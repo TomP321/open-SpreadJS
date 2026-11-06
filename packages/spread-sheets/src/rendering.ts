@@ -379,7 +379,14 @@ export class WorkbookRenderer {
           offset += run; part++;
         }
       };
-      if (pattern) { ctx.fillStyle = String(style.backColor ?? 'white'); paint(0, length - startOffset, 0, weight); ctx.fillStyle = border.color; }
+      if (pattern) {
+        ctx.fillStyle = String(style.backColor ?? 'white'); paint(0, length - startOffset, 0, weight);
+        // Slanted dash-dot measures its runs without the trailing cell-edge pixel.
+        // Extend the backing far enough to suppress the gridline there too; vertical
+        // sides only extend their leading column, like the official raster.
+        if (border.style === 13) paint(length - startOffset, z, 0, horizontal ? weight : 1);
+        ctx.fillStyle = border.color;
+      }
       if (border.style === 6) { ctx.fillStyle = String(style.backColor ?? 'white'); paint(0, length, 0, 1); ctx.fillStyle = border.color; line(-z, 1); line(z, 1); }
       else if (border.style === 13) {
         for (let offset = 0, part = 0; offset < length - startOffset;) {
