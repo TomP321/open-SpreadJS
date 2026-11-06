@@ -111,7 +111,10 @@ window.__oracle = {
       const t0 = performance.now(); const official = runOne(Official, host, c); const t1 = performance.now();
       const ours = runOne(OpenSheets, host, c); const t2 = performance.now();
       let pass = false;
-      if (Array.isArray(official) && Array.isArray(ours) && official.length === ours.length)
+      // both threw: equal when the error message (first line, without the "Error: " prefix) matches
+      const msg = (x: unknown) => String((x as { exception: string }).exception).split('\n')[0]!.replace(/^\w*Error: /, '').trim();
+      if (!Array.isArray(official) && !Array.isArray(ours)) pass = msg(official) === msg(ours);
+      else if (Array.isArray(official) && Array.isArray(ours) && official.length === ours.length)
         pass = official.every((stage, i) => stage.length === ours[i]!.length && stage.every((v, j) => same(v, ours[i]![j]!)));
       return { id: c.id, pass, official, ours, ms: { official: +(t1 - t0).toFixed(2), ours: +(t2 - t1).toFixed(2) } };
     });
