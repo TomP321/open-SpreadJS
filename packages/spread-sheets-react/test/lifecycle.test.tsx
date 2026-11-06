@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { SpreadSheets, Worksheet, Column } from '../src/index.js';
-import type GC from '@opensheets/spread-sheets';
+import GC from '@opensheets/spread-sheets';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 it('creates a workbook, configures children, calls the initializer, and destroys on unmount', () => {
   const host = document.createElement('div');
@@ -43,11 +43,33 @@ it('keeps the workbook across equivalent parent renders and updates host styles'
   expect((host.firstElementChild as HTMLElement).style.height).toBe('400px');
   act(() => root.unmount());
 });
-it('reports unsupported props and configuration updates explicitly', () => {
-  expect(() => new SpreadSheets({ allowUndo: true }).componentDidMount()).toThrow('NotImplemented: SpreadSheets.allowUndo');
-  expect(() => new SpreadSheets({ children: <Worksheet rowCount={100} /> }).componentDidMount()).toThrow('NotImplemented: Worksheet.rowCount');
-  expect(() => new SpreadSheets({ children: <Worksheet><Column width={100} /></Worksheet> }).componentDidMount()).toThrow('NotImplemented: Worksheet.children');
-  expect(() => new SpreadSheets({ children: <Worksheet name="After" /> }).componentDidUpdate({ children: <Worksheet name="Before" /> })).toThrow('NotImplemented: SpreadSheets.update.children');
+it('updates workbook options, events, worksheets and columns without replacing the workbook', () => {
+  const host = document.createElement('div'), root = createRoot(host);
+  let workbook: GC.Spread.Sheets.Workbook | undefined;
+  const first = vi.fn(), second = vi.fn();
+  const initialized = (value: GC.Spread.Sheets.Workbook) => { workbook = value; };
+  act(() => root.render(<SpreadSheets allowUndo={false} valueChanged={first} workbookInitialized={initialized}><Worksheet name="Before" rowCount={100}><Column width={100} headerText="Label" /></Worksheet></SpreadSheets>));
+  const original = workbook;
+  expect(workbook!.options.allowUndo).toBe(false);
+  expect(workbook!.getSheet(0).getRowCount()).toBe(100);
+  expect(workbook!.getSheet(0).getColumnWidth(0)).toBe(100);
+  act(() => root.render(<SpreadSheets allowUndo valueChanged={second} workbookInitialized={initialized}><Worksheet name="After" rowCount={200}><Column width={120} headerText="Updated" /></Worksheet><Worksheet name="Added" /></SpreadSheets>));
+  expect(workbook).toBe(original);
+  expect(workbook!.getSheet(0).getColumnWidth(0)).toBe(120);
+  expect(workbook!.getSheet(0).name()).toBe('After');
+  expect(workbook!.getSheet(0).getValue(0, 0, GC.Spread.Sheets.SheetArea.colHeader)).toBe('Updated');
+  expect(workbook!.getSheetCount()).toBe(2);
+  workbook!.commandManager().execute({ cmd: 'editCell', row: 0, col: 0, newValue: 5 });
+  expect(first).not.toHaveBeenCalled(); expect(second).toHaveBeenCalledTimes(1);
+  act(() => root.unmount());
+});
+it('applies declarative binding fields and source data', () => {
+  const host = document.createElement('div'), root = createRoot(host);
+  let workbook: GC.Spread.Sheets.Workbook | undefined;
+  act(() => root.render(<SpreadSheets workbookInitialized={value => { workbook = value; }}><Worksheet dataSource={[{ title: 'One', amount: 3 }]}><Column dataField="title" headerText="Title" width={120} /><Column dataField="amount" formatter="0.00" /></Worksheet></SpreadSheets>));
+  expect(workbook!.getSheet(0).getValue(0, 0)).toBe('One');
+  expect(workbook!.getSheet(0).getText(0, 1)).toBe('3.00');
+  act(() => root.unmount());
 });
 it('releases the workbook if initialization fails', () => {
   const host = document.createElement('div');
@@ -58,4 +80,17 @@ it('releases the workbook if initialization fails', () => {
     expect(() => act(() => root.render(<SpreadSheets workbookInitialized={value => { workbook = value; throw new Error('initializer failed'); }} />))).toThrow('initializer failed');
     expect(workbook!.sheets).toEqual([]);
   } finally { act(() => root.unmount()); errorLog.mockRestore(); }
+});
+
+it('preserves keyed sheet data through reorder and restores removed option props', () => {
+  const host = document.createElement('div'), root = createRoot(host);
+  let workbook: GC.Spread.Sheets.Workbook | undefined;
+  const initialize = (value: GC.Spread.Sheets.Workbook) => { workbook = value; };
+  act(() => root.render(<SpreadSheets allowUndo={false} workbookInitialized={initialize}><Worksheet key="a" name="Alpha"><Column width={100} /></Worksheet><Worksheet key="b" name="Beta" /></SpreadSheets>));
+  workbook!.getSheet(0).setValue(0, 0, 'A'); workbook!.getSheet(1).setValue(0, 0, 'B');
+  act(() => root.render(<SpreadSheets workbookInitialized={initialize}><Worksheet key="b" name="Beta" /><Worksheet key="a" name="Alpha"><Column /></Worksheet></SpreadSheets>));
+  expect(workbook!.sheets.map(sheet => sheet.getValue(0, 0))).toEqual(['B', 'A']);
+  expect(workbook!.options.allowUndo).toBe(true);
+  expect(workbook!.getSheet(1).getColumnWidth(0)).toBe(62);
+  act(() => root.unmount());
 });

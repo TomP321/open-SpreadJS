@@ -162,8 +162,9 @@ export class EventHub {
   unbindAll(): void {
     this.bindings = [];
   }
+  has(type: string): boolean { return this.bindings.some(binding => binding.type === type); }
   emit(type: string, info: EventInfo): void {
-    if (this.depth) return;
+    if (this.depth || !this.bindings.length) return;
     for (const binding of [...this.bindings])
       if (binding.type === type) {
         let prevented = false;

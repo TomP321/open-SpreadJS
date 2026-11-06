@@ -11,10 +11,13 @@
     "test:visual": "playwright test"
   },
   "dependencies": {
-    "@opensheets/spread-sheets": "workspace:*",
-    "@mescius/spread-sheets": "19.2.5"
+    "@mescius/spread-sheets": "19.2.5",
+    "@opensheets/spread-sheets": "workspace:*"
   },
   "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "pixelmatch": "^8.0.0",
+    "pngjs": "^7.0.0",
     "vite": "^6.4.1"
   }
 }

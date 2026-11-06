@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
+import { comparePanes } from './pixel-report.js';
 import { scenarios } from '../src/scenarios/index.js';
 
 for (const scenario of scenarios) {
@@ -34,10 +35,13 @@ for (const scenario of scenarios) {
     const directory = path.resolve('../../test-results/compare');
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(path.join(directory, `${scenario.name}.json`), JSON.stringify(snapshots, null, 2) + '\n');
+    const captures: Buffer[] = [];
     for (const pane of ['official', 'ours']) {
       const screenshot = path.join(directory, `${scenario.name}-${pane}.png`);
-      await page.locator(`#${pane}-pane`).screenshot({ path: screenshot, animations: 'disabled' });
+      captures.push(await page.locator(`#${pane}-pane`).screenshot({ path: screenshot, animations: 'disabled' }));
       await test.info().attach(`${scenario.name}-${pane}`, { path: screenshot, contentType: 'image/png' });
     }
+    const ratio = await comparePanes(scenario.name, captures[0], captures[1]);
+    expect(ratio, `${scenario.name} pixel difference: ${(ratio * 100).toFixed(3)}%`).toBeLessThan(0.01);
   });
 }

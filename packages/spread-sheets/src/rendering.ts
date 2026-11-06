@@ -1,0 +1,534 @@
+import type { Workbook, Worksheet } from './model.js';
+import { Range, type Style, type LineBorder } from './primitives.js';
+import { Events } from './events.js';
+import { GeneralFormatter } from './formatter.js';
+import type { AxisLayout } from './structures.js';
+import { Interaction } from './interaction.js';
+
+export interface Rect { x: number; y: number; width: number; height: number }
+export interface AxisSlot { index: number; position: number; size: number; min: number; max: number }
+
+/** Layout visits visible items only, including independently clipped frozen panes. */
+export function axisSlots(axis: AxisLayout, origin: number, extent: number, offset: number, zoom: number, leading: number, trailing: number): AxisSlot[] {
+  const slots: AxisSlot[] = [];
+  leading = Math.min(leading, axis.count); trailing = Math.min(trailing, axis.count - leading);
+  const leadEnd = Math.min(extent, origin + axis.prefixSum(leading) * zoom);
+  const trailStart = Math.max(leadEnd, extent - axis.sum(axis.count - trailing, trailing) * zoom);
+  const append = (start: number, end: number, position: number, min: number, max: number) => {
+    for (let i = start; i < end && position < max; i++) {
+      const size = axis.getSize(i) * zoom;
+      if (size > 0 && position + size > min) slots.push({ index: i, position, size, min, max });
+      position += size;
+      if (!size) i = Math.max(i, axis.indexAtOffset(axis.prefixSum(i)) - 1);
+    }
+  };
+  append(0, leading, origin, origin, leadEnd);
+  const start = Math.max(leading, axis.indexAtOffset(axis.prefixSum(leading) + offset));
+  append(start, axis.count - trailing, leadEnd + (axis.prefixSum(start) - axis.prefixSum(leading) - offset) * zoom, leadEnd, trailStart);
+  append(axis.count - trailing, axis.count, trailStart, trailStart, extent);
+  return slots;
+}
+export function columnLabel(index: number): string {
+  let name = '';
+  for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + (n - 1) % 26) + name;
+  return name;
+}
+export function borderWeight(border?: LineBorder): number {
+  return !border || !border.style ? 0 : border.style === 6 ? 40 : [5].includes(border.style) ? 30 : [2, 8, 10, 12, 13].includes(border.style) ? 20 : border.style === 7 ? 5 : 10;
+}
+export function strongerBorder(first?: LineBorder, second?: LineBorder): LineBorder | undefined {
+  return borderWeight(second) > borderWeight(first) ? second : first;
+}
+export function wrappedLines(text: string, width: number, measure: (text: string) => number): string[] {
+  const result: string[] = [];
+  for (const paragraph of text.split('\n')) {
+    let line = '';
+    for (const token of paragraph.match(/\S+\s*|\s+/g) ?? ['']) {
+      if (line && measure(line + token.trimEnd()) > width) { result.push(line.trimEnd()); line = ''; }
+      if (measure(token.trimEnd()) <= width) line += token;
+      else for (const char of token) {
+        if (line && measure(line + char) > width) { result.push(line); line = ''; }
+        line += char;
+      }
+    }
+    result.push(line.trimEnd());
+  }
+  return result;
+}
+
+function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, parent: HTMLElement): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag); node.className = className; parent.append(node); return node;
+}
+interface ScrollControl { root: HTMLDivElement; track: HTMLDivElement; handle: HTMLDivElement }
+
+export class WorkbookRenderer {
+  readonly root: HTMLDivElement;
+  readonly canvas: HTMLCanvasElement;
+  readonly overlay: HTMLCanvasElement;
+  readonly tabs: HTMLCanvasElement;
+  readonly editor: HTMLTextAreaElement;
+  readonly interaction: Interaction;
+  readonly context: CanvasRenderingContext2D;
+  readonly selectionContext: CanvasRenderingContext2D;
+  private tabContext: CanvasRenderingContext2D;
+  private vertical: ScrollControl;
+  private horizontal: ScrollControl;
+  private observer?: ResizeObserver;
+  private abort = new AbortController();
+  private frame = 0;
+  private destroyed = false;
+  private layoutDirty = true;
+  private fullDirty = true;
+  private dirtyCells: [number, number][] = [];
+  private styleCache = new Map<string, Style>();
+  private formatters = new Map<string, GeneralFormatter>();
+  width = 0; height = 0; viewWidth = 0; viewHeight = 0;
+  headerWidth = 40; headerHeight = 20; zoom = 1;
+  scrollX = 0; scrollY = 0;
+  rows: AxisSlot[] = []; cols: AxisSlot[] = [];
+  tabHits: { x: number; width: number; index: number }[] = [];
+  copiedRange?: Range;
+  private currentSheet?: Worksheet;
+  private offsets = new WeakMap<Worksheet, [number, number]>();
+  private used?: { row: number; col: number };
+  readonly metrics = { frames: 0, lastFrameMs: 0, paintedCells: 0 };
+
+  constructor(readonly workbook: Workbook, host: HTMLElement) {
+    this.root = element('div', 'gc-spread-sheets opensheets-viewport', host);
+    this.root.tabIndex = 0; this.root.setAttribute('role', 'grid'); this.root.setAttribute('aria-label', 'Spreadsheet');
+    this.canvas = element('canvas', 'gc-sheet-canvas', this.root);
+    this.overlay = element('canvas', 'gc-selection-canvas', this.root);
+    this.tabs = element('canvas', 'gc-tab-strip', this.root);
+    this.context = this.canvas.getContext('2d')!;
+    this.selectionContext = this.overlay.getContext('2d')!;
+    this.tabContext = this.tabs.getContext('2d')!;
+    this.editor = element('textarea', 'gc-cell-editor', this.root); this.editor.style.display = 'none';
+    this.editor.spellcheck = false; this.editor.setAttribute('aria-label', 'Cell editor');
+    this.vertical = this.scrollControl(true); this.horizontal = this.scrollControl(false);
+    const splitter = element('div', 'gc-hscrollbar-splitter', this.root);
+    splitter.addEventListener('pointerdown', e => {
+      e.preventDefault(); splitter.setPointerCapture(e.pointerId);
+      const move = (event: PointerEvent) => {
+        const x = event.clientX - this.root.getBoundingClientRect().left;
+        workbook.options.tabStripRatio = Math.max(0.1, Math.min(0.9, x / this.viewWidth)); this.schedule(true);
+      };
+      splitter.addEventListener('pointermove', move);
+      splitter.addEventListener('pointerup', () => splitter.removeEventListener('pointermove', move), { once: true });
+    });
+    this.interaction = new Interaction(this);
+    if (typeof ResizeObserver !== 'undefined') { this.observer = new ResizeObserver(() => this.schedule(true)); this.observer.observe(host); }
+    window.addEventListener('resize', () => this.schedule(true), { signal: this.abort.signal });
+    this.schedule(true);
+  }
+  get sheet(): Worksheet | undefined { return this.workbook.getActiveSheet(); }
+  invalidateCell(row: number, col: number): void {
+    this.used = undefined;
+    if (row < 0 || col < 0) { this.styleCache.clear(); this.fullDirty = true; return; }
+    this.styleCache.delete(`${row}:${col}`);
+    if (this.dirtyCells.length < 100) this.dirtyCells.push([row, col]); else this.fullDirty = true;
+  }
+  schedule(layout = false): void {
+    if (this.destroyed) return;
+    this.layoutDirty ||= layout;
+    if (layout) { this.used = undefined; this.fullDirty = true; this.styleCache.clear(); }
+    else if (!this.dirtyCells.length) this.fullDirty = true;
+    if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.paint(); });
+  }
+  private sizeCanvas(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, width: number, height: number): void {
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(0, Math.round(width * dpr)), h = Math.max(0, Math.round(height * dpr));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    canvas.style.width = `${width}px`; canvas.style.height = `${height}px`;
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  private layout(): void {
+    const s = this.sheet;
+    if (!s) return;
+    if (s !== this.currentSheet) {
+      if (this.currentSheet) this.offsets.set(this.currentSheet, [this.scrollX, this.scrollY]);
+      [this.scrollX, this.scrollY] = this.offsets.get(s) ?? [0, 0];
+      this.currentSheet = s; this.styleCache.clear(); this.fullDirty = true;
+    }
+    this.width = this.root.clientWidth; this.height = this.root.clientHeight;
+    const opts = this.workbook.options;
+    this.viewWidth = Math.max(0, this.width - (opts.showVerticalScrollbar ? 22 : 0));
+    this.viewHeight = Math.max(0, this.height - (opts.tabStripVisible ? 28 : opts.showHorizontalScrollbar ? 22 : 0));
+    this.zoom = s.zoom();
+    this.headerWidth = s.options.rowHeaderVisible ? s._columnLayout(2).prefixSum(s.getColumnCount(2)) * this.zoom : 0;
+    this.headerHeight = s.options.colHeaderVisible ? s._rowLayout(1).prefixSum(s.getRowCount(1)) * this.zoom : 0;
+    this.sizeCanvas(this.canvas, this.context, this.viewWidth, this.viewHeight);
+    this.sizeCanvas(this.overlay, this.selectionContext, this.viewWidth, this.viewHeight);
+    const tabWidth = opts.tabStripVisible ? Math.round(this.viewWidth * opts.tabStripRatio) : 0;
+    this.sizeCanvas(this.tabs, this.tabContext, tabWidth, opts.tabStripVisible ? 28 : 0);
+    this.tabs.style.top = `${this.viewHeight}px`;
+    const split = this.root.querySelector<HTMLElement>('.gc-hscrollbar-splitter')!;
+    Object.assign(split.style, { top: `${this.viewHeight}px`, left: `${tabWidth - 4}px`, height: '28px', display: opts.tabStripVisible ? '' : 'none' });
+    this.vertical.root.style.display = opts.showVerticalScrollbar ? '' : 'none';
+    Object.assign(this.vertical.root.style, { left: `${this.viewWidth + 4}px`, top: '0px', height: `${this.viewHeight}px` });
+    this.horizontal.root.style.display = opts.showHorizontalScrollbar ? '' : 'none';
+    Object.assign(this.horizontal.root.style, { left: `${tabWidth}px`, top: `${this.viewHeight + (opts.tabStripVisible ? 7 : 4)}px`, width: `${this.viewWidth - tabWidth}px` });
+    this.computeSlots(); this.updateScrollbars();
+    this.root.setAttribute('aria-rowcount', String(s.getRowCount())); this.root.setAttribute('aria-colcount', String(s.getColumnCount()));
+    this.layoutDirty = false;
+  }
+  private computeSlots(): void {
+    const s = this.sheet!;
+    this.rows = axisSlots(s._rowLayout(), this.headerHeight, this.viewHeight, this.scrollY, this.zoom, s.frozenRowCount(), s.frozenTrailingRowCount());
+    this.cols = axisSlots(s._columnLayout(), this.headerWidth, this.viewWidth, this.scrollX, this.zoom, s.frozenColumnCount(), s.frozenTrailingColumnCount());
+  }
+  private style(row: number, col: number): Style {
+    const key = `${row}:${col}`;
+    let style = this.styleCache.get(key);
+    if (!style) { style = this.sheet!.getActualStyle(row, col); this.styleCache.set(key, style); }
+    return style;
+  }
+  paint(): void {
+    const s = this.sheet;
+    if (this.destroyed || this.workbook.isPaintSuspended() || s?.isPaintSuspended()) return;
+    const start = performance.now();
+    if (this.layoutDirty || s !== this.currentSheet || this.width !== this.root.clientWidth || this.height !== this.root.clientHeight) this.layout();
+    if (!s || !this.width || !this.height) return;
+    if (this.styleCache.size > 15000) this.styleCache.clear();
+    const ctx = this.context;
+    ctx.save();
+    if (!this.fullDirty && this.dirtyCells.length) {
+      ctx.beginPath();
+      // Whole visible row includes both old and new text overflow and shared border edges.
+      for (const [row] of this.dirtyCells) {
+        const slot = this.rows.find(r => r.index === row);
+        if (slot) ctx.rect(this.headerWidth, Math.max(slot.min, slot.position - 3), this.viewWidth - this.headerWidth, slot.size + 6);
+      }
+      ctx.clip();
+    }
+    ctx.fillStyle = String(this.workbook.options.grayAreaBackColor ?? '#ababab'); ctx.fillRect(0, 0, this.viewWidth, this.viewHeight);
+    const bottom = Math.min(this.viewHeight, this.headerHeight + s._rowLayout().prefixSum(s.getRowCount()) * this.zoom);
+    const right = Math.min(this.viewWidth, this.headerWidth + s._columnLayout().prefixSum(s.getColumnCount()) * this.zoom);
+    ctx.fillStyle = 'white'; ctx.fillRect(0, 0, right, bottom);
+    const spans = s.getSpans();
+    const paintedSpans = new Set<Range>();
+    this.metrics.paintedCells = 0;
+    // Backgrounds and grid precede all text, allowing text to flow through empty neighbours.
+    for (const row of this.rows) for (const col of this.cols) {
+      const span = spans.find(span => span.contains(row.index, col.index));
+      if (span) {
+        if (paintedSpans.has(span)) continue;
+        paintedSpans.add(span);
+      }
+      const r = span?.row ?? row.index, c = span?.col ?? col.index;
+      const rect = span ? this.rangeRect(span, row, col) : { x: col.position, y: row.position, width: col.size, height: row.size };
+      this.clipCell(ctx, row, col, () => {
+        const style = this.style(r, c);
+        ctx.fillStyle = typeof style.backColor === 'string' ? style.backColor : 'white';
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+        ctx.fillStyle = s.options.gridline.color;
+        if (s.options.gridline.showVerticalGridline) ctx.fillRect(Math.round(rect.x + rect.width) - 1, rect.y, 1, rect.height);
+        if (s.options.gridline.showHorizontalGridline) ctx.fillRect(rect.x, Math.round(rect.y + rect.height) - 1, rect.width, 1);
+      });
+    }
+    paintedSpans.clear();
+    for (const row of this.rows) for (const col of this.cols) {
+      const span = spans.find(span => span.contains(row.index, col.index));
+      if (span) { if (paintedSpans.has(span)) continue; paintedSpans.add(span); }
+      const r = span?.row ?? row.index, c = span?.col ?? col.index;
+      const rect = span ? this.rangeRect(span, row, col) : { x: col.position, y: row.position, width: col.size, height: row.size };
+      const style = this.style(r, c), value = s.getValue(r, c);
+      this.clipCell(ctx, row, col, () => {
+        if (value != null || (s.options.showFormulas && s.getFormula(r, c))) this.drawText(ctx, r, c, value, style, rect, !span);
+        this.drawBorders(ctx, r, c, style, rect, span);
+      });
+      this.metrics.paintedCells++;
+    }
+    this.drawHeaders(ctx);
+    this.drawFreezeLines(ctx);
+    ctx.restore();
+    this.drawSelection(); this.drawTabs();
+    this.interaction.positionEditor();
+    this.fullDirty = false; this.dirtyCells.length = 0;
+    this.metrics.frames++; this.metrics.lastFrameMs = performance.now() - start;
+  }
+  private clipCell(ctx: CanvasRenderingContext2D, row: AxisSlot, col: AxisSlot, action: () => void): void {
+    ctx.save(); ctx.beginPath(); ctx.rect(col.min, row.min, col.max - col.min, row.max - row.min); ctx.clip(); action(); ctx.restore();
+  }
+  rangeRect(range: Range, row?: AxisSlot, col?: AxisSlot): Rect {
+    const s = this.sheet!, rows = s._rowLayout(), cols = s._columnLayout();
+    const r = row ?? this.rows.find(r => r.index === range.row) ?? this.rows[0];
+    const c = col ?? this.cols.find(c => c.index === range.col) ?? this.cols[0];
+    if (!r || !c) return { x: 0, y: 0, width: 0, height: 0 };
+    return { x: c.position + (cols.prefixSum(range.col) - cols.prefixSum(c.index)) * this.zoom,
+      y: r.position + (rows.prefixSum(range.row) - rows.prefixSum(r.index)) * this.zoom,
+      width: cols.sum(range.col, range.colCount) * this.zoom, height: rows.sum(range.row, range.rowCount) * this.zoom };
+  }
+  cellRect(row: number, col: number): Rect {
+    const span = this.sheet!.getSpan(row, col);
+    return this.rangeRect(span ?? new Range(row, col, 1, 1));
+  }
+  font(style: Style): string {
+    const base = String(style.font ?? '11pt Calibri');
+    // Scale the numeric size without changing font family/fallback selection.
+    return base.replace(/([\d.]+)(px|pt)/, (_, size: string, unit: string) => `${Number(size) * this.zoom}${unit}`);
+  }
+  text(row: number, col: number, value: unknown, style: Style): string {
+    const s = this.sheet!;
+    if (s.options.showFormulas && s.getFormula(row, col)) return '=' + s.getFormula(row, col);
+    if (value == null || (value === 0 && !s.options.showZeros)) return '';
+    if (!style.formatter && !(value instanceof Date) && typeof value !== 'object') return typeof value === 'boolean' ? String(value).toUpperCase() : String(value);
+    if (typeof style.formatter === 'string') {
+      let formatter = this.formatters.get(style.formatter);
+      if (!formatter) this.formatters.set(style.formatter, formatter = new GeneralFormatter(style.formatter));
+      return formatter.format(value);
+    }
+    return s.getText(row, col);
+  }
+  private drawText(ctx: CanvasRenderingContext2D, row: number, col: number, value: unknown, style: Style, rect: Rect, overflow: boolean): void {
+    const text = this.text(row, col, value, style);
+    if (!text) return;
+    const z = this.zoom; ctx.font = this.font(style); ctx.fillStyle = String(style.foreColor ?? 'black');
+    const align = style.hAlign === 3 || style.hAlign === undefined ? typeof value === 'number' || value instanceof Date ? 2 : typeof value === 'boolean' ? 1 : 0 : Number(style.hAlign);
+    const indent = Number(style.textIndent ?? 0) * 8 * z;
+    const pad = 1 * z;
+    let left = rect.x, right = rect.x + rect.width - 1;
+    const measured = ctx.measureText(text).width;
+    if (overflow && this.sheet!.options.allowCellOverflow && !style.wordWrap && !style.shrinkToFit && typeof value === 'string' && measured > rect.width - pad * 2) {
+      const axis = this.sheet!._columnLayout();
+      if (align !== 2) for (let c = col + 1; c < axis.count && right < this.viewWidth && right - rect.x < measured + pad; c++) {
+        const neighbour = this.style(row, c);
+        if (this.sheet!._columnLayout().getSize(c) === 0) continue;
+        if (this.sheet!.getValue(row, c) != null || this.sheet!.getFormula(row, c) || neighbour.backColor || this.sheet!.getSpan(row, c)) break;
+        right += axis.getSize(c) * z;
+      }
+      if (align !== 0) for (let c = col - 1; c >= 0 && left > this.headerWidth && rect.x + rect.width - left < measured + pad; c--) {
+        const neighbour = this.style(row, c);
+        if (this.sheet!._columnLayout().getSize(c) === 0) continue;
+        if (this.sheet!.getValue(row, c) != null || this.sheet!.getFormula(row, c) || neighbour.backColor || this.sheet!.getSpan(row, c)) break;
+        left -= axis.getSize(c) * z;
+      }
+      ctx.fillStyle = String(style.backColor ?? 'white'); ctx.fillRect(left, rect.y, right - left, rect.height - 1); ctx.fillStyle = String(style.foreColor ?? 'black');
+    }
+    ctx.save(); ctx.beginPath(); ctx.rect(left, rect.y, right - left, rect.height - 1); ctx.clip();
+    let fontSize = Number((ctx.font.match(/([\d.]+)px/) ?? [0, 14.6667 * z])[1]);
+    const fitWidth = Math.max(1, rect.width - 2 * pad - indent);
+    if (style.shrinkToFit && measured > fitWidth) { fontSize *= fitWidth / measured; ctx.font = ctx.font.replace(/[\d.]+px/, `${fontSize}px`); }
+    const lineHeight = Math.ceil(fontSize * 1.3);
+    const width = Math.max(0, rect.width - 2 * pad - indent);
+    const lines = style.wordWrap ? wrappedLines(text, width, t => ctx.measureText(t).width) : text.split('\n');
+    const blockHeight = lines.length * lineHeight;
+    const y = style.vAlign === 2 ? rect.y + rect.height - blockHeight - 1 : style.vAlign === 1 ? rect.y + (rect.height - blockHeight) / 2 : rect.y;
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = align === 2 ? 'right' : align === 1 ? 'center' : 'left';
+    const x = align === 2 ? rect.x + rect.width - pad - indent : align === 1 ? rect.x + rect.width / 2 : rect.x + pad + indent;
+    for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], x, y + fontSize + i * lineHeight);
+    if (style.textDecoration) {
+      const w = Math.min(width, measured), sx = align === 2 ? x - w : align === 1 ? x - w / 2 : x;
+      ctx.fillRect(sx, y + fontSize + 2, w, 1);
+    }
+    ctx.restore();
+  }
+  private drawBorders(ctx: CanvasRenderingContext2D, row: number, col: number, style: Style, rect: Rect, span?: Range): void {
+    const endRow = row + (span?.rowCount ?? 1), endCol = col + (span?.colCount ?? 1);
+    const sides: [LineBorder | undefined, number, number, number, number][] = [
+      [strongerBorder(style.borderTop as LineBorder, row > 0 ? this.style(row - 1, col).borderBottom as LineBorder : undefined), rect.x - 1, rect.y - 1, rect.x + rect.width - 1, rect.y - 1],
+      [strongerBorder(style.borderLeft as LineBorder, col > 0 ? this.style(row, col - 1).borderRight as LineBorder : undefined), rect.x - 1, rect.y - 1, rect.x - 1, rect.y + rect.height - 1],
+      [strongerBorder(style.borderBottom as LineBorder, this.style(endRow, col).borderTop as LineBorder), rect.x - 1, rect.y + rect.height - 1, rect.x + rect.width - 1, rect.y + rect.height - 1],
+      [strongerBorder(style.borderRight as LineBorder, this.style(row, endCol).borderLeft as LineBorder), rect.x + rect.width - 1, rect.y - 1, rect.x + rect.width - 1, rect.y + rect.height - 1],
+    ];
+    for (const [border, x1, y1, x2, y2] of sides) if (border && border.style) {
+      ctx.save(); ctx.strokeStyle = border.color; ctx.lineWidth = (borderWeight(border) >= 30 ? 3 : borderWeight(border) >= 20 ? 2 : 1) * this.zoom;
+      const patterns: Record<number, number[]> = { 3: [3, 2], 4: [1, 1], 7: [1, 1], 8: [6, 3], 9: [3, 2, 1, 2], 10: [6, 3, 2, 3], 11: [3, 2, 1, 2, 1, 2], 12: [6, 3, 2, 3, 2, 3], 13: [6, 3, 2, 3] };
+      ctx.setLineDash((patterns[border.style] ?? []).map(n => n * this.zoom));
+      const stroke = (delta: number) => { const pixel = ctx.lineWidth % 2 ? 0.5 : 0; ctx.beginPath(); ctx.moveTo(Math.round(x1) + pixel + (x1 === x2 ? delta : 0), Math.round(y1) + pixel + (y1 === y2 ? delta : 0)); ctx.lineTo(Math.round(x2) + pixel + (x1 === x2 ? delta : 0), Math.round(y2) + pixel + (y1 === y2 ? delta : 0)); ctx.stroke(); };
+      if (border.style === 6) { ctx.lineWidth = 1; stroke(-1); stroke(1); } else stroke(0);
+      ctx.restore();
+    }
+  }
+  private drawHeaders(ctx: CanvasRenderingContext2D): void {
+    const s = this.sheet!, selections = s.getSelections();
+    ctx.font = `${14.6667 * this.zoom}px Calibri`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    for (const col of this.cols) if (this.headerHeight) {
+      const selected = selections.some(r => r.col === -1 || (col.index >= r.col && col.index < r.col + r.colCount));
+      ctx.save(); ctx.beginPath(); ctx.rect(col.min, 0, col.max - col.min, this.headerHeight); ctx.clip();
+      ctx.fillStyle = selected ? '#e1e1e1' : 'white'; ctx.fillRect(col.position, 0, col.size, this.headerHeight);
+      ctx.fillStyle = '#d4d4d4'; ctx.fillRect(Math.round(col.position + col.size) - 1, 0, 1, this.headerHeight);
+      ctx.fillStyle = '#ababab'; ctx.fillRect(col.position, this.headerHeight - 1, col.size, 1);
+      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${14.6667 * this.zoom}px Calibri`;
+      const text = s.getValue(0, col.index, 1);
+      ctx.fillText(text == null ? columnLabel(col.index) : String(text), col.position + col.size / 2 - 1, this.headerHeight / 2 + 1);
+      ctx.restore();
+    }
+    for (const row of this.rows) if (this.headerWidth) {
+      const selected = selections.some(r => r.row === -1 || (row.index >= r.row && row.index < r.row + r.rowCount));
+      ctx.save(); ctx.beginPath(); ctx.rect(0, row.min, this.headerWidth, row.max - row.min); ctx.clip();
+      ctx.fillStyle = selected ? '#e1e1e1' : 'white'; ctx.fillRect(0, row.position, this.headerWidth, row.size);
+      ctx.fillStyle = '#d4d4d4'; ctx.fillRect(0, Math.round(row.position + row.size) - 1, this.headerWidth, 1);
+      ctx.fillStyle = '#ababab'; ctx.fillRect(this.headerWidth - 1, row.position, 1, row.size);
+      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${14.6667 * this.zoom}px Calibri`;
+      const text = s.getValue(row.index, 0, 2);
+      ctx.fillText(text == null ? String(row.index + 1) : String(text), this.headerWidth / 2 - 1, row.position + row.size / 2 + 1);
+      ctx.restore();
+    }
+    if (this.headerWidth && this.headerHeight) {
+      ctx.fillStyle = 'white'; ctx.fillRect(0, 0, this.headerWidth - 1, this.headerHeight - 1);
+      ctx.fillStyle = '#e1e1e1'; ctx.beginPath(); ctx.moveTo(this.headerWidth - 4, 3); ctx.lineTo(this.headerWidth - 4, this.headerHeight - 4); ctx.lineTo(this.headerWidth - this.headerHeight + 3, this.headerHeight - 4); ctx.closePath(); ctx.fill();
+    }
+  }
+  private drawFreezeLines(ctx: CanvasRenderingContext2D): void {
+    const s = this.sheet!; ctx.fillStyle = s.options.frozenlineColor;
+    for (const [slots, count, trailing, isRow] of [[this.rows, s.frozenRowCount(), s.frozenTrailingRowCount(), true], [this.cols, s.frozenColumnCount(), s.frozenTrailingColumnCount(), false]] as const) {
+      const axis = isRow ? s._rowLayout() : s._columnLayout();
+      for (const boundary of [count ? slots.find(slot => slot.index >= count)?.min : undefined, trailing ? slots.find(slot => slot.index >= axis.count - trailing)?.min : undefined])
+        if (boundary !== undefined) ctx.fillRect(isRow ? 0 : boundary - 1, isRow ? boundary - 1 : 0, isRow ? this.viewWidth : 1, isRow ? 1 : this.viewHeight);
+    }
+  }
+  drawSelection(): void {
+    const ctx = this.selectionContext, s = this.sheet!;
+    ctx.clearRect(0, 0, this.viewWidth, this.viewHeight);
+    if (this.workbook.options.hideSelection || this.interaction.isEditing) return;
+    ctx.save(); ctx.beginPath(); ctx.rect(Math.max(0, this.headerWidth - 2), Math.max(0, this.headerHeight - 2), this.viewWidth, this.viewHeight); ctx.clip();
+    const active = this.cellRect(s.getActiveRowIndex(), s.getActiveColumnIndex());
+    for (const selection of s.getSelections()) {
+      const range = selection.normalized(s.getRowCount(), s.getColumnCount());
+      for (const rowPane of this.panes(this.rows)) for (const colPane of this.panes(this.cols)) {
+        const r = this.rows.find(r => r.index >= range.row && r.index < range.row + range.rowCount && r.min === rowPane.min);
+        const c = this.cols.find(c => c.index >= range.col && c.index < range.col + range.colCount && c.min === colPane.min);
+        if (!r || !c) continue;
+        const rect = this.rangeRect(range, r, c);
+        ctx.save(); ctx.beginPath(); ctx.rect(Math.max(this.headerWidth - 2, colPane.min - 2), Math.max(this.headerHeight - 2, rowPane.min - 2), colPane.max - colPane.min + 3, rowPane.max - rowPane.min + 3); ctx.clip();
+        if (range.rowCount > 1 || range.colCount > 1) {
+          ctx.fillStyle = String(s.options.selectionBackColor ?? 'rgba(0,0,0,0.185)');
+          const inset = s.getSelections().length > 1 ? 1 : 0;
+          ctx.fillRect(rect.x + inset, rect.y + inset, rect.width - 1 - inset * 2, rect.height - 1 - inset * 2);
+          ctx.clearRect(active.x, active.y, active.width, active.height);
+        }
+        ctx.strokeStyle = s.getSelections().length > 1 ? 'white' : String(s.options.selectionBorderColor ?? '#217346'); ctx.lineWidth = s.getSelections().length > 1 ? 1 : 2;
+        if (s.getSelections().length === 1) ctx.strokeRect(Math.round(rect.x) - 1, Math.round(rect.y) - 1, Math.round(rect.width) + 1, Math.round(rect.height) + 1);
+        if (s.getSelections().length === 1 && this.workbook.options.allowUserDragFill && range.rowCount < s.getRowCount() && range.colCount < s.getColumnCount()) {
+          ctx.fillStyle = 'white'; ctx.fillRect(rect.x + rect.width - 5, rect.y + rect.height - 5, 7, 7);
+          ctx.fillStyle = String(s.options.selectionBorderColor ?? '#217346'); ctx.fillRect(rect.x + rect.width - 3, rect.y + rect.height - 3, 5, 5);
+        }
+        ctx.restore();
+      }
+    }
+    if (s.getSelections().length > 1) { ctx.strokeStyle = String(s.options.selectionBorderColor ?? '#217346'); ctx.lineWidth = 1; ctx.strokeRect(active.x + 1.5, active.y + 1.5, active.width - 4, active.height - 4); }
+    if (this.copiedRange && this.workbook.options.cutCopyIndicatorVisible) {
+      const rect = this.rangeRect(this.copiedRange); ctx.strokeStyle = this.workbook.options.cutCopyIndicatorBorderColor; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.lineDashOffset = -(performance.now() / 120 % 7);
+      ctx.strokeRect(rect.x - 1, rect.y - 1, rect.width, rect.height);
+    }
+    ctx.restore();
+  }
+  private panes(slots: AxisSlot[]): { min: number; max: number }[] { return [...new Map(slots.map(slot => [slot.min, { min: slot.min, max: slot.max }])).values()]; }
+  private drawTabs(): void {
+    const ctx = this.tabContext, width = Number.parseFloat(this.tabs.style.width), options = this.workbook.options;
+    if (!options.tabStripVisible) return;
+    ctx.clearRect(0, 0, width, 28); ctx.fillStyle = '#f6f6f6'; ctx.fillRect(0, 0, width, 28);
+    ctx.fillStyle = '#ababab'; ctx.fillRect(0, 0, width, 1);
+    this.tabHits = [];
+    if (options.tabNavigationVisible) {
+      for (const [x, reverse] of [[28, true], [57, false]] as const) { ctx.fillStyle = '#bfbfbf'; ctx.beginPath(); ctx.moveTo(x + (reverse ? 2 : -2), 11); ctx.lineTo(x + (reverse ? -2 : 2), 14); ctx.lineTo(x + (reverse ? 2 : -2), 17); ctx.fill(); this.tabHits.push({ x: x - 12, width: 24, index: reverse ? -2 : -3 }); }
+    }
+    ctx.font = 'bold 10pt Calibri';
+    const overflow = this.workbook.sheets.reduce((sum, sheet) => sum + Math.ceil(ctx.measureText(sheet.name()).width + 24), 0) > width - (options.tabNavigationVisible ? 99 : 0) - 65;
+    const list = options.tabNavigationVisible && (options.allSheetsListVisible === 1 || (options.allSheetsListVisible === 2 && overflow));
+    if (list) { ctx.fillStyle = '#217346'; for (let y = 9; y <= 19; y += 5) ctx.fillRect(72, y, 14, 2); this.tabHits.push({ x: 66, width: 26, index: -4 }); }
+    let x = options.tabNavigationVisible ? list ? 115 : 99 : 0;
+    ctx.font = 'bold 10pt Calibri'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    const active = this.workbook.getActiveSheetIndex();
+    for (let i = this.workbook.startSheetIndex(); i < this.workbook.sheets.length; i++) {
+      const sheet = this.workbook.sheets[i]; if (!sheet.visible()) continue;
+      const w = Math.ceil(ctx.measureText(sheet.name()).width + 24);
+      if (x + w > width - 40) break;
+      const selected = i === active;
+      ctx.fillStyle = selected ? 'white' : '#f6f6f6'; ctx.fillRect(x, 0, w, 25);
+      if (!selected && sheet.options.sheetTabColor) { ctx.fillStyle = sheet.options.sheetTabColor; ctx.fillRect(x + 2, 2, w - 4, 23); }
+      ctx.fillStyle = selected ? '#217346' : '#ababab'; ctx.fillRect(x, 0, 1, 25); ctx.fillRect(x + w - 1, 0, 1, 25);
+      if (selected) { ctx.fillStyle = sheet.options.sheetTabColor ?? '#217346'; ctx.fillRect(x, 24, w, 2); }
+      ctx.fillStyle = selected ? '#217346' : sheet.options.sheetTabColor ? 'white' : '#444'; ctx.font = `${selected || sheet.options.sheetTabColor ? 'bold ' : ''}10pt Calibri`; ctx.fillText(sheet.name(), x + w / 2, 13);
+      this.tabHits.push({ x, width: w, index: i }); x += w;
+    }
+    if (options.newTabVisible) {
+      if (overflow) { ctx.fillStyle = '#217346'; ctx.font = 'bold 10pt Calibri'; ctx.fillText('...', width - 71, 13); this.tabHits.push({ x: width - 84, width: 25, index: -4 }); }
+      const cx = overflow ? width - 44 : Math.min(width - 20, x + 41); ctx.strokeStyle = '#7f7f7f'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, 14, 6.5, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#7f7f7f'; ctx.fillRect(cx - 3.5, 13, 7, 2); ctx.fillRect(cx - 1, 10.5, 2, 7);
+      this.tabHits.push({ x: cx - 12, width: 24, index: -1 });
+    }
+    ctx.fillStyle = '#217346'; for (let y = 10; y <= 20; y += 4) ctx.fillRect(width - 15, y, 2, 2);
+  }
+  private scrollControl(vertical: boolean): ScrollControl {
+    const root = element('div', `gc-scroll-container ${vertical ? 'gc-vertical-scrollbar' : 'gc-horizontal-scrollbar'}`, this.root);
+    const track = element('div', 'gc-scrollbar-wrapper', root);
+    const handle = element('div', 'gc-scroll-handle gc-scroll-bar', track);
+    for (const [direction, increment] of [[vertical ? 'Up' : 'Left', -1], [vertical ? 'Down' : 'Right', 1]] as const) {
+      const arrow = element('div', `gc-scroll-arrow gc-scroll-arrow${direction}`, root);
+      arrow.addEventListener('pointerdown', e => { e.preventDefault(); this.scroll(vertical ? increment * this.sheet!.defaults.rowHeight : 0, vertical ? 0 : increment * this.sheet!.defaults.colWidth); });
+    }
+    handle.addEventListener('pointerdown', event => {
+      event.preventDefault(); handle.setPointerCapture(event.pointerId);
+      const start = vertical ? event.clientY : event.clientX, old = vertical ? this.scrollY : this.scrollX;
+      const move = (e: PointerEvent) => {
+        const axis = vertical ? this.sheet!._rowLayout() : this.sheet!._columnLayout();
+        const extent = vertical ? this.viewHeight - this.headerHeight : this.viewWidth - this.headerWidth;
+        const trackLength = vertical ? track.clientHeight - handle.clientHeight : track.clientWidth - handle.clientWidth;
+        const delta = ((vertical ? e.clientY : e.clientX) - start) * Math.max(0, this.scrollTotal(axis, vertical) - extent / this.zoom) / Math.max(1, trackLength);
+        this.setScroll(vertical ? this.scrollX : old + delta, vertical ? old + delta : this.scrollY);
+        if (this.workbook.options.showScrollTip) handle.title = vertical ? `Row: ${this.rows[0]?.index + 1}` : `Column: ${columnLabel(this.cols[0]?.index ?? 0)}`;
+      };
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', () => handle.removeEventListener('pointermove', move), { once: true });
+    });
+    track.addEventListener('pointerdown', e => {
+      if (e.target === handle) return;
+      const r = handle.getBoundingClientRect();
+      const dir = (vertical ? e.clientY < r.top : e.clientX < r.left) ? -1 : 1;
+      this.scroll(vertical ? dir * (this.viewHeight - this.headerHeight) / this.zoom : 0, vertical ? 0 : dir * (this.viewWidth - this.headerWidth) / this.zoom);
+    });
+    return { root, track, handle };
+  }
+  private updateScrollbars(): void {
+    const s = this.sheet!;
+    for (const [bar, axis, extent, offset, vertical] of [[this.vertical, s._rowLayout(), this.viewHeight - this.headerHeight, this.scrollY, true], [this.horizontal, s._columnLayout(), this.viewWidth - this.headerWidth, this.scrollX, false]] as const) {
+      const length = Math.max(0, (vertical ? this.viewHeight : this.viewWidth - Number.parseFloat(this.tabs.style.width)) - 30);
+      const total = this.scrollTotal(axis, vertical), visible = extent / this.zoom;
+      const size = Math.min(length, Math.max(20, Math.floor(length * visible / Math.max(visible, total + (this.workbook.options.scrollbarShowMax && !this.workbook.options.scrollbarMaxAlign ? visible - axis.defaultSize : 0)))));
+      const pos = Math.max(0, (length - size) * offset / Math.max(1, total - visible));
+      Object.assign(bar.handle.style, vertical ? { height: `${size}px`, top: `${pos}px` } : { width: `${size}px`, left: `${pos}px` });
+    }
+  }
+  private scrollTotal(axis: AxisLayout, vertical: boolean): number {
+    const count = this.workbook.options.scrollbarShowMax ? axis.count : Math.min(axis.count, ((this.used ??= this.sheet!._usedRange())[vertical ? 'row' : 'col']) + 1);
+    return axis.prefixSum(count);
+  }
+  scroll(vPixels: number, hPixels: number): void { this.setScroll(this.scrollX + hPixels, this.scrollY + vPixels); }
+  setScroll(x: number, y: number): void {
+    const s = this.sheet; if (!s) return;
+    const oldTop = this.rows.find(r => r.index >= s.frozenRowCount())?.index ?? 0;
+    const oldLeft = this.cols.find(c => c.index >= s.frozenColumnCount())?.index ?? 0;
+    const max = (axis: AxisLayout, extent: number, vertical: boolean) => this.workbook.options.scrollbarMaxAlign ? Math.max(0, this.scrollTotal(axis, vertical) - extent / this.zoom) : Math.max(0, this.scrollTotal(axis, vertical) - axis.getSize(axis.indexAtOffset(Math.max(0, this.scrollTotal(axis, vertical) - 1))));
+    this.scrollX = Math.max(0, Math.min(x, max(s._columnLayout(), this.viewWidth - this.headerWidth, false)));
+    this.scrollY = Math.max(0, Math.min(y, max(s._rowLayout(), this.viewHeight - this.headerHeight, true)));
+    this.computeSlots(); this.updateScrollbars();
+    const newTop = this.rows.find(r => r.index >= s.frozenRowCount())?.index ?? 0;
+    const newLeft = this.cols.find(c => c.index >= s.frozenColumnCount())?.index ?? 0;
+    if (newTop !== oldTop) s._emit(Events.TopRowChanged, { sheet: s, sheetName: s.name(), viewportIndex: 1, oldTopRow: oldTop, newTopRow: newTop });
+    if (newLeft !== oldLeft) s._emit(Events.LeftColumnChanged, { sheet: s, sheetName: s.name(), viewportIndex: 1, oldLeftCol: oldLeft, newLeftCol: newLeft });
+    this.fullDirty = true; this.schedule();
+  }
+  showCell(row: number, col: number, vertical = 3, horizontal = 3): void {
+    const s = this.sheet!;
+    const offset = (axis: AxisLayout, index: number, origin: number, extent: number, current: number, leading: number, position: number) => {
+      if (index < leading) return current;
+      const start = axis.prefixSum(index) - axis.prefixSum(leading), size = axis.getSize(index), available = (extent - origin) / this.zoom - axis.prefixSum(leading);
+      if (position === 0) return start;
+      if (position === 1) return start - (available - size) / 2;
+      if (position === 2) return start - available + size;
+      return start < current ? start : start + size > current + available ? start + size - available : current;
+    };
+    this.setScroll(offset(s._columnLayout(), col, this.headerWidth, this.viewWidth, this.scrollX, s.frozenColumnCount(), horizontal), offset(s._rowLayout(), row, this.headerHeight, this.viewHeight, this.scrollY, s.frozenRowCount(), vertical));
+  }
+  hitTest(x: number, y: number): { row: number; col: number; sheetArea: number } | null {
+    if (x < 0 || y < 0 || x >= this.viewWidth || y >= this.viewHeight) return null;
+    const row = y < this.headerHeight ? -1 : this.rows.find(r => y >= Math.max(r.min, r.position) && y < Math.min(r.max, r.position + r.size))?.index;
+    const col = x < this.headerWidth ? -1 : this.cols.find(c => x >= Math.max(c.min, c.position) && x < Math.min(c.max, c.position + c.size))?.index;
+    if (row === undefined || col === undefined) return null;
+    return { row, col, sheetArea: row < 0 && col < 0 ? 0 : row < 0 ? 1 : col < 0 ? 2 : 3 };
+  }
+  destroy(): void {
+    this.destroyed = true; cancelAnimationFrame(this.frame); this.observer?.disconnect(); this.abort.abort(); this.interaction.destroy(); this.root.remove();
+  }
+}

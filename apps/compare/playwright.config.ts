@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test';
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= path.resolve('../../.playwright-browsers');
 export default defineConfig({
   testDir: './test',
+  globalTeardown: './test/pixel-report.ts',
   outputDir: '../../test-results/compare/artifacts',
   fullyParallel: false,
   workers: 1,

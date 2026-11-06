@@ -26,7 +26,9 @@
   "scripts": {
     "build": "tsx scripts/clean.ts && tsup && tsx scripts/finalize.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "vitest bench --run",
+    "bench:cjs": "tsx bench/cjs.ts"
   },
   "dependencies": {
     "ssf": "0.11.2"

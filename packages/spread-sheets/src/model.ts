@@ -1,6 +1,7 @@
+import { WorkbookRenderer, type Rect } from './rendering.js';
 import { GC } from './generated/enums.js';
 import { notImplemented } from './not-implemented.js';
-import { AxisLayout, SparseGrid } from './structures.js';
+import { AxisLayout, CellStore, DirtyGrid } from './structures.js';
 import { clone, NameInfo, Range, Style } from './primitives.js';
 import { adjustFormula, CellRange } from './range.js';
 import { Events, EventHub, type EventHandler, type EventInfo } from './events.js';
@@ -65,7 +66,7 @@ interface CellData {
   validator?: unknown;
 }
 interface AreaData {
-  cells: SparseGrid<CellData>;
+  cells: CellStore<CellData>;
   rowStyles: Map<number, Style | string>;
   colStyles: Map<number, Style | string>;
   defaultStyle: Style;
@@ -156,6 +157,10 @@ export class Worksheet {
   private selections = [new Range(0, 0, 1, 1)];
   private activeRow = 0;
   private activeCol = 0;
+  private policy = 2;
+  private unit = 0;
+  private source: Record<string, unknown>[] | null = null;
+  private boundColumns = new Map<number, { name: string; displayName?: string; size?: number }>();
   private settings: JsonRecord = {
     visible: 1,
     zoomFactor: 1,
@@ -170,7 +175,7 @@ export class Worksheet {
   };
   private namedStyles = new Map<string, Style>();
   private names = new Map<string, NameInfo>();
-  private dirty = new SparseGrid<DirtyCell>();
+  private dirty = new DirtyGrid();
   private dirtyDepth = 0;
   private calcEngine?: ICalcEngine;
   private calcQueue = new Map<
@@ -181,7 +186,12 @@ export class Worksheet {
 
   constructor(name = 'Sheet1') {
     this.sheetName = name;
-    this.options = clone(worksheetDefaults);
+    this.options = new Proxy(clone(worksheetDefaults), {
+      set: (target, key, value) => { Reflect.set(target, key, value); this.invalidateLayout(); return true; },
+    });
+    this.options.gridline = new Proxy(this.options.gridline, {
+      set: (target, key, value) => { Reflect.set(target, key, value); this.invalidateLayout(); return true; },
+    });
     this.defaults = new Proxy(this.dimensions, {
       set: (target, key, value) => {
         if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
@@ -220,6 +230,7 @@ export class Worksheet {
     this._emit(Events.SheetNameChanging, info);
     if (info.cancel) return this;
     this.sheetName = value;
+    this.batch.invalidate();
     this._emit(Events.SheetNameChanged, { sheet: this, oldValue: old, newValue: value });
     return this;
   }
@@ -231,7 +242,7 @@ export class Worksheet {
       this.areas.set(
         area,
         (data = {
-          cells: new SparseGrid(),
+          cells: new CellStore(),
           rowStyles: new Map(),
           colStyles: new Map(),
           defaultStyle,
@@ -242,7 +253,7 @@ export class Worksheet {
     return data;
   }
   private cell(row: number, col: number, area = VIEW): CellData | undefined {
-    return this.areas.get(area)?.cells.get(row, col);
+    return this.areas.get(area)?.cells.peek(row, col);
   }
   private ensure(row: number, col: number, area = VIEW): CellData {
     const data = this.area(area);
@@ -251,28 +262,27 @@ export class Worksheet {
     return cell;
   }
   private prune(row: number, col: number, area = VIEW): void {
-    const cell = this.cell(row, col, area);
+    const cell = this.areas.get(area)?.cells.peek(row, col);
     if (cell && !Object.keys(cell).length) this.area(area).cells.set(row, col, undefined);
   }
   getValue(row: number, col: number, area = VIEW, valueType = ValueType.normal): unknown {
     coordinate(row);
     coordinate(col);
     if (valueType !== ValueType.normal) notImplemented('GC.Spread.Sheets.Worksheet.getValue(valueType)');
-    return this.cell(row, col, area)?.value ?? null;
+    return this.areas.get(area)?.cells.getValue(row, col) ?? null;
   }
   setValue(row: number, col: number, value: unknown, area = VIEW, ignoreRecalc = false): void {
     coordinate(row);
     coordinate(col);
-    const oldValue = this.getValue(row, col, area),
-      cell = this.ensure(row, col, area);
-    const oldFormula = cell.formula;
-    delete cell.formula;
-    if (value == null) delete cell.value;
-    else cell.value = value;
-    this.prune(row, col, area);
+    const data = this.area(area), oldValue = data.cells.getValue(row, col) ?? null;
+    const cell = data.cells.peek(row, col), oldFormula = cell?.formula;
+    if (cell) delete cell.formula;
+    data.cells.setValue(row, col, value);
+    if (area === VIEW && this.source?.[row] && this.boundColumns.has(col)) this.source[row][this.boundColumns.get(col)!.name] = value;
+    if (cell) this.prune(row, col, area);
     if (!Object.is(oldValue, value ?? null) || oldFormula !== undefined) {
       if (area === VIEW) this.markDirty(row, col, oldValue, value ?? null);
-      if (!ignoreRecalc && area === VIEW) this.queueCalc({ kind: 'value', row, col, value });
+      if (!ignoreRecalc && area === VIEW && this.calcEngine) this.queueCalc({ kind: 'value', row, col, value });
       this.changed(row, col, area, 'value', oldValue, value ?? null);
     }
   }
@@ -305,7 +315,7 @@ export class Worksheet {
   getFormula(row: number, col: number, area = VIEW): string | null {
     coordinate(row);
     coordinate(col);
-    return this.cell(row, col, area)?.formula ?? null;
+    return this.areas.get(area)?.cells.peek(row, col)?.formula ?? null;
   }
   setFormula(row: number, col: number, value: string | null, area = VIEW): void {
     coordinate(row);
@@ -333,9 +343,9 @@ export class Worksheet {
   _setCalculatedValue(row: number, col: number, value: unknown, area = VIEW): void {
     const oldValue = this.getValue(row, col, area);
     this.ensure(row, col, area).value = value;
-    const dirty = this.dirty.get(row, col);
-    if (dirty && area === VIEW) dirty.newValue = value;
+    if (area === VIEW) this.dirty.update(row, col, value);
     if (!Object.is(oldValue, value)) {
+      this.parent?._renderer()?.invalidateCell(row, col);
       this._emit(Events.ValueChanged, {
         sheet: this,
         sheetName: this.sheetName,
@@ -354,6 +364,7 @@ export class Worksheet {
     formula?: string | null;
     value?: unknown;
   }): void {
+    if (!this.calcEngine) return;
     this.calcQueue.set(`${change.row}:${change.col}`, change);
     if (!this.batch.calc && !this.parent?._isCalcSuspended()) this.flushCalc();
   }
@@ -368,8 +379,28 @@ export class Worksheet {
       else this.calcEngine.valueChanged?.(this, change.row, change.col, change.value);
     if (queue.length || all) this.calcEngine.recalculate(this, all);
   }
-  getDataSource(): null {
-    return null;
+  getDataSource(): Record<string, unknown>[] | null { return this.source; }
+  setDataSource(data: Record<string, unknown>[] | null, reset = true): void {
+    if (data !== null && !Array.isArray(data)) notImplemented('Worksheet.setDataSource(non-array)');
+    this.source = data;
+    if (reset && data) this.setRowCount(data.length);
+    if (data && this.autoGenerateColumns && !this.boundColumns.size) this.bindColumns(Object.keys(data[0] ?? {}).map(name => ({ name })));
+    this.loadBinding();
+  }
+  bindColumn(index: number, column: string | { name: string; displayName?: string; size?: number }): void {
+    this.boundColumns.set(index, typeof column === 'string' ? { name: column } : column); this.loadBinding();
+  }
+  bindColumns(columns: { name: string; displayName?: string; size?: number }[]): void {
+    this.boundColumns.clear(); columns.forEach((column, index) => this.boundColumns.set(index, column));
+    this.setColumnCount(columns.length); this.loadBinding();
+  }
+  private loadBinding(): void {
+    this.suspendPaint(); this.suspendDirty();
+    try { for (const [col, column] of this.boundColumns) {
+      this.setValue(0, col, column.displayName ?? column.name, SheetArea.colHeader);
+      if (column.size !== undefined) this.setColumnWidth(col, column.size);
+      this.source?.forEach((item, row) => this.setValue(row, col, item[column.name]));
+    } } finally { this.resumeDirty(); this.resumePaint(); }
   }
   getArray(row: number, col: number, rowCount: number, colCount: number, getFormula = false): unknown[][] {
     count(rowCount);
@@ -804,10 +835,6 @@ export class Worksheet {
     layout.shift(index, amount, remove);
     if (layout === (axis === 'row' ? this.rows : this.cols)) {
       this.dirty.shift(axis, index, amount, remove);
-      for (const [r, c, item] of this.dirty.entries()) {
-        item.row = r;
-        item.col = c;
-      }
       this.comments._shift(axis, index, amount, remove);
     }
     if (emit) this.axisChanged(axis, index, area, property, old, amount, amount);
@@ -908,6 +935,7 @@ export class Worksheet {
     this._emit(Events.SheetChanging, info);
     if (!info.cancel) {
       this.settings.visible = next;
+      this.invalidateLayout();
       this._emit(Events.SheetChanged, info);
     }
     return this;
@@ -927,15 +955,17 @@ export class Worksheet {
   tabColor(value?: string): string | undefined | this {
     if (value === undefined) return this.options.sheetTabColor;
     this.options.sheetTabColor = value;
+    this.batch.invalidate();
     return this;
   }
   getSelections(): Range[] {
     return this.selections.map((s) => new Range(s.row, s.col, s.rowCount, s.colCount));
   }
   setSelection(row: number, col: number, rowCount: number, colCount: number): void {
-    this.updateSelections([new Range(row, col, rowCount, colCount)]);
+    if (!this.updateSelections([new Range(row, col, rowCount, colCount)])) return;
     this.activeRow = Math.max(0, row);
     this.activeCol = Math.max(0, col);
+    this.parent?._renderer()?.schedule();
   }
   addSelection(row: number, col: number, rowCount: number, colCount: number): void {
     this.updateSelections([...this.selections, new Range(row, col, rowCount, colCount)]);
@@ -943,7 +973,7 @@ export class Worksheet {
   clearSelection(): void {
     this.updateSelections([]);
   }
-  private updateSelections(selections: Range[]): void {
+  private updateSelections(selections: Range[]): boolean {
     const info = {
       sheet: this,
       sheetName: this.sheetName,
@@ -952,7 +982,7 @@ export class Worksheet {
       cancel: false,
     };
     this._emit(Events.SelectionChanging, info);
-    if (info.cancel) return;
+    if (info.cancel) return false;
     this.selections = selections;
     this._emit(Events.SelectionChanged, {
       sheet: this,
@@ -961,6 +991,7 @@ export class Worksheet {
       newSelections: this.getSelections(),
     });
     this.batch.invalidate();
+    return true;
   }
   getActiveRowIndex(): number {
     return this.activeRow;
@@ -971,6 +1002,7 @@ export class Worksheet {
   setActiveCell(row: number, col: number): void {
     coordinate(row);
     coordinate(col);
+    if (row === this.activeRow && col === this.activeCol) { this.updateSelections([new Range(row, col, 1, 1)]); return; }
     const info = {
       sheet: this,
       sheetName: this.sheetName,
@@ -980,9 +1012,9 @@ export class Worksheet {
     };
     this._emit(Events.LeaveCell, info);
     if (info.cancel) return;
+    if (!this.updateSelections([new Range(row, col, 1, 1)])) return;
     this.activeRow = row;
     this.activeCol = col;
-    this.updateSelections([new Range(row, col, 1, 1)]);
     this._emit(Events.EnterCell, { sheet: this, sheetName: this.sheetName, row, col });
   }
   clear(
@@ -1018,7 +1050,7 @@ export class Worksheet {
         if (storageType & StorageType.bindingPath) delete cell.bindingPath;
         if (storageType & StorageType.hyperlink) delete cell.hyperlink;
         if (storageType & StorageType.altText) delete cell.altText;
-        this.prune(r, c, area);
+        data.cells.set(r, c, Object.keys(cell).length ? cell : undefined);
         changedCells.push({ row: r, col: c, sheetArea: area });
       }
     if (storageType & StorageType.style) {
@@ -1130,7 +1162,7 @@ export class Worksheet {
       if (target.contains(r, c) || (move && from.contains(r, c))) {
         for (const [key, flag] of flags) if (option & flag) delete cell[key];
         if (option & CopyToOptions.value) delete cell.formula;
-        this.prune(r, c);
+        data.cells.set(r, c, Object.keys(cell).length ? cell : undefined);
       }
     for (const [r, c, cell] of cells) {
       const nr = r - from.row + tr,
@@ -1192,21 +1224,96 @@ export class Worksheet {
     }
     this.batch.invalidate();
   }
-  autoFitRow(_row: number): never {
-    return notImplemented('GC.Spread.Sheets.Worksheet.autoFitRow (requires renderer)');
+  autoFitRow(row: number): void {
+    coordinate(row);
+    const ctx = this.measureContext(); let height = 20;
+    for (const [r, col] of this.area().cells.entries()) if (r === row && !this.getSpan(row, col)) {
+      const style = this.getActualStyle(row, col); ctx.font = String(style.font);
+      const size = Number((ctx.font.match(/([\d.]+)px/) ?? [0, 14.6667])[1]);
+      const text = this.getText(row, col), width = Math.max(1, this.cols.getSize(col) - 6);
+      const lines = style.wordWrap ? text.split('\n').reduce((sum, line) => sum + Math.max(1, Math.ceil(ctx.measureText(line).width / width)), 0) : text.split('\n').length;
+      height = Math.max(height, Math.ceil(lines * size * 1.2 + 2));
+    }
+    this.setRowHeight(row, height);
   }
-  autoFitColumn(_col: number): never {
-    return notImplemented('GC.Spread.Sheets.Worksheet.autoFitColumn (requires renderer)');
+  autoFitColumn(col: number): void {
+    coordinate(col);
+    const ctx = this.measureContext(); let width = 0;
+    for (const [row, c] of this.area().cells.entries()) if (c === col && !this.getSpan(row, col)) {
+      const style = this.getActualStyle(row, col); ctx.font = String(style.font);
+      width = Math.max(width, ...this.getText(row, col).split('\n').map(text => ctx.measureText(text).width + 8 + Number(style.textIndent ?? 0) * 8));
+    }
+    this.setColumnWidth(col, Math.ceil(width || this.defaults.colWidth));
   }
+  private measureContext(): CanvasRenderingContext2D {
+    const context = this.parent?._renderer()?.context ?? (typeof CanvasRenderingContext2D !== 'undefined' ? document.createElement('canvas').getContext('2d') : null);
+    if (!context) return notImplemented('Worksheet.autoFit (requires browser text measurement)');
+    return context;
+  }
+  selectionPolicy(): number;
+  selectionPolicy(value: number): this;
+  selectionPolicy(value?: number): number | this { if (value === undefined) return this.policy; this.policy = value; return this; }
+  selectionUnit(): number;
+  selectionUnit(value: number): this;
+  selectionUnit(value?: number): number | this { if (value === undefined) return this.unit; this.unit = value; return this; }
+  _setUserSelections(ranges: Range[], row: number, col: number): void {
+    if (this.policy === 0) ranges = ranges.map(range => new Range(Math.max(0, range.row), Math.max(0, range.col), 1, 1));
+    if (!this.updateSelections(this.policy === 2 ? ranges : ranges.slice(-1))) return;
+    this.activeRow = row; this.activeCol = col;
+  }
+  *_storedCells(): IterableIterator<[number, number, unknown, string | undefined]> {
+    for (const [row, col, cell] of this.area().cells.entries()) yield [row, col, cell.value, cell.formula];
+  }
+  /** Sparse snapshots cover user operations without allocating empty rectangle contents. */
+  _snapshotRanges(ranges: Range[]): () => void {
+    const data = this.area(), contains = (row: number, col: number) => ranges.some(range => range.contains(row, col));
+    const cells = [...data.cells.entries()].filter(([row, col]) => contains(row, col)).map(([row, col, cell]) => [row, col, clone(cell)] as const);
+    const spans = data.spans.filter(span => ranges.some(range => range.intersect(span.row, span.col, span.rowCount, span.colCount))).map(clone);
+    const notes = this.comments.all().filter(note => contains(note.rowIndex(), note.colIndex())).map(note => note.toJSON());
+    return () => {
+      const old = new Map<string, { row: number; col: number; value: unknown }>();
+      for (const [row, col, cell] of data.cells.entries()) if (contains(row, col)) {
+        old.set(`${row}:${col}`, { row, col, value: cell.value }); data.cells.set(row, col, undefined);
+      }
+      for (const [row, col, cell] of cells) {
+        if (!old.has(`${row}:${col}`)) old.set(`${row}:${col}`, { row, col, value: undefined });
+        data.cells.set(row, col, clone(cell));
+      }
+      data.spans = data.spans.filter(span => !ranges.some(range => range.intersect(span.row, span.col, span.rowCount, span.colCount))).concat(spans.map(clone));
+      for (const note of this.comments.all()) if (contains(note.rowIndex(), note.colIndex())) this.comments.remove(note.rowIndex(), note.colIndex());
+      for (const raw of notes) { const note = new Comment(); note.fromJSON(raw); this.comments.set(note.rowIndex(), note.colIndex(), note); }
+      for (const { row, col, value } of old.values()) {
+        const next = this.getValue(row, col);
+        if (!Object.is(value ?? null, next)) { this.markDirty(row, col, value, next); this._emit(Events.ValueChanged, { sheet: this, sheetName: this.name(), row, col, oldValue: value ?? null, newValue: next }); }
+        const formula = this.getFormula(row, col);
+        if (formula) this.queueCalc({ kind: 'formula', row, col, formula }); else this.queueCalc({ kind: 'value', row, col, value: next });
+      }
+      this.invalidateLayout();
+    };
+  }
+  _usedRange(): { row: number; col: number } {
+    let row = 0, col = 0;
+    for (const [r, c, cell] of this.area().cells.entries()) if (cell.value != null || cell.formula) { row = Math.max(row, r); col = Math.max(col, c); }
+    return { row, col };
+  }
+  _view(): WorkbookRenderer | undefined { return this.parent?._renderer(); }
+  getCellRect(row: number, col: number): Rect { return this._view()?.cellRect(row, col) ?? { x: this.cols.prefixSum(col) + 40, y: this.rows.prefixSum(row) + 20, width: this.cols.getSize(col), height: this.rows.getSize(row) }; }
+  startEdit(selectAll = false, defaultText?: string): void { this._view()?.interaction.startEdit(selectAll, defaultText); }
+  endEdit(ignoreValueChange = false): boolean { return this._view()?.interaction.endEdit(ignoreValueChange) ?? true; }
+  isEditing(): boolean { return this._view()?.interaction.isEditing ?? false; }
+  scroll(vPixels: number, hPixels: number): void { this._view()?.scroll(vPixels, hPixels); }
+  showCell(row: number, col: number, verticalPosition = 3, horizontalPosition = 3): void { this._view()?.showCell(row, col, verticalPosition, horizontalPosition); }
+  showRow(row: number, position = 0): void { this.showCell(row, this.getViewportLeftColumn(1), position, 3); }
+  showColumn(col: number, position = 0): void { this.showCell(this.getViewportTopRow(1), col, 3, position); }
+  getViewportTopRow(_index: number): number { return this._view()?.rows.find(r => r.index >= this.frozenRowCount())?.index ?? 0; }
+  getViewportBottomRow(_index: number): number { return this._view()?.rows.filter(r => r.index < this.rows.count - this.frozenTrailingRowCount()).at(-1)?.index ?? 0; }
+  getViewportLeftColumn(_index: number): number { return this._view()?.cols.find(c => c.index >= this.frozenColumnCount())?.index ?? 0; }
+  getViewportRightColumn(_index: number): number { return this._view()?.cols.filter(c => c.index < this.cols.count - this.frozenTrailingColumnCount()).at(-1)?.index ?? 0; }
+  getViewportHeight(_index: number): number { const view = this._view(); return view ? view.viewHeight - view.headerHeight : 0; }
+  getViewportWidth(_index: number): number { const view = this._view(); return view ? view.viewWidth - view.headerWidth : 0; }
   private markDirty(row: number, col: number, oldValue: unknown, newValue: unknown): void {
     if (this.dirtyDepth) return;
-    const prev = this.dirty.get(row, col);
-    this.dirty.set(row, col, {
-      row,
-      col,
-      oldValue: prev ? prev.oldValue : (oldValue ?? undefined),
-      newValue,
-    });
+    this.dirty.record(row, col, oldValue, newValue);
   }
   isDirty(): boolean {
     return this.dirty.size > 0;
@@ -1311,7 +1418,9 @@ export class Worksheet {
     oldValue: unknown,
     newValue: unknown,
   ): void {
-    this._emit(row < 0 ? Events.ColumnChanged : col < 0 ? Events.RowChanged : Events.CellChanged, {
+    this.parent?._renderer()?.invalidateCell(row, col);
+    const type = row < 0 ? Events.ColumnChanged : col < 0 ? Events.RowChanged : Events.CellChanged;
+    if (this.events.has(type) || this.parent?._hasEvent(type)) this._emit(type, {
       sheet: this,
       sheetName: this.sheetName,
       row,
@@ -1366,7 +1475,7 @@ export class Worksheet {
   }
   resumePaint(): void {
     this.batch.paint = Math.max(0, this.batch.paint - 1);
-    if (!this.batch.paint && !this.parent?.isPaintSuspended()) this.batch.flush();
+    if (!this.batch.paint && !this.parent?.isPaintSuspended()) { this.batch.flush(); this.parent?._renderer()?.schedule(); }
   }
   isPaintSuspended(): boolean {
     return this.batch.paint > 0 || !!this.parent?.isPaintSuspended();
@@ -1704,6 +1813,7 @@ export class Workbook {
   private host?: HTMLElement;
   private addedHostClass = false;
   private destroyed = false;
+  private renderer?: WorkbookRenderer;
   private active = 0;
   private start = 0;
   private events = new EventHub(this);
@@ -1716,7 +1826,9 @@ export class Workbook {
   constructor(host?: HTMLElement | string, options: WorkbookOptions = {}) {
     const sheetCount = options.sheetCount ?? 1;
     count(sheetCount);
-    this.options = Object.assign(clone(workbookDefaults), options);
+    this.options = new Proxy(Object.assign(clone(workbookDefaults), options), {
+      set: (target, key, value) => { Reflect.set(target, key, value); this.invalidateLayout(); return true; },
+    });
     delete this.options.sheetCount;
     if (typeof host === 'string') {
       const element = typeof document === 'undefined' ? null : document.getElementById(host);
@@ -1740,6 +1852,7 @@ export class Workbook {
           col = Number(options.col);
         coordinate(row);
         coordinate(col);
+        const previousValue = sheet.getValue(row, col);
         if (!isUndo && !Object.hasOwn(options, '_before'))
           options._before = { value: sheet.getValue(row, col), formula: sheet.getFormula(row, col) };
         if (isUndo) {
@@ -1751,12 +1864,19 @@ export class Workbook {
         } else if (typeof options.newValue === 'string' && options.newValue.startsWith('='))
           sheet.setFormula(row, col, options.newValue);
         else sheet.setValue(row, col, options.newValue);
+        const newValue = sheet.getValue(row, col);
+        if (!Object.is(previousValue, newValue)) sheet._emit(Events.ValueChanged, { sheet, sheetName: sheet.name(), row, col, oldValue: previousValue, newValue });
         return true;
       },
     });
     this.setSheetCount(sheetCount);
     this.events.unbindAll();
+    if (this.host && typeof CanvasRenderingContext2D !== 'undefined') {
+      this.renderer = new WorkbookRenderer(this, this.host);
+      this.batch.onInvalidate = layout => this.renderer?.schedule(layout);
+    }
   }
+  _renderer(): WorkbookRenderer | undefined { return this.renderer; }
   private assertAlive(): void {
     if (this.destroyed) throw new Error('Workbook has been destroyed');
   }
@@ -1868,6 +1988,7 @@ export class Workbook {
   startSheetIndex(value?: number): number | this {
     if (value === undefined) return this.start;
     this.start = Math.max(0, Math.min(value, Math.max(0, this.sheets.length - 1)));
+    this.repaint();
     return this;
   }
   changeSheetIndex(name: string, index: number): boolean {
@@ -1877,6 +1998,7 @@ export class Workbook {
     const [sheet] = this.sheets.splice(current, 1);
     this.sheets.splice(index, 0, sheet);
     this.active = this.sheets.indexOf(active);
+    this.invalidateLayout();
     return true;
   }
   addNamedStyle(style: Style): void {
@@ -1935,6 +2057,7 @@ export class Workbook {
   _emit(type: string, info: EventInfo): void {
     this.events.emit(type, info);
   }
+  _hasEvent(type: string): boolean { return this.events.has(type); }
   _isEventSuspended(): boolean {
     return this.events.depth > 0;
   }
@@ -1989,7 +2112,7 @@ export class Workbook {
     this.batch.onInvalidate = callback;
   }
   focus(focusIn = true): void {
-    if (focusIn) this.host?.focus();
+    if (focusIn) (this.renderer?.root ?? this.host)?.focus();
     else this.host?.blur();
   }
   toJSON(options: SerializationOptions = {}): JsonRecord {
@@ -2117,6 +2240,7 @@ export class Workbook {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.renderer?.destroy(); this.renderer = undefined;
     if (this.addedHostClass) this.host?.classList.remove('opensheets-host');
     for (const sheet of this.sheets) {
       sheet.unbindAll();

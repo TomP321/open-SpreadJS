@@ -7,7 +7,7 @@ import { GeneralFormatter } from './formatter.js';
 import { CultureInfo, CultureManager } from './culture.js';
 import { CommandManager, UndoManager } from './commands.js';
 import { Comment, CommentManager } from './comments.js';
-import { installFallbacks, STUB } from './not-implemented.js';
+import { installFallbacks } from './not-implemented.js';
 
 export const Spread = {
   ...Enums.Spread,
@@ -31,8 +31,6 @@ export const Spread = {
 };
 export const Pivot = Enums.Pivot;
 const GC = { ...Enums, Spread, Pivot };
-for (const method of [Worksheet.prototype.autoFitRow, Worksheet.prototype.autoFitColumn])
-  Object.defineProperty(method, STUB, { value: true });
 installFallbacks(GC);
 export const Data = GC.Data;
 export default GC;

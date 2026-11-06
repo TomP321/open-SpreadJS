@@ -1,3 +1,4 @@
+import { renderingScenarios } from './m2.js';
 import { empty } from './empty.js';
 import { values } from './values.js';
 import { multipleSheets } from './multiple-sheets.js';
@@ -19,7 +20,7 @@ export interface Scenario {
   sheetCount: number;
   run(workbook: Workbook): void;
 }
-export const scenarios: readonly Scenario[] = [empty, values, multipleSheets];
+export const scenarios: readonly Scenario[] = [empty, values, multipleSheets, ...renderingScenarios];
 export function selectScenario(name: string | null): Scenario {
   const scenario = scenarios.find(item => item.name === (name ?? 'values'));
   if (!scenario) throw new Error(`Unknown scenario: ${name}`);

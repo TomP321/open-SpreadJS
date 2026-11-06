@@ -16,7 +16,7 @@ declare global {
 window.__referenceGC = Official;
 window.__implementationGC = OpenSheets;
 const root = document.getElementById('root')!;
-root.innerHTML = '<header><div><p>OPENSHEETS / COMPATIBILITY LAB</p><h1>Workbook comparison</h1></div><label>Scenario <select id="scenario"></select></label></header><main><section><h2>SpreadJS 19.2.5 · trial</h2><div id="official-pane" class="pane"></div></section><section><h2>OpenSheets 0.1.0</h2><div id="ours-pane" class="pane"></div></section></main><p class="note">The same scenario runs in both panes. M1 supplies the headless model; rendering parity is scheduled for M2.</p>';
+root.innerHTML = '<header><div><p>OPENSHEETS / COMPATIBILITY LAB</p><h1>Workbook comparison</h1></div><label>Scenario <select id="scenario"></select></label></header><main><section><h2>SpreadJS 19.2.5 · trial</h2><div id="official-pane" class="pane"></div></section><section><h2>OpenSheets 0.1.0</h2><div id="ours-pane" class="pane"></div></section></main><p class="note">The same scenario runs in both panes. Black-box rendering and interaction comparison.</p>';
 try {
   const scenario = selectScenario(new URLSearchParams(location.search).get('scenario'));
   const select = document.getElementById('scenario') as HTMLSelectElement;
@@ -28,9 +28,11 @@ try {
   const ours = new OpenSheets.Spread.Sheets.Workbook(document.getElementById('ours-pane')!, options);
   scenario.run(official);
   scenario.run(ours);
+  ours.refresh();
   window.__compare = { ready: false, scenario: scenario.name, official, ours };
   await document.fonts.ready;
   await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  if (scenario.name === 'editing') ours.getActiveSheet().startEdit(false);
   window.__compare.ready = true;
   window.addEventListener('beforeunload', () => { official.destroy(); ours.destroy(); });
 } catch (error) {

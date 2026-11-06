@@ -1,1 +1,35 @@
-.opensheets-host { position: relative; overflow: hidden; font: 12px Arial, sans-serif; background: #fff; color: #222; }
+/* OpenSheets: independently authored styles based on observable runtime layout. */
+.opensheets-host { position: relative; overflow: hidden; background: #fff; color: #000; }
+.opensheets-host .opensheets-viewport { position: absolute; inset: 0; overflow: hidden; outline: none; background: #f6f6f6; font: 11pt Calibri; user-select: none; touch-action: none; }
+.opensheets-host .gc-sheet-canvas, .opensheets-host .gc-selection-canvas, .opensheets-host .gc-tab-strip { position: absolute; left: 0; top: 0; display: block; }
+.opensheets-host .gc-selection-canvas { cursor: cell; }
+.opensheets-host .gc-tab-strip { cursor: default; }
+.opensheets-host .gc-cell-editor { position: absolute; z-index: 5; box-sizing: border-box; margin: 0; border: 0; border-radius: 0; outline: none; resize: none; overflow: hidden; user-select: text; white-space: pre-wrap; }
+.opensheets-host .gc-tab-editor { position: absolute; z-index: 6; box-sizing: border-box; margin: 0; border: 1px solid #217346; outline: none; padding: 2px; font: 10pt Arial; text-align: center; }
+.opensheets-host .gc-scroll-container { position: absolute; background: #eaeaea; box-sizing: border-box; }
+.opensheets-host .gc-vertical-scrollbar { width: 15px; }
+.opensheets-host .gc-horizontal-scrollbar { height: 15px; }
+.opensheets-host .gc-scrollbar-wrapper { position: absolute; }
+.opensheets-host .gc-vertical-scrollbar .gc-scrollbar-wrapper { top: 15px; bottom: 15px; width: 15px; }
+.opensheets-host .gc-horizontal-scrollbar .gc-scrollbar-wrapper { left: 15px; right: 15px; height: 15px; }
+.opensheets-host .gc-scroll-bar, .opensheets-host .gc-scroll-arrow { position: absolute; box-sizing: border-box; background: white; border: 1px solid #ababab; }
+.opensheets-host .gc-scroll-bar:hover, .opensheets-host .gc-scroll-arrow:hover { background: #e1e1e1; }
+.opensheets-host .gc-vertical-scrollbar .gc-scroll-bar { width: 15px; }
+.opensheets-host .gc-horizontal-scrollbar .gc-scroll-bar { height: 15px; }
+.opensheets-host .gc-scroll-arrow { width: 15px; height: 15px; }
+.opensheets-host .gc-scroll-arrowDown { bottom: 0; }
+.opensheets-host .gc-scroll-arrowRight { right: 0; }
+.opensheets-host .gc-scroll-arrow::after { content: ''; position: absolute; width: 0; height: 0; border: 4px solid transparent; }
+.opensheets-host .gc-scroll-arrowUp::after { border-bottom-color: #7f7f7f; left: 3px; top: 0; }
+.opensheets-host .gc-scroll-arrowDown::after { border-top-color: #7f7f7f; left: 3px; top: 5px; }
+.opensheets-host .gc-scroll-arrowLeft::after { border-right-color: #7f7f7f; top: 3px; left: 0; }
+.opensheets-host .gc-scroll-arrowRight::after { border-left-color: #7f7f7f; top: 3px; left: 5px; }
+.opensheets-host .gc-hscrollbar-splitter { position: absolute; width: 8px; cursor: col-resize; }
+.opensheets-host .gc-contextmenu { position: absolute; z-index: 10; min-width: 170px; padding: 3px 0; background: #fff; color: #444; border: 1px solid #aaa; box-shadow: 2px 3px 5px #0003; font: 12px Arial; }
+.opensheets-host .gc-contextmenu-menuitem { display: block; width: 100%; border: 0; padding: 7px 24px; background: transparent; color: inherit; text-align: left; font: inherit; }
+.opensheets-host .gc-contextmenu-menuitem:hover { background: #e1e1e1; }
+
+.opensheets-host .gc-sheet-canvas { border-right: 1px solid #ababab; }
+
+.opensheets-host .gc-cell-editor { border: 2px solid #5292f7; box-shadow: 1px 2px 5px #0006; }
+.opensheets-host .gc-ui-contextmenu-container { font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
