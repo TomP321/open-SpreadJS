@@ -1,0 +1,338 @@
+[
+ {
+  "id": "dyn-1",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "SEQUENCE(3,2,10,5)",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-2",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "SORT({3;1;2})",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-3",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "UNIQUE({1;2;2;3})",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-4",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "FILTER(A1:A5,A1:A5>2)",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-5",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "TRANSPOSE(A1:A3)",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-6",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "A1:A3*2",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-7",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "TEXTSPLIT(\"a,b,c\",\",\")",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-8",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "VSTACK({1,2},{3,4})",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-9",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "RANDARRAY(2,2)*0",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-10",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "MODE.MULT({1,2,2,3,3})",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-11",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "FREQUENCY(A1:A5,{2,4})",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ },
+ {
+  "id": "dyn-12",
+  "options": {
+   "allowDynamicArray": true
+  },
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "TOCOL({1,2;3,4})",
+  "at": "H1",
+  "read": [
+   "H1:K5"
+  ]
+ }
+]

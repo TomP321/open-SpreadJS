@@ -1,0 +1,778 @@
+[
+ {
+  "id": "date-328",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATE(2024,2,29)"
+ },
+ {
+  "id": "date-329",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATE(2023,2,29)"
+ },
+ {
+  "id": "date-330",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATE(2024,13,1)"
+ },
+ {
+  "id": "date-331",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATE(1900,2,29)"
+ },
+ {
+  "id": "date-332",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATE(1899,12,31)"
+ },
+ {
+  "id": "date-333",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "YEAR(45000)"
+ },
+ {
+  "id": "date-334",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "MONTH(45000)"
+ },
+ {
+  "id": "date-335",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DAY(45000)"
+ },
+ {
+  "id": "date-336",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "WEEKDAY(45000)"
+ },
+ {
+  "id": "date-337",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "WEEKDAY(45000,2)"
+ },
+ {
+  "id": "date-338",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "WEEKNUM(45000)"
+ },
+ {
+  "id": "date-339",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "ISOWEEKNUM(45000)"
+ },
+ {
+  "id": "date-340",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "EDATE(45000,1)"
+ },
+ {
+  "id": "date-341",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "EOMONTH(45000,-1)"
+ },
+ {
+  "id": "date-342",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATEVALUE(\"2024-03-15\")"
+ },
+ {
+  "id": "date-343",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATEVALUE(\"3/15/2024\")"
+ },
+ {
+  "id": "date-344",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "TIMEVALUE(\"13:30\")"
+ },
+ {
+  "id": "date-345",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "TIME(25,61,61)"
+ },
+ {
+  "id": "date-346",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "HOUR(0.75)"
+ },
+ {
+  "id": "date-347",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "MINUTE(0.7513)"
+ },
+ {
+  "id": "date-348",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "SECOND(0.75139)"
+ },
+ {
+  "id": "date-349",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "NETWORKDAYS(45000,45030)"
+ },
+ {
+  "id": "date-350",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "NETWORKDAYS.INTL(45000,45030,11)"
+ },
+ {
+  "id": "date-351",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "WORKDAY(45000,10)"
+ },
+ {
+  "id": "date-352",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "WORKDAY.INTL(45000,10,\"0000011\")"
+ },
+ {
+  "id": "date-353",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DAYS(45030,45000)"
+ },
+ {
+  "id": "date-354",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DAYS360(45000,45100)"
+ },
+ {
+  "id": "date-355",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATEDIF(45000,45400,\"m\")"
+ },
+ {
+  "id": "date-356",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATEDIF(45000,45400,\"md\")"
+ },
+ {
+  "id": "date-357",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "YEARFRAC(45000,45400)"
+ },
+ {
+  "id": "date-358",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "YEARFRAC(45000,45400,1)"
+ },
+ {
+  "id": "date-359",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "YEAR(\"2024-05-01\")"
+ },
+ {
+  "id": "date-360",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DATE(2024,1,1)+0.5"
+ },
+ {
+  "id": "date-361",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "TEXT(DATE(2024,1,1),\"dddd\")"
+ },
+ {
+  "id": "date-362",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "TODAY()-TODAY()"
+ },
+ {
+  "id": "date-363",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "INT(NOW())=TODAY()"
+ },
+ {
+  "id": "date-cell-arith",
+  "cells": {
+   "A1": {
+    "date": "2024-01-15T00:00:00"
+   }
+  },
+  "formula": "A1+30",
+  "at": "B1"
+ },
+ {
+  "id": "date-cell-year",
+  "cells": {
+   "A1": {
+    "date": "2024-01-15T00:00:00"
+   }
+  },
+  "formula": "YEAR(A1)",
+  "at": "B1"
+ }
+]

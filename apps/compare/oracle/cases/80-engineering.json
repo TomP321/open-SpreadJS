@@ -1,0 +1,422 @@
+[
+ {
+  "id": "eng-388",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DEC2BIN(10)"
+ },
+ {
+  "id": "eng-389",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DEC2BIN(-1)"
+ },
+ {
+  "id": "eng-390",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "BIN2DEC(\"1010\")"
+ },
+ {
+  "id": "eng-391",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DEC2HEX(255,4)"
+ },
+ {
+  "id": "eng-392",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "HEX2DEC(\"FF\")"
+ },
+ {
+  "id": "eng-393",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "OCT2DEC(\"17\")"
+ },
+ {
+  "id": "eng-394",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "BITAND(12,10)"
+ },
+ {
+  "id": "eng-395",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "BITOR(12,10)"
+ },
+ {
+  "id": "eng-396",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "BITXOR(12,10)"
+ },
+ {
+  "id": "eng-397",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "BITLSHIFT(1,4)"
+ },
+ {
+  "id": "eng-398",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "DELTA(1,1)"
+ },
+ {
+  "id": "eng-399",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "GESTEP(5,4)"
+ },
+ {
+  "id": "eng-400",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "COMPLEX(3,4)"
+ },
+ {
+  "id": "eng-401",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "IMABS(\"3+4i\")"
+ },
+ {
+  "id": "eng-402",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "IMSUM(\"1+i\",\"2-3i\")"
+ },
+ {
+  "id": "eng-403",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "CONVERT(1,\"m\",\"ft\")"
+ },
+ {
+  "id": "eng-404",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "CONVERT(100,\"C\",\"F\")"
+ },
+ {
+  "id": "eng-405",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "ERF(1)"
+ },
+ {
+  "id": "eng-406",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "ERFC(1)"
+ },
+ {
+  "id": "eng-407",
+  "cells": {
+   "A1": 1,
+   "A2": 2,
+   "A3": 3,
+   "A4": 4,
+   "A5": 5,
+   "B1": 10,
+   "B2": -20,
+   "B3": 30.5,
+   "B4": "text",
+   "B5": true,
+   "C1": "apple",
+   "C2": "Banana",
+   "C3": "cherry",
+   "C4": "",
+   "C5": "  spaced  "
+  },
+  "formula": "BESSELJ(1.5,1)"
+ }
+]
