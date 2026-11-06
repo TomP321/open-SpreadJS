@@ -9,6 +9,7 @@ import { GeneralFormatter } from './formatter.js';
 import { Comment, CommentManager } from './comments.js';
 import { CommandManager, UndoManager } from './commands.js';
 import type { ICalcEngine } from './calc.js';
+import { CalcEngine } from './calc/engine.js';
 import {
   deserializeValue,
   list,
@@ -57,6 +58,7 @@ function defaultMetadata(): JsonRecord {
 interface CellData {
   value?: unknown;
   formula?: string;
+  arrayFormula?: { rowCount: number; colCount: number };
   style?: Style | string;
   tag?: unknown;
   bindingPath?: string;
@@ -213,6 +215,7 @@ export class Worksheet {
   }
   _attach(parent?: Workbook): void {
     this.parent = parent;
+    this.calcEngine = parent?._calcEngine() as ICalcEngine | undefined;
   }
   getParent(): Workbook {
     return this.parent!;
@@ -230,12 +233,25 @@ export class Worksheet {
     this._emit(Events.SheetNameChanging, info);
     if (info.cancel) return this;
     this.sheetName = value;
+    this.calcEngine?.sheetRenamed?.(this, old, value);
     this.batch.invalidate();
     this._emit(Events.SheetNameChanged, { sheet: this, oldValue: old, newValue: value });
     return this;
   }
+  private viewCellStore?: CellStore<CellData>;
+  private viewAreaCache?: AreaData;
+  _fastValue(row: number, col: number): unknown {
+    return this.viewCellStore ? (this.viewCellStore.getValue(row, col) ?? null) : null;
+  }
+  _viewCellStore(): CellStore<CellData> | undefined {
+    return this.viewCellStore;
+  }
   private area(area = VIEW): AreaData {
     let data = this.areas.get(area);
+    if (area === VIEW && data) {
+      this.viewCellStore = data.cells;
+      this.viewAreaCache = data;
+    }
     if (!data) {
       const defaultStyle = new Style();
       defaultStyle.themeFont = 'Body';
@@ -249,14 +265,19 @@ export class Worksheet {
           spans: [],
         }),
       );
+      if (area === VIEW) {
+        this.viewCellStore = data.cells;
+        this.viewAreaCache = data;
+      }
     }
     return data;
   }
   private cell(row: number, col: number, area = VIEW): CellData | undefined {
+    if (area === VIEW && this.viewAreaCache) return this.viewAreaCache.cells.peek(row, col);
     return this.areas.get(area)?.cells.peek(row, col);
   }
   private ensure(row: number, col: number, area = VIEW): CellData {
-    const data = this.area(area);
+    const data = area === VIEW && this.viewAreaCache ? this.viewAreaCache : this.area(area);
     let cell = data.cells.get(row, col);
     if (!cell) data.cells.set(row, col, (cell = {}));
     return cell;
@@ -275,8 +296,8 @@ export class Worksheet {
     coordinate(row);
     coordinate(col);
     const data = this.area(area), oldValue = data.cells.getValue(row, col) ?? null;
+    if (area === VIEW) this.calcEngine?.cellWriting?.(this, row, col);
     const cell = data.cells.peek(row, col), oldFormula = cell?.formula;
-    if (cell) delete cell.formula;
     data.cells.setValue(row, col, value);
     if (area === VIEW && this.source?.[row] && this.boundColumns.has(col)) this.source[row][this.boundColumns.get(col)!.name] = value;
     if (cell) this.prune(row, col, area);
@@ -320,29 +341,74 @@ export class Worksheet {
   setFormula(row: number, col: number, value: string | null, area = VIEW): void {
     coordinate(row);
     coordinate(col);
+    let stored = value ? value.replace(/^=/, '') : null;
+    if (stored && this.calcEngine?.parseFormula && area === VIEW) {
+      const canonical = this.calcEngine.parseFormula(this, row, col, stored);
+      if (canonical !== undefined) stored = canonical;
+    }
     const cell = this.ensure(row, col, area),
       old = cell.formula ?? null,
       oldValue = cell.value;
-    if (value) {
-      cell.formula = value.replace(/^=/, '');
+    if (old === stored) return;
+    if (stored) {
+      cell.formula = stored;
       delete cell.value;
     } else {
       delete cell.formula;
-      delete cell.value;
     }
     this.prune(row, col, area);
-    if (old !== (cell.formula ?? null)) {
-      if (area === VIEW) this.markDirty(row, col, oldValue, null);
-      this.queueCalc({ kind: 'formula', row, col, formula: cell.formula ?? null });
-      this.changed(row, col, area, 'formula', old, value);
-    }
+    if (area === VIEW) this.markDirty(row, col, oldValue, cell.value ?? null);
+    this.queueCalc({ kind: 'formula', row, col, formula: cell.formula ?? null });
+    this.changed(row, col, area, 'formula', old, value);
   }
   _setCalcEngine(engine?: ICalcEngine): void {
     this.calcEngine = engine;
   }
+  /** Updates stored formula text without recalculating (used by ref transforms). */
+  _translateFormula(formula: string, rows: number, columns: number): string {
+    return this.calcEngine?.translateFormula
+      ? this.calcEngine.translateFormula(formula, rows, columns)
+      : adjustFormula(formula, rows, columns);
+  }
+  _setFormulaText(row: number, col: number, formula: string): void {
+    const cell = this.areas.get(VIEW)?.cells.peek(row, col);
+    if (cell) cell.formula = formula;
+  }
+  /** Marks a range as a legacy (CSE) array formula anchored at the cell. */
+  setArrayFormula(
+    row: number,
+    col: number,
+    rowCount: number,
+    colCount: number,
+    value: string,
+    area = VIEW,
+  ): void {
+    coordinate(row);
+    coordinate(col);
+    count(rowCount);
+    count(colCount);
+    if (!rowCount || !colCount) throw new RangeError('Array formula range must be non-empty');
+    this.suspendCalcService();
+    try {
+      this.setFormula(row, col, value, area);
+      if (area === VIEW) {
+        const cell = this.ensure(row, col, area);
+        cell.arrayFormula = { rowCount, colCount };
+        this.calcEngine?.formulaChanged?.(this, row, col, cell.formula ?? null);
+      }
+    } finally {
+      this.resumeCalcService();
+    }
+  }
+  _arrayFormula(row: number, col: number): { rowCount: number; colCount: number } | undefined {
+    return this.areas.get(VIEW)?.cells.peek(row, col)?.arrayFormula;
+  }
   _setCalculatedValue(row: number, col: number, value: unknown, area = VIEW): void {
     const oldValue = this.getValue(row, col, area);
-    this.ensure(row, col, area).value = value;
+    const data = area === VIEW && this.viewAreaCache ? this.viewAreaCache : this.area(area);
+    let target = data.cells.get(row, col);
+    if (!target) data.cells.set(row, col, (target = {}));
+    target.value = value;
     if (area === VIEW) this.dirty.update(row, col, value);
     if (!Object.is(oldValue, value)) {
       this.parent?._renderer()?.invalidateCell(row, col);
@@ -839,6 +905,7 @@ export class Worksheet {
     }
     if (emit) this.axisChanged(axis, index, area, property, old, amount, amount);
     else this.invalidateLayout();
+    if (area === VIEW && this.calcEngine) this.calcEngine.adjustStructure?.(this, axis, index, amount, remove);
   }
   addSpan(row: number, col: number, rowCount: number, colCount: number, area = VIEW): void {
     coordinate(row);
@@ -1096,7 +1163,7 @@ export class Worksheet {
     toCol: number,
     rowCount: number,
     colCount: number,
-    option = CopyToOptions.all,
+    option = 0,
   ): void {
     this.transfer(fromRow, fromCol, toRow, toCol, rowCount, colCount, option, false);
   }
@@ -1172,7 +1239,12 @@ export class Worksheet {
       for (const [key, flag] of flags)
         if (option & flag && cell[key] !== undefined)
           Object.assign(dest, {
-            [key]: key === 'formula' && !move ? adjustFormula(String(cell[key]), nr - r, nc - c) : cell[key],
+            [key]:
+              key === 'formula' && !move
+                ? this.calcEngine?.translateFormula
+                  ? this.calcEngine.translateFormula(String(cell[key]), nr - r, nc - c)
+                  : adjustFormula(String(cell[key]), nr - r, nc - c)
+                : cell[key],
           });
       this.prune(nr, nc);
     }
@@ -1375,6 +1447,8 @@ export class Worksheet {
       this.names.set(next.toLowerCase(), info);
     };
     this.names.set(name.toLowerCase(), info);
+    info._onChange = () => this.calcEngine?.namesChanged?.();
+    this.calcEngine?.namesChanged?.();
   }
   getCustomName(name: string): NameInfo {
     return this.names.get(name.toLowerCase())!;
@@ -1384,9 +1458,11 @@ export class Worksheet {
   }
   removeCustomName(name: string): void {
     this.names.delete(name.toLowerCase());
+    this.calcEngine?.namesChanged?.();
   }
   clearCustomNames(): void {
     this.names.clear();
+    this.calcEngine?.namesChanged?.();
   }
   bind(type: string, fn: EventHandler): void;
   bind(type: string, data: unknown, fn: EventHandler): void;
@@ -1489,6 +1565,16 @@ export class Worksheet {
   }
   _resumeWorkbookCalc(recalcAll = false): void {
     this.flushCalc(recalcAll);
+  }
+  recalcAll(_refreshAll = false): void {
+    this.calcEngine?.recalcAll?.();
+  }
+  addCustomFunction(fn: import('./calc/functions-api.js').CalcFunction): void {
+    (this.calcEngine as unknown as { addFunction?: (fn: object, sheet?: Worksheet) => void })?.addFunction?.(fn, this);
+  }
+  getCustomFunction(name: string): unknown {
+    return (this.calcEngine as unknown as { getCustomFunction?: (name: string, sheet: Worksheet) => unknown })
+      ?.getCustomFunction?.(name, this);
   }
   invalidateLayout(): void {
     this.batch.invalidate(true);
@@ -1634,6 +1720,8 @@ export class Worksheet {
   fromJSON(settings: object): void {
     const json = object(settings);
     this.areas.clear();
+    this.viewCellStore = undefined;
+    this.viewAreaCache = undefined;
     this.namedStyles.clear();
     this.names.clear();
     this.comments.clear();
@@ -1823,11 +1911,17 @@ export class Workbook {
   private namedStyles = new Map<string, Style>();
   private names = new Map<string, NameInfo>();
   private extraJSON: JsonRecord = defaultMetadata();
+  private calc?: CalcEngine;
   constructor(host?: HTMLElement | string, options: WorkbookOptions = {}) {
     const sheetCount = options.sheetCount ?? 1;
     count(sheetCount);
     this.options = new Proxy(Object.assign(clone(workbookDefaults), options), {
-      set: (target, key, value) => { Reflect.set(target, key, value); this.invalidateLayout(); return true; },
+      set: (target, key, value) => {
+        Reflect.set(target, key, value);
+        if (key === 'referenceStyle' || key === 'allowDynamicArray') this.calc?.optionsChanged();
+        this.invalidateLayout();
+        return true;
+      },
     });
     delete this.options.sheetCount;
     if (typeof host === 'string') {
@@ -1839,6 +1933,7 @@ export class Workbook {
       this.addedHostClass = !this.host.classList.contains('opensheets-host');
       this.host.classList.add('opensheets-host');
     }
+    this.calc = new CalcEngine(this);
     this.manager = new CommandManager(this);
     this.manager.register('editCell', {
       canUndo: true,
@@ -1863,7 +1958,10 @@ export class Workbook {
           } else sheet.setValue(row, col, before.value);
         } else if (typeof options.newValue === 'string' && options.newValue.startsWith('='))
           sheet.setFormula(row, col, options.newValue);
-        else sheet.setValue(row, col, options.newValue);
+        else {
+          if (sheet.getFormula(row, col) !== null) sheet.setFormula(row, col, null);
+          sheet.setValue(row, col, options.newValue);
+        }
         if (isUndo || Object.hasOwn(options, '_applied')) {
           this.setActiveSheet(sheet.name()); sheet.setSelection(row, col, 1, 1);
         }
@@ -1881,6 +1979,10 @@ export class Workbook {
     }
   }
   _renderer(): WorkbookRenderer | undefined { return this.renderer; }
+  _calcEngine(): CalcEngine | undefined { return this.calc; }
+  calculate(type = 0, address?: string): void { this.calc?.calculate(type, address); }
+  addCustomFunction(fn: import('./calc/functions-api.js').CalcFunction): void { this.calc?.addFunction(fn); }
+  getCustomFunction(name: string): unknown { return this.calc?.getCustomFunction(name, this.getActiveSheet()); }
   private assertAlive(): void {
     if (this.destroyed) throw new Error('Workbook has been destroyed');
   }
@@ -1932,7 +2034,9 @@ export class Workbook {
     this._emit(Events.SheetChanging, info);
     if (info.cancel) return;
     this.sheets.splice(index, 1);
+    const wasAttached = sheet.getParent?.() === this;
     sheet._attach();
+    if (wasAttached) this.calc?.sheetRemoved(sheet);
     this.active =
       oldActive === sheet
         ? Math.min(index, this.sheets.length - 1)
@@ -2034,6 +2138,8 @@ export class Workbook {
       this.names.set(next.toLowerCase(), info);
     };
     this.names.set(name.toLowerCase(), info);
+    info._onChange = () => this.calc?.namesChanged();
+    this.calc?.namesChanged();
   }
   getCustomName(name: string): NameInfo {
     return this.names.get(name.toLowerCase())!;
@@ -2043,9 +2149,11 @@ export class Workbook {
   }
   removeCustomName(name: string): void {
     this.names.delete(name.toLowerCase());
+    this.calc?.namesChanged();
   }
   clearCustomNames(): void {
     this.names.clear();
+    this.calc?.namesChanged();
   }
   bind(type: string, fn: EventHandler): void;
   bind(type: string, data: unknown, fn: EventHandler): void;
@@ -2235,6 +2343,7 @@ export class Workbook {
             .map(([key, value]) => [key, clone(value)]),
         ),
       };
+      this.calc?.loadFormulas();
       this.invalidateLayout();
     } finally {
       this.resumeEvent();
@@ -2253,6 +2362,7 @@ export class Workbook {
     this.sheets.length = 0;
     this.events.unbindAll();
     this.history.clear();
+    this.calc = undefined;
     this.host = undefined;
     this.batch.onInvalidate = undefined;
   }

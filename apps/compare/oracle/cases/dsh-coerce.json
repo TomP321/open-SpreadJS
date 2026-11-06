@@ -1,0 +1,727 @@
+[
+ {
+  "id": "dsh-coerce-1-SUM",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "SUM(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-2-PRODUCT",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "PRODUCT(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-3-AVERAGE",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "AVERAGE(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-4-AVERAGEA",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "AVERAGEA(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-5-MAX",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "MAX(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-6-MIN",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "MIN(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-7-MAXA",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "MAXA(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-8-MINA",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "MINA(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-9-COUNT",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "COUNT(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-10-COUNTA",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "COUNTA(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-11-MEDIAN",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "MEDIAN(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-12-STDEV",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "STDEV(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-13-STDEVP",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "STDEVP(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-14-VAR",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "VAR(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-15-VARP",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "VARP(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-16-GEOMEAN",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "GEOMEAN(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-17-HARMEAN",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "HARMEAN(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-18-SUMSQ",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "SUMSQ(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-19-DEVSQ",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "DEVSQ(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-20-AVEDEV",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "AVEDEV(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-21-SKEW",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "SKEW(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-22-KURT",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "KURT(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-23-SMALL",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "SMALL(A1:A5,1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-24-LARGE",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "LARGE(A1:A5,1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-25-PERCENTILE",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "PERCENTILE(A1:A5,0.5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-26-QUARTILE",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "QUARTILE(A1:A5,1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-27-TRIMMEAN",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "TRIMMEAN(A1:A5,0.2)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-28-MODE",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "MODE(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-29-SUMIF",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "SUMIF(A1:A5,\">0\")",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-30-COUNTIF",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "COUNTIF(A1:A5,\">0\")",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-31-AVERAGEIF",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "AVERAGEIF(A1:A5,\">0\")",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-32-direct-SUM",
+  "cells": {},
+  "formula": "SUM(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-33-direct-PRODUCT",
+  "cells": {},
+  "formula": "PRODUCT(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-34-direct-AVERAGE",
+  "cells": {},
+  "formula": "AVERAGE(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-35-direct-MAX",
+  "cells": {},
+  "formula": "MAX(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-36-direct-MIN",
+  "cells": {},
+  "formula": "MIN(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-37-direct-COUNT",
+  "cells": {},
+  "formula": "COUNT(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-38-direct-COUNTA",
+  "cells": {},
+  "formula": "COUNTA(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-39-direct-MEDIAN",
+  "cells": {},
+  "formula": "MEDIAN(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-40-direct-STDEV",
+  "cells": {},
+  "formula": "STDEV(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-41-direct-VAR",
+  "cells": {},
+  "formula": "VAR(\"1\",\"2\",TRUE,3)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-42-single-SUM",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "SUM(A1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-43-single-AVERAGE",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "AVERAGE(A1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-44-single-MAX",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "MAX(A1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-45-single-COUNT",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "COUNT(A1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-46-sum-mixed",
+  "cells": {
+   "A1": "1",
+   "A2": "2",
+   "A3": "x",
+   "A4": true,
+   "A5": 3
+  },
+  "formula": "SUM(A1:A2,A4,A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-47-sum-textnum",
+  "cells": {
+   "A1": "1e3",
+   "A2": " 5 ",
+   "A3": "$5",
+   "A4": "50%",
+   "A5": "1,000"
+  },
+  "formula": "SUM(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-48-avg-textnum",
+  "cells": {
+   "A1": "1e3",
+   "A2": " 5 ",
+   "A3": "$5",
+   "A4": "50%",
+   "A5": "1,000"
+  },
+  "formula": "AVERAGE(A1:A5)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-49-sum-date",
+  "cells": {
+   "A1": {
+    "date": "2024-01-01T00:00:00"
+   },
+   "A2": 1
+  },
+  "formula": "SUM(A1:A2)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-50-num-date",
+  "cells": {
+   "A1": {
+    "date": "2024-01-01T00:00:00"
+   }
+  },
+  "formula": "N(A1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-51-val-date",
+  "cells": {
+   "A1": {
+    "date": "2024-01-01T00:00:00"
+   }
+  },
+  "formula": "VALUE(A1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-52-int-date",
+  "cells": {
+   "A1": {
+    "date": "2024-01-01T00:00:00"
+   }
+  },
+  "formula": "INT(A1)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ },
+ {
+  "id": "dsh-coerce-53-sum-null",
+  "cells": {
+   "A1": null,
+   "A2": 2
+  },
+  "formula": "SUM(A1:A2)",
+  "read": [
+   "H1"
+  ],
+  "at": "H1"
+ }
+]

@@ -122,7 +122,7 @@ export class CellRange {
         r,
         c,
         autoAdjustReference
-          ? adjustFormula(value, r - Math.max(0, this.row), c - Math.max(0, this.col))
+          ? this.sheet._translateFormula(value, r - Math.max(0, this.row), c - Math.max(0, this.col))
           : value,
         this.sheetArea,
       ),

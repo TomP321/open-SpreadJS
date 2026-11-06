@@ -17,8 +17,11 @@ export interface OracleCase {
   at?: string;
   /** cells to read and compare, default [at]; a range like "A1:C3" reads every cell (spills) */
   read?: string[];
-  /** later edits; after each, `read` cells are compared again (tests incremental recalc) */
-  steps?: SheetCells[];
+  /** later edits; after each, `read` cells are compared again (tests incremental recalc).
+   *  A step may instead call a public method: {"$call": ["addRows", 1, 2], "$sheet": "Sheet1"} (sheet method),
+   *  {"$wb": ["removeSheet", 1]} (workbook method). "$enum:Path.To.Enum.member" strings in args resolve against GC.Spread.Sheets.
+   *  `read` entries prefixed with "f:" (e.g. "f:B6" or "f:Sheet2!A1") read getFormula instead of getValue. */
+  steps?: (SheetCells | { $call?: unknown[]; $wb?: unknown[]; $sheet?: string })[];
   /** workbook options to set before filling, e.g. {"referenceStyle":1} */
   options?: Record<string, unknown>;
 }
@@ -73,15 +76,23 @@ function runOne(GC: any, host: HTMLElement, c: OracleCase): Normalized[][] | { e
     if (c.formula !== undefined) { const a = parseAddr(at); fill(GC, sheetOf(a.sheet), { [at.slice(at.lastIndexOf('!') + 1)]: c.formula.startsWith('=') ? c.formula : '=' + c.formula }); }
     const read = () => {
       const out: Normalized[] = [];
-      for (const addr of c.read ?? [at]) {
+      for (const raw of c.read ?? [at]) {
+        const isF = raw.startsWith('f:'); const addr = isF ? raw.slice(2) : raw;
         const a = parseAddr(addr); const sh = sheetOf(a.sheet);
-        for (let r = a.r1; r <= a.r2; r++) for (let col = a.c1; col <= a.c2; col++) out.push(normalize(sh.getValue(r, col)));
+        for (let r = a.r1; r <= a.r2; r++) for (let col = a.c1; col <= a.c2; col++) out.push(normalize(isF ? sh.getFormula(r, col) : sh.getValue(r, col)));
       }
       return out;
     };
     const stages = [read()];
+    const resolveArg = (x: unknown) => typeof x === 'string' && x.startsWith('$enum:') ? x.slice(6).split('.').reduce((o: any, key) => o?.[key], GC.Spread.Sheets) : x;
     for (const step of c.steps ?? []) {
-      for (const [addr, v] of Object.entries(step)) { const a = parseAddr(addr); fill(GC, sheetOf(a.sheet), { [addr.slice(addr.lastIndexOf('!') + 1)]: v }); }
+      if ('$call' in step || '$wb' in step) {
+        const st = step as { $call?: unknown[]; $wb?: unknown[]; $sheet?: string };
+        if (st.$call) { const [m, ...args] = st.$call as [string, ...unknown[]]; const sh = sheetOf(st.$sheet); sh[m](...args.map(resolveArg)); }
+        if (st.$wb) { const [m, ...args] = st.$wb as [string, ...unknown[]]; wb[m](...args.map(resolveArg)); }
+        stages.push(read()); continue;
+      }
+      for (const [addr, v] of Object.entries(step as SheetCells)) { const a = parseAddr(addr); fill(GC, sheetOf(a.sheet), { [addr.slice(addr.lastIndexOf('!') + 1)]: v }); }
       stages.push(read());
     }
     return stages;

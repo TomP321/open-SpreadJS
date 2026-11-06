@@ -1,0 +1,431 @@
+[
+ {
+  "id": "dsh-iter-1-geo0.0005",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.0005
+  }
+ },
+ {
+  "id": "dsh-iter-2-geo0.001",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.001
+  }
+ },
+ {
+  "id": "dsh-iter-3-geo0.002",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.002
+  }
+ },
+ {
+  "id": "dsh-iter-4-geo0.005",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.005
+  }
+ },
+ {
+  "id": "dsh-iter-5-geo0.01",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-iter-6-geo0.02",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.02
+  }
+ },
+ {
+  "id": "dsh-iter-7-geo0.05",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter-8-geo0.1",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter-9-geo0.2",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter-10-geo0.5",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter-11-geo1",
+  "cells": {
+   "A1": "=(A1+1)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter-12-lin0.001",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.001
+  }
+ },
+ {
+  "id": "dsh-iter-13-lin20.001",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.001
+  }
+ },
+ {
+  "id": "dsh-iter-14-lin0.01",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-iter-15-lin20.01",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-iter-16-lin0.05",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter-17-lin20.05",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter-18-lin0.1",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter-19-lin20.1",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter-20-lin0.2",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter-21-lin20.2",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter-22-lin0.5",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter-23-lin20.5",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter-24-lin1",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter-25-lin21",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter-26-lin10",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 10
+  }
+ },
+ {
+  "id": "dsh-iter-27-lin210",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 10
+  }
+ },
+ {
+  "id": "dsh-iter-28-geo100.01",
+  "cells": {
+   "A1": "=(A1+10)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-iter-29-geo010.01",
+  "cells": {
+   "A1": "=A1/2+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-iter-30-geo100.1",
+  "cells": {
+   "A1": "=(A1+10)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter-31-geo010.1",
+  "cells": {
+   "A1": "=A1/2+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter-32-geo101",
+  "cells": {
+   "A1": "=(A1+10)/2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter-33-geo011",
+  "cells": {
+   "A1": "=A1/2+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ }
+]

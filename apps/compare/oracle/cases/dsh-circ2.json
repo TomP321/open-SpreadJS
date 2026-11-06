@@ -1,0 +1,497 @@
+[
+ {
+  "id": "dsh-circ2-1-self1",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1
+  }
+ },
+ {
+  "id": "dsh-circ2-2-2cyc1",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1
+  }
+ },
+ {
+  "id": "dsh-circ2-3-2cyc-rev1",
+  "cells": {
+   "B1": "=A1+1",
+   "A1": "=B1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1
+  }
+ },
+ {
+  "id": "dsh-circ2-4-3cyc1",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=C1+1",
+   "C1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1",
+   "C1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1
+  }
+ },
+ {
+  "id": "dsh-circ2-5-selfsum1",
+  "cells": {
+   "A1": "=SUM(A1:A2)",
+   "A2": 5
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1
+  }
+ },
+ {
+  "id": "dsh-circ2-6-self21",
+  "cells": {
+   "A1": "=A1+1",
+   "B1": "=A1+B1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1
+  }
+ },
+ {
+  "id": "dsh-circ2-7-2cycval1",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1",
+   "C1": 0
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-circ2-8-self2",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 2
+  }
+ },
+ {
+  "id": "dsh-circ2-9-2cyc2",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 2
+  }
+ },
+ {
+  "id": "dsh-circ2-10-2cyc-rev2",
+  "cells": {
+   "B1": "=A1+1",
+   "A1": "=B1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 2
+  }
+ },
+ {
+  "id": "dsh-circ2-11-3cyc2",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=C1+1",
+   "C1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1",
+   "C1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 2
+  }
+ },
+ {
+  "id": "dsh-circ2-12-selfsum2",
+  "cells": {
+   "A1": "=SUM(A1:A2)",
+   "A2": 5
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 2
+  }
+ },
+ {
+  "id": "dsh-circ2-13-self22",
+  "cells": {
+   "A1": "=A1+1",
+   "B1": "=A1+B1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 2
+  }
+ },
+ {
+  "id": "dsh-circ2-14-2cycval2",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1",
+   "C1": 0
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 2,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-circ2-15-self3",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 3
+  }
+ },
+ {
+  "id": "dsh-circ2-16-2cyc3",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 3
+  }
+ },
+ {
+  "id": "dsh-circ2-17-2cyc-rev3",
+  "cells": {
+   "B1": "=A1+1",
+   "A1": "=B1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 3
+  }
+ },
+ {
+  "id": "dsh-circ2-18-3cyc3",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=C1+1",
+   "C1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1",
+   "C1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 3
+  }
+ },
+ {
+  "id": "dsh-circ2-19-selfsum3",
+  "cells": {
+   "A1": "=SUM(A1:A2)",
+   "A2": 5
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 3
+  }
+ },
+ {
+  "id": "dsh-circ2-20-self23",
+  "cells": {
+   "A1": "=A1+1",
+   "B1": "=A1+B1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 3
+  }
+ },
+ {
+  "id": "dsh-circ2-21-2cycval3",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1",
+   "C1": 0
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 3,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-circ2-22-self5",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 5
+  }
+ },
+ {
+  "id": "dsh-circ2-23-2cyc5",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 5
+  }
+ },
+ {
+  "id": "dsh-circ2-24-2cyc-rev5",
+  "cells": {
+   "B1": "=A1+1",
+   "A1": "=B1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 5
+  }
+ },
+ {
+  "id": "dsh-circ2-25-3cyc5",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=C1+1",
+   "C1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1",
+   "C1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 5
+  }
+ },
+ {
+  "id": "dsh-circ2-26-selfsum5",
+  "cells": {
+   "A1": "=SUM(A1:A2)",
+   "A2": 5
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 5
+  }
+ },
+ {
+  "id": "dsh-circ2-27-self25",
+  "cells": {
+   "A1": "=A1+1",
+   "B1": "=A1+B1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 5
+  }
+ },
+ {
+  "id": "dsh-circ2-28-2cycval5",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1",
+   "C1": 0
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 5,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ },
+ {
+  "id": "dsh-circ2-29-self1000",
+  "cells": {
+   "A1": "=A1+1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000
+  }
+ },
+ {
+  "id": "dsh-circ2-30-2cyc1000",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000
+  }
+ },
+ {
+  "id": "dsh-circ2-31-2cyc-rev1000",
+  "cells": {
+   "B1": "=A1+1",
+   "A1": "=B1+1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000
+  }
+ },
+ {
+  "id": "dsh-circ2-32-3cyc1000",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=C1+1",
+   "C1": "=A1+1"
+  },
+  "read": [
+   "A1",
+   "B1",
+   "C1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000
+  }
+ },
+ {
+  "id": "dsh-circ2-33-selfsum1000",
+  "cells": {
+   "A1": "=SUM(A1:A2)",
+   "A2": 5
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000
+  }
+ },
+ {
+  "id": "dsh-circ2-34-self21000",
+  "cells": {
+   "A1": "=A1+1",
+   "B1": "=A1+B1"
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000
+  }
+ },
+ {
+  "id": "dsh-circ2-35-2cycval1000",
+  "cells": {
+   "A1": "=B1+1",
+   "B1": "=A1+1",
+   "C1": 0
+  },
+  "read": [
+   "A1",
+   "B1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.01
+  }
+ }
+]

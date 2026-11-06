@@ -239,6 +239,7 @@ for (const key of [...styleProperties, 'quotePrefix'])
 
 export class NameInfo {
   _onRename?: (previous: string, next: string) => void;
+  _onChange?: () => void;
   constructor(
     private n = '',
     private expr: unknown = '',
@@ -275,6 +276,7 @@ export class NameInfo {
     if (baseRow !== undefined) this.r = baseRow;
     if (baseCol !== undefined) this.c = baseCol;
     if (comment !== undefined) this.comment = comment;
+    this._onChange?.();
   }
   toJSON(): Record<string, unknown> {
     return {

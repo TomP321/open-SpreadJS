@@ -35,7 +35,7 @@ describe('Worksheet', () => {
     s.options.showFormulas = true;
     expect(s.getText(3, 0)).toBe('=A1+1');
     s.setValue(3, 0, 9);
-    expect(s.getFormula(3, 0)).toBeNull();
+    expect(s.getFormula(3, 0)).toBe('A1+1');
     s.setFormula(3, 0, '=2');
     s.setFormula(3, 0, null);
     expect(s.getFormula(3, 0)).toBeNull();

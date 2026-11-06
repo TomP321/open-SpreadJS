@@ -1,0 +1,626 @@
+[
+ {
+  "id": "dsh-iter2-1-inc0.05_mc0.05",
+  "cells": {
+   "A1": "=A1+0.05"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter2-2-inc0.05_mc0.1",
+  "cells": {
+   "A1": "=A1+0.05"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter2-3-inc0.05_mc0.2",
+  "cells": {
+   "A1": "=A1+0.05"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter2-4-inc0.05_mc0.3",
+  "cells": {
+   "A1": "=A1+0.05"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.3
+  }
+ },
+ {
+  "id": "dsh-iter2-5-inc0.05_mc0.5",
+  "cells": {
+   "A1": "=A1+0.05"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter2-6-inc0.05_mc1",
+  "cells": {
+   "A1": "=A1+0.05"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter2-7-inc0.1_mc0.05",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter2-8-inc0.1_mc0.1",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter2-9-inc0.1_mc0.2",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter2-10-inc0.1_mc0.3",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.3
+  }
+ },
+ {
+  "id": "dsh-iter2-11-inc0.1_mc0.5",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter2-12-inc0.1_mc1",
+  "cells": {
+   "A1": "=A1+0.1"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter2-13-inc0.15_mc0.05",
+  "cells": {
+   "A1": "=A1+0.15"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter2-14-inc0.15_mc0.1",
+  "cells": {
+   "A1": "=A1+0.15"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter2-15-inc0.15_mc0.2",
+  "cells": {
+   "A1": "=A1+0.15"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter2-16-inc0.15_mc0.3",
+  "cells": {
+   "A1": "=A1+0.15"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.3
+  }
+ },
+ {
+  "id": "dsh-iter2-17-inc0.15_mc0.5",
+  "cells": {
+   "A1": "=A1+0.15"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter2-18-inc0.15_mc1",
+  "cells": {
+   "A1": "=A1+0.15"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter2-19-inc0.2_mc0.05",
+  "cells": {
+   "A1": "=A1+0.2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter2-20-inc0.2_mc0.1",
+  "cells": {
+   "A1": "=A1+0.2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter2-21-inc0.2_mc0.2",
+  "cells": {
+   "A1": "=A1+0.2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter2-22-inc0.2_mc0.3",
+  "cells": {
+   "A1": "=A1+0.2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.3
+  }
+ },
+ {
+  "id": "dsh-iter2-23-inc0.2_mc0.5",
+  "cells": {
+   "A1": "=A1+0.2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter2-24-inc0.2_mc1",
+  "cells": {
+   "A1": "=A1+0.2"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter2-25-inc0.25_mc0.05",
+  "cells": {
+   "A1": "=A1+0.25"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter2-26-inc0.25_mc0.1",
+  "cells": {
+   "A1": "=A1+0.25"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter2-27-inc0.25_mc0.2",
+  "cells": {
+   "A1": "=A1+0.25"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter2-28-inc0.25_mc0.3",
+  "cells": {
+   "A1": "=A1+0.25"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.3
+  }
+ },
+ {
+  "id": "dsh-iter2-29-inc0.25_mc0.5",
+  "cells": {
+   "A1": "=A1+0.25"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter2-30-inc0.25_mc1",
+  "cells": {
+   "A1": "=A1+0.25"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter2-31-inc0.3_mc0.05",
+  "cells": {
+   "A1": "=A1+0.3"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter2-32-inc0.3_mc0.1",
+  "cells": {
+   "A1": "=A1+0.3"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter2-33-inc0.3_mc0.2",
+  "cells": {
+   "A1": "=A1+0.3"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter2-34-inc0.3_mc0.3",
+  "cells": {
+   "A1": "=A1+0.3"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.3
+  }
+ },
+ {
+  "id": "dsh-iter2-35-inc0.3_mc0.5",
+  "cells": {
+   "A1": "=A1+0.3"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter2-36-inc0.3_mc1",
+  "cells": {
+   "A1": "=A1+0.3"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter2-37-inc0.4_mc0.05",
+  "cells": {
+   "A1": "=A1+0.4"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter2-38-inc0.4_mc0.1",
+  "cells": {
+   "A1": "=A1+0.4"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter2-39-inc0.4_mc0.2",
+  "cells": {
+   "A1": "=A1+0.4"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter2-40-inc0.4_mc0.3",
+  "cells": {
+   "A1": "=A1+0.4"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.3
+  }
+ },
+ {
+  "id": "dsh-iter2-41-inc0.4_mc0.5",
+  "cells": {
+   "A1": "=A1+0.4"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter2-42-inc0.4_mc1",
+  "cells": {
+   "A1": "=A1+0.4"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ },
+ {
+  "id": "dsh-iter2-43-inc0.5_mc0.05",
+  "cells": {
+   "A1": "=A1+0.5"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.05
+  }
+ },
+ {
+  "id": "dsh-iter2-44-inc0.5_mc0.1",
+  "cells": {
+   "A1": "=A1+0.5"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.1
+  }
+ },
+ {
+  "id": "dsh-iter2-45-inc0.5_mc0.2",
+  "cells": {
+   "A1": "=A1+0.5"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.2
+  }
+ },
+ {
+  "id": "dsh-iter2-46-inc0.5_mc0.3",
+  "cells": {
+   "A1": "=A1+0.5"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.3
+  }
+ },
+ {
+  "id": "dsh-iter2-47-inc0.5_mc0.5",
+  "cells": {
+   "A1": "=A1+0.5"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 0.5
+  }
+ },
+ {
+  "id": "dsh-iter2-48-inc0.5_mc1",
+  "cells": {
+   "A1": "=A1+0.5"
+  },
+  "read": [
+   "A1"
+  ],
+  "options": {
+   "iterativeCalculationMaximumIterations": 1000,
+   "iterativeCalculationMaximumChange": 1
+  }
+ }
+]

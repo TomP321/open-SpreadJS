@@ -1,7 +1,30 @@
 import type { Worksheet } from './model.js';
-/** M3 can attach a calculator without changing the sparse model or its public API. */
+
+/** Calculation service attached to worksheets by the workbook. */
 export interface ICalcEngine {
+  /** Parses and validates a formula, returning its canonical text. */
+  parseFormula?(sheet: Worksheet, row: number, col: number, formula: string): string;
   formulaChanged(sheet: Worksheet, row: number, col: number, formula: string | null): void;
   valueChanged?(sheet: Worksheet, row: number, col: number, value: unknown): void;
+  cellWriting?(sheet: Worksheet, row: number, col: number): void;
   recalculate(sheet: Worksheet, all: boolean): void;
+  /** Translates relative references for copy/fill. */
+  translateFormula?(formula: string, rows: number, columns: number): string;
+  /** Adjusts stored formulas after rows/columns were inserted or removed. */
+  adjustStructure?(
+    sheet: Worksheet,
+    axis: 'row' | 'col',
+    index: number,
+    amount: number,
+    remove: boolean,
+  ): void;
+  sheetRenamed?(sheet: Worksheet, oldName: string, newName: string): void;
+  sheetRemoved?(sheet: Worksheet): void;
+  namesChanged?(): void;
+  /** Rebuilds the formula graph from stored cell formulas. */
+  rebuildFormulas?(): void;
+  /** Loads formulas with cached values after a JSON import. */
+  loadFormulas?(): void;
+  recalcAll?(type?: number): void;
+  calculate?(type?: number, address?: string): void;
 }
