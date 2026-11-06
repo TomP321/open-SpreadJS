@@ -4,15 +4,19 @@ import OpenSheets from '@opensheets/spread-sheets';
 import '@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css';
 import '@opensheets/spread-sheets/styles/gc.spread.sheets.css';
 import './style.css';
-import { scenarios, selectScenario, type Workbook } from './scenarios/index.js';
+import { scenarios, selectScenario } from './scenarios/index.js';
 
 declare global {
   interface Window {
-    __compare?: { ready: boolean; scenario: string; official: Workbook; ours: Workbook };
+    __referenceGC: typeof Official;
+    __implementationGC: typeof OpenSheets;
+    __compare?: { ready: boolean; scenario: string; official: InstanceType<typeof Official.Spread.Sheets.Workbook>; ours: InstanceType<typeof OpenSheets.Spread.Sheets.Workbook> };
   }
 }
+window.__referenceGC = Official;
+window.__implementationGC = OpenSheets;
 const root = document.getElementById('root')!;
-root.innerHTML = '<header><div><p>OPENSHEETS / COMPATIBILITY LAB</p><h1>Workbook comparison</h1></div><label>Scenario <select id="scenario"></select></label></header><main><section><h2>SpreadJS 19.2.5 · trial</h2><div id="official-pane" class="pane"></div></section><section><h2>OpenSheets 0.1.0</h2><div id="ours-pane" class="pane"></div></section></main><p class="note">The same scenario runs in both panes. M0 supplies the data model; rendering parity is scheduled for M2.</p>';
+root.innerHTML = '<header><div><p>OPENSHEETS / COMPATIBILITY LAB</p><h1>Workbook comparison</h1></div><label>Scenario <select id="scenario"></select></label></header><main><section><h2>SpreadJS 19.2.5 · trial</h2><div id="official-pane" class="pane"></div></section><section><h2>OpenSheets 0.1.0</h2><div id="ours-pane" class="pane"></div></section></main><p class="note">The same scenario runs in both panes. M1 supplies the headless model; rendering parity is scheduled for M2.</p>';
 try {
   const scenario = selectScenario(new URLSearchParams(location.search).get('scenario'));
   const select = document.getElementById('scenario') as HTMLSelectElement;

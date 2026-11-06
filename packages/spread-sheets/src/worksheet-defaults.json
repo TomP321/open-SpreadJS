@@ -1,0 +1,40 @@
+{
+  "allowCellOverflow": true,
+  "showFormulas": false,
+  "showZeros": true,
+  "frozenlineColor": "black",
+  "clipBoardOptions": 0,
+  "gridline": {
+    "color": "rgb(212, 212, 212)",
+    "showVerticalGridline": true,
+    "showHorizontalGridline": true
+  },
+  "rowHeaderVisible": true,
+  "colHeaderVisible": true,
+  "rowHeaderAutoText": 1,
+  "colHeaderAutoText": 2,
+  "rowHeaderAutoTextIndex": -1,
+  "colHeaderAutoTextIndex": -1,
+  "isProtected": false,
+  "protectionOptions": {},
+  "sheetAreaOffset": {
+    "left": 0,
+    "top": 0
+  },
+  "keepUnknownFormulas": false,
+  "addRowButtonOption": {
+    "visible": false,
+    "height": null,
+    "command": "gc.spread.contextMenu.insertRows",
+    "style": null,
+    "tooltip": null
+  },
+  "addColumnButtonOption": {
+    "visible": false,
+    "width": null,
+    "command": "gc.spread.contextMenu.insertColumns",
+    "style": null,
+    "tooltip": null
+  },
+  "rightToLeft": false
+}

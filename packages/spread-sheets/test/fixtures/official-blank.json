@@ -1,0 +1,82 @@
+{
+  "version": "19.2.5",
+  "name": "",
+  "docProps": {
+    "docPropsApp": {},
+    "docPropsCore": {}
+  },
+  "sheetCount": 1,
+  "users": [
+    {
+      "id": "{954763CF-16D0-4602-A6AE-32A866CC433B}",
+      "name": "Guest",
+      "color": "#26A69A"
+    }
+  ],
+  "customList": [],
+  "defaultSheetTabStyles": {},
+  "builtInFileIcons": {},
+  "sheets": {
+    "Sheet1": {
+      "name": "Sheet1",
+      "isSelected": true,
+      "visible": 1,
+      "theme": "Office",
+      "data": {
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          }
+        }
+      },
+      "rowHeaderData": {
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          }
+        }
+      },
+      "colHeaderData": {
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          }
+        }
+      },
+      "defaultData": {},
+      "leftCellIndex": 0,
+      "topCellIndex": 0,
+      "selections": {
+        "0": {
+          "row": 0,
+          "col": 0,
+          "rowCount": 1,
+          "colCount": 1
+        },
+        "length": 1
+      },
+      "rowOutlines": {
+        "items": []
+      },
+      "columnOutlines": {
+        "items": []
+      },
+      "cellStates": {},
+      "states": {},
+      "outlineColumnOptions": {},
+      "autoMergeRangeInfos": [],
+      "index": 0,
+      "order": 0
+    }
+  },
+  "sheetTabCount": 0,
+  "namedPatterns": {},
+  "scenarioAdditionalInfo": {
+    "appliedScenarios": {},
+    "baseValues": {}
+  },
+  "dataManager": {
+    "tables": [],
+    "relationships": []
+  }
+}

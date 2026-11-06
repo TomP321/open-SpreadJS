@@ -14,7 +14,7 @@ describe('M0 model', () => {
     const first = new Workbook();
     const second = new Workbook(undefined, { sheetCount: 2 });
     expect(first.sheets).toHaveLength(1);
-    expect(second.sheets.map(s => s.name())).toEqual(['Sheet1', 'Sheet2']);
+    expect(second.sheets.map((s) => s.name())).toEqual(['Sheet1', 'Sheet2']);
     expect(first.getActiveSheet()).toBe(first.getSheet(0));
     expect(first.getSheet(12)).toBeUndefined();
     first.getActiveSheet().setValue(0, 0, 42);
@@ -55,16 +55,16 @@ describe('M0 model', () => {
   });
   it('destroys idempotently and rejects subsequent reads', () => {
     const workbook = new Workbook();
-    workbook.destroy(); workbook.destroy();
+    workbook.destroy();
+    workbook.destroy();
     expect(workbook.sheets).toEqual([]);
     expect(() => workbook.getActiveSheet()).toThrow('destroyed');
   });
-  it('unsupported API members are present and fail explicitly', () => {
-    const sheet = new Worksheet('Unsupported') as unknown as { setFormula: () => void; options: unknown };
-    expect(() => sheet.setFormula()).toThrow('NotImplemented: GC.Spread.Sheets.Worksheet.setFormula');
-    expect(() => sheet.options).toThrow('NotImplemented');
-    const style = (GC.Spread.Sheets as unknown as { Style: new () => object }).Style;
-    expect(() => new style()).toThrow('NotImplemented: GC.Spread.Sheets.Style');
-    expect(() => new Workbook(undefined, { allowUndo: true } as never)).toThrow('NotImplemented');
+  it('renderer-dependent members fail explicitly', () => {
+    const sheet = new Worksheet('Unsupported');
+    expect(() => sheet.autoFitRow(0)).toThrow('NotImplemented');
+    expect(() => sheet.autoFitColumn(0)).toThrow('NotImplemented');
+    expect(new GC.Spread.Sheets.Style()).toBeInstanceOf(GC.Spread.Sheets.Style);
+    expect(new Workbook(undefined, { allowUndo: true }).options.allowUndo).toBe(true);
   });
 });

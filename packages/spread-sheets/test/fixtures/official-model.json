@@ -1,0 +1,363 @@
+{
+  "version": "19.2.5",
+  "name": "",
+  "docProps": {
+    "docPropsApp": {},
+    "docPropsCore": {}
+  },
+  "sheetCount": 2,
+  "users": [
+    {
+      "id": "{954763CF-16D0-4602-A6AE-32A866CC433B}",
+      "name": "Guest",
+      "color": "#26A69A"
+    }
+  ],
+  "startSheetIndex": 1,
+  "customList": [
+    [
+      "small",
+      "medium",
+      "large"
+    ]
+  ],
+  "defaultSheetTabStyles": {},
+  "builtInFileIcons": {},
+  "activeSheetIndex": 1,
+  "sheets": {
+    "Model": {
+      "name": "Model",
+      "isSelected": false,
+      "rowCount": 42,
+      "columnCount": 17,
+      "activeRow": 1,
+      "activeCol": 1,
+      "zoomFactor": 1.25,
+      "rowHeaderColCount": 2,
+      "colHeaderRowCount": 2,
+      "visible": 1,
+      "frozenRowCount": 1,
+      "frozenColCount": 2,
+      "frozenTrailingRowCount": 1,
+      "frozenTrailingColCount": 1,
+      "theme": "Office",
+      "data": {
+        "dataTable": {
+          "0": {
+            "0": {
+              "value": "Item"
+            },
+            "1": {
+              "value": "Count"
+            },
+            "2": {
+              "value": "Amount"
+            }
+          },
+          "1": {
+            "0": {
+              "value": "Notebook",
+              "tag": {
+                "id": 9
+              }
+            },
+            "1": {
+              "value": 12
+            },
+            "2": {
+              "value": 4.5,
+              "style": "Amount"
+            }
+          },
+          "2": {
+            "0": {
+              "value": "Pencil"
+            },
+            "1": {
+              "value": 0
+            },
+            "2": {
+              "value": false
+            }
+          },
+          "3": {
+            "3": {
+              "style": {
+                "backColor": "#fedcba",
+                "hAlign": 1,
+                "borderBottom": {
+                  "color": "blue",
+                  "style": 1
+                }
+              }
+            }
+          },
+          "5": {
+            "3": {
+              "value": "/OADate(45351.520833333336)/"
+            }
+          },
+          "7": {
+            "1": {
+              "style": {
+                "foreColor": "red",
+                "formatter": "0.0%",
+                "locked": false
+              }
+            },
+            "2": {
+              "style": {
+                "foreColor": "red",
+                "formatter": "0.0%",
+                "locked": false
+              }
+            }
+          },
+          "8": {
+            "1": {
+              "style": {
+                "foreColor": "red",
+                "formatter": "0.0%",
+                "locked": false
+              }
+            },
+            "2": {
+              "style": {
+                "foreColor": "red",
+                "formatter": "0.0%",
+                "locked": false
+              }
+            }
+          }
+        },
+        "rowDataArray": [
+          null,
+          {
+            "style": {
+              "backColor": "#eeeeee"
+            }
+          }
+        ],
+        "columnDataArray": [
+          null,
+          null,
+          {
+            "style": {
+              "wordWrap": true
+            }
+          }
+        ],
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          },
+          "tag": "model-tag"
+        }
+      },
+      "rowHeaderData": {
+        "dataTable": {
+          "1": {
+            "1": {
+              "value": "Row label"
+            }
+          }
+        },
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          }
+        }
+      },
+      "colHeaderData": {
+        "dataTable": {
+          "1": {
+            "1": {
+              "value": "Header"
+            }
+          }
+        },
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          }
+        }
+      },
+      "rows": [
+        null,
+        {
+          "size": 28
+        },
+        null,
+        null,
+        {
+          "visible": false
+        }
+      ],
+      "columns": [
+        null,
+        null,
+        {
+          "size": 94
+        },
+        null,
+        null,
+        {
+          "visible": false
+        }
+      ],
+      "rowHeaderColInfos": [
+        {
+          "size": 48
+        }
+      ],
+      "colHeaderRowInfos": [
+        {
+          "size": 32
+        }
+      ],
+      "defaultData": {},
+      "leftCellIndex": 2,
+      "topCellIndex": 1,
+      "spans": [
+        {
+          "row": 10,
+          "col": 1,
+          "rowCount": 2,
+          "colCount": 3
+        }
+      ],
+      "colHeaderSpan": [
+        {
+          "row": 0,
+          "col": 0,
+          "rowCount": 1,
+          "colCount": 2
+        }
+      ],
+      "selections": {
+        "0": {
+          "row": 1,
+          "col": 1,
+          "rowCount": 1,
+          "colCount": 1
+        },
+        "length": 1
+      },
+      "showRowOutline": false,
+      "showColumnOutline": false,
+      "rowOutlines": {
+        "items": []
+      },
+      "columnOutlines": {
+        "items": []
+      },
+      "cellStates": {},
+      "states": {},
+      "outlineColumnOptions": {},
+      "autoMergeRangeInfos": [],
+      "names": [
+        {
+          "name": "Local",
+          "formula": "42",
+          "row": 0,
+          "col": 0,
+          "isReadOnly": false
+        }
+      ],
+      "sheetTabColor": "#ff0000",
+      "gridline": {
+        "showHorizontalGridline": false
+      },
+      "namedStyles": [
+        {
+          "formatter": "#,##0.00",
+          "name": "Amount",
+          "parentName": "Base"
+        }
+      ],
+      "index": 0,
+      "order": 0
+    },
+    "Other": {
+      "name": "Other",
+      "isSelected": true,
+      "visible": 1,
+      "theme": "Office",
+      "data": {
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          }
+        }
+      },
+      "rowHeaderData": {
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          }
+        }
+      },
+      "colHeaderData": {
+        "defaultDataNode": {
+          "style": {
+            "themeFont": "Body"
+          }
+        }
+      },
+      "defaultData": {},
+      "leftCellIndex": 0,
+      "topCellIndex": 0,
+      "selections": {
+        "0": {
+          "row": 0,
+          "col": 0,
+          "rowCount": 1,
+          "colCount": 1
+        },
+        "length": 1
+      },
+      "rowOutlines": {
+        "items": []
+      },
+      "columnOutlines": {
+        "items": []
+      },
+      "cellStates": {},
+      "states": {},
+      "outlineColumnOptions": {},
+      "autoMergeRangeInfos": [],
+      "index": 1,
+      "order": 1
+    }
+  },
+  "sheetTabCount": 0,
+  "namedStyles": [
+    {
+      "foreColor": "#123456",
+      "font": "bold 12px Arial",
+      "name": "Base",
+      "fontWeight": "bold",
+      "fontSize": "12px",
+      "fontFamily": "Arial"
+    }
+  ],
+  "namedPatterns": {},
+  "scenarioAdditionalInfo": {
+    "appliedScenarios": {},
+    "baseValues": {}
+  },
+  "names": [
+    {
+      "name": "Tax",
+      "formula": "0.2",
+      "row": 0,
+      "col": 0,
+      "comment": "Tax rate",
+      "isReadOnly": false
+    }
+  ],
+  "dataManager": {
+    "tables": [],
+    "relationships": []
+  }
+}

@@ -24,9 +24,11 @@
     "styles"
   ],
   "scripts": {
-    "build": "pnpm --filter @opensheets/compat generate && tsx scripts/clean.ts && tsup && tsx scripts/finalize.ts",
+    "build": "tsx scripts/clean.ts && tsup && tsx scripts/finalize.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
-  "devDependencies": {}
+  "dependencies": {
+    "ssf": "0.11.2"
+  }
 }

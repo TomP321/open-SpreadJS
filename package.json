@@ -13,7 +13,8 @@
     "generate": "pnpm --filter @opensheets/compat generate",
     "compare": "pnpm --filter @opensheets/compare dev",
     "test:compare": "pnpm --filter @opensheets/compare test:visual",
-    "setup:compare": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium"
+    "setup:compare": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium",
+    "generate:enums": "pnpm --filter @opensheets/compat generate"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
