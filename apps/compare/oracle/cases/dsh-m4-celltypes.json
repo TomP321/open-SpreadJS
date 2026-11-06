@@ -1,0 +1,107 @@
+[
+ {
+  "id": "m4-ct-default",
+  "read": [
+   "js:(function(){ const t=sheet.getCellType(0,0); return [t.typeName,t.toJSON(),t.format(3.5,'0.00'),sheet.getCellType(0,0) instanceof GC.Spread.Sheets.CellTypes.Base]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-text",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.Text(); sheet.setCellType(0,0,t); const b=sheet.getCellType(0,0); return [b.typeName,b.toJSON(),sheet.toJSON().data.dataTable]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-button",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.Button(); t.buttonBackColor('#ff0000'); t.text('Go'); t.marginTop(2); t.marginLeft(1); t.marginRight(4); t.marginBottom(3); sheet.setCellType(0,0,t); const b=sheet.getCellType(0,0); return [b.typeName,b.toJSON(),b.buttonBackColor(),b.text(),b.marginTop(),b.marginLeft(),b.marginRight(),b.marginBottom()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-checkbox",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.CheckBox(); t.caption('Cap'); t.isThreeState(true); t.textTrue('Yes'); t.textFalse('No'); t.textIndeterminate('Maybe'); t.boxSize(20); t.textAlign(CT.TextAlign.right); t.hitTestMode('cell'); sheet.setCellType(0,0,t); const b=sheet.getCellType(0,0); return [b.typeName,b.toJSON(),b.caption(),b.isThreeState(),b.textTrue(),b.textFalse(),b.textIndeterminate(),b.boxSize(),b.textAlign(),b.hitTestMode()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-combobox",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.ComboBox(); t.items(['a','b']); t.editable(true); t.editorValueType(CT.EditorValueType.value); t.itemHeight(24); t.maxDropDownItems(8); t.allowFloat(false); sheet.setCellType(0,0,t); const b=sheet.getCellType(0,0); return [b.typeName,b.toJSON(),b.items(),b.editable(),b.editorValueType(),b.itemHeight(),b.maxDropDownItems(),b.allowFloat()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-hyperlink",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.HyperLink(); t.text('x'); t.linkColor('#00ff00'); t.visitedLinkColor('#ff00ff'); t.linkToolTip('tip'); t.target(CT.HyperLinkTargetType.blank); t.activeOnClick(false); sheet.setCellType(0,0,t); const b=sheet.getCellType(0,0); return [b.typeName,b.toJSON(),b.text(),b.linkColor(),b.visitedLinkColor(),b.linkToolTip(),b.target(),b.activeOnClick()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-lists",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const out=[]; [new CT.CheckBoxList(),new CT.RadioButtonList(),new CT.ButtonList()].forEach(function(t){ t.items(['a','b']); t.direction(CT.Direction.vertical); t.maxColumnCount(2); t.maxRowCount(3); t.itemSpacing({horizontal:2,vertical:3}); sheet.setCellType(0,0,t); const b=sheet.getCellType(0,0); out.push([b.typeName,b.toJSON(),b.items(),b.direction(),b.maxColumnCount(),b.maxRowCount(),b.itemSpacing()]); }); return out; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-headers",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const out=[]; [new CT.Corner(),new CT.ColumnHeader(),new CT.RowHeader()].forEach(function(t){ sheet.setCellType(0,0,t); const b=sheet.getCellType(0,0); out.push([b.typeName,b.toJSON()]); }); return out; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-fromjson",
+  "read": [
+   "js:(function(){ sheet.fromJSON({name:'Sheet1',data:{dataTable:{'0':{'0':{style:{cellType:{typeName:'5',caption:'Hi',isThreeState:true}}}}},defaultDataNode:{style:{themeFont:'Body'}}},rowOutlines:{items:[]},columnOutlines:{items:[]}}); const b=sheet.getCellType(0,0); return [b.typeName,b.toJSON(),b instanceof GC.Spread.Sheets.CellTypes.CheckBox]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-json-roundtrip",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.CheckBox(); t.caption('X'); t.isThreeState(true); sheet.setCellType(0,0,t); const before=sheet.toJSON().data.dataTable; wb.fromJSON(JSON.parse(JSON.stringify(wb.toJSON()))); return [before,wb.toJSON().sheets.Sheet1.data.dataTable,wb.getActiveSheet().getCellType(0,0).toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-custom-class",
+  "read": [
+   "js:(function(){ class MyType extends GC.Spread.Sheets.CellTypes.Base { constructor(){ super(); this.typeName='my'; this.color='red'; } paintContent(ctx,value,x,y,w,h,style){ ctx.fillStyle=this.color; ctx.fillRect(x,y,w,h); } toJSON(){ return {typeName:'my',color:this.color}; } } const t=new MyType(); sheet.setCellType(0,0,t); const b=sheet.getCellType(0,0); return [b.typeName,b.toJSON(),b instanceof MyType,b.format(12,'0.0')]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-getHitInfo",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.CheckBox(); const info=t.getHitInfo(3,3,new GC.Spread.Sheets.Style(),{x:0,y:0,width:100,height:20}); return [info && typeof info==='object', info && info.x, info && info.y, info && info.row]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-createEditor",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.Text(); const el=t.createEditorElement(); return [el.tagName,el.className,el instanceof HTMLElement]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-set-null",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; sheet.setCellType(0,0,new CT.CheckBox()); const a=sheet.getCellType(0,0).typeName; sheet.setCellType(0,0,null); const b=sheet.getCellType(0,0).typeName; return [a,b,sheet.getStyle(0,0)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-ct-afmt",
+  "read": [
+   "js:(function(){ const CT=GC.Spread.Sheets.CellTypes; const t=new CT.Text(); return [t.format(1234.5,'#,##0.00'),t.format(new Date(2020,0,2),'yyyy-mm-dd'),t.format(true,'General'),t.format(null,'General')]; })()"
+  ],
+  "steps": []
+ }
+]

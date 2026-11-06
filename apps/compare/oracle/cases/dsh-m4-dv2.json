@@ -1,0 +1,310 @@
+[
+ {
+  "id": "m4-dv-list-b",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createListValidator('a,b,c'); sheet.setDataValidator(0,0,v); return [v.type(),v.toJSON(),v.getValidList(sheet,0,0),sheet.getDataValidator(0,0)===v];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-formulalist",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createFormulaListValidator('=A1:A3'); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-number-0",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(0,1,10); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-number-1",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(1,1,10); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-number-2",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(2,1,10); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-number-3",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(3,1,10); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-number-4",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(4,1,10); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-number-5",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(5,1,10); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-number-6",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(6,1,10); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-number-7",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(7,1,10); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-integer-0",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(0,1,10,true); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-integer-1",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(1,1,10,true); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-integer-2",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(2,1,10,true); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-integer-3",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(3,1,10,true); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-integer-4",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(4,1,10,true); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-integer-5",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(5,1,10,true); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-integer-6",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(6,1,10,true); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-integer-7",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(7,1,10,true); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-date-0",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createDateValidator(0,new Date(2020,0,1),new Date(2020,11,31)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-date-1",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createDateValidator(1,new Date(2020,0,1),new Date(2020,11,31)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-date-2",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createDateValidator(2,new Date(2020,0,1),new Date(2020,11,31)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-date-3",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createDateValidator(3,new Date(2020,0,1),new Date(2020,11,31)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-date-4",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createDateValidator(4,new Date(2020,0,1),new Date(2020,11,31)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-date-5",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createDateValidator(5,new Date(2020,0,1),new Date(2020,11,31)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-time-0",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTimeValidator(0,new Date(2020,0,1,9),new Date(2020,0,1,17)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-time-1",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTimeValidator(1,new Date(2020,0,1,9),new Date(2020,0,1,17)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-time-2",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTimeValidator(2,new Date(2020,0,1,9),new Date(2020,0,1,17)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-time-3",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTimeValidator(3,new Date(2020,0,1,9),new Date(2020,0,1,17)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-time-4",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTimeValidator(4,new Date(2020,0,1,9),new Date(2020,0,1,17)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-time-5",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTimeValidator(5,new Date(2020,0,1,9),new Date(2020,0,1,17)); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-length-0",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTextLengthValidator(0,2,8); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-length-1",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTextLengthValidator(1,2,8); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-length-2",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTextLengthValidator(2,2,8); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-length-3",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTextLengthValidator(3,2,8); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-length-4",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTextLengthValidator(4,2,8); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-length-5",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTextLengthValidator(5,2,8); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-length-6",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTextLengthValidator(6,2,8); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-length-7",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createTextLengthValidator(7,2,8); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-formula-b",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createFormulaValidator('=A1>0'); return [v.type(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-props",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=new D.DefaultDataValidator(); v.type(2); v.showInputMessage(true); v.inputMessage('in'); v.inputTitle('title'); v.showErrorMessage(true); v.errorMessage('bad'); v.errorTitle('err'); v.errorStyle(1); v.ignoreBlank(false); v.inCellDropdown(false); return [v.type(),v.showInputMessage(),v.inputMessage(),v.inputTitle(),v.showErrorMessage(),v.errorMessage(),v.errorTitle(),v.errorStyle(),v.ignoreBlank(),v.inCellDropdown(),v.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-range-set",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createListValidator('x,y'); sheet.setDataValidator(1,1,3,2,v); return [sheet.getDataValidator(2,2)===v,sheet.getDataValidator(0,0),sheet.getDataValidator(1,1)===v];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-validations-json",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createListValidator('a,b'); sheet.setDataValidator(0,0,v); const j=sheet.toJSON(); return [j.validations,JSON.stringify(j).indexOf('a,b')>=0];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-isvalid-list",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createListValidator('a,b'); sheet.setDataValidator(0,0,v); return [sheet.isValid(0,0,'a'),sheet.isValid(0,0,'z'),sheet.isValid(1,1,'z')];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-dv-isvalid-number",
+  "read": [
+   "js:(function(){const D=GC.Spread.Sheets.DataValidation; const v=D.createNumberValidator(6,1,10); sheet.setDataValidator(0,0,v); return [sheet.isValid(0,0,5),sheet.isValid(0,0,11),sheet.isValid(0,0,'5')];})()"
+  ],
+  "steps": []
+ }
+]

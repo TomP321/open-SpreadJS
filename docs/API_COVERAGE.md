@@ -14,30 +14,30 @@ Classes count implemented constructors (their remaining members may be partial).
 | GC.Spread.CalcEngine.Functions | 2/2 (100.0%) | 19/19 (100.0%) | 1/1 (100.0%) | 8/8 (100.0%) |
 | GC.Spread.CalcEngine.LanguagePackages | — | 1/1 (100.0%) | — | 1/1 (100.0%) |
 | GC.Spread.Commands | 2/2 (100.0%) | 11/11 (100.0%) | 1/1 (100.0%) | 3/3 (100.0%) |
-| GC.Spread.Common | 2/4 (50.0%) | 6/11 (54.5%) | — | 15/15 (100.0%) |
+| GC.Spread.Common | 3/4 (75.0%) | 11/11 (100.0%) | — | 15/15 (100.0%) |
 | GC.Spread.Formatter | 1/2 (50.0%) | 3/7 (42.9%) | — | 2/2 (100.0%) |
 | GC.Spread.Pivot | 0/8 (0.0%) | 0/186 (0.0%) | 11/11 (100.0%) | 51/51 (100.0%) |
 | GC.Spread.Pivot.PivotTable | 0/1 (0.0%) | 0/6 (0.0%) | — | 1/1 (100.0%) |
 | GC.Spread.Report | 0/2 (0.0%) | 0/48 (0.0%) | — | 56/56 (100.0%) |
-| GC.Spread.Sheets | 8/20 (40.0%) | 251/383 (65.5%) | 70/70 (100.0%) | 324/324 (100.0%) |
+| GC.Spread.Sheets | 9/20 (45.0%) | 256/383 (66.8%) | 70/70 (100.0%) | 324/324 (100.0%) |
 | GC.Spread.Sheets.AI | — | — | — | 3/3 (100.0%) |
 | GC.Spread.Sheets.AutoMerge | — | — | 3/3 (100.0%) | 4/4 (100.0%) |
 | GC.Spread.Sheets.Barcode | 0/11 (0.0%) | — | — | 11/11 (100.0%) |
 | GC.Spread.Sheets.Bindings | 0/1 (0.0%) | 0/4 (0.0%) | — | 1/1 (100.0%) |
 | GC.Spread.Sheets.CalcEngine | — | 8/8 (100.0%) | 1/1 (100.0%) | 11/11 (100.0%) |
 | GC.Spread.Sheets.CellState | 0/1 (0.0%) | 0/2 (0.0%) | — | 1/1 (100.0%) |
-| GC.Spread.Sheets.CellTypes | 0/16 (0.0%) | 0/101 (0.0%) | 8/8 (100.0%) | 32/32 (100.0%) |
+| GC.Spread.Sheets.CellTypes | 16/16 (100.0%) | 88/101 (87.1%) | 8/8 (100.0%) | 32/32 (100.0%) |
 | GC.Spread.Sheets.Charts | 0/4 (0.0%) | 0/60 (0.0%) | 21/21 (100.0%) | 62/62 (100.0%) |
 | GC.Spread.Sheets.Collaboration | 0/1 (0.0%) | 0/13 (0.0%) | 3/3 (100.0%) | 13/13 (100.0%) |
 | GC.Spread.Sheets.Commands | — | 0/3 (0.0%) | — | 114/114 (100.0%) |
-| GC.Spread.Sheets.Comments | 2/3 (66.7%) | 6/33 (18.2%) | 2/2 (100.0%) | 5/5 (100.0%) |
-| GC.Spread.Sheets.ConditionalFormatting | 0/11 (0.0%) | 0/108 (0.0%) | 19/19 (100.0%) | 31/31 (100.0%) |
+| GC.Spread.Sheets.Comments | 2/3 (66.7%) | 33/33 (100.0%) | 2/2 (100.0%) | 5/5 (100.0%) |
+| GC.Spread.Sheets.ConditionalFormatting | 10/11 (90.9%) | 108/108 (100.0%) | 19/19 (100.0%) | 31/31 (100.0%) |
 | GC.Spread.Sheets.ContextMenu | 0/2 (0.0%) | 0/5 (0.0%) | — | 3/3 (100.0%) |
 | GC.Spread.Sheets.DataCharts | 0/3 (0.0%) | 0/34 (0.0%) | 27/27 (100.0%) | 87/87 (100.0%) |
 | GC.Spread.Sheets.DataRange | 0/2 (0.0%) | 0/8 (0.0%) | — | 4/4 (100.0%) |
-| GC.Spread.Sheets.DataValidation | 0/1 (0.0%) | 0/26 (0.0%) | 5/5 (100.0%) | 14/14 (100.0%) |
+| GC.Spread.Sheets.DataValidation | 1/1 (100.0%) | 26/26 (100.0%) | 5/5 (100.0%) | 14/14 (100.0%) |
 | GC.Spread.Sheets.Fill | — | — | 5/5 (100.0%) | 6/6 (100.0%) |
-| GC.Spread.Sheets.Filter | 0/2 (0.0%) | 0/17 (0.0%) | 1/1 (100.0%) | 5/5 (100.0%) |
+| GC.Spread.Sheets.Filter | 2/2 (100.0%) | 17/17 (100.0%) | 1/1 (100.0%) | 5/5 (100.0%) |
 | GC.Spread.Sheets.FloatingObjects | 0/3 (0.0%) | 0/41 (0.0%) | — | 3/3 (100.0%) |
 | GC.Spread.Sheets.FormulaPanel | 0/1 (0.0%) | 0/8 (0.0%) | — | 4/4 (100.0%) |
 | GC.Spread.Sheets.FormulaPanel.Commands | — | — | — | 6/6 (100.0%) |
@@ -49,7 +49,7 @@ Classes count implemented constructors (their remaining members may be partial).
 | GC.Spread.Sheets.NameBox | 0/1 (0.0%) | 0/4 (0.0%) | — | 3/3 (100.0%) |
 | GC.Spread.Sheets.NamedCellTemplates | 0/1 (0.0%) | 0/7 (0.0%) | — | 8/8 (100.0%) |
 | GC.Spread.Sheets.OutlineColumn | 0/1 (0.0%) | 0/6 (0.0%) | — | 2/2 (100.0%) |
-| GC.Spread.Sheets.Outlines | 0/2 (0.0%) | 0/20 (0.0%) | 2/2 (100.0%) | 4/4 (100.0%) |
+| GC.Spread.Sheets.Outlines | 2/2 (100.0%) | 20/20 (100.0%) | 2/2 (100.0%) | 4/4 (100.0%) |
 | GC.Spread.Sheets.PDF | 0/1 (0.0%) | 0/2 (0.0%) | — | 1/1 (100.0%) |
 | GC.Spread.Sheets.Print | 0/2 (0.0%) | 0/35 (0.0%) | 5/5 (100.0%) | 15/15 (100.0%) |
 | GC.Spread.Sheets.Scenarios | 0/2 (0.0%) | 0/14 (0.0%) | — | 7/7 (100.0%) |
@@ -59,12 +59,12 @@ Classes count implemented constructors (their remaining members may be partial).
 | GC.Spread.Sheets.Sparklines | 0/27 (0.0%) | 0/23 (0.0%) | 4/4 (100.0%) | 59/59 (100.0%) |
 | GC.Spread.Sheets.StatusBar | 0/2 (0.0%) | 0/14 (0.0%) | — | 5/5 (100.0%) |
 | GC.Spread.Sheets.StatusBar.StatusItem | — | — | — | 2/2 (100.0%) |
-| GC.Spread.Sheets.Tables | 0/7 (0.0%) | 0/88 (0.0%) | 1/1 (100.0%) | 11/11 (100.0%) |
+| GC.Spread.Sheets.Tables | 7/7 (100.0%) | 84/88 (95.5%) | 1/1 (100.0%) | 11/11 (100.0%) |
 | GC.Spread.Sheets.TableSheet | 0/3 (0.0%) | 0/45 (0.0%) | 4/4 (100.0%) | 29/29 (100.0%) |
 | GC.Spread.Sheets.ThreadedComments | 0/3 (0.0%) | 0/19 (0.0%) | 1/1 (100.0%) | 9/9 (100.0%) |
 | GC.Spread.Sheets.Touch | 0/3 (0.0%) | 0/17 (0.0%) | — | 3/3 (100.0%) |
 | GC.Spread.Slicers | 0/1 (0.0%) | 0/26 (0.0%) | 2/2 (100.0%) | 9/9 (100.0%) |
-| **Total** | 21/207 (10.1%) | 308/1796 (17.1%) | 252/252 (100.0%) | 1369/1369 (100.0%) |
+| **Total** | 61/207 (29.5%) | 688/1796 (38.3%) | 252/252 (100.0%) | 1369/1369 (100.0%) |
 
 ## M1/M2 behavior and limits
 
@@ -86,8 +86,6 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Data.View` members throwing `NotImplemented`: `autoFilter`, `autoSort`, `addColumn`, `addStyleRule`, `clearStyleRules`, `fetch`, `getColumn`, `getStyleRule`, `length`, `removeColumn`, `removeStyleRule`, `visibleLength`.
 - `GC.Spread.Common.Events`: constructor throws `NotImplemented`.
 - `GC.Spread.Common.Events` members throwing `NotImplemented`: `static CurrentUserChanged`.
-- `GC.Spread.Common.UserManager`: constructor throws `NotImplemented`.
-- `GC.Spread.Common.UserManager` members throwing `NotImplemented`: `static bind`, `static configure`, `static current`, `static get`, `static unbind`.
 - `GC.Spread.Formatter.FormatterBase`: constructor throws `NotImplemented`.
 - `GC.Spread.Formatter.FormatterBase` members throwing `NotImplemented`: `typeName`, `format`, `fromJSON`, `parse`, `toJSON`.
 - `GC.Spread.Pivot.CustomPivotTableThemeManager`: constructor throws `NotImplemented`.
@@ -128,33 +126,9 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Spread.Sheets.CellRange` members throwing `NotImplemented`: `applyNamedCellTemplate`, `toHtml`.
 - `GC.Spread.Sheets.CellState.CellStateManager`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.CellState.CellStateManager` members throwing `NotImplemented`: `add`, `clear`.
-- `GC.Spread.Sheets.CellTypes.Base`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.Base` members throwing `NotImplemented`: `typeName`, `activateEditor`, `createEditorElement`, `deactivateEditor`, `focus`, `format`, `fromJSON`, `getAutoFitHeight`, `getAutoFitWidth`, `getEditorValue`, `getHitInfo`, `isEditingValueChanged`, `isImeAware`, `isReservedKey`, `paint`, `paintContent`, `parse`, `processKeyDown`, `processKeyUp`, `processMouseDown`, `processMouseEnter`, `processMouseLeave`, `processMouseMove`, `processMouseUp`, `selectAll`, `setEditorValue`, `toJSON`, `updateEditor`, `updateEditorContainer`, `updateImeMode`.
-- `GC.Spread.Sheets.CellTypes.Button`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.Button` members throwing `NotImplemented`: `buttonBackColor`, `marginBottom`, `marginLeft`, `marginRight`, `marginTop`, `text`.
-- `GC.Spread.Sheets.CellTypes.ButtonList`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.ButtonList` members throwing `NotImplemented`: `direction`, `isFlowLayout`, `items`, `itemSpacing`, `maxColumnCount`, `maxRowCount`, `padding`, `selectedBackColor`, `selectedForeColor`, `selectionMode`.
-- `GC.Spread.Sheets.CellTypes.CheckBox`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.CheckBox` members throwing `NotImplemented`: `boxSize`, `caption`, `hitTestMode`, `isThreeState`, `mode`, `textAlign`, `textEditable`, `textFalse`, `textIndeterminate`, `textTrue`, `toggleOptions`.
-- `GC.Spread.Sheets.CellTypes.CheckBoxList`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.CheckBoxList` members throwing `NotImplemented`: `boxSize`, `direction`, `isFlowLayout`, `items`, `itemSpacing`, `maxColumnCount`, `maxRowCount`, `mode`, `textAlign`, `toggleOptions`.
-- `GC.Spread.Sheets.CellTypes.ColumnHeader`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.ComboBox`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.ComboBox` members throwing `NotImplemented`: `allowFloat`, `dataBinding`, `editable`, `editorValueType`, `itemHeight`, `items`, `maxDropDownItems`.
-- `GC.Spread.Sheets.CellTypes.Corner`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.DataObject`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.DataObject` members throwing `NotImplemented`: `formatString`.
-- `GC.Spread.Sheets.CellTypes.Diagonal`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.Diagonal` members throwing `NotImplemented`: `divergeDirection`, `lineBorder`.
-- `GC.Spread.Sheets.CellTypes.FileUpload`: constructor throws `NotImplemented`.
+- `GC.Spread.Sheets.CellTypes.Base` members throwing `NotImplemented`: `parse`.
+- `GC.Spread.Sheets.CellTypes.CheckBoxList` members throwing `NotImplemented`: `mode`, `toggleOptions`.
 - `GC.Spread.Sheets.CellTypes.FileUpload` members throwing `NotImplemented`: `previewCommand`, `accept`, `isClearEnabled`, `isDownloadEnabled`, `isPreviewEnabled`, `marginBottom`, `marginLeft`, `marginRight`, `marginTop`, `maxSize`, `valuePath`.
-- `GC.Spread.Sheets.CellTypes.HyperLink`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.HyperLink` members throwing `NotImplemented`: `activeOnClick`, `linkColor`, `linkToolTip`, `onClickAction`, `target`, `text`, `visitedLinkColor`.
-- `GC.Spread.Sheets.CellTypes.RadioButtonList`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.RadioButtonList` members throwing `NotImplemented`: `boxSize`, `direction`, `isFlowLayout`, `items`, `itemSpacing`, `maxColumnCount`, `maxRowCount`, `textAlign`.
-- `GC.Spread.Sheets.CellTypes.RangeTemplate`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.RowHeader`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.CellTypes.Text`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.Charts.Chart`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.Charts.Chart` members throwing `NotImplemented`: `typeName`, `allowMove`, `allowResize`, `alt`, `axes`, `canPrint`, `chartArea`, `chartType`, `cloneContent`, `colorScheme`, `content`, `dataLabels`, `dataRange`, `displayBlanksAs`, `displayNaAsBlank`, `dynamicMove`, `dynamicSize`, `endColumn`, `endColumnOffset`, `endRow`, `endRowOffset`, `fixedPosition`, `formatOvers`, `getFormula`, `getHost`, `height`, `hoverStyle`, `ignoreHidden`, `isLocked`, `isSelected`, `isVisible`, `legend`, `name`, `plotArea`, `refreshContent`, `series`, `setFormula`, `startColumn`, `startColumnOffset`, `startRow`, `startRowOffset`, `switchDataOrientation`, `title`, `toImageSrc`, `toImageSrcAsync`, `useAnimation`, `width`, `x`, `y`.
 - `GC.Spread.Sheets.Charts.ChartCollection`: constructor throws `NotImplemented`.
@@ -282,29 +256,9 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Spread.Sheets.Commands.undo`: property access throws `NotImplemented`.
 - `GC.Spread.Sheets.Commands.undoTransaction`: function throws `NotImplemented`.
 - `GC.Spread.Sheets.Commands.zoom`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Comments.Comment` members throwing `NotImplemented`: `autoSize`, `backColor`, `borderColor`, `borderStyle`, `borderWidth`, `commentState`, `displayMode`, `dynamicMove`, `dynamicSize`, `fontFamily`, `fontSize`, `fontStyle`, `fontWeight`, `foreColor`, `height`, `horizontalAlign`, `indicatorColor`, `indicatorSize`, `location`, `locked`, `lockText`, `opacity`, `padding`, `showShadow`, `textDecoration`, `width`, `zIndex`.
 - `GC.Spread.Sheets.Comments.Padding`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.Condition`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.Condition` members throwing `NotImplemented`: `compareType`, `evaluate`, `expected`, `formula`, `static fromDay`, `static fromFormula`, `static fromMonth`, `static fromQuarter`, `static fromSource`, `static fromWeek`, `static fromYear`, `getExpected`, `getValidList`, `ignoreBlank`, `ignoreCase`, `item1`, `item2`, `preciseCompareDate`, `ranges`, `reset`, `treatNullValueAsZero`, `useWildCards`.
-- `GC.Spread.Sheets.ConditionalFormatting.ConditionalFormats`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.ConditionalFormats` members throwing `NotImplemented`: `add2ScaleRule`, `add3ScaleRule`, `addAverageRule`, `addCellValueRule`, `addColumnStateRule`, `addDataBarRule`, `addDateOccurringRule`, `addDuplicateRule`, `addFormulaRule`, `addIconSetRule`, `addRowStateRule`, `addRule`, `addSparklineRule`, `addSpecificTextRule`, `addTop10Rule`, `addUniqueRule`, `clearRule`, `containsRule`, `count`, `getRule`, `getRules`, `removeRule`, `removeRuleByRange`.
-- `GC.Spread.Sheets.ConditionalFormatting.ConditionRuleBase`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.ConditionRuleBase` members throwing `NotImplemented`: `condition`, `contains`, `createCondition`, `evaluate`, `getExpected`, `intersects`, `isScaleRule`, `priority`, `ranges`, `reset`, `ruleType`, `stopIfTrue`, `style`.
-- `GC.Spread.Sheets.ConditionalFormatting.DataBarRule`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.DataBarRule` members throwing `NotImplemented`: `axisColor`, `axisPosition`, `borderColor`, `color`, `dataBarDirection`, `evaluate`, `gradient`, `negativeBorderColor`, `negativeFillColor`, `showBarOnly`, `showBorder`, `useNegativeBorderColor`, `useNegativeFillColor`.
-- `GC.Spread.Sheets.ConditionalFormatting.IconCriterion`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.IconSetRule`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.IconSetRule` members throwing `NotImplemented`: `evaluate`, `static getIcon`, `iconCriteria`, `icons`, `iconSetType`, `reset`, `reverseIconOrder`, `showIconOnly`.
-- `GC.Spread.Sheets.ConditionalFormatting.NormalConditionRule`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.NormalConditionRule` members throwing `NotImplemented`: `createCondition`, `formula`, `isPercent`, `operator`, `rank`, `reset`, `text`, `type`, `value1`, `value2`.
-- `GC.Spread.Sheets.ConditionalFormatting.ScaleRule`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.ScaleRule` members throwing `NotImplemented`: `createCondition`, `evaluate`, `maxColor`, `maxType`, `maxValue`, `midColor`, `midType`, `midValue`, `minColor`, `minType`, `minValue`, `stopIfTrue`.
 - `GC.Spread.Sheets.ConditionalFormatting.ScaleValue`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.ConditionalFormatting.ScaleValue` members throwing `NotImplemented`: `type`, `value`.
-- `GC.Spread.Sheets.ConditionalFormatting.SparklineRule`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.SparklineRule` members throwing `NotImplemented`: `evaluate`, `reset`, `showSparklineOnly`, `sparklineOptions`, `sparklineType`.
-- `GC.Spread.Sheets.ConditionalFormatting.StateRule`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.ConditionalFormatting.StateRule` members throwing `NotImplemented`: `isRow`, `state`.
 - `GC.Spread.Sheets.ContextMenu.ContextMenu`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.ContextMenu.ContextMenu` members throwing `NotImplemented`: `menuData`, `menuView`, `onOpenMenu`.
 - `GC.Spread.Sheets.ContextMenu.MenuView`: constructor throws `NotImplemented`.
@@ -322,19 +276,6 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Spread.Sheets.DataRange.DataRange` members throwing `NotImplemented`: `name`, `range`, `repaint`.
 - `GC.Spread.Sheets.DataRange.DataRangeManager`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.DataRange.DataRangeManager` members throwing `NotImplemented`: `add`, `all`, `clear`, `get`, `remove`.
-- `GC.Spread.Sheets.DataValidation.createDateValidator`: function throws `NotImplemented`.
-- `GC.Spread.Sheets.DataValidation.createFormulaListValidator`: function throws `NotImplemented`.
-- `GC.Spread.Sheets.DataValidation.createFormulaValidator`: function throws `NotImplemented`.
-- `GC.Spread.Sheets.DataValidation.createListValidator`: function throws `NotImplemented`.
-- `GC.Spread.Sheets.DataValidation.createNumberValidator`: function throws `NotImplemented`.
-- `GC.Spread.Sheets.DataValidation.createTextLengthValidator`: function throws `NotImplemented`.
-- `GC.Spread.Sheets.DataValidation.createTimeValidator`: function throws `NotImplemented`.
-- `GC.Spread.Sheets.DataValidation.DefaultDataValidator`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.DataValidation.DefaultDataValidator` members throwing `NotImplemented`: `comparisonOperator`, `condition`, `errorMessage`, `errorStyle`, `errorTitle`, `getValidList`, `highlightStyle`, `ignoreBlank`, `inCellDropdown`, `inputMessage`, `inputTitle`, `isValid`, `preciseCompareDate`, `reset`, `showErrorMessage`, `showInputMessage`, `type`, `value1`, `value2`.
-- `GC.Spread.Sheets.Filter.HideRowFilter`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Filter.HideRowFilter` members throwing `NotImplemented`: `filterDialogVisibleInfo`.
-- `GC.Spread.Sheets.Filter.RowFilterBase`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Filter.RowFilterBase` members throwing `NotImplemented`: `extendedRange`, `range`, `typeName`, `addFilterItem`, `filter`, `filterButtonVisible`, `fromJSON`, `getFilteredItems`, `getFilterItems`, `getSortState`, `isFiltered`, `isRowFilteredOut`, `onFilter`, `openFilterDialog`, `removeFilterItems`, `reset`, `sortColumn`, `toJSON`, `unfilter`.
 - `GC.Spread.Sheets.findControl`: function throws `NotImplemented`.
 - `GC.Spread.Sheets.FloatingObjects.FloatingObject`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.FloatingObjects.FloatingObject` members throwing `NotImplemented`: `typeName`, `allowMove`, `allowResize`, `alt`, `cloneContent`, `content`, `dynamicMove`, `dynamicSize`, `endColumn`, `endColumnOffset`, `endRow`, `endRowOffset`, `fixedPosition`, `getHost`, `height`, `isLocked`, `isSelected`, `isVisible`, `name`, `refreshContent`, `startColumn`, `startColumnOffset`, `startRow`, `startRowOffset`, `width`, `x`, `y`.
@@ -399,15 +340,10 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Spread.Sheets.NamedCellTemplates.NamedCellTemplatesManager` members throwing `NotImplemented`: `add`, `all`, `clear`, `createFromCell`, `get`, `has`, `remove`.
 - `GC.Spread.Sheets.OutlineColumn.OutlineColumn`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.OutlineColumn.OutlineColumn` members throwing `NotImplemented`: `getCheckStatus`, `getCollapsed`, `options`, `refresh`, `setCheckStatus`, `setCollapsed`.
-- `GC.Spread.Sheets.Outlines.Outline`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Outlines.Outline` members throwing `NotImplemented`: `direction`, `expand`, `expandGroup`, `find`, `getCollapsed`, `getLevel`, `getMaxLevel`, `getState`, `group`, `isCollapsed`, `isGroupEnd`, `refresh`, `resumeAdding`, `setCollapsed`, `suspendAdding`, `ungroup`, `ungroupRange`.
-- `GC.Spread.Sheets.Outlines.OutlineInfo`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Outlines.OutlineInfo` members throwing `NotImplemented`: `children`, `end`, `level`, `model`, `parent`, `start`, `addChild`, `contains`, `state`.
 - `GC.Spread.Sheets.PDF.PDFFontsManager`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.PDF.PDFFontsManager` members throwing `NotImplemented`: `static fallbackFont`, `static registerFont`.
 - `GC.Spread.Sheets.PivotTableManager`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.PivotTableManager` members throwing `NotImplemented`: `add`, `all`, `customList`, `findPivotTable`, `get`, `getRangePivotAreas`, `remove`.
-- `GC.Spread.Sheets.Point`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.Point` members throwing `NotImplemented`: `clone`.
 - `GC.Spread.Sheets.Print.PaperSize`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.Print.PaperSize` members throwing `NotImplemented`: `getPageSize`, `height`, `kind`, `width`.
@@ -505,20 +441,7 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Spread.Sheets.StatusBar.StatusBar` members throwing `NotImplemented`: `add`, `all`, `bind`, `dispose`, `get`, `remove`, `unbind`, `update`.
 - `GC.Spread.Sheets.StatusBar.StatusItem`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.StatusBar.StatusItem` members throwing `NotImplemented`: `onBind`, `onCreateItemView`, `onDispose`, `onUnbind`, `onUpdate`.
-- `GC.Spread.Sheets.Tables.CustomTableThemeManager`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Tables.CustomTableThemeManager` members throwing `NotImplemented`: `add`, `all`, `get`, `remove`, `update`.
-- `GC.Spread.Sheets.Tables.Table`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Tables.Table` members throwing `NotImplemented`: `adjustTableRangeForBind`, `allowAutoExpand`, `autoGenerateColumns`, `bandColumns`, `bandRows`, `bind`, `bindColumns`, `bindingPath`, `clearPendingChanges`, `columnLayoutStyle`, `dataRange`, `deleteColumns`, `deleteRows`, `expandBoundRows`, `filterButtonVisible`, `footerIndex`, `getBindingSource`, `getColumnDataField`, `getColumnFormula`, `getColumnName`, `getColumnValue`, `getDirtyRows`, `getSlicerData`, `getStyleName`, `headerIndex`, `highlightFirstColumn`, `highlightLastColumn`, `insertColumns`, `insertRows`, `isTableLayoutDirty`, `layoutStyle`, `name`, `range`, `rowFilter`, `setColumnDataField`, `setColumnDataFormula`, `setColumnFormula`, `setColumnName`, `setColumnValue`, `showFooter`, `showHeader`, `showResizeHandle`, `style`, `useFooterDropDownList`.
-- `GC.Spread.Sheets.Tables.TableColumn`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Tables.TableColumn` members throwing `NotImplemented`: `cellType`, `dataField`, `dataStyle`, `footerStyle`, `formatter`, `headerStyle`, `id`, `name`, `value`.
-- `GC.Spread.Sheets.Tables.TableManager`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Tables.TableManager` members throwing `NotImplemented`: `add`, `addFromDataSource`, `all`, `convertFromDataTable`, `convertToDataTable`, `find`, `findByName`, `move`, `remove`, `resize`.
-- `GC.Spread.Sheets.Tables.TableStyle`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Tables.TableStyle` members throwing `NotImplemented`: `backColor`, `borderBottom`, `borderHorizontal`, `borderLeft`, `borderRight`, `borderTop`, `borderVertical`, `font`, `fontFamily`, `fontSize`, `fontStyle`, `fontWeight`, `foreColor`, `textDecoration`.
-- `GC.Spread.Sheets.Tables.TableTheme`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Tables.TableTheme` members throwing `NotImplemented`: `firstColumnStripSize`, `firstColumnStripStyle`, `firstFooterCellStyle`, `firstHeaderCellStyle`, `firstRowStripSize`, `firstRowStripStyle`, `footerRowStyle`, `fromJSON`, `headerRowStyle`, `highlightFirstColumnStyle`, `highlightLastColumnStyle`, `lastFooterCellStyle`, `lastHeaderCellStyle`, `name`, `secondColumnStripSize`, `secondColumnStripStyle`, `secondRowStripSize`, `secondRowStripStyle`, `toJSON`, `wholeTableStyle`.
-- `GC.Spread.Sheets.Tables.TableThemes`: constructor throws `NotImplemented`.
-- `GC.Spread.Sheets.Tables.TableThemes` members throwing `NotImplemented`: `static dark1`, `static dark10`, `static dark11`, `static dark2`, `static dark3`, `static dark4`, `static dark5`, `static dark6`, `static dark7`, `static dark8`, `static dark9`, `static light1`, `static light10`, `static light11`, `static light12`, `static light13`, `static light14`, `static light15`, `static light16`, `static light17`, `static light18`, `static light19`, `static light2`, `static light20`, `static light21`, `static light3`, `static light4`, `static light5`, `static light6`, `static light7`, `static light8`, `static light9`, `static medium1`, `static medium10`, `static medium11`, `static medium12`, `static medium13`, `static medium14`, `static medium15`, `static medium16`, `static medium17`, `static medium18`, `static medium19`, `static medium2`, `static medium20`, `static medium21`, `static medium22`, `static medium23`, `static medium24`, `static medium25`, `static medium26`, `static medium27`, `static medium28`, `static medium3`, `static medium4`, `static medium5`, `static medium6`, `static medium7`, `static medium8`, `static medium9`, `static professional1`, `static professional10`, `static professional11`, `static professional12`, `static professional13`, `static professional14`, `static professional15`, `static professional16`, `static professional17`, `static professional18`, `static professional19`, `static professional2`, `static professional20`, `static professional21`, `static professional22`, `static professional23`, `static professional24`, `static professional3`, `static professional4`, `static professional5`, `static professional6`, `static professional7`, `static professional8`, `static professional9`.
+- `GC.Spread.Sheets.Tables.Table` members throwing `NotImplemented`: `deleteColumns`, `deleteRows`, `insertColumns`, `insertRows`.
 - `GC.Spread.Sheets.TableSheet.BuiltInRowActions`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.TableSheet.BuiltInRowActions` members throwing `NotImplemented`: `static dirtyStatus`, `static pinRow`, `static removeRow`, `static resetRow`, `static saveRow`, `static warningInfo`.
 - `GC.Spread.Sheets.TableSheet.TableSheet`: constructor throws `NotImplemented`.
@@ -548,7 +471,7 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Spread.Sheets.Touch.TouchToolStripSeparator`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.Touch.TouchToolStripSeparator` members throwing `NotImplemented`: `name`.
 - `GC.Spread.Sheets.Workbook` members throwing `NotImplemented`: `collaboration`, `contextMenu`, `customPivotTableThemes`, `customSlicerThemes`, `customTableThemes`, `customTimelineThemes`, `namedCellTemplates`, `scenarioManager`, `sheetTabStyles`, `touchToolStrip`, `addSheetTab`, `addSparklineEx`, `changeSheetPosition`, `clearCustomFunctions`, `clearSheetTabs`, `dataManager`, `defaultPivotTableTheme`, `defaultSlicerTheme`, `defaultTableTheme`, `defaultTimelineTheme`, `export`, `getActiveSheetTab`, `getActiveSheetTabIndex`, `getCircularReference`, `getExternalReferences`, `getSheetPosition`, `getSheetTab`, `getSheetTabCount`, `getSheetTabIndex`, `hitTest`, `import`, `injectAI`, `nextControl`, `open`, `pageInfo`, `previousControl`, `print`, `removeCustomFunction`, `removeSheetTab`, `removeSparklineEx`, `save`, `savePDF`, `search`, `setActiveSheetTab`, `updateExternalReference`, `waitForAllCalculations`.
-- `GC.Spread.Sheets.Worksheet` members throwing `NotImplemented`: `cellStates`, `charts`, `columnOutlines`, `conditionalFormats`, `dataCharts`, `dataRanges`, `floatingObjects`, `outlineColumn`, `pictures`, `pivotTables`, `rowOutlines`, `shapes`, `slicers`, `tables`, `threadedComments`, `applyNamedCellTemplate`, `autoMerge`, `backgroundImage`, `clearCustomFunctions`, `currentTheme`, `editorStatus`, `fillAuto`, `getColumnPageBreak`, `getCsv`, `getDataColumnName`, `getDataItem`, `getDeletedRows`, `getDependents`, `getDirtyRows`, `getFormulaInformation`, `getHyperlink`, `getId`, `getInsertRows`, `getPrecedents`, `getRowPageBreak`, `getSortState`, `getSparkline`, `getUsedRange`, `groupSparkline`, `hasPassword`, `hitTest`, `isPrintLineVisible`, `isSelected`, `isValid`, `printInfo`, `protect`, `removeCustomFunction`, `removeSparkline`, `reset`, `rowFilter`, `search`, `setColumnPageBreak`, `setCsv`, `setHyperlink`, `setRowPageBreak`, `setSparkline`, `sortRange`, `ungroupSparkline`, `unprotect`.
+- `GC.Spread.Sheets.Worksheet` members throwing `NotImplemented`: `cellStates`, `charts`, `dataCharts`, `dataRanges`, `floatingObjects`, `outlineColumn`, `pictures`, `pivotTables`, `shapes`, `slicers`, `threadedComments`, `applyNamedCellTemplate`, `autoMerge`, `backgroundImage`, `clearCustomFunctions`, `currentTheme`, `editorStatus`, `fillAuto`, `getColumnPageBreak`, `getCsv`, `getDataColumnName`, `getDataItem`, `getDeletedRows`, `getDependents`, `getDirtyRows`, `getFormulaInformation`, `getId`, `getInsertRows`, `getPrecedents`, `getRowPageBreak`, `getSortState`, `getSparkline`, `getUsedRange`, `groupSparkline`, `hasPassword`, `hitTest`, `isPrintLineVisible`, `isSelected`, `printInfo`, `protect`, `removeCustomFunction`, `removeSparkline`, `reset`, `search`, `setColumnPageBreak`, `setCsv`, `setRowPageBreak`, `setSparkline`, `ungroupSparkline`, `unprotect`.
 - `GC.Spread.Slicers.GeneralSlicerData`: constructor throws `NotImplemented`.
 - `GC.Spread.Slicers.GeneralSlicerData` members throwing `NotImplemented`: `columnNames`, `data`, `aggregateData`, `attachListener`, `clearPreview`, `detachListener`, `doFilter`, `doUnfilter`, `getColumnIndex`, `getData`, `getExclusiveData`, `getExclusiveRowIndex`, `getFilteredIndexes`, `getFilteredOutIndexes`, `getFilteredOutRanges`, `getFilteredOutRowIndexes`, `getFilteredRanges`, `getFilteredRowIndexes`, `getRowIndexes`, `inPreview`, `onColumnNameChanged`, `onColumnsRemoved`, `onDataChanged`, `onFiltered`, `onRowsAdded`, `onRowsRemoved`, `resumeFilteredEvents`, `suspendFilteredEvents`.
 

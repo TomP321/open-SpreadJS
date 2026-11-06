@@ -1090,8 +1090,12 @@ function render(node: AstNode, options: LexOptions): string {
       return `{${node.rows.map((row) => row.map((value) => render(value, options)).join(',')).join(';')}}`;
     case 'spill':
       return `${render(node.ref, options)}#`;
-    case 'structured':
-      return `${node.table}${node.spec}`;
+    case 'structured': {
+      let spec = node.spec;
+      const thisRow = /^\[\[#This Row\],\[([^\]]+)\]\]$/i.exec(spec);
+      if (thisRow) spec = `[@${thisRow[1]}]`;
+      return `${node.table}${spec}`;
+    }
     case 'call':
       return `${render(node.callee, options)}(${node.args.map((arg) => render(arg, options)).join(',')})`;
   }
@@ -1297,6 +1301,74 @@ export function adjustRefsForStructure(
     }
   };
   return visit(node);
+}
+
+/**
+ * Re-points references to a moved block. References fully inside the moved
+ * rectangle shift by the same delta; a formula that moved with the block keeps
+ * its text (SpreadJS preserves it when its cell is cut and pasted).
+ */
+export function moveRefsForRange(
+  node: AstNode,
+  fromRow: number,
+  fromCol: number,
+  fromRowEnd: number,
+  fromColEnd: number,
+  toRow: number,
+  toCol: number,
+  dr: number,
+  dc: number,
+  sheetName: string,
+  formulaRow: number,
+  formulaCol: number,
+  destRowCount: number,
+  destColCount: number,
+  onMovedSheet: boolean,
+): AstNode {
+  // The formula's coordinates are already the post-move ones. Formulas now in
+  // the destination rectangle were part of the moved block and keep their refs.
+  if (
+    onMovedSheet &&
+    formulaRow >= toRow && formulaRow < toRow + destRowCount &&
+    formulaCol >= toCol && formulaCol < toCol + destColCount
+  )
+    return node;
+  const walk = (current: AstNode): AstNode => {
+    if (current.kind === 'ref') {
+      if (current.sheet && current.sheet.toLowerCase() !== sheetName.toLowerCase()) return current;
+      if (
+        current.r1 >= fromRow && current.r2 <= fromRowEnd &&
+        current.c1 >= fromCol && current.c2 <= fromColEnd
+      )
+        return { ...current, r1: current.r1 + dr, r2: current.r2 + dr, c1: current.c1 + dc, c2: current.c2 + dc };
+      return current;
+    }
+    switch (current.kind) {
+      case 'range':
+        return { ...current, start: walk(current.start), end: walk(current.end) };
+      case 'union':
+        return { ...current, parts: current.parts.map(walk) };
+      case 'intersect':
+        return { ...current, left: walk(current.left), right: walk(current.right) };
+      case 'binary':
+        return { ...current, left: walk(current.left), right: walk(current.right) };
+      case 'unary':
+        return { ...current, operand: walk(current.operand) };
+      case 'percent':
+        return { ...current, operand: walk(current.operand) };
+      case 'paren':
+        return { ...current, inner: walk(current.inner) };
+      case 'function':
+        return { ...current, args: current.args.map(walk) };
+      case 'spill':
+        return { ...current, ref: walk(current.ref) };
+      case 'call':
+        return { ...current, callee: walk(current.callee), args: current.args.map(walk) };
+      default:
+        return current;
+    }
+  };
+  return walk(node);
 }
 
 /** Text of a static range reference. */

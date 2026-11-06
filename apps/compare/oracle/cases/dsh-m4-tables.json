@@ -1,0 +1,559 @@
+[
+ {
+  "id": "m4-table-add-default",
+  "cells": {
+   "A1": "Item",
+   "B1": "Qty",
+   "A2": "Pen",
+   "B2": 3,
+   "A3": "Pad",
+   "B3": 5
+  },
+  "read": [
+   "js:sheet.tables.all().length",
+   "js:sheet.tables.all()[0].name()",
+   "js:sheet.tables.all()[0].range()",
+   "js:sheet.tables.all()[0].dataRange()",
+   "js:sheet.tables.all()[0].getStyleName()",
+   "js:sheet.tables.all()[0].headerIndex()",
+   "js:sheet.tables.all()[0].footerIndex()",
+   "js:sheet.tables.all()[0].showHeader()",
+   "js:sheet.tables.all()[0].showFooter()",
+   "js:sheet.tables.all()[0].bandRows()",
+   "js:sheet.tables.all()[0].bandColumns()",
+   "js:sheet.tables.all()[0].filterButtonVisible()",
+   "js:sheet.tables.all()[0].toJSON()",
+   "js:JSON.stringify(wb.toJSON().sheets.Sheet1.tables)"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 3, 2)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-add-empty-header-names",
+  "read": [
+   "js:[sheet.getValue(0,0),sheet.getValue(0,1),sheet.getValue(0,2)]",
+   "js:sheet.tables.all()[0].toJSON()",
+   "js:[sheet.tables.all()[0].getColumnName(0),sheet.tables.all()[0].getColumnName(1),sheet.tables.all()[0].getColumnName(2)]"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('TblA', 0, 0, 3, 3)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-invalid-name",
+  "read": [
+   "js:sheet.tables.all().length",
+   "js:(function(){ try { sheet.tables.add('T1',0,0,3,2); return 'ok'; } catch(e) { return String(e.message); } })()",
+   "js:(function(){ try { sheet.tables.add('R1C1',0,0,3,2); return 'ok'; } catch(e) { return String(e.message); } })()",
+   "js:(function(){ try { sheet.tables.add('1bad',0,0,3,2); return 'ok'; } catch(e) { return String(e.message); } })()",
+   "js:(function(){ try { sheet.tables.add('Sales',0,0,3,2); sheet.tables.add('sales2',1,1,2,2); return 'ok'; } catch(e) { return String(e.message); } })()"
+  ]
+ },
+ {
+  "id": "m4-table-duplicate-name",
+  "read": [
+   "js:(function(){ try { sheet.tables.add('Sales',0,0,3,2); sheet.tables.add('sales',4,0,3,2); return 'ok'; } catch(e) { return String(e.message); } })()",
+   "js:sheet.tables.all().length"
+  ]
+ },
+ {
+  "id": "m4-table-da-find",
+  "read": [
+   "js:sheet.tables.find(1,1) && sheet.tables.find(1,1).name()",
+   "js:sheet.tables.find(10,10)",
+   "js:sheet.tables.findByName('sales') && sheet.tables.findByName('sales').name()",
+   "js:sheet.tables.findByName('nope')",
+   "js:sheet.tables.all().map(function(t){return t.name();})"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales',0,0,3,2); sheet.tables.add('Other',5,2,4,2)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-showheader",
+  "read": [
+   "js:sheet.tables.all()[0].toJSON()",
+   "js:sheet.tables.all()[0].range()",
+   "js:sheet.tables.all()[0].dataRange()",
+   "js:sheet.tables.all()[0].headerIndex()",
+   "js:(function(){ sheet.tables.all()[0].showHeader(false); return [sheet.tables.all()[0].showHeader(), sheet.tables.all()[0].range(), sheet.tables.all()[0].headerIndex()]; })()",
+   "js:sheet.tables.all()[0].toJSON()",
+   "js:sheet.tables.all()[0].range()",
+   "js:(function(){ sheet.tables.all()[0].showHeader(true); return [sheet.tables.all()[0].showHeader(), sheet.tables.all()[0].range()]; })()",
+   "js:sheet.tables.all()[0].toJSON()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 5, 3)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-footer",
+  "read": [
+   "js:(function(){ sheet.tables.all()[0].showFooter(true); return sheet.tables.all()[0].footerIndex(); })()",
+   "js:sheet.tables.all()[0].footerIndex()",
+   "js:sheet.tables.all()[0].toJSON()",
+   "js:sheet.tables.all()[0].dataRange()",
+   "js:sheet.tables.all()[0].range()",
+   "js:[sheet.getValue(4,0),sheet.getValue(4,1)]"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 5, 3)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-footer-formula",
+  "cells": {
+   "A1": "Item",
+   "B1": "Qty",
+   "A2": "Pen",
+   "B2": 3,
+   "A3": "Pad",
+   "B3": 5
+  },
+  "read": [
+   "js:(function(){ sheet.tables.all()[0].showFooter(true); return sheet.tables.all()[0].footerIndex(); })()",
+   "js:(function(){ try { sheet.tables.all()[0].setColumnFormula(1,'SUBTOTAL(109,[Qty])'); return sheet.tables.all()[0].toJSON(); } catch(e) { return String(e.message); } })()",
+   "js:sheet.getValue(3,1)",
+   "B4"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 3, 2)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-columns",
+  "read": [
+   "js:(function(){ const t=sheet.tables.all()[0]; t.setColumnName(0,'First'); return t.toJSON(); })()",
+   "js:[sheet.getValue(0,0),sheet.tables.all()[0].getColumnName(0)]",
+   "js:(function(){ const t=sheet.tables.all()[0]; t.setColumnDataField(1,'qty'); return [t.getColumnDataField(1),t.toJSON()]; })()",
+   "js:(function(){ const t=sheet.tables.all()[0]; t.setColumnValue(1,42); return [t.getColumnValue(1),t.toJSON()]; })()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 4, 2)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-flags-json",
+  "read": [
+   "js:(function(){ const t=sheet.tables.all()[0]; t.bandColumns(true); t.highlightFirstColumn(true); t.highlightLastColumn(true); t.bandRows(false); t.showResizeHandle(true); return t.toJSON(); })()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 5, 3)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-filter-buttons",
+  "read": [
+   "js:[sheet.tables.all()[0].filterButtonVisible(0),sheet.tables.all()[0].filterButtonVisible(1)]",
+   "js:(function(){ sheet.tables.all()[0].filterButtonVisible(1,false); return [sheet.tables.all()[0].filterButtonVisible(1),sheet.tables.all()[0].filterButtonVisible(),sheet.tables.all()[0].toJSON()]; })()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 3, 2)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-resize",
+  "read": [
+   "js:(function(){ const t=sheet.tables.all()[0]; sheet.tables.resize(t, new GC.Spread.Sheets.Range(0,1,6,3)); return t.toJSON(); })()",
+   "js:sheet.tables.all()[0].range()",
+   "js:sheet.tables.all()[0].dataRange()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 5, 3)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-move",
+  "read": [
+   "js:(function(){ const t=sheet.tables.all()[0]; sheet.tables.move(t, 2, 2); return t.toJSON(); })()",
+   "js:sheet.tables.all()[0].range()",
+   "js:sheet.tables.find(2,2) && sheet.tables.find(2,2).name()",
+   "js:sheet.tables.find(0,0)"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 5, 3)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-remove-keep",
+  "cells": {
+   "A1": "Item",
+   "B1": "Qty",
+   "A2": "Pen",
+   "B2": 3
+  },
+  "read": [
+   "js:sheet.tables.all().length",
+   "js:[sheet.getValue(0,0),sheet.getValue(1,0),sheet.getValue(1,1)]",
+   "js:JSON.stringify(wb.toJSON().sheets.Sheet1.tables)"
+  ],
+  "steps": [
+   {
+    "$js": "const t=sheet.tables.add('Sales',0,0,3,2); sheet.tables.remove(t, GC.Spread.Sheets.Tables.TableRemoveOptions.keepData)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-remove-none",
+  "cells": {
+   "A1": "Item",
+   "B1": "Qty",
+   "A2": "Pen",
+   "B2": 3
+  },
+  "read": [
+   "js:sheet.tables.all().length",
+   "js:[sheet.getValue(0,0),sheet.getValue(1,0),sheet.getValue(1,1)]"
+  ],
+  "steps": [
+   {
+    "$js": "const t=sheet.tables.add('Sales',0,0,3,2); sheet.tables.remove(t, GC.Spread.Sheets.Tables.TableRemoveOptions.none)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-fromjson",
+  "read": [
+   "js:sheet.tables.all().length",
+   "js:sheet.tables.findByName('Imported').toJSON()",
+   "js:sheet.tables.findByName('Imported').range()",
+   "js:sheet.tables.findByName('Imported').showFooter()",
+   "js:sheet.tables.findByName('Imported').getColumnName(1)"
+  ],
+  "steps": [
+   {
+    "$js": "wb.fromJSON({version:'19.2.5',sheetCount:1,sheets:{Sheet1:{name:'Sheet1',data:{defaultDataNode:{style:{themeFont:'Body'}}},rowOutlines:{items:[]},columnOutlines:{items:[]},tables:[{name:'Imported',row:2,col:1,rowCount:5,colCount:2,showFooter:true,style:'medium9',rowFilter:{range:{row:3,col:1,rowCount:3,colCount:2},typeName:'HideRowFilter',dialogVisibleInfo:{},showFilterButton:true,filteredOutRows:[]},columns:[{id:1,name:'Name'},{id:2,name:'Value'}]}]}}})"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-json-roundtrip",
+  "read": [
+   "js:(function(){ const before=JSON.stringify(wb.toJSON().sheets.Sheet1.tables); wb.fromJSON(JSON.parse(JSON.stringify(wb.toJSON()))); return [before, JSON.stringify(wb.toJSON().sheets.Sheet1.tables)]; })()"
+  ],
+  "steps": [
+   {
+    "$js": "const t=sheet.tables.add('Sales',0,0,4,3); t.showFooter(true); t.bandColumns(true); t.setColumnName(0,'First')"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-styles-medium2",
+  "read": [
+   "js:(function(){ const t=sheet.tables.add('Sales',0,0,5,3,GC.Spread.Sheets.Tables.TableThemes.medium2); const pick=function(s){return [s.backColor,s.foreColor,s.font,s.borderTop&&s.borderTop.color,s.borderTop&&s.borderTop.style,s.borderBottom&&s.borderBottom.style,s.borderLeft&&s.borderLeft.style];}; return [pick(sheet.getActualStyle(0,0)),pick(sheet.getActualStyle(1,0)),pick(sheet.getActualStyle(1,1)),pick(sheet.getActualStyle(2,0)),pick(sheet.getActualStyle(2,1)),pick(sheet.getActualStyle(4,2))]; })()"
+  ]
+ },
+ {
+  "id": "m4-table-styles-light1",
+  "read": [
+   "js:(function(){ const t=sheet.tables.add('Sales',0,0,5,3,GC.Spread.Sheets.Tables.TableThemes.light1); const pick=function(s){return [s.backColor,s.foreColor,s.font];}; return [pick(sheet.getActualStyle(0,0)),pick(sheet.getActualStyle(1,0)),pick(sheet.getActualStyle(2,0)),pick(sheet.getActualStyle(3,0)),pick(sheet.getActualStyle(4,0))]; })()"
+  ]
+ },
+ {
+  "id": "m4-table-styles-dark1",
+  "read": [
+   "js:(function(){ const t=sheet.tables.add('Sales',0,0,5,3,GC.Spread.Sheets.Tables.TableThemes.dark1); const pick=function(s){return [s.backColor,s.foreColor,s.font];}; return [pick(sheet.getActualStyle(0,0)),pick(sheet.getActualStyle(1,0)),pick(sheet.getActualStyle(2,0)),pick(sheet.getActualStyle(3,0)),pick(sheet.getActualStyle(4,0))]; })()"
+  ]
+ },
+ {
+  "id": "m4-table-style-names",
+  "read": [
+   "js:Object.keys(GC.Spread.Sheets.Tables.TableThemes).filter(function(k){return /^(light|medium|dark|professional)/.test(k);}).length",
+   "js:GC.Spread.Sheets.Tables.TableThemes.light1.name()",
+   "js:GC.Spread.Sheets.Tables.TableThemes.medium28.name()",
+   "js:GC.Spread.Sheets.Tables.TableThemes.dark11.name()",
+   "js:GC.Spread.Sheets.Tables.TableThemes.professional24.name()",
+   "js:GC.Spread.Sheets.Tables.TableThemes.light1.toJSON()",
+   "js:GC.Spread.Sheets.Tables.TableThemes.medium9.toJSON()"
+  ]
+ },
+ {
+  "id": "m4-table-style-object",
+  "read": [
+   "js:(function(){ const th=GC.Spread.Sheets.Tables.TableThemes.light2; const t=sheet.tables.add('Sales',0,0,3,2,th); return [t.style()===th, t.getStyleName(), t.toJSON().style]; })()"
+  ]
+ },
+ {
+  "id": "m4-table-style-set",
+  "read": [
+   "js:(function(){ const t=sheet.tables.add('Sales',0,0,3,2,GC.Spread.Sheets.Tables.TableThemes.light1); t.style(GC.Spread.Sheets.Tables.TableThemes.dark7); return [t.getStyleName(),t.toJSON().style,sheet.getActualStyle(0,0).backColor]; })()"
+  ]
+ },
+ {
+  "id": "m4-table-overlap",
+  "read": [
+   "js:(function(){ try { sheet.tables.add('One',0,0,4,3); sheet.tables.add('Two',2,1,4,3); return 'ok'; } catch(e){ return String(e.message); } })()",
+   "js:sheet.tables.all().length"
+  ]
+ },
+ {
+  "id": "m4-table-column-formatter",
+  "read": [
+   "js:(function(){ const t=sheet.tables.add('Sales',0,0,3,2); t.showFooter(true); t.setColumnDataFormula(1,'SUBTOTAL(109,[Qty])'); return t.toJSON(); })()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.setValue(0,1,'Qty')"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-structured-sum",
+  "read": [
+   "D1",
+   "D2",
+   "D3",
+   "D4",
+   "D5",
+   "f:D1",
+   "f:D4"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.setValue(0,0,\"Item\")"
+   },
+   {
+    "$js": "sheet.setValue(0,1,\"Qty\")"
+   },
+   {
+    "$js": "sheet.setValue(1,0,\"Pen\")"
+   },
+   {
+    "$js": "sheet.setValue(1,1,3)"
+   },
+   {
+    "$js": "sheet.setValue(2,0,\"Pad\")"
+   },
+   {
+    "$js": "sheet.setValue(2,1,5)"
+   },
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 3, 2)"
+   },
+   {
+    "$js": "sheet.setFormula(0,3,'SUM(Sales[Qty])')"
+   },
+   {
+    "$js": "sheet.setFormula(1,3,'COUNT(Sales[Qty])')"
+   },
+   {
+    "$js": "sheet.setFormula(2,3,'AVERAGE(Sales[Qty])')"
+   },
+   {
+    "$js": "sheet.setFormula(3,3,'Sales[[#Headers],[Qty]]')"
+   },
+   {
+    "$js": "sheet.setFormula(4,3,'SUM(Sales[[#Data],[Qty]])')"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-structured-this-row",
+  "read": [
+   "D2",
+   "D3",
+   "f:D2"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.setValue(0,0,\"Item\")"
+   },
+   {
+    "$js": "sheet.setValue(0,1,\"Qty\")"
+   },
+   {
+    "$js": "sheet.setValue(1,0,\"Pen\")"
+   },
+   {
+    "$js": "sheet.setValue(1,1,3)"
+   },
+   {
+    "$js": "sheet.setValue(2,0,\"Pad\")"
+   },
+   {
+    "$js": "sheet.setValue(2,1,5)"
+   },
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 3, 2)"
+   },
+   {
+    "$js": "sheet.setFormula(1,3,'Sales[@Qty]*2')"
+   },
+   {
+    "$js": "sheet.setFormula(2,3,'Sales[@Qty]*3')"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-structured-totals",
+  "read": [
+   "D1",
+   "f:D1",
+   "B4"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.setValue(0,0,\"Item\")"
+   },
+   {
+    "$js": "sheet.setValue(0,1,\"Qty\")"
+   },
+   {
+    "$js": "sheet.setValue(1,0,\"Pen\")"
+   },
+   {
+    "$js": "sheet.setValue(1,1,3)"
+   },
+   {
+    "$js": "sheet.setValue(2,0,\"Pad\")"
+   },
+   {
+    "$js": "sheet.setValue(2,1,5)"
+   },
+   {
+    "$js": "const t=sheet.tables.add('Sales', 0, 0, 3, 2)"
+   },
+   {
+    "$js": "sheet.setFormula(0,3,'SUM(Sales[[#Totals],[Qty]])')"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-structured-counta",
+  "read": [
+   "D1",
+   "D2",
+   "f:D2"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.setValue(0,0,\"Item\")"
+   },
+   {
+    "$js": "sheet.setValue(0,1,\"Qty\")"
+   },
+   {
+    "$js": "sheet.setValue(1,0,\"Pen\")"
+   },
+   {
+    "$js": "sheet.setValue(1,1,3)"
+   },
+   {
+    "$js": "sheet.setValue(2,0,\"Pad\")"
+   },
+   {
+    "$js": "sheet.setValue(2,1,5)"
+   },
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 3, 2)"
+   },
+   {
+    "$js": "sheet.setFormula(0,3,'COUNTA(Sales[Item])')"
+   },
+   {
+    "$js": "sheet.setFormula(1,3,'SUM(Sales)')"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-sheet-json-no-style-copy",
+  "cells": {
+   "A1": "Item",
+   "B1": "Qty",
+   "A2": "Pen",
+   "B2": 3
+  },
+  "read": [
+   "js:sheet.getStyle(1,0)",
+   "js:sheet.toJSON().data.dataTable",
+   "js:sheet.getActualStyle(1,0).backColor"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 0, 0, 3, 2, GC.Spread.Sheets.Tables.TableThemes.medium2)"
+   }
+  ]
+ },
+ {
+  "id": "m4-table-insert-row-near",
+  "read": [
+   "js:sheet.tables.all()[0].toJSON()",
+   "js:sheet.tables.all()[0].range()",
+   "js:sheet.tables.all()[0].dataRange()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 1, 1, 4, 2)"
+   },
+   {
+    "$call": [
+     "addRows",
+     0,
+     1
+    ]
+   }
+  ]
+ },
+ {
+  "id": "m4-table-insert-row-inside",
+  "read": [
+   "js:sheet.tables.all()[0].toJSON()",
+   "js:sheet.tables.all()[0].range()",
+   "js:sheet.tables.all()[0].dataRange()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 1, 1, 4, 2)"
+   },
+   {
+    "$call": [
+     "addRows",
+     3,
+     1
+    ]
+   }
+  ]
+ },
+ {
+  "id": "m4-table-delete-row-inside",
+  "read": [
+   "js:sheet.tables.all()[0].toJSON()",
+   "js:sheet.tables.all()[0].range()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.tables.add('Sales', 1, 1, 5, 2)"
+   },
+   {
+    "$call": [
+     "deleteRows",
+     3,
+     1
+    ]
+   }
+  ]
+ }
+]

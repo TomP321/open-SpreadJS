@@ -8,6 +8,12 @@ import { Events, EventHub, type EventHandler, type EventInfo } from './events.js
 import { GeneralFormatter } from './formatter.js';
 import { Comment, CommentManager } from './comments.js';
 import { CommandManager, UndoManager } from './commands.js';
+import { TableManager } from './features/tables.js';
+import { ConditionalFormats } from './features/conditional-formatting.js';
+import { DefaultDataValidator, rangeToAddress, validatorFromJSON } from './features/data-validation.js';
+import { Outline } from './features/outlines.js';
+import { cellTypeFromJSON, defaultCellType } from './features/cell-types.js';
+import { RowFilterBase, filterFromJSON, sortRange as sortRangeImpl } from './features/filters.js';
 import type { ICalcEngine } from './calc.js';
 import { CalcEngine } from './calc/engine.js';
 import {
@@ -33,6 +39,19 @@ function coordinate(value: number, sentinel = false): void {
 function count(value: number): void {
   if (!Number.isSafeInteger(value) || value < 0)
     throw new RangeError('Count must be a non-negative safe integer');
+}
+/** Subtracts a rectangle from another, returning up to four remaining rectangles. */
+export function subtractRange(source: Range, cut: Range): Range[] {
+  const sx1 = source.row, sy1 = source.col, sx2 = sx1 + source.rowCount, sy2 = sy1 + source.colCount;
+  const cx1 = Math.max(sx1, cut.row), cy1 = Math.max(sy1, cut.col);
+  const cx2 = Math.min(sx2, cut.row + cut.rowCount), cy2 = Math.min(sy2, cut.col + cut.colCount);
+  if (cx1 >= cx2 || cy1 >= cy2) return [new Range(source.row, source.col, source.rowCount, source.colCount)];
+  const parts: Range[] = [];
+  if (cx1 > sx1) parts.push(new Range(sx1, sy1, cx1 - sx1, source.colCount));
+  if (cx2 < sx2) parts.push(new Range(cx2, sy1, sx2 - cx2, source.colCount));
+  if (cy1 > sy1) parts.push(new Range(cx1, sy1, cx2 - cx1, cy1 - sy1));
+  if (cy2 < sy2) parts.push(new Range(cx1, cy2, cx2 - cx1, sy2 - cy2));
+  return parts;
 }
 function defaultMetadata(): JsonRecord {
   return {
@@ -140,6 +159,12 @@ export class Worksheet {
     rowHeaderColWidth: number;
   };
   readonly comments = new CommentManager(this);
+  readonly tables = new TableManager(this);
+  readonly conditionalFormats = new ConditionalFormats(this);
+  readonly rowOutlines = new Outline();
+  readonly columnOutlines = new Outline();
+  private validationRecords: { ranges: Range[]; validator: DefaultDataValidator }[] = [];
+  private rowFilterValue: RowFilterBase | null = null;
   private sheetName: string;
   private parent?: Workbook;
   private areas = new Map<number, AreaData>();
@@ -194,6 +219,8 @@ export class Worksheet {
     this.options.gridline = new Proxy(this.options.gridline, {
       set: (target, key, value) => { Reflect.set(target, key, value); this.invalidateLayout(); return true; },
     });
+    this.rowOutlines._attach(this, 'row');
+    this.columnOutlines._attach(this, 'col');
     this.defaults = new Proxy(this.dimensions, {
       set: (target, key, value) => {
         if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
@@ -601,14 +628,31 @@ export class Worksheet {
           : Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined))),
       };
     };
-    for (const style of [
-      data.defaultStyle,
-      data.colStyles.get(col),
-      data.rowStyles.get(row),
-      this.cell(row, col, area)?.style,
-    ])
+    for (const style of [data.defaultStyle, data.colStyles.get(col), data.rowStyles.get(row)])
       Object.assign(result, resolve(style));
+    if (area === VIEW && row >= 0 && col >= 0 && this.tables.all().length) {
+      const tableStyle = this._tableStyleAt(row, col);
+      if (tableStyle) Object.assign(result, resolve(tableStyle));
+    }
+    Object.assign(result, resolve(this.cell(row, col, area)?.style));
+    if (area === VIEW && row >= 0 && col >= 0) {
+      const conditional = this.conditionalFormats.styleFor(row, col, this.getValue(row, col));
+      if (conditional) Object.assign(result, resolve(conditional));
+    }
     return result;
+  }
+  private _tableStyleAt(row: number, col: number): Style | null {
+    for (const table of this.tables.all()) {
+      const style = table._styleFor(row, col);
+      if (style) return style;
+    }
+    return null;
+  }
+  _tableAt(row: number, col: number) {
+    return this.tables.find(row, col);
+  }
+  _tablesChanged(): void {
+    (this.calcEngine as { tablesChanged?: () => void } | undefined)?.tablesChanged?.();
   }
   setStyleName(row: number, col: number, name: string, area = VIEW): void {
     if (row === -1) this.area(area).colStyles.set(col, name);
@@ -637,14 +681,23 @@ export class Worksheet {
   setFormatter(row: number, col: number, value: string | GeneralFormatter, area = VIEW): void {
     this._setStyleProperty(row, col, 'formatter', value, area);
   }
+  private cachedDefaultCellType?: ReturnType<typeof defaultCellType>;
   getCellType(row: number, col: number, area = VIEW): unknown {
-    return this.getActualStyle(row, col, area).cellType;
+    const stored = this.getActualStyle(row, col, area).cellType;
+    if (!stored) return (this.cachedDefaultCellType ??= defaultCellType());
+    if (typeof stored === 'object' && stored && typeof (stored as { typeName?: unknown }).typeName === 'string')
+      return cellTypeFromJSON(stored) ?? defaultCellType();
+    return stored;
   }
   setCellType(row: number, col: number, value: unknown, area = VIEW): void {
-    this._setStyleProperty(row, col, 'cellType', value, area);
+    this._setStyleProperty(row, col, 'cellType', value ?? undefined, area);
   }
   getDataValidator(row: number, col: number, area = VIEW): unknown {
-    return this.cell(row, col, area)?.validator;
+    if (area === VIEW) {
+      for (const record of this.validationRecords)
+        if (record.ranges.some((range) => range.contains(row, col))) return record.validator;
+    }
+    return this.cell(row, col, area)?.validator ?? null;
   }
   setDataValidator(row: number, col: number, value: unknown, area?: number): void;
   setDataValidator(
@@ -668,8 +721,43 @@ export class Worksheet {
       cols = ranged ? fourth : 1,
       value = ranged ? fifth : third,
       area = ranged ? sixth : fourth;
-    for (let r = row; r < row + rows; r++)
-      for (let c = col; c < col + cols; c++) this.ensure(r, c, area).validator = value;
+    void area;
+    this._setValidatorRecord(new Range(row, col, rows, cols), (value ?? null) as DefaultDataValidator | null);
+  }
+  private _setValidatorRecord(range: Range, validator: DefaultDataValidator | null): void {
+    const next: { ranges: Range[]; validator: DefaultDataValidator }[] = [];
+    for (const record of this.validationRecords) {
+      const remaining: Range[] = [];
+      for (const existing of record.ranges) remaining.push(...subtractRange(existing, range));
+      if (remaining.length) next.push({ ranges: remaining, validator: record.validator });
+    }
+    if (validator) {
+      const existing = next.find((record) => record.validator === validator);
+      if (existing) existing.ranges.push(new Range(range.row, range.col, range.rowCount, range.colCount));
+      else next.push({ ranges: [new Range(range.row, range.col, range.rowCount, range.colCount)], validator });
+    }
+    this.validationRecords = next;
+    for (const record of this.validationRecords) {
+      const fn = (record.validator as unknown as { _ranges?: (ranges: Range[]) => void })._ranges;
+      if (typeof fn === 'function') fn.call(record.validator, record.ranges);
+    }
+    for (let r = range.row; r < range.row + range.rowCount; r++)
+      for (let c = range.col; c < range.col + range.colCount; c++) {
+        const cell = this.cell(r, c);
+        if (!cell) continue;
+        if (validator) cell.validator = validator;
+        else delete cell.validator;
+        this.prune(r, c);
+      }
+    this.batch.invalidate();
+  }
+  _removeValidatorRanges(range: Range): void {
+    this._setValidatorRecord(range, null);
+  }
+  isValid(row: number, column: number, value: unknown): boolean {
+    const validator = this.getDataValidator(row, column) as DefaultDataValidator | null;
+    if (!validator || typeof validator.isValid !== 'function') return true;
+    return validator.isValid(this, row, column, value);
   }
   getTag(row: number, col: number, area = VIEW): unknown {
     return this.cell(row, col, area)?.tag;
@@ -851,6 +939,9 @@ export class Worksheet {
       old = layout.count;
     if (index > old || (remove && index + amount > old)) throw new RangeError('Invalid structural change');
     if (!amount) return;
+    // Array-spill outputs are derived values; drop them before the shift so the
+    // anchors re-spill instead of colliding with their own moved output.
+    if (area === VIEW) this.calcEngine?.clearSpills?.(this);
     const property = `${remove ? 'delete' : 'add'}${axis === 'row' ? 'Rows' : 'Columns'}`;
     const changing = this.axisInfo(axis, index, area, property, old, amount, amount);
     changing.cancel = false;
@@ -902,9 +993,13 @@ export class Worksheet {
     if (layout === (axis === 'row' ? this.rows : this.cols)) {
       this.dirty.shift(axis, index, amount, remove);
       this.comments._shift(axis, index, amount, remove);
+      if (axis === 'row') this.rowOutlines._shift(index, amount, remove);
+      else this.columnOutlines._shift(index, amount, remove);
     }
+    if (area === VIEW) this.tables._shift(axis, index, amount, remove);
     if (emit) this.axisChanged(axis, index, area, property, old, amount, amount);
     else this.invalidateLayout();
+    if (area === VIEW) this.conditionalFormats._shift(axis, index, amount, remove);
     if (area === VIEW && this.calcEngine) this.calcEngine.adjustStructure?.(this, axis, index, amount, remove);
   }
   addSpan(row: number, col: number, rowCount: number, colCount: number, area = VIEW): void {
@@ -1098,6 +1193,10 @@ export class Worksheet {
       ),
       data = this.area(area);
     const changedCells: { row: number; col: number; sheetArea: number }[] = [];
+    // Batch recalculation until every cleared value has actually left the store;
+    // otherwise dependents observe the old precedent during an eager flush.
+    if (area === VIEW) this.suspendCalcService();
+    try {
     for (const [r, c, cell] of data.cells.entries())
       if (range.contains(r, c)) {
         if (storageType & StorageType.data) {
@@ -1127,6 +1226,8 @@ export class Worksheet {
         for (const c of data.colStyles.keys()) if (range.contains(0, c)) data.colStyles.delete(c);
       if (row === -1 && col === -1) data.defaultStyle = Object.assign(new Style(), { themeFont: 'Body' });
     }
+    if (area === VIEW && storageType & StorageType.style && this.validationRecords.length)
+      this._removeValidatorRanges(range);
     if (area === VIEW && storageType & StorageType.comment)
       for (const comment of this.comments.all())
         if (range.contains(comment.rowIndex(), comment.colIndex()))
@@ -1142,6 +1243,9 @@ export class Worksheet {
         for (const c of this.axisMetadata('col', area).keys())
           if (c >= range.col && c < range.col + range.colCount) this.axisMetadata('col', area).delete(c);
       }
+    }
+    } finally {
+      if (area === VIEW) this.resumeCalcService();
     }
     this._emit(Events.RangeChanged, {
       sheet: this,
@@ -1219,7 +1323,13 @@ export class Worksheet {
       }
     const cells = [...data.cells.entries()]
       .filter(([r, c]) => from.contains(r, c))
-      .map(([r, c, v]) => [r, c, clone(v)] as const);
+      .map(([r, c, v]) => {
+        const copy = clone(v);
+        const source = v.hyperlink as JsonRecord | undefined;
+        if (copy.hyperlink && source && Object.prototype.hasOwnProperty.call(source, '_fresh'))
+          Object.defineProperty(copy.hyperlink, '_fresh', { value: true, enumerable: false, configurable: true });
+        return [r, c, copy] as const;
+      });
     const spans = data.spans.filter((s) => from.containsRange(s)).map(clone);
     const comments = this.comments
       .all()
@@ -1227,7 +1337,8 @@ export class Worksheet {
       .map((c) => c.toJSON());
     for (const [r, c, cell] of [...data.cells.entries()])
       if (target.contains(r, c) || (move && from.contains(r, c))) {
-        for (const [key, flag] of flags) if (option & flag) delete cell[key];
+        for (const [key, flag] of flags)
+          if (option & flag && !(move && key === 'hyperlink')) delete cell[key];
         if (option & CopyToOptions.value) delete cell.formula;
         data.cells.set(r, c, Object.keys(cell).length ? cell : undefined);
       }
@@ -1236,8 +1347,9 @@ export class Worksheet {
         nc = c - from.col + tc;
       const dest = this.ensure(nr, nc);
       if (option & CopyToOptions.formula && cell.formula) delete dest.value;
+      const sourceHyperlink = cell.hyperlink as JsonRecord | undefined;
       for (const [key, flag] of flags)
-        if (option & flag && cell[key] !== undefined)
+        if (option & flag && cell[key] !== undefined && !(move && key === 'hyperlink'))
           Object.assign(dest, {
             [key]:
               key === 'formula' && !move
@@ -1246,6 +1358,8 @@ export class Worksheet {
                   : adjustFormula(String(cell[key]), nr - r, nc - c)
                 : cell[key],
           });
+      if (sourceHyperlink && dest.hyperlink && Object.prototype.hasOwnProperty.call(sourceHyperlink, '_fresh'))
+        Object.defineProperty(dest.hyperlink, '_fresh', { value: true, enumerable: false, configurable: true });
       this.prune(nr, nc);
     }
     if (option & CopyToOptions.style)
@@ -1283,6 +1397,7 @@ export class Worksheet {
     }
     this.suspendCalcService();
     try {
+      if (move) this.calcEngine?.moveRange?.(this, from.row, from.col, tr, tc, from.rowCount, from.colCount);
       for (const { r, c, value, formula: oldFormula } of oldValues.values()) {
         const next = this.getValue(r, c);
         if (!Object.is(value, next) || oldFormula !== this.getFormula(r, c))
@@ -1369,7 +1484,17 @@ export class Worksheet {
     return { row, col };
   }
   _view(): WorkbookRenderer | undefined { return this.parent?._renderer(); }
-  getCellRect(row: number, col: number): Rect { return this._view()?.cellRect(row, col) ?? { x: this.cols.prefixSum(col) + 40, y: this.rows.prefixSum(row) + 20, width: this.cols.getSize(col), height: this.rows.getSize(row) }; }
+  _outlineGutters(): { row: number; col: number } {
+    const rowMax = this.rowOutlines.getMaxLevel();
+    const colMax = this.columnOutlines.getMaxLevel();
+    return { row: rowMax < 0 ? 0 : 21 + 17 * (rowMax + 1), col: colMax < 0 ? 0 : 21 + 17 * (colMax + 1) };
+  }
+  getCellRect(row: number, col: number): Rect {
+    const view = this._view()?.cellRect(row, col);
+    if (view) return view;
+    const gutter = this._outlineGutters();
+    return { x: this.cols.prefixSum(col) + 40 + gutter.row, y: this.rows.prefixSum(row) + 20 + gutter.col, width: this.cols.getSize(col), height: this.rows.getSize(row) };
+  }
   startEdit(selectAll = false, defaultText?: string): void { this._view()?.interaction.startEdit(selectAll, defaultText); }
   endEdit(ignoreValueChange = false): boolean { return this._view()?.interaction.endEdit(ignoreValueChange) ?? true; }
   isEditing(): boolean { return this._view()?.interaction.isEditing ?? false; }
@@ -1588,6 +1713,73 @@ export class Worksheet {
   _onInvalidate(callback: (layout: boolean) => void): void {
     this.batch.onInvalidate = callback;
   }
+  rowFilter(value?: RowFilterBase | null): RowFilterBase | null {
+    if (value === undefined) return this.rowFilterValue;
+    this.rowFilterValue = value ?? null;
+    if (this.rowFilterValue) this.rowFilterValue._attach(this);
+    this.batch.invalidate(true);
+    return this.rowFilterValue;
+  }
+  sortRange(
+    row: number,
+    column: number,
+    rowCount: number,
+    columnCount: number,
+    byRows: boolean,
+    sortInfo: unknown[],
+    sortOption?: { sortByValue?: boolean; sortByColor?: boolean },
+  ): boolean {
+    return sortRangeImpl(this, row, column, rowCount, columnCount, byRows, sortInfo as never, sortOption);
+  }
+  getHyperlink(row: number, col: number, area = VIEW): unknown {
+    const hyperlink = this.cell(row, col, area)?.hyperlink;
+    if (!hyperlink) return null;
+    const fresh = Object.prototype.hasOwnProperty.call(hyperlink, '_fresh');
+    const record = clone(hyperlink as JsonRecord);
+    delete record._fresh;
+    if (fresh) return { command: '', drawUnderline: true, isVisited: false, target: 0, tooltip: '', url: '', ...record };
+    return { command: '', drawUnderline: true, target: 0, tooltip: '', url: '', ...record };
+  }
+  setHyperlink(row: number, col: number, value: JsonRecord | null, area = VIEW): void {
+    const cell = this.ensure(row, col, area);
+    if (!value) delete cell.hyperlink;
+    else {
+      const stored = {
+        command: '',
+        drawUnderline: true,
+        target: 0,
+        tooltip: '',
+        url: '',
+        ...clone(value),
+      } as JsonRecord;
+      Object.defineProperty(stored, '_fresh', { value: true, enumerable: false, configurable: true });
+      cell.hyperlink = stored;
+    }
+    this.prune(row, col, area);
+    this.changed(row, col, area, 'hyperlink', undefined, value ?? undefined);
+  }
+  /** Expands a table when an edit lands in the row directly below or column right of it. */
+  _autoExpandTables(row: number, col: number, previousValue?: unknown): void {
+    void previousValue;
+    for (const table of this.tables.all()) {
+      if (!table.allowAutoExpand()) continue;
+      const data = table.dataRange();
+      const insideColumns = col >= data.col && col < data.col + data.colCount;
+      const insideRows = row >= data.row && row < data.row + data.rowCount;
+      if (insideColumns && row === data.row + data.rowCount) {
+        table._grow(1, 0);
+        const info = { sheet: this, sheetName: this.name(), table };
+        this._emit(Events.TableRowsChanged, info);
+      }
+      if (insideRows && col === data.col + data.colCount) {
+        const lastColumn = (table as unknown as { columns: unknown[] }).columns.length;
+        table._grow(0, 1);
+        table.setColumnName(lastColumn, `Column${lastColumn + 1}`);
+        const info = { sheet: this, sheetName: this.name(), table };
+        this._emit(Events.TableColumnsChanged, info);
+      }
+    }
+  }
   toJSON(options: SerializationOptions = {}): JsonRecord {
     const result: JsonRecord = {
       ...clone(this.extraJSON),
@@ -1630,6 +1822,8 @@ export class Worksheet {
             if (!options.ignoreStyle) node.style = styleToJSON(cell.style);
           } else if (property === 'formula') {
             if (!options.ignoreFormula) node.formula = value;
+          } else if (property === 'validator') {
+            // Validators are serialised once per range in sheet.validations.
           } else node[property] = serializeValue(value);
         }
         if (Object.keys(node).length) {
@@ -1697,8 +1891,19 @@ export class Worksheet {
       ),
       length: this.selections.length,
     };
-    result.rowOutlines ??= { items: [] };
-    result.columnOutlines ??= { items: [] };
+    result.rowOutlines = this.rowOutlines.toJSON();
+    result.columnOutlines = this.columnOutlines.toJSON();
+    if (this.validationRecords.length)
+      result.validations = this.validationRecords.map((record) => {
+        record.validator._ranges(record.ranges);
+        const json = record.validator.toJSON();
+        json.ranges = record.ranges.map(rangeToAddress).join(', ');
+        return json;
+      });
+    const conditionalJSON = this.conditionalFormats.toJSON();
+    if (conditionalJSON.rules) result.conditionalFormats = conditionalJSON;
+    if (this.tables.all().length) result.tables = this.tables.all().map((table) => table.toJSON());
+    if (this.rowFilterValue) result.rowFilter = this.rowFilterValue.toJSON();
     result.cellStates ??= {};
     result.states ??= {};
     result.outlineColumnOptions ??= {};
@@ -1854,6 +2059,27 @@ export class Worksheet {
       c.fromJSON(object(raw));
       this.comments.set(c.rowIndex(), c.colIndex(), c);
     }
+    this.validationRecords = [];
+    for (const raw of list(json.validations)) {
+      const record = validatorFromJSON(raw);
+      this.validationRecords.push(record.record);
+      for (const rect of record.record.ranges)
+        for (let r = rect.row; r < rect.row + rect.rowCount; r++)
+          for (let c = rect.col; c < rect.col + rect.colCount; c++)
+            this.ensure(r, c).validator = record.validator;
+    }
+    this.conditionalFormats.fromJSON(json.conditionalFormats ?? {});
+    this.tables._clear();
+    this.tables._fromJSON(json.tables);
+    this.rowOutlines.fromJSON(json.rowOutlines ?? { items: [] });
+    this.columnOutlines.fromJSON(json.columnOutlines ?? { items: [] });
+    if (json.rowFilter) {
+      const filter = filterFromJSON(json.rowFilter);
+      this.rowFilterValue = filter;
+      filter._attach(this);
+      for (const row of ((json.rowFilter as JsonRecord).filteredOutRows as number[] | undefined) ?? [])
+        this.setRowVisible(row, false);
+    } else this.rowFilterValue = null;
     const known = new Set([
       'name',
       'rowCount',
@@ -1875,6 +2101,12 @@ export class Worksheet {
       'colHeaderSpan',
       'selections',
       'comments',
+      'validations',
+      'conditionalFormats',
+      'tables',
+      'rowFilter',
+      'rowOutlines',
+      'columnOutlines',
       'namedStyles',
       'names',
       'defaults',
@@ -1961,6 +2193,7 @@ export class Workbook {
         else {
           if (sheet.getFormula(row, col) !== null) sheet.setFormula(row, col, null);
           sheet.setValue(row, col, options.newValue);
+          sheet._autoExpandTables(row, col, previousValue);
         }
         if (isUndo || Object.hasOwn(options, '_applied')) {
           this.setActiveSheet(sheet.name()); sheet.setSelection(row, col, 1, 1);
@@ -1968,6 +2201,8 @@ export class Workbook {
         options._applied = true;
         const newValue = sheet.getValue(row, col);
         if (!Object.is(previousValue, newValue)) sheet._emit(Events.ValueChanged, { sheet, sheetName: sheet.name(), row, col, oldValue: previousValue, newValue });
+        if (!isUndo && sheet.getDataValidator(row, col) && !sheet.isValid(row, col, newValue))
+          sheet._emit(Events.ValidationError, { sheet, sheetName: sheet.name(), row, col, validator: sheet.getDataValidator(row, col), value: newValue });
         return true;
       },
     });

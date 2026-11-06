@@ -110,8 +110,11 @@ export class GeneralFormatter {
     }
     const raw = value instanceof Date ? dateToSerial(value) : value;
     let text: string;
-    if (format.toLowerCase() === 'general' && value instanceof Date)
-      text = SSF.format('m/d/yyyy h:mm:ss', raw as number);
+    if (format.toLowerCase() === 'general' && value instanceof Date) {
+      const date = value as Date;
+      const hasTime = date.getHours() || date.getMinutes() || date.getSeconds() || date.getMilliseconds();
+      text = SSF.format(hasTime ? 'm/d/yyyy h:mm:ss' : 'm/d/yyyy', raw as number);
+    }
     else {
       try {
         if (typeof raw === 'number' && !SSF.is_date(section)) {

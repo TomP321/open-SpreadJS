@@ -37,7 +37,13 @@ export function styleToJSON(style: Style | string | null | undefined): unknown {
       result[key] =
         style[key] instanceof GeneralFormatter
           ? (style[key] as GeneralFormatter).formatString()
-          : serializeValue(style[key]);
+          : style[key] && typeof (style[key] as { toJSON?: unknown }).toJSON === 'function'
+            ? (style[key] as { toJSON(): unknown }).toJSON()
+            : serializeValue(style[key]);
+  if (result.cellType !== undefined) {
+    if (result.name === undefined) result.name = null;
+    if (result.fontForColumnWidth === undefined) result.fontForColumnWidth = null;
+  }
   if (typeof style.font === 'string') {
     const font = style.font.match(/^(.*?)\s*(\d+(?:\.\d+)?(?:px|pt|em|rem|%))(?:\/[\d.]+)?\s+(.+)$/);
     if (font) {

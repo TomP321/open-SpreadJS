@@ -1,0 +1,319 @@
+[
+ {
+  "id": "m4-filter-initial",
+  "cells": {
+   "A1": "H",
+   "A2": "a",
+   "A3": "b"
+  },
+  "read": [
+   "js:sheet.rowFilter()",
+   "js:(function(){ const f=new GC.Spread.Sheets.Filter.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,2)); sheet.rowFilter(f); return [f.typeName,f.range,f.isFiltered(),f.filterButtonVisible(),f.filterDialogVisibleInfo(),f.toJSON()]; })()",
+   "js:JSON.stringify(wb.toJSON().sheets.Sheet1.rowFilter)"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-add-item-json",
+  "read": [
+   "js:(function(){ const f=new GC.Spread.Sheets.Filter.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,2)); sheet.rowFilter(f); f.addFilterItem(0,GC.Spread.Sheets.ConditionalFormatting.Condition.fromSource('a')); return [f.getFilterItems(0).length,f.getFilteredItems().length,f.isFiltered(),f.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-apply",
+  "cells": {
+   "A1": "H",
+   "B1": "N",
+   "A2": "a",
+   "B2": 1,
+   "A3": "b",
+   "B3": 2,
+   "A4": "a",
+   "B4": 3,
+   "A5": "c",
+   "B5": 4
+  },
+  "read": [
+   "js:(function(){ const f=new GC.Spread.Sheets.Filter.HideRowFilter(new GC.Spread.Sheets.Range(0,0,5,2)); sheet.rowFilter(f); f.addFilterItem(0,GC.Spread.Sheets.ConditionalFormatting.Condition.fromSource('a')); f.filter(); return [f.isFiltered(),f.isFiltered(0),f.getFilteredItems().length,f.isRowFilteredOut(0),f.isRowFilteredOut(1),f.isRowFilteredOut(2),f.isRowFilteredOut(3),f.isRowFilteredOut(4),f.toJSON()]; })()",
+   "js:[sheet.getRowVisible(0),sheet.getRowVisible(1),sheet.getRowVisible(2),sheet.getRowVisible(3),sheet.getRowVisible(4)]",
+   "js:JSON.stringify(wb.toJSON().sheets.Sheet1.rowFilter)"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-unfilter-reset",
+  "cells": {
+   "A1": "H",
+   "A2": "a",
+   "A3": "b",
+   "A4": "a"
+  },
+  "read": [
+   "js:(function(){ const f=new GC.Spread.Sheets.Filter.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,1)); sheet.rowFilter(f); f.addFilterItem(0,GC.Spread.Sheets.ConditionalFormatting.Condition.fromSource('a')); f.filter(); const a=[f.isFiltered(),sheet.getRowVisible(2)]; f.unfilter(); const b=[f.isFiltered(),sheet.getRowVisible(2),f.getFilterItems(0).length,f.toJSON()]; f.addFilterItem(0,GC.Spread.Sheets.ConditionalFormatting.Condition.fromSource('a')); f.filter(); f.reset(); return [a,b,f.isFiltered(),sheet.getRowVisible(1),sheet.getRowVisible(2),f.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-multi-column",
+  "cells": {
+   "A1": "A",
+   "B1": "B",
+   "A2": "x",
+   "B2": 1,
+   "A3": "x",
+   "B3": 2,
+   "A4": "y",
+   "B4": 1,
+   "A5": "y",
+   "B5": 2
+  },
+  "read": [
+   "js:(function(){ const F=GC.Spread.Sheets.Filter, CF=GC.Spread.Sheets.ConditionalFormatting; const f=new F.HideRowFilter(new GC.Spread.Sheets.Range(0,0,5,2)); sheet.rowFilter(f); f.addFilterItem(0,CF.Condition.fromSource('x')); f.addFilterItem(1,CF.Condition.fromSource('1')); f.filter(); return [f.isRowFilteredOut(1),f.isRowFilteredOut(2),f.isRowFilteredOut(3),f.isRowFilteredOut(4),f.toJSON()]; })()",
+   "js:(function(){ const f=sheet.rowFilter(); f.filter(1); return [f.isRowFilteredOut(1),f.isRowFilteredOut(2),f.isRowFilteredOut(3),f.isRowFilteredOut(4)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-number-condition",
+  "cells": {
+   "A1": 10,
+   "A2": 5,
+   "A3": 20,
+   "A4": 15
+  },
+  "read": [
+   "js:(function(){ const F=GC.Spread.Sheets.Filter, CF=GC.Spread.Sheets.ConditionalFormatting; const c=new CF.Condition(CF.ConditionType.numberCondition,{compareType:CF.ComparisonOperators.greaterThan,expected:10}); const f=new F.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,1)); sheet.rowFilter(f); f.addFilterItem(0,c); f.filter(); return [f.isRowFilteredOut(0),f.isRowFilteredOut(1),f.isRowFilteredOut(2),f.isRowFilteredOut(3),f.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-text-condition",
+  "cells": {
+   "A1": "alpha",
+   "A2": "beta",
+   "A3": "Alphabet",
+   "A4": "gamma"
+  },
+  "read": [
+   "js:(function(){ const F=GC.Spread.Sheets.Filter, CF=GC.Spread.Sheets.ConditionalFormatting; const c=new CF.Condition(CF.ConditionType.textCondition,{compareType:CF.TextCompareType.contains,expected:'alpha'}); const f=new F.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,1)); sheet.rowFilter(f); f.addFilterItem(0,c); f.filter(); return [f.isRowFilteredOut(0),f.isRowFilteredOut(1),f.isRowFilteredOut(2),f.isRowFilteredOut(3)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-multi-condition-or",
+  "cells": {
+   "A1": "a",
+   "A2": "b",
+   "A3": "c",
+   "A4": "d"
+  },
+  "read": [
+   "js:(function(){ const F=GC.Spread.Sheets.Filter, CF=GC.Spread.Sheets.ConditionalFormatting; const f=new F.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,1)); sheet.rowFilter(f); f.addFilterItem(0,[CF.Condition.fromSource('a'),CF.Condition.fromSource('c')]); f.filter(); return [f.isRowFilteredOut(0),f.isRowFilteredOut(1),f.isRowFilteredOut(2),f.isRowFilteredOut(3)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-button-visible",
+  "read": [
+   "js:(function(){ const F=GC.Spread.Sheets.Filter; const f=new F.HideRowFilter(new GC.Spread.Sheets.Range(0,0,5,3)); sheet.rowFilter(f); const a=[f.filterButtonVisible(),f.filterButtonVisible(0)]; f.filterButtonVisible(1,false); const b=[f.filterButtonVisible(),f.filterButtonVisible(1),f.toJSON()]; f.filterButtonVisible(2,false); const c=[f.filterButtonVisible(),f.toJSON()]; f.filterButtonVisible(false); const d=[f.filterButtonVisible(),f.toJSON()]; f.filterButtonVisible(true); return [a,b,c,d,f.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-sort-asc",
+  "cells": {
+   "A1": "H",
+   "A2": "c",
+   "A3": "a",
+   "A4": "b"
+  },
+  "read": [
+   "js:(function(){ const F=GC.Spread.Sheets.Filter; const f=new F.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,1)); sheet.rowFilter(f); f.sortColumn(0,true); return [sheet.getValue(0,0),sheet.getValue(1,0),sheet.getValue(2,0),sheet.getValue(3,0),f.getSortState(0),f.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-sort-desc",
+  "cells": {
+   "A1": "H",
+   "A2": "c",
+   "A3": "a",
+   "A4": "b"
+  },
+  "read": [
+   "js:(function(){ const F=GC.Spread.Sheets.Filter; const f=new F.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,1)); sheet.rowFilter(f); f.sortColumn(0,false); return [sheet.getValue(0,0),sheet.getValue(1,0),sheet.getValue(2,0),sheet.getValue(3,0),f.getSortState(0),f.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-filter-fromjson",
+  "cells": {
+   "A1": "H",
+   "A2": "a",
+   "A3": "b",
+   "A4": "a"
+  },
+  "read": [
+   "js:(function(){ const j={range:{row:0,col:0,rowCount:4,colCount:1},typeName:'HideRowFilter',dialogVisibleInfo:{sortByValue:false},filterItemMap:[{index:0,conditions:[{conType:12,expected:'a'}]}],filteredColumns:[0],filterButtonVisibleInfo:{'0':true},showFilterButton:true,filteredOutRows:[2]}; sheet.rowFilter().fromJSON(j); const f=sheet.rowFilter(); return [f.isFiltered(),f.getFilterItems(0).length,f.isRowFilteredOut(2),f.filterButtonVisible(0),f.filterDialogVisibleInfo(),f.toJSON()]; })()"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.rowFilter(new GC.Spread.Sheets.Filter.HideRowFilter(new GC.Spread.Sheets.Range(0,0,4,1)))"
+   }
+  ]
+ },
+ {
+  "id": "m4-sort-range-cols",
+  "cells": {
+   "A1": "a",
+   "B1": 3,
+   "A2": "c",
+   "B2": 1,
+   "A3": "b",
+   "B3": 5,
+   "A4": "e",
+   "B4": 2,
+   "A5": "d",
+   "B5": 4
+  },
+  "read": [
+   "js:sheet.sortRange(0,0,5,2,true,[{index:1,ascending:true}])",
+   "js:[0,1,2,3,4].map(function(r){return sheet.getValue(r,0);})",
+   "js:[0,1,2,3,4].map(function(r){return sheet.getValue(r,1);})"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-sort-range-multi",
+  "cells": {
+   "A1": "b",
+   "B1": 2,
+   "A2": "a",
+   "B2": 3,
+   "A3": "a",
+   "B3": 1,
+   "A4": "b",
+   "B4": 1
+  },
+  "read": [
+   "js:sheet.sortRange(0,0,4,2,false,[{index:0,ascending:true},{index:1,ascending:false}])",
+   "js:[0,1,2,3].map(function(r){return [sheet.getValue(r,0),sheet.getValue(r,1)];})"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-sort-range-rows",
+  "cells": {
+   "A1": 3,
+   "B1": 1,
+   "C1": 2,
+   "A2": "x",
+   "B2": "y",
+   "C2": "z"
+  },
+  "read": [
+   "js:sheet.sortRange(0,0,2,3,true,[{index:0,ascending:true}])",
+   "js:[0,1,2].map(function(c){return sheet.getValue(0,c);})",
+   "js:[0,1,2].map(function(c){return sheet.getValue(1,c);})"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-sort-range-custom",
+  "cells": {
+   "A1": "x",
+   "A2": "y",
+   "A3": "z"
+  },
+  "read": [
+   "js:sheet.sortRange(0,0,3,1,true,[{index:0,ascending:true,compareFunction:function(a,b){var order={z:0,y:1,x:2};return order[a]-order[b];}}])",
+   "js:[0,1,2].map(function(r){return sheet.getValue(r,0);})"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-sort-range-color",
+  "cells": {
+   "A1": "a",
+   "A2": "b",
+   "A3": "c",
+   "A4": "d"
+  },
+  "read": [
+   "js:(function(){ sheet.getCell(0,0).backColor('#ff0000'); sheet.getCell(2,0).backColor('#00ff00'); return sheet.sortRange(0,0,4,1,true,[{index:0,order:'top',backColor:'#00ff00',ascending:true}]); })()",
+   "js:[0,1,2,3].map(function(r){return sheet.getValue(r,0);})"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-sort-formula-stays",
+  "cells": {
+   "A1": 3,
+   "A2": 1,
+   "A3": 2,
+   "B1": "=A1*10",
+   "B2": "=A2*10",
+   "B3": "=A3*10"
+  },
+  "read": [
+   "js:sheet.sortRange(0,0,3,2,false,[{index:0,ascending:true}])",
+   "js:[0,1,2].map(function(r){return sheet.getValue(r,1);})",
+   "js:[0,1,2].map(function(r){return sheet.getFormula(r,1);})"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-sort-styles-comments",
+  "cells": {
+   "A1": 3,
+   "A2": 1,
+   "A3": 2
+  },
+  "read": [
+   "js:(function(){ sheet.getCell(1,0).backColor('#ff0000'); sheet.comments.add(1,0,'note'); sheet.sortRange(0,0,3,1,false,[{index:0,ascending:true}]); return [0,1,2].map(function(r){return [sheet.getValue(r,0),sheet.getCell(r,0).backColor(),sheet.comments.get(r,0)&&sheet.comments.get(r,0).text()];}); })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-sort-range-json",
+  "cells": {
+   "A1": 3,
+   "A2": 1,
+   "A3": 2
+  },
+  "read": [
+   "js:sheet.sortRange(0,0,3,1,false,[{index:0,ascending:true}])",
+   "js:JSON.stringify(wb.toJSON().sheets.Sheet1.data)"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-table-filter-json",
+  "cells": {
+   "A1": "Item",
+   "A2": "a",
+   "A3": "b",
+   "A4": "a"
+  },
+  "read": [
+   "js:(function(){ const t=sheet.tables.add('Sales',0,0,4,1); return [t.rowFilter().typeName,t.rowFilter().range,t.toJSON().rowFilter]; })()",
+   "js:(function(){ const f=sheet.tables.findByName('Sales').rowFilter(); f.addFilterItem(0,GC.Spread.Sheets.ConditionalFormatting.Condition.fromSource('a')); f.filter(); return [f.isRowFilteredOut(0),f.isRowFilteredOut(1),f.isRowFilteredOut(2),f.isRowFilteredOut(3),sheet.tables.findByName('Sales').toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-table-filter-sort",
+  "cells": {
+   "A1": "Item",
+   "A2": "c",
+   "A3": "a",
+   "A4": "b"
+  },
+  "read": [
+   "js:(function(){ const t=sheet.tables.add('Sales',0,0,4,1); t.rowFilter().sortColumn(0,true); return [0,1,2,3].map(function(r){return sheet.getValue(r,0);}); })()",
+   "js:sheet.tables.findByName('Sales').rowFilter().getSortState(0)"
+  ],
+  "steps": []
+ }
+]

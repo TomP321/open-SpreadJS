@@ -75,6 +75,12 @@ export class Range {
   }
 }
 
+export class Point {
+  constructor(
+    public x = 0,
+    public y = 0,
+  ) {}
+}
 export class LineBorder {
   constructor(
     public color = 'black',

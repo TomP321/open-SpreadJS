@@ -26,10 +26,10 @@ try {
   const options = { sheetCount: scenario.sheetCount };
   const official = new Official.Spread.Sheets.Workbook(document.getElementById('official-pane')!, options);
   const ours = new OpenSheets.Spread.Sheets.Workbook(document.getElementById('ours-pane')!, options);
+  window.__compare = { ready: false, scenario: scenario.name, official, ours };
   scenario.run(official);
   scenario.run(ours);
   ours.refresh();
-  window.__compare = { ready: false, scenario: scenario.name, official, ours };
   await document.fonts.ready;
   await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   if (scenario.name === 'editing') ours.getActiveSheet().startEdit(false);

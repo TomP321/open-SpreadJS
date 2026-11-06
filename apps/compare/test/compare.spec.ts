@@ -39,10 +39,26 @@ for (const dpr of [1, 2]) {
       const directory = path.resolve('../../test-results/compare');
       await fs.mkdir(directory, { recursive: true });
       await fs.writeFile(path.join(directory, `${scenario.name}.json`), JSON.stringify(snapshots, null, 2) + '\n');
-      const regions = await page.evaluate(() => {
+      const glyphCells = scenario.glyphCells ?? [];
+      const regions = await page.evaluate((glyphCells) => {
         const boxes: { x: number; y: number; width: number; height: number }[] = [];
+        const glyphBoxes: { x: number; y: number; width: number; height: number }[] = [];
         const host = document.getElementById('official-pane')!;
         const width = host.clientWidth - 22, height = host.clientHeight - 28;
+        const clip = (rect: { x: number; y: number; width: number; height: number }) => {
+          const left = Math.max(0, rect.x), top = Math.max(0, rect.y);
+          const right = Math.min(width, rect.x + rect.width), bottom = Math.min(height, rect.y + rect.height);
+          return { x: left, y: top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+        };
+        type GlyphSheet = { getCellRect(row: number, col: number): { x: number; y: number; width: number; height: number } };
+        const addGlyphCell = (s: GlyphSheet, cell: [number, number, number, number]) => {
+          const [row, col, rowCount, colCount] = cell;
+          if (rowCount <= 0 || colCount <= 0) return;
+          const first = s.getCellRect(row, col), last = s.getCellRect(row + rowCount - 1, col + colCount - 1);
+          if (!first || !last) return;
+          const rect = clip({ x: first.x, y: first.y, width: last.x + last.width - first.x, height: last.y + last.height - first.y });
+          if (rect.width && rect.height) glyphBoxes.push(rect);
+        };
         let headerWidth = 0, headerHeight = 0;
         for (const wb of [window.__compare!.official, window.__compare!.ours]) {
           const s = wb.getActiveSheet(), first = s.getCellRect(0, 0);
@@ -81,6 +97,21 @@ for (const dpr of [1, 2]) {
             boxes.push({ x: start.x - 1, y: 0, width: end.x + end.width - start.x + 1, height: first.y });
             boxes.push({ x: 0, y: start.y - 1, width: first.x, height: end.y + end.height - start.y + 1 });
           }
+          for (const cell of glyphCells) addGlyphCell(s, cell);
+          // Sheet-level filter buttons live in the column-header strip, not in a cell.
+          const filter = s.rowFilter();
+          const filterRange = filter && filter.range;
+          if (filterRange) {
+            for (let index = 0; index < filterRange.colCount; index++) {
+              if (filter.filterButtonVisible(index) === false) continue;
+              const cell = s.getCellRect(filterRange.row, filterRange.col + index);
+              if (!cell || !first.y) continue;
+              const w = Math.min(18, cell.width - 4), h = Math.min(17, Math.max(6, first.y - 3));
+              if (w < 6 || h < 6) continue;
+              const rect = clip({ x: cell.x + cell.width - w - 2, y: first.y - 2 - h, width: w, height: h });
+              if (rect.width && rect.height) glyphBoxes.push(rect);
+            }
+          }
         }
         for (const pane of ['official', 'ours']) {
           const element = document.getElementById(`${pane}-pane`)!, hostRect = element.getBoundingClientRect();
@@ -91,8 +122,8 @@ for (const dpr of [1, 2]) {
         }
         const x = Math.max(0, Math.min(...boxes.map(r => r.x)) - 2), y = Math.max(0, Math.min(...boxes.map(r => r.y)) - 2);
         const right = Math.min(width, Math.max(...boxes.map(r => r.x + r.width)) + 2), bottom = Math.min(height, Math.max(...boxes.map(r => r.y + r.height)) + 2);
-        return { content: [{ x, y, width: right - x, height: bottom - y }], headers: [{ x: 0, y: 0, width, height: headerHeight }, { x: 0, y: headerHeight, width: headerWidth, height: height - headerHeight }], tabs: [{ x: 0, y: height, width: host.clientWidth, height: 28 }] };
-      });
+        return { content: [{ x, y, width: right - x, height: bottom - y }], headers: [{ x: 0, y: 0, width, height: headerHeight }, { x: 0, y: headerHeight, width: headerWidth, height: height - headerHeight }], tabs: [{ x: 0, y: height, width: host.clientWidth, height: 28 }], glyphs: glyphBoxes };
+      }, glyphCells);
       const name = scenario.name + (dpr === 2 ? '-2x' : '');
       await fs.writeFile(path.join(directory, `${name}-regions.json`), JSON.stringify(regions));
       const captures: Buffer[] = [];
@@ -131,7 +162,7 @@ for (const dpr of [1, 2]) {
         expect.soft(different, `${name} complete border regions including gaps`).toBe(0);
       }
       const metrics = await comparePanes(name, captures[0], captures[1], regions, dpr);
-      for (const region of ['content', 'headers', 'tabs'] as const) expect.soft(metrics[region].ratio, `${name} ${region}: ${(metrics[region].ratio * 100).toFixed(3)}%`).toBeLessThan(limits[region]);
+      for (const region of ['content', 'headers', 'tabs', 'glyphs'] as const) expect.soft(metrics[region].ratio, `${name} ${region}: ${(metrics[region].ratio * 100).toFixed(3)}%`).toBeLessThan(limits[region]);
     });
   }
 

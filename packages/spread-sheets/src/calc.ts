@@ -10,6 +10,18 @@ export interface ICalcEngine {
   recalculate(sheet: Worksheet, all: boolean): void;
   /** Translates relative references for copy/fill. */
   translateFormula?(formula: string, rows: number, columns: number): string;
+  /** Drops array-spill output values before a structural change re-spills them. */
+  clearSpills?(sheet: Worksheet): void;
+  /** Re-points formulas after a move (cut/paste) operation. */
+  moveRange?(
+    sheet: Worksheet,
+    fromRow: number,
+    fromCol: number,
+    toRow: number,
+    toCol: number,
+    rowCount: number,
+    colCount: number,
+  ): void;
   /** Adjusts stored formulas after rows/columns were inserted or removed. */
   adjustStructure?(
     sheet: Worksheet,

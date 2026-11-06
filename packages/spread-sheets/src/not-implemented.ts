@@ -36,7 +36,7 @@ export function installFallbacks(root: object): void {
     const ctor = parent[key] as { prototype: Container } & Container;
     for (const member of entry.members) {
       const target = member.kind === 'static' ? ctor : ctor.prototype;
-      if (Object.hasOwn(target, member.name)) continue;
+      if (member.name in target) continue;
       const path = `${entry.path}.${member.name}`;
       if (member.declarationKind === 'MethodDeclaration') target[member.name] = fallback(path);
       else Object.defineProperty(target, member.name, { configurable: true, enumerable: true, get: fallback(path), set: fallback(path) });

@@ -58,6 +58,8 @@ export interface EvalHost {
   allowDynamicArray(): boolean;
   hasFormula(sheet: Worksheet, row: number, col: number): boolean;
   getFormulaText(sheet: Worksheet, row: number, col: number): string | null;
+  resolveStructured?(table: string, spec: string, sheet: Worksheet, row: number, col: number): Value;
+  resolveTableName?(name: string, sheet: Worksheet): Value | undefined;
   workbookIndex(sheet: Worksheet): number;
   sheetCount(): number;
 }
@@ -408,7 +410,9 @@ export class Evaluator {
         return this.invokeLambda(callee, node.args, ctx);
       }
       case 'structured':
-        return error(ErrorCode.name);
+        return this.host.resolveStructured
+          ? this.host.resolveStructured(node.table, node.spec, ctx.sheet, ctx.row, ctx.col)
+          : error(ErrorCode.name);
     }
   }
 
@@ -430,6 +434,8 @@ export class Evaluator {
       if (!found) return error(ErrorCode.ref);
       sheet = found;
     }
+    const tableRef = this.host.resolveTableName?.(name, sheet);
+    if (tableRef !== undefined) return tableRef;
     const info = this.host.resolveName(name, sheet, ctx.row, ctx.col);
     if (!info) {
       const upper = name.toUpperCase();

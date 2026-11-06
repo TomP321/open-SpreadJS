@@ -1,9 +1,14 @@
 import type { Workbook, Worksheet } from './model.js';
-import { Range, type Style, type LineBorder } from './primitives.js';
+import { Range, Style, type LineBorder } from './primitives.js';
 import { Events } from './events.js';
 import { GeneralFormatter } from './formatter.js';
 import type { AxisLayout } from './structures.js';
 import { Interaction } from './interaction.js';
+import { defaultCellType, isDefaultCellType } from './features/cell-types.js';
+import { drawFilterGlyph, drawIconSet, type FilterGlyphState } from './features/glyphs.js';
+
+const DEFAULT_CELL_TYPE = defaultCellType();
+import { usingThemedDocument } from './features/tables.js';
 
 export interface Rect { x: number; y: number; width: number; height: number }
 export interface AxisSlot { index: number; position: number; size: number; min: number; max: number }
@@ -102,7 +107,7 @@ export class WorkbookRenderer {
   private styleCache = new Map<string, Style>();
   private formatters = new Map<string, GeneralFormatter>();
   width = 0; height = 0; viewWidth = 0; viewHeight = 0;
-  headerWidth = 40; headerHeight = 20; zoom = 1;
+  headerWidth = 40; headerHeight = 20; rowGutter = 0; colGutter = 0; zoom = 1;
   scrollX = 0; scrollY = 0;
   rows: AxisSlot[] = []; cols: AxisSlot[] = [];
   tabHits: { x: number; width: number; index: number }[] = [];
@@ -175,8 +180,14 @@ export class WorkbookRenderer {
     this.viewWidth = Math.max(0, this.width - (opts.showVerticalScrollbar ? 22 : 0));
     this.viewHeight = Math.max(0, this.height - (opts.tabStripVisible ? 28 : opts.showHorizontalScrollbar ? 22 : 0));
     this.zoom = s.zoom();
-    this.headerWidth = s.options.rowHeaderVisible ? s._columnLayout(2).prefixSum(s.getColumnCount(2)) * this.zoom : 0;
-    this.headerHeight = s.options.colHeaderVisible ? s._rowLayout(1).prefixSum(s.getRowCount(1)) * this.zoom : 0;
+    this.rowGutter = s.options.rowHeaderVisible ? this.outlineGutter(s.rowOutlines) : 0;
+    this.colGutter = s.options.colHeaderVisible ? this.outlineGutter(s.columnOutlines) : 0;
+    this.headerWidth = s.options.rowHeaderVisible
+      ? s._columnLayout(2).prefixSum(s.getColumnCount(2)) * this.zoom + this.rowGutter
+      : 0;
+    this.headerHeight = s.options.colHeaderVisible
+      ? s._rowLayout(1).prefixSum(s.getRowCount(1)) * this.zoom + this.colGutter
+      : 0;
     this.sizeCanvas(this.canvas, this.context, this.viewWidth, this.viewHeight);
     this.sizeCanvas(this.overlay, this.selectionContext, this.viewWidth, this.viewHeight);
     const tabWidth = opts.tabStripVisible ? Math.round(this.viewWidth * opts.tabStripRatio) : 0;
@@ -193,6 +204,64 @@ export class WorkbookRenderer {
     this.computeSlots(); this.updateScrollbars();
     this.root.setAttribute('aria-rowcount', String(s.getRowCount())); this.root.setAttribute('aria-colcount', String(s.getColumnCount()));
     this.layoutDirty = false;
+  }
+  private outlineGutter(outline: { getMaxLevel(): number }): number {
+    const max = outline.getMaxLevel();
+    return max < 0 ? 0 : 21 + 17 * (max + 1);
+  }
+  /** Hit-test the filter dropdown buttons painted in headers/table headers. */
+  filterButtonHit(x: number, y: number): { kind: 'table' | 'sheet'; col: number; table?: unknown } | null {
+    const s = this.sheet;
+    if (!s) return null;
+    const inside = (x0: number, y0: number, w: number, h: number): boolean => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h;
+    const geometry = (cx: number, cy: number, width: number, height: number) => {
+      const w = Math.min(18, width - 4), h = Math.min(17, Math.max(6, height - 3));
+      if (w < 6 || h < 6) return null;
+      const bx = Math.round(cx + width - w - 2), by = Math.round(cy + height - 2 - h);
+      return inside(bx, by, w, h) ? { bx, by, w, h } : null;
+    };
+    for (const table of s.tables.all()) {
+      if (!table.showHeader()) continue;
+      const header = table.headerIndex(), range = table.range();
+      const rowSlot = this.rows.find((slot) => slot.index === header);
+      if (!rowSlot) continue;
+      for (const col of this.cols) {
+        const index = col.index - range.col;
+        if (index < 0 || index >= range.colCount || table.filterButtonVisible(index) === false) continue;
+        if (geometry(col.position, rowSlot.position, col.size, rowSlot.size)) return { kind: 'table', col: col.index, table };
+      }
+    }
+    const filter = s.rowFilter();
+    if (filter && filter.range && this.headerHeight > 0) {
+      for (const col of this.cols) {
+        const index = col.index - filter.range.col;
+        if (index < 0 || index >= filter.range.colCount || filter.filterButtonVisible(index) === false) continue;
+        if (geometry(col.position, 0, col.size, this.headerHeight)) return { kind: 'sheet', col: col.index };
+      }
+    }
+    return null;
+  }
+  /** Hit-test expand/collapse buttons in the outline gutter. */
+  outlineButtonHit(x: number, y: number): { axis: 'row' | 'col'; index: number } | null {
+    const s = this.sheet;
+    if (!s) return null;
+    for (const run of s.rowOutlines._runs()) {
+      const summary = this.rows.find((slot) => slot.index === run.index + run.count);
+      if (!summary) continue;
+      const top = summary.position + summary.size / 2 - 9;
+      if (x >= 2 && x < 20 && y >= top && y < top + 18) return { axis: 'row', index: run.index };
+    }
+    for (const run of s.columnOutlines._runs()) {
+      const summary = this.cols.find((slot) => slot.index === run.index + run.count);
+      if (!summary) continue;
+      const left = summary.position + summary.size / 2 - 9;
+      if (y >= 2 && y < 20 && x >= left && x < left + 18) return { axis: 'col', index: run.index };
+    }
+    return null;
+  }
+  /** Outline gutter sizes (CSS pixels) for the current sheet. */
+  outlineGutters(): { row: number; col: number } {
+    return { row: this.rowGutter, col: this.colGutter };
   }
   private computeSlots(): void {
     const s = this.sheet!;
@@ -229,6 +298,9 @@ export class WorkbookRenderer {
     ctx.fillStyle = 'white'; ctx.fillRect(0, 0, right, bottom);
     const spans = s.getSpans();
     const paintedSpans = new Set<Range>();
+    const hasRules = s.conditionalFormats._hasRules();
+    const hasComments = s.comments._hasAny();
+    const hasValidations = (s as unknown as { validationRecords: unknown[] }).validationRecords.length > 0;
     this.metrics.paintedCells = 0;
     // Backgrounds and grid precede all text, allowing text to flow through empty neighbours.
     for (const row of this.rows) for (const col of this.cols) {
@@ -257,12 +329,42 @@ export class WorkbookRenderer {
       const rect = span ? this.rangeRect(span, row, col) : { x: col.position, y: row.position, width: col.size, height: row.size };
       const style = this.style(r, c), value = s.getValue(r, c);
       this.clipCell(ctx, row, col, () => {
-        if (value != null || (s.options.showFormulas && s.getFormula(r, c))) this.drawText(ctx, r, c, value, style, rect, !span);
+        const visual = hasRules ? s.conditionalFormats._visualFor(r, c, value) : null;
+        if (visual?.backColor) {
+          ctx.fillStyle = visual.backColor;
+          ctx.fillRect(rect.x, rect.y, rect.width - 1, rect.height - 1);
+        }
+        if (visual?.bar) this.drawDataBar(ctx, rect, visual.bar);
+        const cellType = style.cellType ? s.getCellType(r, c) : DEFAULT_CELL_TYPE;
+        const custom = cellType && !isDefaultCellType(cellType) && cellType !== null;
+        const hyperlink = s.getHyperlink(r, c) as { linkColor?: string; visitedLinkColor?: string; drawUnderline?: boolean } | null;
+        let iconWidth = 0;
+        if (visual?.icon) iconWidth = this.drawIcon(ctx, visual.icon, rect);
+        if (custom) {
+          (cellType as { paint: (ctx: CanvasRenderingContext2D, value: unknown, x: number, y: number, w: number, h: number, style: Style, context: unknown, ...rest: unknown[]) => void }).paint(
+            ctx, value, rect.x, rect.y, rect.width, rect.height, style,
+            { sheet: s, row: r, col: c, cellStyle: style, hyperlink },
+          );
+        } else if (value != null || (s.options.showFormulas && s.getFormula(r, c))) {
+          if (visual?.icon?.iconOnly) {
+            // Icon-only rules suppress the cell text.
+          } else if (iconWidth) {
+            this.drawText(ctx, r, c, value, style, rect, !span);
+            void iconWidth;
+          } else if (hyperlink) {
+            this.drawHyperlinkText(ctx, r, c, value, style, rect, hyperlink);
+          } else this.drawText(ctx, r, c, value, style, rect, !span);
+        }
+        if (!span) {
+          if (hasComments) this.drawCommentIndicator(ctx, r, c, rect);
+          if (hasValidations) this.drawValidationUI(ctx, r, c, value, rect);
+        }
         this.drawBorders(ctx, r, c, style, rect, span);
       });
       this.metrics.paintedCells++;
     }
     this.drawHeaders(ctx);
+    if (s.tables.all().length || s.rowFilter()) this.drawFilterButtons(ctx);
     this.drawFreezeLines(ctx);
     ctx.restore();
     this.drawSelection(); this.drawTabs();
@@ -343,7 +445,7 @@ export class WorkbookRenderer {
     for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], x, y + baseline + i * lineHeight);
     if (style.textDecoration) {
       const w = Math.min(width, measured), sx = align === 2 ? x - w : align === 1 ? x - w / 2 : x;
-      ctx.fillRect(sx, y + fontSize + 2, w, 1);
+      ctx.fillRect(sx, Math.round(y + fontSize + 1), w, 1);
     }
     ctx.restore();
   }
@@ -404,36 +506,288 @@ export class WorkbookRenderer {
       ctx.restore();
     }
   }
+  private drawHyperlinkText(ctx: CanvasRenderingContext2D, row: number, col: number, value: unknown, style: Style, rect: Rect, hyperlink: { linkColor?: string; drawUnderline?: boolean }): void {
+    const linkStyle = Object.assign(new Style(), style);
+    linkStyle.foreColor = hyperlink.linkColor ?? (usingThemedDocument() ? '#0563c1' : '#0000ff');
+    if (hyperlink.drawUnderline !== false) linkStyle.textDecoration = 1;
+    this.drawText(ctx, row, col, value, linkStyle, rect, true);
+  }
+  private drawDataBar(ctx: CanvasRenderingContext2D, rect: Rect, bar: NonNullable<ReturnType<Worksheet['conditionalFormats']['_visualFor']>>['bar']): void {
+    if (!bar) return;
+    const width = Math.max(0, Math.min(1, bar.fraction)) * (rect.width - 2);
+    const left = rect.x + 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.width - 1, rect.height - 1);
+    ctx.clip();
+    if (bar.gradient) {
+      const gradient = ctx.createLinearGradient(left, 0, left + Math.max(1, width), 0);
+      gradient.addColorStop(0, bar.color);
+      gradient.addColorStop(1, '#ffffff');
+      ctx.fillStyle = gradient;
+    } else ctx.fillStyle = bar.color;
+    ctx.fillRect(left, rect.y + 1, width, rect.height - 3);
+    if (bar.showBorder) {
+      ctx.strokeStyle = bar.borderColor ?? bar.color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(left + 0.5, rect.y + 1.5, width - 1, rect.height - 4);
+    }
+    ctx.restore();
+  }
+  private drawIcon(ctx: CanvasRenderingContext2D, icon: { iconSetType: number; iconIndex: number; iconOnly: boolean }, rect: Rect): number {
+    const size = Math.min(18, Math.max(10, rect.height - 2));
+    const x = Math.round(rect.x) + 1, y = Math.round(rect.y + (rect.height - size) / 2);
+    drawIconSet(ctx, icon.iconSetType, icon.iconIndex, x, y, size);
+    return size;
+  }
+  private drawCommentIndicator(ctx: CanvasRenderingContext2D, row: number, col: number, rect: Rect): void {
+    const sheet = this.sheet!;
+    if (!sheet.comments.all().length) return;
+    const comment = sheet.comments.get(row, col);
+    if (!comment) return;
+    const size = Number(comment.indicatorSize()) || 6;
+    ctx.save();
+    ctx.fillStyle = String(comment.indicatorColor() ?? 'red');
+    ctx.beginPath();
+    ctx.moveTo(rect.x + rect.width - size - 1, rect.y + 1);
+    ctx.lineTo(rect.x + rect.width - 1, rect.y + 1);
+    ctx.lineTo(rect.x + rect.width - 1, rect.y + size + 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  private drawValidationUI(ctx: CanvasRenderingContext2D, row: number, col: number, value: unknown, rect: Rect): void {
+    const sheet = this.sheet!;
+    const validator = sheet.getDataValidator(row, col) as { type?: () => number; inCellDropdown?: () => boolean; highlightStyle?: () => { type?: number; color?: string; position?: number } } | null;
+    if (!validator) return;
+    const type = typeof validator.type === 'function' ? validator.type() : 0;
+    const editing = this.interaction.editingAt(row, col);
+    if (editing && type === 3 && (typeof validator.inCellDropdown !== 'function' || validator.inCellDropdown())) {
+      const width = Math.min(18, rect.width);
+      ctx.save();
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(rect.x + rect.width - width, rect.y, width, rect.height - 1);
+      ctx.strokeStyle = '#ababab';
+      ctx.strokeRect(rect.x + rect.width - width + 0.5, rect.y + 0.5, width - 1, rect.height - 2);
+      ctx.fillStyle = 'black';
+      const cx = rect.x + rect.width - width / 2, cy = rect.y + rect.height / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy - 2);
+      ctx.lineTo(cx + 4, cy - 2);
+      ctx.lineTo(cx, cy + 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    if (this.workbook.options.highlightInvalidData && value != null && typeof sheet.isValid === 'function' && !sheet.isValid(row, col, value)) {
+      const style = typeof validator.highlightStyle === 'function' ? validator.highlightStyle() : undefined;
+      ctx.save();
+      ctx.strokeStyle = style?.color ?? 'red';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width / 2 + 4, rect.height / 2 + 4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  private drawFilterButtons(ctx: CanvasRenderingContext2D): void {
+    const sheet = this.sheet!;
+    const draw = (x: number, y: number, width: number, height: number, state: FilterGlyphState) => {
+      const w = Math.min(18, width - 4), h = Math.min(17, Math.max(6, height - 3));
+      if (w < 6 || h < 6) return;
+      const bx = Math.round(x + width - w - 2), by = Math.round(y + height - 2 - h);
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(bx, by, w, h);
+      ctx.strokeStyle = '#cccccc';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx + 0.5, by + 0.5, w - 1, h - 1);
+      drawFilterGlyph(ctx, bx + w / 2, by + h / 2, state);
+      ctx.restore();
+    };
+    for (const table of sheet.tables.all()) {
+      if (!table.showHeader()) continue;
+      const header = table.headerIndex();
+      const range = table.range();
+      if (header < 0) continue;
+      const rowSlot = this.rows.find((slot) => slot.index === header);
+      if (!rowSlot) continue;
+      for (const col of this.cols) {
+        const index = col.index - range.col;
+        if (index < 0 || index >= range.colCount) continue;
+        if (table.filterButtonVisible(index) === false) continue;
+        const tableFilter = table.rowFilter();
+        draw(col.position, rowSlot.position, col.size, rowSlot.size, {
+          filtered: tableFilter.isFiltered(index),
+          sort: tableFilter.getSortState(index),
+        });
+      }
+    }
+    const filter = sheet.rowFilter();
+    if (filter && filter.range && this.headerHeight > 0) {
+      const range = filter.range;
+      for (const col of this.cols) {
+        const index = col.index - range.col;
+        if (index < 0 || index >= range.colCount) continue;
+        if (filter.filterButtonVisible(index) === false) continue;
+        draw(col.position, 0, col.size, this.headerHeight, {
+          filtered: filter.isFiltered(index),
+          sort: filter.getSortState(index),
+        });
+      }
+    }
+  }
   private drawHeaders(ctx: CanvasRenderingContext2D): void {
     const s = this.sheet!, selections = s.getSelections();
-    ctx.font = `${Number((14.6667 * this.zoom).toFixed(4))}px Calibri`; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+    const baseFont = Number((14.6667 * this.zoom).toFixed(4));
+    ctx.font = `${baseFont}px Calibri`; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+    const columnBandTop = this.colGutter;
+    const columnBandHeight = Math.max(0, this.headerHeight - this.colGutter);
+    const rowBandLeft = this.rowGutter;
+    const rowBandWidth = Math.max(0, this.headerWidth - this.rowGutter);
     for (const col of this.cols) if (this.headerHeight) {
       const selected = selections.some(r => r.col === -1 || (col.index >= r.col && col.index < r.col + r.colCount));
       ctx.save(); ctx.beginPath(); ctx.rect(col.min, 0, col.max - col.min, this.headerHeight); ctx.clip();
-      ctx.fillStyle = selected ? '#e1e1e1' : 'white'; ctx.fillRect(col.position, 0, col.size, this.headerHeight);
-      ctx.fillStyle = '#d4d4d4'; ctx.fillRect(Math.round(col.position + col.size) - 1, 0, 1, this.headerHeight);
+      ctx.fillStyle = selected ? '#e1e1e1' : 'white'; ctx.fillRect(col.position, columnBandTop, col.size, columnBandHeight);
+      ctx.fillStyle = '#e1e6e1'; ctx.fillRect(Math.round(col.position + col.size) - 1, columnBandTop, 1, columnBandHeight);
       ctx.fillStyle = '#ababab'; ctx.fillRect(col.position, this.headerHeight - 1, col.size, 1);
       if (selected) { ctx.fillStyle = '#217346'; ctx.fillRect(col.position - 1, this.headerHeight - 2, col.size + 1, 2); }
-      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${Number((14.6667 * this.zoom).toFixed(4))}px Calibri`;
+      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${baseFont}px Calibri`;
       const text = s.getValue(0, col.index, 1);
-      ctx.fillText(text == null ? columnLabel(col.index) : String(text), col.position + col.size / 2 - 0.5, fontMetrics(ctx.font).baseline + (this.headerHeight - fontMetrics(ctx.font).height - 3) / 2);
+      const headerFilter = s.rowFilter();
+      let headerLabelWidth = col.size;
+      if (headerFilter && headerFilter.range) {
+        const index = col.index - headerFilter.range.col;
+        if (index >= 0 && index < headerFilter.range.colCount && headerFilter.filterButtonVisible(index) !== false)
+          headerLabelWidth -= Math.min(18, col.size - 4) + 2;
+      }
+      ctx.fillText(text == null ? columnLabel(col.index) : String(text), col.position + headerLabelWidth / 2 - 0.5, columnBandTop + fontMetrics(ctx.font).baseline + (columnBandHeight - fontMetrics(ctx.font).height - 3) / 2);
       ctx.restore();
     }
     for (const row of this.rows) if (this.headerWidth) {
       const selected = selections.some(r => r.row === -1 || (row.index >= r.row && row.index < r.row + r.rowCount));
       ctx.save(); ctx.beginPath(); ctx.rect(0, row.min, this.headerWidth, row.max - row.min); ctx.clip();
-      ctx.fillStyle = selected ? '#e1e1e1' : 'white'; ctx.fillRect(0, row.position, this.headerWidth, row.size);
-      ctx.fillStyle = '#d4d4d4'; ctx.fillRect(0, Math.round(row.position + row.size) - 1, this.headerWidth, 1);
+      ctx.fillStyle = selected ? '#e1e1e1' : 'white'; ctx.fillRect(rowBandLeft, row.position, rowBandWidth, row.size);
+      ctx.fillStyle = '#e1e6e1'; ctx.fillRect(rowBandLeft, Math.round(row.position + row.size) - 1, rowBandWidth, 1);
       ctx.fillStyle = '#ababab'; ctx.fillRect(this.headerWidth - 1, row.position, 1, row.size);
       if (selected) { ctx.fillStyle = '#217346'; ctx.fillRect(this.headerWidth - 2, row.position - 1, 2, row.size + 1); }
-      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${Number((14.6667 * this.zoom).toFixed(4))}px Calibri`;
+      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${baseFont}px Calibri`;
       const text = s.getValue(row.index, 0, 2);
-      ctx.fillText(text == null ? String(row.index + 1) : String(text), this.headerWidth / 2 - 0.5, row.position + fontMetrics(ctx.font).baseline + (row.size - fontMetrics(ctx.font).height - 3) / 2);
+      ctx.fillText(text == null ? String(row.index + 1) : String(text), rowBandLeft + rowBandWidth / 2 - 0.5, row.position + fontMetrics(ctx.font).baseline + (row.size - fontMetrics(ctx.font).height - 3) / 2);
       ctx.restore();
     }
     if (this.headerWidth && this.headerHeight) {
       ctx.fillStyle = 'white'; ctx.fillRect(0, 0, this.headerWidth - 1, this.headerHeight - 1);
-      ctx.fillStyle = '#e1e1e1'; ctx.beginPath(); ctx.moveTo(this.headerWidth - 3, 2); ctx.lineTo(this.headerWidth - 3, this.headerHeight - 3); ctx.lineTo(this.headerWidth - this.headerHeight + 2, this.headerHeight - 3); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e1e1e1';
+      ctx.beginPath();
+      if (this.rowGutter || this.colGutter) {
+        const bandHeight = Math.max(0, this.headerHeight - this.colGutter);
+        ctx.moveTo(this.headerWidth - 4, columnBandTop + 2);
+        ctx.lineTo(this.headerWidth - 4, columnBandTop + bandHeight - 3);
+        ctx.lineTo(this.headerWidth - 4 - (bandHeight - 6), columnBandTop + bandHeight - 3);
+      } else {
+        ctx.moveTo(this.headerWidth - 3, 2);
+        ctx.lineTo(this.headerWidth - 3, this.headerHeight - 3);
+        ctx.lineTo(this.headerWidth - this.headerHeight + 2, this.headerHeight - 3);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ababab';
+      ctx.fillRect(this.headerWidth - 1, 0, 1, this.headerHeight);
+      if (this.rowGutter) ctx.fillRect(0, this.headerHeight - 1, this.headerWidth, 1);
+    }
+    if (this.colGutter) {
+      ctx.fillStyle = '#ababab';
+      ctx.fillRect(0, this.colGutter - 1, this.viewWidth, 1);
+    }
+    if (this.rowGutter) {
+      ctx.fillStyle = '#ababab';
+      ctx.fillRect(this.rowGutter - 1, 0, 1, this.viewHeight);
+    }
+    if (s.rowOutlines._hasAny() || s.columnOutlines._hasAny()) this.drawOutlines(ctx);
+  }
+  private drawOutlineButton(ctx: CanvasRenderingContext2D, x: number, y: number, expand: boolean): void {
+    const size = 18;
+    ctx.save();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, size, size);
+    ctx.strokeStyle = '#828790'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+    ctx.strokeStyle = '#404040'; ctx.lineWidth = 1;
+    const cx = x + size / 2 - 0.5, cy = y + size / 2 - 0.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 3.5, cy); ctx.lineTo(cx + 3.5, cy);
+    if (expand) { ctx.moveTo(cx, cy - 3.5); ctx.lineTo(cx, cy + 3.5); }
+    ctx.stroke();
+    ctx.restore();
+  }
+  private drawOutlines(ctx: CanvasRenderingContext2D): void {
+    const s = this.sheet!;
+    const rowRuns = s.rowOutlines._runs();
+    const colRuns = s.columnOutlines._runs();
+    const rowMax = s.rowOutlines.getMaxLevel();
+    const colMax = s.columnOutlines.getMaxLevel();
+    // Level buttons.
+    if (this.rowGutter && this.colGutter) {
+      ctx.save();
+      ctx.font = `${Number((12 * this.zoom).toFixed(4))}px Calibri`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#666666';
+      for (let level = 0; level <= rowMax + 1; level++) {
+        const x = 2 + level * 16, y = this.colGutter + 1;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, 18, 17);
+        ctx.strokeStyle = '#828790'; ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, 17, 16);
+        ctx.fillStyle = '#666666'; ctx.fillText(String(level + 1), x + 9, y + 8.5);
+      }
+      for (let level = 0; level <= colMax + 1; level++) {
+        const x = this.rowGutter + 11, y = 2 + level * 16;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, 17, 18);
+        ctx.strokeStyle = '#828790'; ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, 16, 17);
+        ctx.fillStyle = '#666666'; ctx.fillText(String(level + 1), x + 8.5, y + 9);
+      }
+      ctx.restore();
+    }
+    // Row group brackets and expand/collapse buttons.
+    for (const run of rowRuns) {
+      const startSlot = this.rows.find((slot) => slot.index === run.index);
+      const summary = this.rows.find((slot) => slot.index === run.index + run.count);
+      if (!startSlot && !summary) continue;
+      const x = 11 + run.info.level * 17;
+      const collapsed = !!s.rowOutlines._item(run.index)?.collapsed;
+      ctx.save();
+      ctx.strokeStyle = '#ababab'; ctx.lineWidth = 2;
+      const top = (startSlot?.position ?? summary!.position) + 1;
+      const bottom = summary ? summary.position + summary.size / 2 : (startSlot?.position ?? 0) + startSlot!.size;
+      ctx.beginPath();
+      ctx.moveTo(x + 5, top); ctx.lineTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+      if (summary) {
+        this.drawOutlineButton(ctx, 2, summary.position + summary.size / 2 - 9, collapsed);
+        ctx.fillStyle = '#ababab';
+        for (const slot of this.rows)
+          if (slot.index >= run.index && slot.index < run.index + run.count)
+            ctx.fillRect(x + 4, slot.position + slot.size / 2 - 1, 2, 2);
+      }
+      ctx.restore();
+    }
+    // Column group brackets and buttons.
+    for (const run of colRuns) {
+      const startSlot = this.cols.find((slot) => slot.index === run.index);
+      const summary = this.cols.find((slot) => slot.index === run.index + run.count);
+      if (!startSlot && !summary) continue;
+      const y = 11 + run.info.level * 17;
+      const collapsed = !!s.columnOutlines._item(run.index)?.collapsed;
+      ctx.save();
+      ctx.strokeStyle = '#ababab'; ctx.lineWidth = 2;
+      const left = (startSlot?.position ?? summary!.position) + 1;
+      const right = summary ? summary.position + summary.size / 2 : (startSlot?.position ?? 0) + startSlot!.size;
+      ctx.beginPath();
+      ctx.moveTo(left, y + 5); ctx.lineTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+      if (summary) {
+        this.drawOutlineButton(ctx, summary.position + summary.size / 2 - 9, 2, collapsed);
+        ctx.fillStyle = '#ababab';
+        for (const slot of this.cols)
+          if (slot.index >= run.index && slot.index < run.index + run.count)
+            ctx.fillRect(slot.position + slot.size / 2 - 1, y + 17, 2, 2);
+      }
+      ctx.restore();
     }
   }
   private drawFreezeLines(ctx: CanvasRenderingContext2D): void {
@@ -466,7 +820,8 @@ export class WorkbookRenderer {
         }
         ctx.strokeStyle = s.getSelections().length > 1 ? 'white' : String(s.options.selectionBorderColor ?? '#217346'); ctx.lineWidth = s.getSelections().length > 1 ? 1 : 2;
         if (s.getSelections().length === 1) ctx.strokeRect(Math.round(rect.x) - 1, Math.round(rect.y) - 1, Math.round(rect.width) + 1, Math.round(rect.height) + 1);
-        if (s.getSelections().length === 1 && this.workbook.options.allowUserDragFill && range.rowCount < s.getRowCount() && range.colCount < s.getColumnCount()) {
+        const inTable = !!this.sheet!._tableAt(s.getActiveRowIndex(), s.getActiveColumnIndex());
+        if (!inTable && s.getSelections().length === 1 && this.workbook.options.allowUserDragFill && range.rowCount < s.getRowCount() && range.colCount < s.getColumnCount()) {
           ctx.fillStyle = 'white'; ctx.fillRect(rect.x + rect.width - 5, rect.y + rect.height - 5, 7, 7);
           ctx.fillStyle = String(s.options.selectionBorderColor ?? '#217346'); ctx.fillRect(rect.x + rect.width - 3, rect.y + rect.height - 3, 5, 5);
         }

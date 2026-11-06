@@ -10,6 +10,7 @@ import {
   astToText,
   collectRefs,
   containsFunction,
+  moveRefsForRange,
   parseFormula,
   translateRefs,
 } from './parser.js';
@@ -24,6 +25,7 @@ import {
   error,
   isArray,
   isLambda,
+  ReferenceValue,
   isReference,
   normalizeNumber,
   } from './values.js';
@@ -296,9 +298,9 @@ export class CalcEngine implements EvalHost {
 
   /** Parses/validates a formula and returns its canonical text. */
   parseFormula(sheet: Worksheet, row: number, col: number, formula: string): string {
-    void row;
-    void col;
-    return this.parseFormulaText(sheet, formula);
+    const text = this.parseFormulaText(sheet, formula);
+    this.validateStructured(this.compile(formula), sheet, row, col);
+    return text;
   }
 
   parseFormulaText(sheet: Worksheet, formula: string, r1c1 = this.isR1C1()): string {
@@ -415,6 +417,168 @@ export class CalcEngine implements EvalHost {
     }
   }
 
+  /** Parses a structured reference spec into tokens. */
+  private parseStructuredSpec(spec: string): { special: string[]; columns: string[]; columnRange: [string, string] | null; thisRow: boolean } {
+    let text = spec.trim();
+    if (text.startsWith('[') && text.endsWith(']')) text = text.slice(1, -1);
+    const special: string[] = [];
+    const columns: string[] = [];
+    let columnRange: [string, string] | null = null;
+    let thisRow = false;
+    // Split on top-level "],[" boundaries.
+    const parts: string[] = [];
+    let buffer = '';
+    let depth = 0;
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i]!;
+      if (char === '[') depth++;
+      else if (char === ']') depth--;
+      if (char === ',' && depth === 0) {
+        parts.push(buffer);
+        buffer = '';
+      } else buffer += char;
+    }
+    parts.push(buffer);
+    for (const raw of parts) {
+      let part = raw.trim();
+      if (part.startsWith('[') && part.endsWith(']')) part = part.slice(1, -1).trim();
+      if (!part) continue;
+      if (part.startsWith('@')) {
+        thisRow = true;
+        const name = part.slice(1).replace(/^\[|\]$/g, '');
+        if (name) columns.push(name);
+        continue;
+      }
+      if (part.startsWith('#')) {
+        special.push(part.toLowerCase());
+        continue;
+      }
+      if (part.includes(']:[')) {
+        const [left, right] = part.split(']:[');
+        columnRange = [left.replace(/^\[|\]$/g, ''), right.replace(/^\[|\]$/g, '')];
+        continue;
+      }
+      const name = part.replace(/^\[|\]$/g, '');
+      if (name) columns.push(name);
+    }
+    return { special, columns, columnRange, thisRow };
+  }
+  /** Resolves a structured reference to sheet areas. */
+  resolveStructuredAreas(
+    table: string,
+    spec: string,
+    sheet: Worksheet,
+    row: number,
+    col: number,
+  ): AreaRef[] | undefined {
+    let sheetName: string | undefined;
+    let tableName = table;
+    if (table.includes('!')) {
+      const bang = table.lastIndexOf('!');
+      sheetName = table.slice(0, bang).replace(/^'|'$/g, '').replace(/''/g, "'");
+      tableName = table.slice(bang + 1);
+    }
+    const target = sheetName ? this.sheetFromName(sheetName) : sheet;
+    if (!target) return undefined;
+    const found = target.tables?.findByName(tableName);
+    if (!found) return undefined;
+    const data = found.dataRange();
+    const header = found.headerIndex();
+    const footer = found.footerIndex();
+    const parsed = this.parseStructuredSpec(spec);
+    const nameToIndex = (name: string): number => {
+      for (let c = 0; c < found.range().colCount; c++)
+        if (found.getColumnName(c).toLowerCase() === name.toLowerCase()) return c;
+      return -1;
+    };
+    let firstCol = 0;
+    let lastCol = data.colCount - 1;
+    if (parsed.columnRange) {
+      const start = nameToIndex(parsed.columnRange[0]);
+      const end = nameToIndex(parsed.columnRange[1]);
+      if (start < 0 || end < 0) return undefined;
+      firstCol = Math.min(start, end);
+      lastCol = Math.max(start, end);
+    } else if (parsed.columns.length) {
+      const indexes = parsed.columns.map(nameToIndex).filter((index) => index >= 0);
+      if (!indexes.length) return undefined;
+      firstCol = Math.min(...indexes);
+      lastCol = Math.max(...indexes);
+    }
+    const includeHeaders = parsed.special.includes('#headers') || parsed.special.includes('#all');
+    const includeData = parsed.special.includes('#data') || parsed.special.includes('#all') || (!parsed.special.length && !parsed.thisRow);
+    const includeTotals = parsed.special.includes('#totals') || parsed.special.includes('#all');
+    const areas: AreaRef[] = [];
+    const addArea = (r1: number, r2: number): void => {
+      if (r1 < 0 || r2 < r1) return;
+      areas.push({ sheet: target, r1, c1: data.col + firstCol, r2, c2: data.col + lastCol });
+    };
+    if (parsed.thisRow) {
+      if (row < data.row || row >= data.row + data.rowCount) return [];
+      if (parsed.columns.length) {
+        for (const name of parsed.columns) {
+          const index = nameToIndex(name);
+          if (index < 0) return undefined;
+          areas.push({ sheet: target, r1: row, c1: data.col + index, r2: row, c2: data.col + index });
+        }
+      } else areas.push({ sheet: target, r1: row, c1: data.col, r2: row, c2: data.col + data.colCount - 1 });
+      return areas;
+    }
+    if (includeHeaders) {
+      if (header < 0) return undefined;
+      addArea(header, header);
+    }
+    if (includeData) addArea(data.row, data.row + data.rowCount - 1);
+    if (includeTotals && footer >= 0) addArea(footer, footer);
+    if (!areas.length) return [];
+    void col;
+    return areas;
+  }
+  /** Evaluation hook for structured references. */
+  resolveStructured(table: string, spec: string, sheet: Worksheet, row: number, col: number): Value {
+    let tableName = table;
+    if (table.includes('!')) tableName = table.slice(table.lastIndexOf('!') + 1);
+    const found = sheet.tables?.findByName(tableName);
+    if (!found) return error(ErrorCode.ref);
+    if (/#totals/i.test(spec) && found.footerIndex() < 0) return error(ErrorCode.ref);
+    if (/#headers/i.test(spec) && found.headerIndex() < 0) return error(ErrorCode.ref);
+    const areas = this.resolveStructuredAreas(table, spec, sheet, row, col);
+    if (!areas || !areas.length) return error(/@|#This Row/i.test(spec) ? ErrorCode.value : ErrorCode.ref);
+    return new ReferenceValue(areas);
+  }
+  /** Validates structured references in a formula. */
+  private validateStructured(ast: AstNode, sheet: Worksheet, row: number, col: number): void {
+    const visit = (node: AstNode): void => {
+      switch (node.kind) {
+        case 'structured':
+          if (!this.resolveStructuredAreas(node.table, node.spec, sheet, row, col))
+            throw new Error('Invalid Formula');
+          break;
+        case 'range':
+          visit(node.start); visit(node.end); break;
+        case 'union':
+          node.parts.forEach(visit); break;
+        case 'intersect':
+          visit(node.left); visit(node.right); break;
+        case 'binary':
+          visit(node.left); visit(node.right); break;
+        case 'unary':
+        case 'percent':
+          visit(node.operand); break;
+        case 'paren':
+          visit(node.inner); break;
+        case 'function':
+          node.args.forEach(visit); break;
+        case 'spill':
+          visit(node.ref); break;
+        case 'call':
+          visit(node.callee); node.args.forEach(visit); break;
+        default:
+          break;
+      }
+    };
+    visit(ast);
+  }
   private installFormula(
     sheet: Worksheet,
     row: number,
@@ -491,6 +655,8 @@ export class CalcEngine implements EvalHost {
   private registerDependencies(cell: FormulaCell): void {
     const refs = collectRefs(cell.ast);
     for (const ref of refs) this.registerRef(cell, ref);
+    this.registerStructuredDependencies(cell);
+    this.registerTableNameDependencies(cell);
     // Names may contain their own references; register those too.
     if (containsFunction(cell.ast, NAME_MARKERS) || hasNameNodes(cell.ast))
       this.registerNameDependencies(cell, cell.ast);
@@ -612,7 +778,6 @@ export class CalcEngine implements EvalHost {
       if (!found) return;
       sheet = found;
     }
-    const ownId = this.sheetId(sheet);
     const r1c1 = this.isR1C1();
     const originRow = baseRow ?? cell.row;
     const originCol = baseCol ?? cell.col;
@@ -636,6 +801,12 @@ export class CalcEngine implements EvalHost {
     if (r1 > r2) [r1, r2] = [r2, r1];
     if (c1 > c2) [c1, c2] = [c2, c1];
     if (r1 < 0 || c1 < 0) return;
+    this.addRangeDependency(cell, sheet, r1, c1, r2, c2);
+  }
+  private addRangeDependency(cell: FormulaCell, sheet: Worksheet, r1: number, c1: number, r2: number, c2: number): void {
+    const ownId = this.sheetId(sheet);
+    if (r1 > r2) [r1, r2] = [r2, r1];
+    if (c1 > c2) [c1, c2] = [c2, c1];
     if (r1 === r2 && c1 === c2) {
       this.addCellDependency(cell, this.keyFor(ownId, r1, c1));
       return;
@@ -672,6 +843,68 @@ export class CalcEngine implements EvalHost {
         set.add(entry);
       }
     }
+  }
+  /** Resolves a bare table name to its data range. */
+  resolveTableName(name: string, sheet: Worksheet): Value | undefined {
+    const table = sheet.tables?.findByName(name);
+    if (!table) return undefined;
+    const data = table.dataRange();
+    return new ReferenceValue([{ sheet, r1: data.row, c1: data.col, r2: data.row + data.rowCount - 1, c2: data.col + data.colCount - 1 }]);
+  }
+  private registerTableNameDependencies(cell: FormulaCell): void {
+    const visit = (node: AstNode): void => {
+      switch (node.kind) {
+        case 'name': {
+          if (node.sheet && node.sheet.toLowerCase() !== cell.sheet.name().toLowerCase()) return;
+          const table = cell.sheet.tables?.findByName(node.name);
+          if (table) {
+            const data = table.dataRange();
+            this.addRangeDependency(cell, cell.sheet, data.row, data.col, data.row + data.rowCount - 1, data.col + data.colCount - 1);
+          }
+          break;
+        }
+        case 'range': visit(node.start); visit(node.end); break;
+        case 'union': node.parts.forEach(visit); break;
+        case 'intersect': visit(node.left); visit(node.right); break;
+        case 'binary': visit(node.left); visit(node.right); break;
+        case 'unary':
+        case 'percent': visit(node.operand); break;
+        case 'paren': visit(node.inner); break;
+        case 'function': node.args.forEach(visit); break;
+        case 'spill': visit(node.ref); break;
+        case 'call': visit(node.callee); node.args.forEach(visit); break;
+        default: break;
+      }
+    };
+    visit(cell.ast);
+  }
+  private registerStructuredDependencies(cell: FormulaCell): void {
+    const visit = (node: AstNode): void => {
+      switch (node.kind) {
+        case 'structured': {
+          const areas = this.resolveStructuredAreas(node.table, node.spec, cell.sheet, cell.row, cell.col);
+          for (const area of areas ?? [])
+            this.addRangeDependency(cell, area.sheet, area.r1, area.c1, area.r2, area.c2);
+          break;
+        }
+        case 'range': visit(node.start); visit(node.end); break;
+        case 'union': node.parts.forEach(visit); break;
+        case 'intersect': visit(node.left); visit(node.right); break;
+        case 'binary': visit(node.left); visit(node.right); break;
+        case 'unary':
+        case 'percent': visit(node.operand); break;
+        case 'paren': visit(node.inner); break;
+        case 'function': node.args.forEach(visit); break;
+        case 'spill': visit(node.ref); break;
+        case 'call': visit(node.callee); node.args.forEach(visit); break;
+        default: break;
+      }
+    };
+    visit(cell.ast);
+  }
+  /** Rebuilds formulas after table definitions changed. */
+  tablesChanged(): void {
+    this.rebuildFormulas(true);
   }
 
   private indexFormula(sheetId: number, row: number, col: number, key: string): void {
@@ -1179,6 +1412,53 @@ export class CalcEngine implements EvalHost {
   // -------------------------------------------------------------------------
   // Public operations
   // -------------------------------------------------------------------------
+  /** Clears every array-spill output on a sheet so a structural shift re-spills cleanly. */
+  clearSpills(sheet: Worksheet): void {
+    for (const cell of this.formulas.values())
+      if (cell.sheet === sheet && cell.spill) this.clearSpill(cell);
+  }
+
+  /** Re-points references to a moved range and moves formula cells with it. */
+  moveRange(
+    sheet: Worksheet,
+    fromRow: number,
+    fromCol: number,
+    toRow: number,
+    toCol: number,
+    rowCount: number,
+    colCount: number,
+  ): void {
+    const dr = toRow - fromRow,
+      dc = toCol - fromCol;
+    if (!dr && !dc) return;
+    this.rebuildFormulas(false);
+    for (const cell of this.formulas.values()) {
+      const ast = moveRefsForRange(
+        cell.ast,
+        fromRow,
+        fromCol,
+        fromRow + rowCount - 1,
+        fromCol + colCount - 1,
+        toRow,
+        toCol,
+        dr,
+        dc,
+        sheet.name(),
+        cell.row,
+        cell.col,
+        rowCount,
+        colCount,
+        cell.sheet === sheet,
+      );
+      if (ast !== cell.ast) {
+        const text = astToText(ast, { r1c1: this.isR1C1() });
+        if (text !== cell.text) cell.sheet._setFormulaText(cell.row, cell.col, text);
+      }
+    }
+    this.rebuildFormulas(false);
+    this.recalculate(undefined, true, 1);
+  }
+
   recalcAll(type?: number): void {
     this.pending.length = 0;
     this.recalculate(undefined, true, type ?? 0);

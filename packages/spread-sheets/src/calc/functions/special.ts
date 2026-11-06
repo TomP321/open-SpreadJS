@@ -187,17 +187,44 @@ export function tPdf(t: number, df: number): number {
   );
 }
 
-/** Inverse Student's t for a cumulative probability. */
+/**
+ * Inverse Student's t for a cumulative probability.
+ *
+ * The trial uses Hill's 1970 approximation (AS 27) for three or more degrees of
+ * freedom and closed forms for one and two. It is slightly *less* accurate than
+ * an exact quantile at small df, but matching its approximation is what makes
+ * T.INV/T.INV.2T/TINV/TTEST agree with the reference implementation.
+ */
 export function tInv(p: number, df: number): number {
   if (p <= 0 || p >= 1) return NaN;
-  let low = -100;
-  let high = 100;
-  for (let iteration = 0; iteration < 200; iteration++) {
-    const mid = (low + high) / 2;
-    if (tCdf(mid, df) < p) low = mid;
-    else high = mid;
+  if (df < 1) return NaN;
+  const twoTail = 2 * (1 - p);
+  if (df === 1) return Math.tan(Math.PI * (p - 0.5));
+  if (df === 2) return Math.sqrt(2 / (twoTail * (2 - twoTail)) - 2);
+  const a = 1 / (df - 0.5);
+  const b = 48 / (a * a);
+  let c = ((20700 * a) / b - 98) * a - 16;
+  c = c * a + 96.36;
+  const d = ((94.5 / (b + c) - 3) / b + 1) * Math.sqrt((a * Math.PI) / 2) * df;
+  let x = d * twoTail;
+  let y = Math.pow(x, 2 / df);
+  if (y > 0.05 + a) {
+    x = normalInv(twoTail / 2);
+    y = x * x;
+    if (df < 5) c = c + 0.3 * (df - 4.5) * (x + 0.6);
+    c = ((((0.05 * d * x - 5) * x - 7) * x - 2) * x + b + c);
+    y = ((((((0.4 * y + 6.3) * y + 36) * y + 94.5) / c - y - 3) / b + 1) * x);
+    y = a * y * y;
+    y = y > 0.002 ? Math.exp(y) - 1 : 0.5 * y * y + y;
+  } else {
+    y =
+      ((1 / ((((df + 6) / (df * y) - 0.089 * d - 0.822) * (df + 2) * 3)) + 0.5 / (df + 4)) *
+        y -
+        1) *
+        ((df + 1) / (df + 2)) +
+      1 / y;
   }
-  return (low + high) / 2;
+  return Math.sqrt(df * y);
 }
 
 export function chiSquareCdf(x: number, df: number): number {

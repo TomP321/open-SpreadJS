@@ -1,0 +1,149 @@
+[
+ {
+  "id": "m4-cmt-basic",
+  "read": [
+   "js:(function(){sheet.comments.add(1,2,'hello'); const c=sheet.comments.get(1,2); const j=c.toJSON(); return [c.text(),c.backColor(),c.foreColor(),c.commentState(),sheet.comments.all().length,sheet.comments.toJSON(),j.rowIndex,j.colIndex];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cmt-props",
+  "read": [
+   "js:(function(){sheet.comments.add(0,0,'body'); const c=sheet.comments.get(0,0); c.text('new'); c.backColor('#123456'); c.foreColor('#abcdef'); c.autoSize(true); c.dynamicSize(true); c.dynamicMove(true); c.lock(true); c.showShadow(false); c.width(120); c.height(45); return [c.text(),c.backColor(),c.foreColor(),c.autoSize(),c.dynamicSize(),c.dynamicMove(),c.lock(),c.showShadow(),c.width(),c.height(),c.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cmt-json",
+  "read": [
+   "js:(function(){sheet.comments.add(0,0,'x'); sheet.comments.add(2,1,'y'); const j=sheet.toJSON(); return [j.comments,sheet.comments.all().map(function(c){return c.toJSON();})];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cmt-remove-clear",
+  "read": [
+   "js:(function(){sheet.comments.add(0,0,'x'); sheet.comments.add(1,1,'y'); sheet.comments.remove(0,0); const a=sheet.comments.all().length; sheet.comments.clear(); return [a,sheet.comments.all().length,sheet.comments.get(1,1)];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cmt-shift",
+  "read": [
+   "js:(function(){sheet.comments.add(2,1,'a'); sheet.addRows(1,1); sheet.addColumns(0,1); return [sheet.comments.get(3,2)!==null,sheet.comments.all().map(function(c){const j=c.toJSON();return [j.rowIndex,j.colIndex,c.text()];})];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-link-url",
+  "read": [
+   "js:(function(){sheet.setValue(0,0,'x'); sheet.setHyperlink(0,0,{url:'https://a.b/c',tooltip:'tip',linkColor:'#112233',visitedLinkColor:'#445566',target:1,drawUnderline:false}); const h=sheet.getHyperlink(0,0); return [h,sheet.toJSON().data.dataTable];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-link-move",
+  "read": [
+   "js:(function(){sheet.setValue(0,0,'x'); sheet.setHyperlink(0,0,{url:'https://a.b'}); sheet.setValue(1,0,'y'); sheet.setHyperlink(1,0,{url:'https://c.d'}); sheet.moveTo(0,0,2,0,1,1); return [sheet.getHyperlink(0,0),sheet.getHyperlink(2,0),sheet.getHyperlink(1,0)];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-link-copy",
+  "read": [
+   "js:(function(){sheet.setValue(0,0,'x'); sheet.setHyperlink(0,0,{url:'https://a.b'}); sheet.copyTo(0,0,1,1,1,1,GC.Spread.Sheets.CopyToOptions.hyperlink); return [sheet.getHyperlink(0,0),sheet.getHyperlink(1,1)];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-link-clear",
+  "read": [
+   "js:(function(){sheet.setValue(0,0,'x'); sheet.setHyperlink(0,0,{url:'https://a.b'}); sheet.clear(0,0,1,1,GC.Spread.Sheets.SheetArea.viewport,GC.Spread.Sheets.StorageType.hyperlink); return [sheet.getHyperlink(0,0),sheet.getValue(0,0)];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-nested-b",
+  "read": [
+   "js:(function(){sheet.rowOutlines.group(2,3); sheet.rowOutlines.group(3,2); sheet.rowOutlines.group(1,1); return [sheet.rowOutlines.getMaxLevel(),sheet.rowOutlines.toJSON(),[0,1,2,3,4,5,6].map(function(i){return sheet.rowOutlines.getLevel(i);})];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-collapse-b",
+  "read": [
+   "js:(function(){sheet.rowOutlines.group(2,2); sheet.rowOutlines.setCollapsed(2,true); const x=sheet.rowOutlines.toJSON(); sheet.rowOutlines.setCollapsed(2,false); return [x,sheet.rowOutlines.isCollapsed(2),sheet.rowOutlines.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-expand-b",
+  "read": [
+   "js:(function(){sheet.rowOutlines.group(1,4); sheet.rowOutlines.group(2,2); sheet.rowOutlines.expand(1,3); return [sheet.rowOutlines.getMaxLevel(),sheet.rowOutlines.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-col",
+  "read": [
+   "js:(function(){sheet.columnOutlines.group(1,2); sheet.columnOutlines.group(4,3); sheet.columnOutlines.setCollapsed(4,true); return [sheet.columnOutlines.getMaxLevel(),sheet.columnOutlines.toJSON(),sheet.toJSON().columnOutlines];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-json-roundtrip",
+  "read": [
+   "js:(function(){sheet.rowOutlines.group(2,3); sheet.rowOutlines.setCollapsed(2,true); sheet.fromJSON(JSON.parse(JSON.stringify(sheet.toJSON()))); return [sheet.rowOutlines.toJSON(),sheet.rowOutlines.getMaxLevel()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-struct-sum",
+  "read": [
+   "js:(function(){for(let r=0;r<4;r++)for(let c=0;c<3;c++)sheet.setValue(r,c,[['Item','Qty','Price'],['A',2,3],['B',5,7],['C',4,6]][r][c]); sheet.tables.add('T',0,0,4,3,GC.Spread.Sheets.Tables.TableThemes.light1); sheet.setFormula(5,0,'=SUM(T[Qty])'); sheet.setFormula(5,1,'=AVERAGE(T[Price])'); sheet.setFormula(5,2,'=COUNT(T[Qty])'); return [sheet.getValue(5,0),sheet.getValue(5,1),sheet.getValue(5,2)];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-struct-table-total",
+  "read": [
+   "js:(function(){for(let r=0;r<4;r++)for(let c=0;c<3;c++)sheet.setValue(r,c,[['Item','Qty','Price'],['A',2,3],['B',5,7],['C',4,6]][r][c]); sheet.tables.add('T',0,0,4,3,GC.Spread.Sheets.Tables.TableThemes.light1); sheet.setFormula(5,0,'=SUM(T[[#Data],[Qty]])'); sheet.setFormula(5,1,'=COUNTA(T[[#Headers],[Item]])'); return [sheet.getValue(5,0),sheet.getValue(5,1)];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-struct-bare-name",
+  "read": [
+   "js:(function(){for(let r=0;r<4;r++)for(let c=0;c<3;c++)sheet.setValue(r,c,[['Item','Qty','Price'],['A',2,3],['B',5,7],['C',4,6]][r][c]); sheet.tables.add('T',0,0,4,3,GC.Spread.Sheets.Tables.TableThemes.light1); sheet.setFormula(5,0,'=ROWS(T)'); sheet.setFormula(5,1,'=COLUMNS(T)'); return [sheet.getValue(5,0),sheet.getValue(5,1)];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-table-options",
+  "read": [
+   "js:(function(){for(let c=0;c<3;c++){sheet.setValue(0,c,'H'+c);sheet.setValue(1,c,c+1);} const t=sheet.tables.add('T',0,0,2,3,GC.Spread.Sheets.Tables.TableThemes.medium4,{showHeader:false,showFooter:true,bandRows:false,bandColumns:true,highlightFirstColumn:true,highlightLastColumn:true}); return [t.showHeader(),t.showFooter(),t.bandRows(),t.bandColumns(),t.highlightFirstColumn(),t.highlightLastColumn(),t.headerIndex(),t.footerIndex(),t.dataRange(),t.range(),t.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-table-columns-b",
+  "read": [
+   "js:(function(){for(let c=0;c<3;c++){sheet.setValue(0,c,'H'+c);sheet.setValue(1,c,c+1);} const t=sheet.tables.add('T',0,0,2,3,GC.Spread.Sheets.Tables.TableThemes.light2); t.setColumnName(0,'AA'); t.setColumnDataField(1,'field'); t.setColumnValue(2,{value:9}); return [t.getColumnName(0),t.getColumnDataField(1),JSON.stringify(t.getColumnValue(2)),t.toJSON().columns];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-table-filter-buttons-b",
+  "read": [
+   "js:(function(){for(let c=0;c<3;c++){sheet.setValue(0,c,'H'+c);sheet.setValue(1,c,c+1);} const t=sheet.tables.add('T',0,0,2,3,GC.Spread.Sheets.Tables.TableThemes.light3); const a=t.filterButtonVisible(1); t.filterButtonVisible(1,false); const b=t.filterButtonVisible(1); const f=t.rowFilter(); return [a,b,f!==null,f&&f.typeName,t.toJSON().filterButtonSet];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-table-remove",
+  "read": [
+   "js:(function(){for(let c=0;c<2;c++){sheet.setValue(0,c,'H'+c);sheet.setValue(1,c,c+1);} const t=sheet.tables.add('T',0,0,2,2,GC.Spread.Sheets.Tables.TableThemes.medium1); const n=t.name(); sheet.tables.remove(n); return [sheet.tables.all().length,sheet.getActualStyle(1,1).backColor];})()"
+  ],
+  "steps": []
+ }
+]

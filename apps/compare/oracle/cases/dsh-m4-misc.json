@@ -1,0 +1,192 @@
+[
+ {
+  "id": "m4-comment-default",
+  "read": [
+   "js:(function(){ const c=sheet.comments.add(0,0,'hello'); return [c.text(),c.width(),c.height(),c.autoSize(),c.location(),c.displayMode(),c.commentState(),c.indicatorColor(),c.indicatorSize(),c.zIndex(),c.locked(),c.opacity(),c.fontFamily(),c.fontSize(),c.fontWeight(),c.foreColor(),c.backColor(),c.showShadow(),c.padding(),c.toJSON()]; })()",
+   "js:sheet.toJSON().comments"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-comment-props",
+  "read": [
+   "js:(function(){ const C=GC.Spread.Sheets.Comments; const c=sheet.comments.add(0,0,'hi'); c.width(200); c.height(100); c.autoSize(true); c.backColor('#ffff00'); c.foreColor('red'); c.fontFamily('Arial'); c.fontSize('12px'); c.fontStyle('italic'); c.fontWeight('bold'); c.textDecoration(1); c.horizontalAlign(2); c.opacity(0.5); c.showShadow(true); c.displayMode(C.DisplayMode.alwaysShown); c.commentState(C.CommentState.active); c.location(new GC.Spread.Sheets.Point(30,40)); c.indicatorColor('#00ff00'); c.indicatorSize(8); c.zIndex(900); c.locked(false); c.lockText(false); c.dynamicMove(true); c.dynamicSize(true); c.padding({top:1,right:2,bottom:3,left:4}); return c.toJSON(); })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-comment-manager",
+  "read": [
+   "js:(function(){ const a=sheet.comments.add(0,0,'a'); const b=sheet.comments.add(1,1,'b'); return [sheet.comments.all().length,sheet.comments.get(0,0).text(),sheet.comments.get(2,2),sheet.comments.all().map(function(c){return c.text();})]; })()",
+   "js:(function(){ sheet.comments.remove(0,0); return [sheet.comments.all().length,sheet.comments.get(0,0)]; })()",
+   "js:(function(){ sheet.comments.clear(new GC.Spread.Sheets.Range(1,1,1,1)); return sheet.comments.all().length; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-comment-clear-storage",
+  "read": [
+   "js:(function(){ sheet.comments.add(0,0,'a'); sheet.comments.add(1,1,'b'); sheet.clear(0,0,1,2,GC.Spread.Sheets.SheetArea.viewport,GC.Spread.Sheets.StorageType.comment); return [sheet.comments.all().length,sheet.comments.get(0,0),sheet.comments.get(1,1)&&sheet.comments.get(1,1).text()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-comment-shift-rows",
+  "read": [
+   "js:(function(){ sheet.comments.add(2,0,'two'); sheet.addRows(0,2); const a=sheet.comments.get(4,0)&&sheet.comments.get(4,0).text(); sheet.deleteRows(0,1); const b=sheet.comments.get(3,0)&&sheet.comments.get(3,0).text(); return [a,b,sheet.toJSON().comments]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-comment-shift-cols",
+  "read": [
+   "js:(function(){ sheet.comments.add(0,2,'two'); sheet.addColumns(0,1); const a=sheet.comments.get(0,3)&&sheet.comments.get(0,3).text(); sheet.deleteColumns(0,1); const b=sheet.comments.get(0,2)&&sheet.comments.get(0,2).text(); return [a,b]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-comment-copy",
+  "read": [
+   "js:(function(){ sheet.comments.add(0,0,'c'); sheet.copyTo(0,0,2,2,1,1,GC.Spread.Sheets.CopyToOptions.all); return [sheet.comments.get(2,2)&&sheet.comments.get(2,2).text(),sheet.comments.all().length]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-comment-json-roundtrip",
+  "read": [
+   "js:(function(){ const c=sheet.comments.add(0,0,'x'); c.width(120); c.displayMode(1); const before=sheet.toJSON().comments; wb.fromJSON(JSON.parse(JSON.stringify(wb.toJSON()))); return [before,wb.toJSON().sheets.Sheet1.comments,wb.getActiveSheet().comments.get(0,0).width()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-hyperlink-default",
+  "read": [
+   "js:(function(){ sheet.setValue(0,0,'link'); sheet.setHyperlink(0,0,{url:'https://example.com'}); return [sheet.getHyperlink(0,0),sheet.getHyperlink(1,1),sheet.toJSON().data.dataTable]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-hyperlink-options",
+  "read": [
+   "js:(function(){ sheet.setHyperlink(0,0,{url:'https://example.com',tooltip:'tip',linkColor:'#0000ff',visitedLinkColor:'#800080',target:1,drawUnderline:false}); return [sheet.getHyperlink(0,0),sheet.toJSON().data.dataTable]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-hyperlink-remove",
+  "read": [
+   "js:(function(){ sheet.setHyperlink(0,0,{url:'x'}); sheet.setHyperlink(0,0,null); return [sheet.getHyperlink(0,0),sheet.toJSON().data.dataTable]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-hyperlink-clear",
+  "read": [
+   "js:(function(){ sheet.setHyperlink(0,0,{url:'x'}); sheet.clear(0,0,1,1,GC.Spread.Sheets.SheetArea.viewport,GC.Spread.Sheets.StorageType.hyperlink); return [sheet.getHyperlink(0,0),sheet.toJSON().data.dataTable]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-hyperlink-copy",
+  "read": [
+   "js:(function(){ sheet.setHyperlink(0,0,{url:'x'}); sheet.copyTo(0,0,2,2,1,1,GC.Spread.Sheets.CopyToOptions.all); return [sheet.getHyperlink(2,2),sheet.getHyperlink(0,0)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-hyperlink-move",
+  "read": [
+   "js:(function(){ sheet.setHyperlink(0,0,{url:'x'}); sheet.moveTo(0,0,3,3,1,1); return [sheet.getHyperlink(0,0),sheet.getHyperlink(3,3)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-hyperlink-json-roundtrip",
+  "read": [
+   "js:(function(){ sheet.setHyperlink(1,1,{url:'https://a.b',tooltip:'t'}); const before=sheet.toJSON().data.dataTable; wb.fromJSON(JSON.parse(JSON.stringify(wb.toJSON()))); return [before,wb.toJSON().sheets.Sheet1.data.dataTable,wb.getActiveSheet().getHyperlink(1,1)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-group",
+  "read": [
+   "js:(function(){ const o=sheet.rowOutlines; o.group(1,2); return [o.getLevel(0),o.getLevel(1),o.getLevel(2),o.getLevel(3),o.getMaxLevel(),o.toJSON(),sheet.toJSON().rowOutlines]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-collapse",
+  "read": [
+   "js:(function(){ const o=sheet.rowOutlines; o.group(1,2); o.setCollapsed(1,true); return [o.getCollapsed(1),o.getCollapsed(2),o.getCollapsed(3),o.isCollapsed(1),sheet.getRowVisible(1),sheet.getRowVisible(2),sheet.getRowVisible(3),o.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-expand",
+  "read": [
+   "js:(function(){ const o=sheet.rowOutlines; o.group(1,3); o.setCollapsed(1,true); const a=[sheet.getRowVisible(1),sheet.getRowVisible(2),sheet.getRowVisible(3),sheet.getRowVisible(4)]; o.setCollapsed(1,false); return [a,[sheet.getRowVisible(1),sheet.getRowVisible(2),sheet.getRowVisible(3),sheet.getRowVisible(4)],o.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-nested",
+  "read": [
+   "js:(function(){ const o=sheet.rowOutlines; o.group(1,2); o.group(2,2); return [o.getLevel(1),o.getLevel(2),o.getLevel(3),o.getMaxLevel(),o.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-ungroup",
+  "read": [
+   "js:(function(){ const o=sheet.rowOutlines; o.group(1,2); o.group(5,3); const before=o.toJSON(); o.ungroup(); return [before,o.toJSON(),o.getMaxLevel()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-find",
+  "read": [
+   "js:(function(){ const o=sheet.rowOutlines; o.group(1,2); const a=o.find(1,0); const b=o.find(1,1); const c=o.find(9,0); return [a&&a.start,a&&a.end,a&&a.level,b,c]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-insert",
+  "read": [
+   "js:(function(){ const o=sheet.rowOutlines; o.group(2,2); return o.toJSON(); })()",
+   "js:JSON.stringify(sheet.toJSON().rowOutlines)"
+  ],
+  "steps": [
+   {
+    "$js": "sheet.rowOutlines.group(2,2)"
+   },
+   {
+    "$call": [
+     "addRows",
+     0,
+     1
+    ]
+   }
+  ]
+ },
+ {
+  "id": "m4-outline-columns",
+  "read": [
+   "js:(function(){ const o=sheet.columnOutlines; o.group(1,1); o.setCollapsed(1,true); return [o.getLevel(0),o.getLevel(1),o.getLevel(2),o.getMaxLevel(),sheet.getColumnVisible(1),sheet.getColumnVisible(2),o.toJSON(),sheet.toJSON().columnOutlines]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-flags",
+  "read": [
+   "js:(function(){ const a=[sheet.showRowOutline(),sheet.showColumnOutline()]; sheet.showRowOutline(false); sheet.showColumnOutline(false); return [a,sheet.showRowOutline(),sheet.showColumnOutline(),sheet.toJSON().showRowOutline,sheet.toJSON().showColumnOutline]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-outline-fromjson",
+  "read": [
+   "js:(function(){ sheet.rowOutlines.fromJSON({items:[null,{level:0,collapsed:true,viewCollapsed:true},{level:0,collapsed:false,viewCollapsed:true},{level:-1,collapsed:true,viewCollapsed:false}],itemsData:[{index:1,count:1,info:{level:0,collapsed:true}},{index:2,count:1,info:{level:0,collapsed:false}},{index:3,count:1,info:{level:-1,collapsed:true}}]}); return [sheet.rowOutlines.toJSON(),sheet.rowOutlines.getLevel(1),sheet.rowOutlines.getCollapsed(1),sheet.getRowVisible(1),sheet.getRowVisible(2)]; })()"
+  ],
+  "steps": []
+ }
+]

@@ -1,0 +1,229 @@
+[
+ {
+  "id": "m4-cf-cellvalue",
+  "cells": {
+   "A1": 1,
+   "A2": 5,
+   "A3": 10
+  },
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='#ff0000'; const r=sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,2,0,st,[new GC.Spread.Sheets.Range(0,0,3,1)]); return [r.ruleType(),r.operator(),r.value1(),r.value2(),r.priority(),r.stopIfTrue(),r.toJSON()]; })()",
+   "js:sheet.toJSON().conditionalFormats",
+   "js:[sheet.getActualStyle(0,0).backColor,sheet.getActualStyle(1,0).backColor,sheet.getActualStyle(2,0).backColor]"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-operators",
+  "cells": {
+   "A1": 5
+  },
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const out=[]; const st=new GC.Spread.Sheets.Style(); st.backColor='red'; [0,1,2,3,4,5,6,7].forEach(function(op){ const r=sheet.conditionalFormats.addCellValueRule(op,2,8,st,[new GC.Spread.Sheets.Range(0,0,1,1)]); out.push([op,r.evaluate(sheet,0,0,5)&&r.evaluate(sheet,0,0,5).backColor||null,r.toJSON().operator,r.toJSON().value2]); }); return out; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-specifictext",
+  "cells": {
+   "A1": "alpha",
+   "A2": "beta"
+  },
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.foreColor='blue'; const out=[]; [0,1,2,3,4,5,6,7].forEach(function(op){ const r=sheet.conditionalFormats.addSpecificTextRule(op,'alp',st,[new GC.Spread.Sheets.Range(0,0,2,1)]); out.push([op,!!r.evaluate(sheet,0,0,'alpha'),!!r.evaluate(sheet,0,0,'beta'),r.toJSON().operator,r.toJSON().text]); }); return out; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-formula",
+  "cells": {
+   "A1": 1,
+   "A2": 9
+  },
+  "read": [
+   "js:(function(){ const st=new GC.Spread.Sheets.Style(); st.backColor='#00ff00'; const r=sheet.conditionalFormats.addFormulaRule('A1>5',st,[new GC.Spread.Sheets.Range(0,0,2,1)]); return [r.toJSON(),r.evaluate(sheet,1,0,9),r.evaluate(sheet,0,0,1)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-dateoccurring",
+  "cells": {
+   "A1": "=TODAY()",
+   "A2": "=TODAY()-1"
+  },
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='#ffff00'; const out=[]; [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].forEach(function(t){ const r=sheet.conditionalFormats.addDateOccurringRule(t,st,[new GC.Spread.Sheets.Range(0,0,2,1)]); out.push([t,r.toJSON().type]); }); return out; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-top10",
+  "cells": {
+   "A1": 3,
+   "A2": 1,
+   "A3": 5,
+   "A4": 2,
+   "A5": 4
+  },
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='#00ffff'; const r=sheet.conditionalFormats.addTop10Rule(CF.Top10ConditionType.top,2,st,[new GC.Spread.Sheets.Range(0,0,5,1)]); return [r.toJSON(),r.rank(),r.type(),r.isPercent(),r.priority()]; })()",
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='#00ffff'; const r=sheet.conditionalFormats.addTop10Rule(CF.Top10ConditionType.bottom,20,st,[new GC.Spread.Sheets.Range(0,0,5,1)],true); return [r.toJSON(),r.rank(),r.type(),r.isPercent()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-unique-duplicate",
+  "cells": {
+   "A1": "a",
+   "A2": "b",
+   "A3": "a"
+  },
+  "read": [
+   "js:(function(){ const st=new GC.Spread.Sheets.Style(); st.backColor='red'; const r=sheet.conditionalFormats.addUniqueRule(st,[new GC.Spread.Sheets.Range(0,0,3,1)]); return [r.ruleType(),r.toJSON()]; })()",
+   "js:(function(){ const st=new GC.Spread.Sheets.Style(); st.backColor='blue'; const r=sheet.conditionalFormats.addDuplicateRule(st,[new GC.Spread.Sheets.Range(0,0,3,1)]); return [r.ruleType(),r.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-average",
+  "cells": {
+   "A1": 1,
+   "A2": 5,
+   "A3": 9
+  },
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='gray'; const out=[]; [0,1,2,3,4,5,6,7,8,9].forEach(function(t){ const r=sheet.conditionalFormats.addAverageRule(t,st,[new GC.Spread.Sheets.Range(0,0,3,1)]); out.push([t,r.toJSON().type]); }); return out; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-2scale",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const r=sheet.conditionalFormats.add2ScaleRule(CF.ScaleValueType.lowestValue,0,'#ff0000',CF.ScaleValueType.highestValue,100,'#00ff00',[new GC.Spread.Sheets.Range(0,0,5,1)]); return [r.ruleType(),r.isScaleRule(),r.minType(),r.minValue(),r.minColor(),r.maxType(),r.maxValue(),r.maxColor(),r.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-3scale",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const r=sheet.conditionalFormats.add3ScaleRule(CF.ScaleValueType.percent,10,'#111111',CF.ScaleValueType.percentile,50,'#222222',CF.ScaleValueType.formula,0,'#333333',[new GC.Spread.Sheets.Range(0,0,5,1)]); return [r.minType(),r.minValue(),r.minColor(),r.midType(),r.midValue(),r.midColor(),r.maxType(),r.maxValue(),r.maxColor(),r.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-databar",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const r=sheet.conditionalFormats.addDataBarRule(CF.ScaleValueType.automin,0,CF.ScaleValueType.automax,0,'#638ec6',[new GC.Spread.Sheets.Range(0,0,5,1)]); return [r.toJSON(),r.color(),r.minType(),r.maxType(),r.gradient(),r.showBarOnly(),r.axisPosition(),r.axisColor()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-databar-options",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const r=sheet.conditionalFormats.addDataBarRule(CF.ScaleValueType.number,0,CF.ScaleValueType.number,100,'#123456',[new GC.Spread.Sheets.Range(0,0,5,1)]); r.gradient(false); r.showBarOnly(true); r.showBorder(true); r.borderColor('#654321'); r.axisColor('#ff0000'); r.axisPosition(CF.DataBarAxisPosition.cellMidPoint); r.dataBarDirection(CF.BarDirection.rightToLeft); r.negativeFillColor('#00ff00'); r.useNegativeFillColor(true); r.negativeBorderColor('#0000ff'); r.useNegativeBorderColor(true); return [r.toJSON(),r.minType(),r.maxType()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const r=sheet.conditionalFormats.addIconSetRule(CF.IconSetType.threeArrowsColored,[new GC.Spread.Sheets.Range(0,0,5,1)]); return [r.toJSON(),r.iconSetType(),r.iconCriteria().length,r.icons().length,r.reverseIconOrder(),r.showIconOnly()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-four",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const r=sheet.conditionalFormats.addIconSetRule(CF.IconSetType.fourArrowsColored,[new GC.Spread.Sheets.Range(0,0,5,1)]); return [r.toJSON(),r.iconCriteria().length,r.icons().length]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-five-options",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const r=sheet.conditionalFormats.addIconSetRule(CF.IconSetType.fiveRatings,[new GC.Spread.Sheets.Range(0,0,5,1)]); r.reverseIconOrder(true); r.showIconOnly(true); return [r.toJSON(),r.iconSetType(),r.reverseIconOrder(),r.showIconOnly()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-priority",
+  "cells": {
+   "A1": 10
+  },
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='red'; const a=sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,1,0,st,[new GC.Spread.Sheets.Range(0,0,1,1)]); const b=sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,2,0,st,[new GC.Spread.Sheets.Range(0,0,1,1)]); return [a.priority(),b.priority(),a.toJSON(),b.toJSON(),sheet.toJSON().conditionalFormats]; })()",
+   "js:(function(){ const r=sheet.conditionalFormats.getRule(0); r.priority(5); return [r.priority(),r.toJSON().priority,sheet.toJSON().conditionalFormats.rules[0].priority]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-stopiftrue",
+  "cells": {
+   "A1": 10
+  },
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const s1=new GC.Spread.Sheets.Style(); s1.backColor='red'; const s2=new GC.Spread.Sheets.Style(); s2.foreColor='blue'; const a=sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,1,0,s1,[new GC.Spread.Sheets.Range(0,0,1,1)]); const b=sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,2,0,s2,[new GC.Spread.Sheets.Range(0,0,1,1)]); a.priority(1); b.priority(2); a.stopIfTrue(true); const st=sheet.getActualStyle(0,0); return [st.backColor,st.foreColor,a.stopIfTrue(),a.toJSON()]; })()",
+   "js:(function(){ sheet.conditionalFormats.getRule(0).stopIfTrue(false); const st=sheet.getActualStyle(0,0); return [st.backColor,st.foreColor]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-getrules-contains-remove",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='red'; const a=sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,1,0,st,[new GC.Spread.Sheets.Range(0,0,2,1)]); const b=sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,1,0,st,[new GC.Spread.Sheets.Range(3,0,2,1)]); return [sheet.conditionalFormats.count(),sheet.conditionalFormats.getRules(0,0).length,sheet.conditionalFormats.getRules(3,0).length,sheet.conditionalFormats.getRules().length,sheet.conditionalFormats.containsRule(a,1,0),sheet.conditionalFormats.containsRule(a,4,0),sheet.conditionalFormats.getRule(0)===a]; })()",
+   "js:(function(){ const a=sheet.conditionalFormats.getRule(0); sheet.conditionalFormats.removeRule(a); return [sheet.conditionalFormats.count(),sheet.conditionalFormats.getRules().length]; })()",
+   "js:(function(){ sheet.conditionalFormats.removeRuleByRange(0,0,4,1); return sheet.conditionalFormats.count(); })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-clearrule",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='red'; sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,1,0,st,[new GC.Spread.Sheets.Range(0,0,2,1)]); sheet.conditionalFormats.clearRule(); return [sheet.conditionalFormats.count(),sheet.toJSON().conditionalFormats]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-fromjson",
+  "cells": {
+   "A1": 10
+  },
+  "read": [
+   "js:(function(){ sheet.conditionalFormats.fromJSON({rules:[{ruleType:1,style:{backColor:'#ff0000'},operator:2,priority:3,ranges:[{row:0,col:0,rowCount:2,colCount:1}],value1:5},{ruleType:10,ranges:[{row:0,col:1,rowCount:2,colCount:1}],minType:1,minValue:0,minColor:'#ff0000',maxType:2,maxValue:0,maxColor:'#00ff00',priority:4}]}); const r=sheet.conditionalFormats.getRule(0); return [sheet.conditionalFormats.count(),r.ruleType(),r.operator(),r.value1(),r.priority(),r.toJSON(),sheet.getActualStyle(0,0).backColor,sheet.conditionalFormats.getRule(1).toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-multi-range",
+  "read": [
+   "js:(function(){ const st=new GC.Spread.Sheets.Style(); st.backColor='red'; const r=sheet.conditionalFormats.addCellValueRule(2,1,0,st,[new GC.Spread.Sheets.Range(0,0,2,1),new GC.Spread.Sheets.Range(5,2,3,2)]); return [r.toJSON(),r.ranges().length,r.contains(0,0),r.contains(6,3),r.intersects(1,0,5,4)]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-state-rule",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='red'; const r=sheet.conditionalFormats.addRowStateRule(GC.Spread.Sheets.RowColumnStates.dirty,st,[new GC.Spread.Sheets.Range(0,0,2,2)]); return [r.ruleType(),r.toJSON()]; })()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-insert-shift",
+  "read": [
+   "js:(function(){ const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='red'; sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,1,0,st,[new GC.Spread.Sheets.Range(1,0,2,1)]); return sheet.toJSON().conditionalFormats; })()",
+   "js:sheet.toJSON().conditionalFormats"
+  ],
+  "steps": [
+   {
+    "$js": "const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='red'; sheet.conditionalFormats.addCellValueRule(CF.ComparisonOperators.greaterThan,1,0,st,[new GC.Spread.Sheets.Range(1,0,2,1)])"
+   },
+   {
+    "$call": [
+     "addRows",
+     0,
+     2
+    ]
+   }
+  ]
+ }
+]

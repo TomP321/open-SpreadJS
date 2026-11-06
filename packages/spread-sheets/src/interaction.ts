@@ -289,6 +289,7 @@ export class Interaction {
     this.closeMenu(); event.preventDefault(); this.view.root.focus(); this.view.overlay.setPointerCapture(event.pointerId);
     const hit = this.hit(event), s = this.view.sheet; if (!hit || !s) return;
     const { x, y } = this.point(event);
+    if (this.handleM4Hit(hit, x, y)) { event.stopPropagation(); return; }
     if (event.pointerType === 'touch') this.touch = { x, y, moved: false };
     const resize = this.resizeHit(event);
     if (resize) {
@@ -307,6 +308,111 @@ export class Interaction {
     }
     this.drag = { kind: 'select', start: hit, last: hit, range: s.getSelections().at(-1)!, initial: 0, startPixel: 0 };
     s._emit(Events.CellClick, { ...this.info(hit, hit.sheetArea), x, y });
+  }
+  private showMenu(x: number, y: number, items: [string, () => void][]): void {
+    this.closeMenu();
+    const menu = document.createElement('div');
+    menu.className = 'gc-contextmenu gc-ui-contextmenu-container';
+    menu.setAttribute('role', 'menu');
+    Object.assign(menu.style, { left: `${Math.min(x, this.view.width - 180)}px`, top: `${Math.min(y, this.view.height - 40 - items.length * 26)}px` });
+    for (const [label, action] of items) {
+      const item = document.createElement('button');
+      item.textContent = label;
+      item.className = 'gc-contextmenu-menuitem gc-ui-contextmenu-menuitem gc-ui-contextmenu-menuitem-content gc-ui-contextmenu-text';
+      item.setAttribute('role', 'menuitem');
+      item.addEventListener('click', () => { this.closeMenu(); action(); this.view.schedule(); });
+      menu.append(item);
+    }
+    this.view.root.append(menu);
+    this.menu = menu;
+  }
+  private itemIndexAt(rect: { x: number; width: number }, x: number, count: number): number {
+    if (count <= 0) return 0;
+    return Math.max(0, Math.min(count - 1, Math.floor(((x - rect.x) / Math.max(1, rect.width)) * count)));
+  }
+  private handleM4Hit(hit: { row: number; col: number }, x: number, y: number): boolean {
+    const view = this.view, s = view.sheet!;
+    const outline = view.outlineButtonHit(x, y);
+    if (outline) {
+      const model = outline.axis === 'row' ? s.rowOutlines : s.columnOutlines;
+      model.setCollapsed(outline.index, !model.isCollapsed(outline.index));
+      view.schedule();
+      return true;
+    }
+    const filterHit = view.filterButtonHit(x, y);
+    if (filterHit) {
+      const filter = filterHit.kind === 'table'
+        ? (filterHit.table as { rowFilter(): { sortColumn(c: number, asc: boolean): void; unfilter(c?: number): void; range: { col: number } | null } }).rowFilter()
+        : s.rowFilter();
+      if (filter && filter.range) {
+        const relative = filterHit.col - filter.range.col;
+        this.showMenu(x, y, [
+          ['Sort A to Z', () => filter.sortColumn(relative, true)],
+          ['Sort Z to A', () => filter.sortColumn(relative, false)],
+          ['Clear Filter', () => filter.unfilter(relative)],
+        ]);
+      }
+      return true;
+    }
+    if (hit.row < 0 || hit.col < 0) return false;
+    const type = s.getCellType(hit.row, hit.col) as {
+      typeName?: string;
+      items?: () => unknown[];
+      isThreeState?: () => boolean;
+    } | null;
+    const name = type?.typeName;
+    if (!name || name === '1') {
+      const hyperlink = s.getHyperlink(hit.row, hit.col) as { url?: string; target?: number } | null;
+      if (hyperlink?.url) {
+        window.open(hyperlink.url, hyperlink.target === 1 ? '_blank' : '_self');
+        return true;
+      }
+      return false;
+    }
+    const value = s.getValue(hit.row, hit.col);
+    if (name === '5') {
+      const three = typeof type?.isThreeState === 'function' && type.isThreeState();
+      s.setValue(hit.row, hit.col, value === true ? (three ? null : false) : value === false ? true : false);
+      s._emit(Events.ValueChanged, { sheet: s, sheetName: s.name(), row: hit.row, col: hit.col, oldValue: value, newValue: s.getValue(hit.row, hit.col) });
+      return true;
+    }
+    if (name === '8') {
+      const hyperlink = s.getHyperlink(hit.row, hit.col) as { url?: string; target?: number } | null;
+      const url = hyperlink?.url ?? (typeof value === 'string' && /^(https?:|mailto:|www\.)/.test(value) ? value : undefined);
+      if (url) window.open(url, hyperlink?.target === 1 ? '_blank' : '_self');
+      return true;
+    }
+    if (name === '7') {
+      const items = type.items?.() ?? [];
+      if (!items.length) return false;
+      const rect = view.cellRect(hit.row, hit.col);
+      const menuItems: [string, () => void][] = items.map((item) => {
+        const record = item as { text?: string; value?: unknown };
+        const text = String(record?.text ?? item);
+        return [text, () => { s.setValue(hit.row, hit.col, record?.value ?? record?.text ?? item); s._emit(Events.ValueChanged, { sheet: s, sheetName: s.name(), row: hit.row, col: hit.col, oldValue: value, newValue: s.getValue(hit.row, hit.col) }); }];
+      });
+      this.showMenu(rect.x, rect.y + rect.height, menuItems);
+      return true;
+    }
+    const items = type.items?.() ?? [];
+    if (name === '12') {
+      const rect = view.cellRect(hit.row, hit.col);
+      const index = this.itemIndexAt(rect, x, items.length);
+      const selected = (Array.isArray(value) ? value.map(String) : String(value ?? '').split(',').map((v) => v.trim())).filter(Boolean);
+      const key = String(index);
+      const text = String((items[index] as { text?: string })?.text ?? items[index] ?? '');
+      const next = selected.includes(key) || selected.includes(text) ? selected.filter((v) => v !== key && v !== text) : [...selected, key];
+      s.setValue(hit.row, hit.col, next);
+      return true;
+    }
+    if (name === '11' || name === '13') {
+      const rect = view.cellRect(hit.row, hit.col);
+      const index = this.itemIndexAt(rect, x, items.length);
+      const item = items[index] as { text?: string; value?: unknown };
+      s.setValue(hit.row, hit.col, item?.value ?? item?.text ?? item ?? '');
+      return true;
+    }
+    return false;
   }
   private pointerMove(event: PointerEvent): void {
     const { x, y } = this.point(event), s = this.view.sheet;
@@ -565,5 +671,9 @@ export class Interaction {
     this.view.root.append(menu); this.menu = menu;
   }
   private closeMenu(): void { this.menu?.remove(); this.menu = undefined; }
+  /** True while the in-cell editor is open on a cell. */
+  editingAt(row: number, col: number): boolean {
+    return !!this.editing && this.editing.row === row && this.editing.col === col;
+  }
   destroy(): void { this.abort.abort(); if (this.ants) clearInterval(this.ants); this.closeMenu(); }
 }

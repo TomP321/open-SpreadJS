@@ -1,0 +1,436 @@
+[
+ {
+  "id": "m4-cf-cellvalue-0",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addCellValueRule(0,10,20,st,r); return [rule.ruleType(),rule.toJSON(),sheet.conditionalFormats.getRules().length];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-cellvalue-1",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addCellValueRule(1,10,20,st,r); return [rule.ruleType(),rule.toJSON(),sheet.conditionalFormats.getRules().length];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-cellvalue-2",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addCellValueRule(2,10,20,st,r); return [rule.ruleType(),rule.toJSON(),sheet.conditionalFormats.getRules().length];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-cellvalue-3",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addCellValueRule(3,10,20,st,r); return [rule.ruleType(),rule.toJSON(),sheet.conditionalFormats.getRules().length];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-cellvalue-4",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addCellValueRule(4,10,20,st,r); return [rule.ruleType(),rule.toJSON(),sheet.conditionalFormats.getRules().length];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-cellvalue-5",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addCellValueRule(5,10,20,st,r); return [rule.ruleType(),rule.toJSON(),sheet.conditionalFormats.getRules().length];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-cellvalue-6",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addCellValueRule(6,10,20,st,r); return [rule.ruleType(),rule.toJSON(),sheet.conditionalFormats.getRules().length];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-cellvalue-7",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addCellValueRule(7,10,20,st,r); return [rule.ruleType(),rule.toJSON(),sheet.conditionalFormats.getRules().length];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-text-0",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addSpecificTextRule(0,'abc',st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-text-1",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addSpecificTextRule(1,'abc',st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-text-2",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addSpecificTextRule(2,'abc',st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-text-3",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addSpecificTextRule(3,'abc',st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-text-4",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addSpecificTextRule(4,'abc',st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-text-5",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addSpecificTextRule(5,'abc',st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-formula-b",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addFormulaRule('=A1>3',st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-date-0",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDateOccurringRule(0,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-date-1",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDateOccurringRule(1,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-date-2",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDateOccurringRule(2,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-date-3",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDateOccurringRule(3,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-date-4",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDateOccurringRule(4,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-date-5",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDateOccurringRule(5,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-top10-0-3-false",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addTop10Rule(0,3,st,r,false); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-top10-1-3-false",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addTop10Rule(1,3,st,r,false); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-top10-0-10-true",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addTop10Rule(0,10,st,r,true); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-top10-1-10-true",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addTop10Rule(1,10,st,r,true); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-unique",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addUniqueRule(st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-duplicate",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDuplicateRule(st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-average-0",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addAverageRule(0,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-average-1",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addAverageRule(1,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-average-2",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addAverageRule(2,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-2scale-0-0-0-10",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.add2ScaleRule(0,0,'#ff0000',0,10,'#00ff00',r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-2scale-1-0-2-0",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.add2ScaleRule(1,0,'#ff0000',2,0,'#00ff00',r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-2scale-3-10-4-90",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.add2ScaleRule(3,10,'#ff0000',4,90,'#00ff00',r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-3scale-1-0-3-50-2-0",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.add3ScaleRule(1,0,'#ff0000',3,50,'#ffff00',2,0,'#00ff00',r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-3scale-0-0-0-50-0-100",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.add3ScaleRule(0,0,'#ff0000',0,50,'#ffff00',0,100,'#00ff00',r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-3scale-3-10-3-50-3-90",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.add3ScaleRule(3,10,'#ff0000',3,50,'#ffff00',3,90,'#00ff00',r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-databar-default",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDataBarRule(5,0,7,0,'#638ec6',r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-databar-solid",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDataBarRule(0,0,0,100,'#ff0000',r); rule.gradient(false); rule.showBorder(true); rule.borderColor('#000000'); return [rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-databar-flags",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addDataBarRule(5,0,7,0,'#00ff00',r); rule.showBarOnly(true); rule.negativeFillColor('#ff0000'); rule.useNegativeFillColor(true); rule.axisPosition(1); return [rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-0",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(0,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-1",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(1,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-2",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(2,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-3",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(3,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-4",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(4,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-5",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(5,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-6",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(6,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-7",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(7,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-8",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(8,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-9",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(9,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-10",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(10,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-11",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(11,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-12",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(12,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-13",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(13,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-14",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(14,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-15",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(15,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-16",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(16,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-17",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(17,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-18",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(18,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-iconset-19",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; st.foreColor='red'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addIconSetRule(19,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-rowstate",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addRowStateRule(3,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-columnstate",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const st=new GC.Spread.Sheets.Style(); st.backColor='yellow'; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addColumnStateRule(3,st,r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ },
+ {
+  "id": "m4-cf-sparkline",
+  "read": [
+   "js:(function(){const CF=GC.Spread.Sheets.ConditionalFormatting; const r=[new GC.Spread.Sheets.Range(0,0,4,2)]; const rule=sheet.conditionalFormats.addSparklineRule('ColumnSparkline',{data:'A1:B3',dataOrientation:'vertical'},r); return [rule.ruleType(),rule.toJSON()];})()"
+  ],
+  "steps": []
+ }
+]

@@ -92,6 +92,9 @@ test('paint suspension, HiDPI and scrolling a populated million-row sheet', asyn
     await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
     const during = view.metrics.frames;
     wb.resumePaint(); await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+    // Warm up the paint path and let setup allocations settle before sampling.
+    for (let i = 0; i < 20; i++) { s.scroll(60, i % 10 === 0 ? 62 : 0); await new Promise(requestAnimationFrame); }
+    await new Promise((resolve) => setTimeout(resolve, 100));
     const renderTimes: number[] = [], frameIntervals: number[] = [];
     let previous = performance.now();
     for (let i = 0; i < 90; i++) {
@@ -165,4 +168,71 @@ test.describe('HiDPI backing canvas', () => {
     await clickCell(page, 2, 2); await page.keyboard.type('HiDPI'); await page.keyboard.press('Enter');
     expect(await page.evaluate(() => window.__compare!.ours.getActiveSheet().getValue(2, 2))).toBe('HiDPI');
   });
+});
+
+test('M4 cell types, outline buttons, filter menus and table auto-expand', async ({ page }) => {
+  await open(page);
+  const pane = (await page.locator('#ours-pane').boundingBox())!;
+  const point = async (row: number, col: number) => {
+    const r = await page.evaluate(({ row, col }) => window.__compare!.ours.getActiveSheet().getCellRect(row, col), { row, col });
+    return { x: pane.x + r.x + r.width / 2, y: pane.y + r.y + r.height / 2 };
+  };
+
+  await page.evaluate(() => {
+    const SS = window.__implementationGC.Spread.Sheets;
+    const s = window.__compare!.ours.getActiveSheet();
+    s.setCellType(1, 1, new SS.CellTypes.CheckBox());
+    s.setValue(1, 1, false);
+  });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  let p = await point(1, 1); await page.mouse.click(p.x, p.y);
+  await page.waitForFunction(() => window.__compare!.ours.getActiveSheet().getValue(1, 1) === true);
+  await page.mouse.click(p.x, p.y);
+  await page.waitForFunction(() => window.__compare!.ours.getActiveSheet().getValue(1, 1) === false);
+
+  await page.evaluate(() => {
+    const SS = window.__implementationGC.Spread.Sheets;
+    const s = window.__compare!.ours.getActiveSheet();
+    const combo = new SS.CellTypes.ComboBox(); combo.items(['Red', 'Green']);
+    s.setCellType(2, 1, combo);
+  });
+  p = await point(2, 1); await page.mouse.click(p.x, p.y);
+  await page.getByRole('menuitem', { name: 'Green' }).click();
+  expect(await page.evaluate(() => window.__compare!.ours.getActiveSheet().getValue(2, 1))).toBe('Green');
+
+  await page.evaluate(() => {
+    const s = window.__compare!.ours.getActiveSheet();
+    s.rowOutlines.group(6, 2);
+  });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  const summary = await page.evaluate(() => window.__compare!.ours.getActiveSheet().getCellRect(8, 0));
+  await page.mouse.click(pane.x + 10, pane.y + summary.y + 10);
+  await page.waitForFunction(() => window.__compare!.ours.getActiveSheet().rowOutlines.isCollapsed(6) === true);
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  const summary2 = await page.evaluate(() => window.__compare!.ours.getActiveSheet().getCellRect(8, 0));
+  await page.mouse.click(pane.x + 10, pane.y + summary2.y + 10);
+  await page.waitForFunction(() => window.__compare!.ours.getActiveSheet().rowOutlines.isCollapsed(6) === false);
+
+  await page.evaluate(() => {
+    const SS = window.__implementationGC.Spread.Sheets;
+    const s = window.__compare!.ours.getActiveSheet();
+    s.setValue(0, 3, 3); s.setValue(1, 3, 1); s.setValue(2, 3, 2);
+    s.rowFilter(new SS.Filter.HideRowFilter(new SS.Range(0, 3, 3, 1)));
+  });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  const header = await page.evaluate(() => window.__compare!.ours.getActiveSheet().getCellRect(0, 3));
+  await page.mouse.click(pane.x + header.x + header.width - 12, pane.y + 12);
+  await page.getByRole('menuitem', { name: 'Sort A to Z' }).click();
+  await page.waitForFunction(() => [0, 1, 2].every((r) => window.__compare!.ours.getActiveSheet().getValue(r, 3) === r + 1));
+
+  await page.evaluate(() => {
+    const SS = window.__implementationGC.Spread.Sheets;
+    const s = window.__compare!.ours.getActiveSheet();
+    s.setValue(10, 0, 'Head'); s.setValue(11, 0, 1);
+    s.tables.add('Auto', 10, 0, 2, 1, SS.Tables.TableThemes.light1);
+    s.setActiveCell(12, 0);
+  });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  p = await point(12, 0); await page.mouse.click(p.x, p.y); await page.keyboard.type('9'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__compare!.ours.getActiveSheet().tables.all()[0].range().rowCount === 3);
 });

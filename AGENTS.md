@@ -21,6 +21,18 @@ Apps switch to us without code changes via npm aliases:
 - Visual/behavioural reference = running the official trial package in the `apps/compare`
   page and comparing screenshots/behaviour (black-box only).
 - Never commit any file from the official packages.
+- **Never embed pixels/bitmaps captured from the official rendering** (screenshots, canvas readbacks,
+  sprites, base64 images, RGB arrays) in our source. Every glyph/icon/arrow is drawn by our own
+  code (paths, shapes, gradients). Observing screenshots to measure positions, sizes and colours is fine;
+  copying the raster is not.
+- Data obtained through the public API (e.g. theme colours read from `toJSON()`) is fine.
+
+## Test integrity (MANDATORY)
+- Never make a gate pass by changing what it measures: no filler content added to scenarios to dilute
+  pixel ratios, no masking of regions that differ, no loosening thresholds, no deleting/weakening tests.
+  Scenario content must exist only to exercise the feature under test.
+- Gate or threshold changes are made only by the supervisor. If a gate cannot be met honestly,
+  stop and report the remaining diff with evidence instead.
 
 ## Architecture
 - `packages/spread-sheets` — core, framework-agnostic TypeScript. Canvas rendering.
