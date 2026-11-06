@@ -20,12 +20,15 @@ export interface OracleCase {
   /** later edits; after each, `read` cells are compared again (tests incremental recalc).
    *  A step may instead call a public method: {"$call": ["addRows", 1, 2], "$sheet": "Sheet1"} (sheet method),
    *  {"$wb": ["removeSheet", 1]} (workbook method). "$enum:Path.To.Enum.member" strings in args resolve against GC.Spread.Sheets.
-   *  `read` entries prefixed with "f:" (e.g. "f:B6" or "f:Sheet2!A1") read getFormula instead of getValue. */
-  steps?: (SheetCells | { $call?: unknown[]; $wb?: unknown[]; $sheet?: string })[];
+   *  {"$js": "sheet.tables.add('T1', 0, 0, 3, 2)"} runs a statement with (GC, wb, sheet) in scope on BOTH libraries.
+   *  `read` entries prefixed with "f:" (e.g. "f:B6" or "f:Sheet2!A1") read getFormula instead of getValue;
+   *  entries prefixed with "js:" evaluate an expression with (GC, wb, sheet) and compare its JSON-normalised result,
+   *  e.g. "js:sheet.getRowCount()", "js:sheet.conditionalFormats.getRules().length", "js:wb.toJSON().sheets.Sheet1.data". */
+  steps?: (SheetCells | { $call?: unknown[]; $wb?: unknown[]; $sheet?: string; $js?: string })[];
   /** workbook options to set before filling, e.g. {"referenceStyle":1} */
   options?: Record<string, unknown>;
 }
-type Normalized = null | number | string | boolean | { error: string } | { date: string } | { other: string };
+type Normalized = null | number | string | boolean | { error: string } | { date: string } | { other: string } | { json: unknown };
 
 const LETTERS = (s: string) => [...s.toUpperCase()].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
 function parseAddr(addr: string): { sheet?: string; r1: number; c1: number; r2: number; c2: number } {
@@ -46,6 +49,26 @@ function normalize(v: unknown): Normalized {
   const s = String(v);
   if (/^#[A-Z0-9/!?]+[!?A]?$/.test(s) || /^#(NULL!|DIV\/0!|VALUE!|REF!|NAME\?|NUM!|N\/A|SPILL!|CALC!|GETTING_DATA)$/.test(s)) return { error: s };
   return { other: s };
+}
+
+/** JSON-normalise arbitrary API results: primitives via normalize(), plain data deeply, class instances by own enumerable data. */
+function normalizeDeep(v: unknown, depth = 0): Normalized {
+  const flat = normalize(v);
+  if (!(flat && typeof flat === 'object' && 'other' in flat) || depth > 6) return flat;
+  const seen = new WeakSet<object>();
+  const walk = (x: unknown, d: number): unknown => {
+    if (x === undefined) return null;
+    if (x === null || typeof x !== 'object') return typeof x === 'function' ? '[function]' : x;
+    if (x instanceof Date) return { date: x.toISOString() };
+    if (seen.has(x as object) || d > 8) return '[cycle]';
+    seen.add(x as object);
+    if (Array.isArray(x)) return x.map(i => walk(i, d + 1));
+    const s = String(x); if (/^#[A-Z0-9/!?]+$/.test(s)) return { error: s };
+    const o: Record<string, unknown> = {};
+    for (const k of Object.keys(x as object).sort()) if (!k.startsWith('_') && typeof (x as any)[k] !== 'function') o[k] = walk((x as any)[k], d + 1);
+    return o;
+  };
+  return { json: walk(v, depth) };
 }
 
 function fill(GC: any, sheet: any, cells: SheetCells) {
@@ -77,6 +100,11 @@ function runOne(GC: any, host: HTMLElement, c: OracleCase): Normalized[][] | { e
     const read = () => {
       const out: Normalized[] = [];
       for (const raw of c.read ?? [at]) {
+        if (raw.startsWith('js:')) {
+          let v: unknown;
+          try { v = new Function('GC', 'wb', 'sheet', `return (${raw.slice(3)});`)(GC, wb, wb.getActiveSheet()); } catch (e) { v = { thrown: String((e as Error)?.message ?? e) }; }
+          out.push(normalizeDeep(v)); continue;
+        }
         const isF = raw.startsWith('f:'); const addr = isF ? raw.slice(2) : raw;
         const a = parseAddr(addr); const sh = sheetOf(a.sheet);
         for (let r = a.r1; r <= a.r2; r++) for (let col = a.c1; col <= a.c2; col++) out.push(normalize(isF ? sh.getFormula(r, col) : sh.getValue(r, col)));
@@ -86,8 +114,9 @@ function runOne(GC: any, host: HTMLElement, c: OracleCase): Normalized[][] | { e
     const stages = [read()];
     const resolveArg = (x: unknown) => typeof x === 'string' && x.startsWith('$enum:') ? x.slice(6).split('.').reduce((o: any, key) => o?.[key], GC.Spread.Sheets) : x;
     for (const step of c.steps ?? []) {
-      if ('$call' in step || '$wb' in step) {
-        const st = step as { $call?: unknown[]; $wb?: unknown[]; $sheet?: string };
+      if ('$call' in step || '$wb' in step || '$js' in step) {
+        const st = step as { $call?: unknown[]; $wb?: unknown[]; $sheet?: string; $js?: string };
+        if (st.$js) new Function('GC', 'wb', 'sheet', st.$js)(GC, wb, wb.getActiveSheet());
         if (st.$call) { const [m, ...args] = st.$call as [string, ...unknown[]]; const sh = sheetOf(st.$sheet); sh[m](...args.map(resolveArg)); }
         if (st.$wb) { const [m, ...args] = st.$wb as [string, ...unknown[]]; wb[m](...args.map(resolveArg)); }
         stages.push(read()); continue;
@@ -97,7 +126,7 @@ function runOne(GC: any, host: HTMLElement, c: OracleCase): Normalized[][] | { e
     }
     return stages;
   } catch (e) {
-    return { exception: String((e as Error)?.stack ?? e).slice(0, 400) };
+    return { exception: String((e as Error)?.message ?? e).split('\n')[0]!.slice(0, 300) };
   } finally {
     try { wb?.destroy(); } catch { /* ignore */ }
     el.remove();

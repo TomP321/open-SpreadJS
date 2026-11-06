@@ -1,0 +1,9 @@
+[
+ { "id": "api-rowcount", "cells": { "A1": 1 }, "read": ["js:sheet.getRowCount()", "js:sheet.getColumnCount()", "js:sheet.getColumnWidth(0)", "js:sheet.getRowHeight(0)", "js:wb.getSheetCount()", "js:sheet.name()"] },
+ { "id": "api-tables-add", "cells": { "A1": "h1", "B1": "h2", "A2": 1, "B2": 2, "A3": 3, "B3": 4 },
+   "read": ["js:sheet.tables.all().length", "js:sheet.tables.findByName('Table1') ? sheet.tables.findByName('Table1').name() : null", "js:sheet.tables.findByName('Table1') ? sheet.tables.findByName('Table1').range() : null"],
+   "steps": [ { "$js": "sheet.tables.add('Table1', 0, 0, 3, 2)" } ] },
+ { "id": "api-cf-count", "cells": { "A1": 1, "A2": 5 }, "read": ["js:sheet.conditionalFormats.getRules().length"],
+   "steps": [ { "$js": "var s=new GC.Spread.Sheets.Style(); s.backColor='red'; sheet.conditionalFormats.addCellValueRule(GC.Spread.Sheets.ConditionalFormatting.ComparisonOperators.greaterThan, 2, 0, s, [new GC.Spread.Sheets.Range(0,0,2,1)])" } ] },
+ { "id": "api-json-data", "cells": { "A1": 1, "B2": "x", "C3": "=A1*2" }, "read": ["js:wb.toJSON().sheets.Sheet1.data.dataTable"] }
+]
