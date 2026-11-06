@@ -5,6 +5,17 @@ function scenario(name: string, title: string, run: (sheet: GC.Spread.Sheets.Wor
   return { name, title, sheetCount, run(workbook) { run(workbook.getActiveSheet() as unknown as GC.Spread.Sheets.Worksheet); } };
 }
 export const renderingScenarios: Scenario[] = [
+  ...Array.from({ length: 14 }, (_, index) => scenario(`line-style-${index}`, `LineStyle ${index}`, s => {
+    const border = new LineBorder('#336699', index as GC.Spread.Sheets.LineStyle);
+    for (let r = 2; r < 6; r++) { s.getCell(r, 2).borderBottom(border); s.getCell(r, 4).borderRight(border); }
+  })),
+  ...['11pt Calibri', '10px Arial', '16px Arial', 'bold 18px serif', '12pt monospace'].map((font, index) => scenario(`wrap-${index + 1}`, `Wrap ${font}`, s => {
+    s.setColumnWidth(2, 90);
+    for (let r = 1; r < 4; r++) { s.setValue(r, 2, 'Wrapped words in a small cell with several lines'); s.setRowHeight(r, 64); s.getCell(r, 2).font(font).wordWrap(true).vAlign(r - 1); }
+  })),
+  scenario('selected-rows', 'Whole row selection', s => { s.setSelection(2, -1, 3, -1); s.addSelection(7, -1, 2, -1); }),
+  scenario('selected-columns', 'Whole column selection', s => { s.setSelection(-1, 2, -1, 3); s.addSelection(-1, 7, -1, 2); }),
+  scenario('header-highlight', 'Selected header accents', s => { s.setSelection(1, 1, 3, 3); s.addSelection(6, 2, 2, 4); }),
   scenario('styles-borders', 'Alignment, formatting and borders', s => {
     s.setValue(0, 0, 'Styled cells');
     s.setValue(1, 0, 1234.5); s.getCell(1, 0).formatter('#,##0.00');

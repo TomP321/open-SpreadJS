@@ -157,7 +157,7 @@ export class AxisLayout {
 }
 
 /** Column chunks allocate only touched blocks; tags distinguish holes, NaN and null. */
-export class ValueGrid {
+class ColumnValueGrid {
   private columns = new Map<number, Map<number, { values: Float64Array; tags: Uint8Array; other?: Map<number, unknown>; used: number }>>();
   private length = 0;
   private lastCol = -1;
@@ -208,6 +208,75 @@ export class ValueGrid {
       }
   }
   clear(): void { this.columns.clear(); this.length = 0; this.lastBlock = undefined; }
+  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean): void {
+    const entries = [...this.entries()]; this.clear();
+    for (const [r, c, value] of entries) {
+      const old = axis === 'row' ? r : c;
+      if (remove && old >= index && old < index + count) continue;
+      const next = old >= index + (remove ? count : 0) ? old + (remove ? -count : count) : old;
+      this.set(axis === 'row' ? next : r, axis === 'col' ? next : c, value);
+    }
+  }
+}
+
+interface RowValueBlock {
+  columns: Uint32Array;
+  tags: Uint8Array;
+  values?: Float64Array;
+  other?: Map<number, unknown>;
+  used: number;
+}
+/** One packed primary slot per touched row; extra columns use dense column blocks. */
+export class ValueGrid {
+  private pages = new Map<number, RowValueBlock>();
+  private overflow = new ColumnValueGrid();
+  private length = 0;
+  private lastPage = -1;
+  private lastBlock?: RowValueBlock;
+  get size(): number { return this.length + this.overflow.size; }
+  private block(row: number, create = false): RowValueBlock | undefined {
+    const page = Math.floor(row / 1024);
+    if (page === this.lastPage && this.lastBlock) return this.lastBlock;
+    let block = this.pages.get(page);
+    if (!block && create) this.pages.set(page, block = { columns: new Uint32Array(1024), tags: new Uint8Array(1024), used: 0 });
+    this.lastPage = page; this.lastBlock = block; return block;
+  }
+  has(row: number, col: number): boolean {
+    const block = this.block(row), i = row % 1024;
+    return block?.columns[i] === col + 1 ? !!block.tags[i] : this.overflow.has(row, col);
+  }
+  get(row: number, col: number): unknown {
+    const block = this.block(row), i = row % 1024;
+    if (block?.columns[i] !== col + 1) return this.overflow.get(row, col);
+    const tag = block.tags[i];
+    return tag === 1 ? block.values![i] : tag === 2 ? null : tag === 4 ? block.other?.get(i) : undefined;
+  }
+  set(row: number, col: number, value: unknown): void {
+    const block = this.block(row, true)!, i = row % 1024;
+    if (col >= 0xffffffff || (!block.columns[i] && this.overflow.has(row, col)) || (block.columns[i] && block.columns[i] !== col + 1)) { this.overflow.set(row, col, value); return; }
+    block.columns[i] = col + 1;
+    if (!block.tags[i]) { this.length++; block.used++; }
+    if (block.tags[i] === 4) block.other?.delete(i);
+    if (typeof value === 'number') { block.tags[i] = 1; (block.values ??= new Float64Array(1024))[i] = value; }
+    else if (value === null) block.tags[i] = 2;
+    else if (value === undefined) block.tags[i] = 3;
+    else { block.tags[i] = 4; (block.other ??= new Map()).set(i, value); }
+  }
+  delete(row: number, col: number): void {
+    const block = this.block(row), i = row % 1024;
+    if (block?.columns[i] !== col + 1) { this.overflow.delete(row, col); return; }
+    if (!block.tags[i]) return;
+    block.tags[i] = 0; block.other?.delete(i); this.length--; block.used--;
+    if (!block.used) { this.pages.delete(Math.floor(row / 1024)); this.lastBlock = undefined; }
+  }
+  *entries(): IterableIterator<[number, number, unknown]> {
+    for (const [page, block] of [...this.pages]) for (let i = 0; i < 1024; i++) if (block.tags[i]) {
+      const tag = block.tags[i];
+      yield [page * 1024 + i, block.columns[i] - 1, tag === 1 ? block.values![i] : tag === 2 ? null : tag === 4 ? block.other?.get(i) : undefined];
+    }
+    yield* this.overflow.entries();
+  }
+  clear(): void { this.pages.clear(); this.overflow.clear(); this.length = 0; this.lastBlock = undefined; }
   shift(axis: 'row' | 'col', index: number, count: number, remove: boolean): void {
     const entries = [...this.entries()]; this.clear();
     for (const [r, c, value] of entries) {

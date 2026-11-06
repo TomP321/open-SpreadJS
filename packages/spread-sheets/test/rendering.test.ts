@@ -83,3 +83,18 @@ it('keeps user resize events separate from API dimension writes and repaints liv
   s.options.gridline.color = 'red'; s.options.rowHeaderVisible = false; wb.options.tabStripVisible = false;
   expect(paint).not.toHaveBeenCalled(); wb.resumePaint(); expect(paint).toHaveBeenCalledTimes(1);
 });
+
+it('undo and redo of an edit restore its sheet, active cell and single-cell selection', () => {
+  const wb = new Workbook(undefined, { sheetCount: 2 }), s = wb.getActiveSheet();
+  s.setValue(2, 2, 'before');
+  wb.commandManager().execute({ cmd: 'editCell', sheetName: s.name(), row: 2, col: 2, newValue: 'after' });
+  s.setSelection(8, 5, 2, 3); wb.setActiveSheetIndex(1);
+  wb.undoManager().undo();
+  expect(wb.getActiveSheet()).toBe(s);
+  expect(s.getValue(2, 2)).toBe('before');
+  expect([s.getActiveRowIndex(), s.getActiveColumnIndex()]).toEqual([2, 2]);
+  expect(s.getSelections()).toEqual([{ row: 2, col: 2, rowCount: 1, colCount: 1 }]);
+  s.setSelection(9, 7, 2, 2); wb.undoManager().redo();
+  expect(s.getValue(2, 2)).toBe('after');
+  expect(s.getSelections()).toEqual([{ row: 2, col: 2, rowCount: 1, colCount: 1 }]);
+});

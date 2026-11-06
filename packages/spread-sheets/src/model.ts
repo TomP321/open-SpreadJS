@@ -1864,6 +1864,10 @@ export class Workbook {
         } else if (typeof options.newValue === 'string' && options.newValue.startsWith('='))
           sheet.setFormula(row, col, options.newValue);
         else sheet.setValue(row, col, options.newValue);
+        if (isUndo || Object.hasOwn(options, '_applied')) {
+          this.setActiveSheet(sheet.name()); sheet.setSelection(row, col, 1, 1);
+        }
+        options._applied = true;
         const newValue = sheet.getValue(row, col);
         if (!Object.is(previousValue, newValue)) sheet._emit(Events.ValueChanged, { sheet, sheetName: sheet.name(), row, col, oldValue: previousValue, newValue });
         return true;

@@ -167,7 +167,7 @@ export class Interaction {
     const ctx = this.view.context; ctx.save(); ctx.font = this.view.font(style);
     const measured = Math.max(...editor.value.split('\n').map(line => ctx.measureText(line).width)); ctx.restore();
     const width = style.wordWrap ? rect.width - 1 : Math.min(this.view.viewWidth - rect.x, Math.max(rect.width - 1, Math.ceil(measured) + 1));
-    Object.assign(editor.style, { left: `${rect.x - 2}px`, top: `${rect.y - 2}px`, width: `${width + 4}px`, height: `${Math.max(rect.height - 1, editor.value.split('\n').length * 19 * this.view.zoom) + 4}px`, font: this.view.font(style), color: String(style.foreColor ?? 'black'), background: String(style.backColor ?? 'white'), textAlign: style.hAlign === 2 ? 'right' : style.hAlign === 1 ? 'center' : 'left', padding: '0px' });
+    Object.assign(editor.style, { left: `${rect.x - 2}px`, top: `${rect.y - 2}px`, width: `${width + 4}px`, height: `${Math.max(rect.height - 1, editor.value.split('\n').length * 19 * this.view.zoom) + 4}px`, font: this.view.font(style), color: String(style.foreColor ?? getComputedStyle(this.view.root.parentElement!.parentElement!).color), background: String(style.backColor ?? 'white'), textAlign: style.hAlign === 2 ? 'right' : style.hAlign === 1 ? 'center' : 'left', padding: '0px' });
     editor.scrollLeft = 0;
 
   }

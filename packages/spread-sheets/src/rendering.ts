@@ -61,6 +61,25 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: strin
 }
 interface ScrollControl { root: HTMLDivElement; track: HTMLDivElement; handle: HTMLDivElement }
 
+const fontMetricsCache = new Map<string, { height: number; baseline: number }>();
+function fontMetrics(font: string): { height: number; baseline: number } {
+  let metrics = fontMetricsCache.get(font);
+  if (!metrics) {
+    const probe = document.createElement('span');
+    probe.textContent = 'Mg';
+    probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${font};line-height:normal`;
+    document.body.append(probe);
+    const height = probe.offsetHeight;
+    // Measure at a large size to remove device-scale-dependent font hinting.
+    const context = document.createElement('canvas').getContext('2d')!;
+    context.font = font.replace(/([\d.]+)(px|pt)/, (_, size: string, unit: string) => `${Number(size) * 64}${unit}`);
+    const ascent = Math.round(context.measureText('Mg').fontBoundingBoxAscent / 64);
+    metrics = { height, baseline: ascent + (height % 2 ? 1.5 : 2) };
+    probe.remove(); fontMetricsCache.set(font, metrics);
+  }
+  return metrics;
+}
+
 export class WorkbookRenderer {
   readonly root: HTMLDivElement;
   readonly canvas: HTMLCanvasElement;
@@ -98,6 +117,8 @@ export class WorkbookRenderer {
     this.root.tabIndex = 0; this.root.setAttribute('role', 'grid'); this.root.setAttribute('aria-label', 'Spreadsheet');
     this.canvas = element('canvas', 'gc-sheet-canvas', this.root);
     this.overlay = element('canvas', 'gc-selection-canvas', this.root);
+    const stripEdge = element('div', 'gc-tab-strip-edge', this.root);
+    stripEdge.style.cssText = 'position:absolute;left:0;height:1px;pointer-events:none;background:linear-gradient(to right,#d1d1d1,#ababab)';
     this.tabs = element('canvas', 'gc-tab-strip', this.root);
     this.context = this.canvas.getContext('2d')!;
     this.selectionContext = this.overlay.getContext('2d')!;
@@ -161,6 +182,8 @@ export class WorkbookRenderer {
     const tabWidth = opts.tabStripVisible ? Math.round(this.viewWidth * opts.tabStripRatio) : 0;
     this.sizeCanvas(this.tabs, this.tabContext, tabWidth, opts.tabStripVisible ? 28 : 0);
     this.tabs.style.top = `${this.viewHeight}px`;
+    const stripEdge = this.root.querySelector<HTMLElement>('.gc-tab-strip-edge')!;
+    Object.assign(stripEdge.style, { top: `${this.viewHeight}px`, width: `${this.viewWidth}px`, display: opts.tabStripVisible ? '' : 'none' });
     const split = this.root.querySelector<HTMLElement>('.gc-hscrollbar-splitter')!;
     Object.assign(split.style, { top: `${this.viewHeight}px`, left: `${tabWidth - 4}px`, height: '28px', display: opts.tabStripVisible ? '' : 'none' });
     this.vertical.root.style.display = opts.showVerticalScrollbar ? '' : 'none';
@@ -219,10 +242,11 @@ export class WorkbookRenderer {
       this.clipCell(ctx, row, col, () => {
         const style = this.style(r, c);
         ctx.fillStyle = typeof style.backColor === 'string' ? style.backColor : 'white';
-        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+        const hideGrid = !!style.backColor;
+        ctx.fillRect(rect.x - (hideGrid ? 1 : 0), rect.y - (hideGrid ? 1 : 0), rect.width + (hideGrid ? 1 : 0), rect.height + (hideGrid ? 1 : 0));
         ctx.fillStyle = s.options.gridline.color;
-        if (s.options.gridline.showVerticalGridline) ctx.fillRect(Math.round(rect.x + rect.width) - 1, rect.y, 1, rect.height);
-        if (s.options.gridline.showHorizontalGridline) ctx.fillRect(rect.x, Math.round(rect.y + rect.height) - 1, rect.width, 1);
+        if (!hideGrid && s.options.gridline.showVerticalGridline) ctx.fillRect(Math.round(rect.x + rect.width) - 1, rect.y, 1, rect.height);
+        if (!hideGrid && s.options.gridline.showHorizontalGridline) ctx.fillRect(rect.x, Math.round(rect.y + rect.height) - 1, rect.width, 1);
       });
     }
     paintedSpans.clear();
@@ -265,7 +289,7 @@ export class WorkbookRenderer {
   font(style: Style): string {
     const base = String(style.font ?? '11pt Calibri');
     // Scale the numeric size without changing font family/fallback selection.
-    return base.replace(/([\d.]+)(px|pt)/, (_, size: string, unit: string) => `${Number(size) * this.zoom}${unit}`);
+    return base.replace(/([\d.]+)(px|pt)/, (_, size: string, unit: string) => `${Number((Number((Number(size) * (unit === 'pt' ? 4 / 3 : 1)).toFixed(4)) * this.zoom).toFixed(4))}px`);
   }
   text(row: number, col: number, value: unknown, style: Style): string {
     const s = this.sheet!;
@@ -285,7 +309,7 @@ export class WorkbookRenderer {
     const z = this.zoom; ctx.font = this.font(style); ctx.fillStyle = String(style.foreColor ?? 'black');
     const align = style.hAlign === 3 || style.hAlign === undefined ? typeof value === 'number' || value instanceof Date ? 2 : typeof value === 'boolean' ? 1 : 0 : Number(style.hAlign);
     const indent = Number(style.textIndent ?? 0) * 8 * z;
-    const pad = 1 * z;
+    const pad = 1;
     let left = rect.x, right = rect.x + rect.width - 1;
     const measured = ctx.measureText(text).width;
     if (overflow && this.sheet!.options.allowCellOverflow && !style.wordWrap && !style.shrinkToFit && typeof value === 'string' && measured > rect.width - pad * 2) {
@@ -308,14 +332,15 @@ export class WorkbookRenderer {
     let fontSize = Number((ctx.font.match(/([\d.]+)px/) ?? [0, 14.6667 * z])[1]);
     const fitWidth = Math.max(1, rect.width - 2 * pad - indent);
     if (style.shrinkToFit && measured > fitWidth) { fontSize *= fitWidth / measured; ctx.font = ctx.font.replace(/[\d.]+px/, `${fontSize}px`); }
-    const lineHeight = Math.ceil(fontSize * 1.3);
+    const metrics = fontMetrics(ctx.font), lineHeight = metrics.height;
+    const baseline = style.shrinkToFit && measured > fitWidth ? fontSize : metrics.baseline;
     const width = Math.max(0, rect.width - 2 * pad - indent);
     const lines = style.wordWrap ? wrappedLines(text, width, t => ctx.measureText(t).width) : text.split('\n');
     const blockHeight = lines.length * lineHeight;
-    const y = style.vAlign === 2 ? rect.y + rect.height - blockHeight - 1 : style.vAlign === 1 ? rect.y + (rect.height - blockHeight) / 2 : rect.y;
+    const y = style.vAlign === 2 ? rect.y + rect.height - blockHeight - 3 : style.vAlign === 1 ? rect.y + (rect.height - blockHeight - 3) / 2 : rect.y;
     ctx.textBaseline = 'alphabetic'; ctx.textAlign = align === 2 ? 'right' : align === 1 ? 'center' : 'left';
-    const x = align === 2 ? rect.x + rect.width - pad - indent : align === 1 ? rect.x + rect.width / 2 : rect.x + pad + indent;
-    for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], x, y + fontSize + i * lineHeight);
+    const x = align === 2 ? rect.x + rect.width - 3 - indent : align === 1 ? rect.x + (rect.width - 1) / 2 : rect.x + pad + indent;
+    for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], x, y + baseline + i * lineHeight);
     if (style.textDecoration) {
       const w = Math.min(width, measured), sx = align === 2 ? x - w : align === 1 ? x - w / 2 : x;
       ctx.fillRect(sx, y + fontSize + 2, w, 1);
@@ -331,26 +356,60 @@ export class WorkbookRenderer {
       [strongerBorder(style.borderRight as LineBorder, this.style(row, endCol).borderLeft as LineBorder), rect.x + rect.width - 1, rect.y - 1, rect.x + rect.width - 1, rect.y + rect.height - 1],
     ];
     for (const [border, x1, y1, x2, y2] of sides) if (border && border.style) {
-      ctx.save(); ctx.strokeStyle = border.color; ctx.lineWidth = (borderWeight(border) >= 30 ? 3 : borderWeight(border) >= 20 ? 2 : 1) * this.zoom;
-      const patterns: Record<number, number[]> = { 3: [3, 2], 4: [1, 1], 7: [1, 1], 8: [6, 3], 9: [3, 2, 1, 2], 10: [6, 3, 2, 3], 11: [3, 2, 1, 2, 1, 2], 12: [6, 3, 2, 3, 2, 3], 13: [6, 3, 2, 3] };
-      ctx.setLineDash((patterns[border.style] ?? []).map(n => n * this.zoom));
-      const stroke = (delta: number) => { const pixel = ctx.lineWidth % 2 ? 0.5 : 0; ctx.beginPath(); ctx.moveTo(Math.round(x1) + pixel + (x1 === x2 ? delta : 0), Math.round(y1) + pixel + (y1 === y2 ? delta : 0)); ctx.lineTo(Math.round(x2) + pixel + (x1 === x2 ? delta : 0), Math.round(y2) + pixel + (y1 === y2 ? delta : 0)); ctx.stroke(); };
-      if (border.style === 6) { ctx.lineWidth = 1; stroke(-1); stroke(1); } else stroke(0);
+      ctx.save(); ctx.fillStyle = border.color;
+      const z = this.zoom, horizontal = y1 === y2;
+      const weight = border.style === 6 ? 1 : borderWeight(border) >= 30 ? 3 : borderWeight(border) >= 20 ? 2 : 1;
+      const patterns: Record<number, number[]> = { 3: [3, 1], 4: [2, 2], 7: [1, 1], 8: [9, 3], 9: [8, 2, 2, 2], 10: [9, 3, 3, 3], 11: [9, 3, 3, 3, 3, 3], 12: [9, 3, 3, 3, 3, 3], 13: [11, 1, 5, 1] };
+      const pattern = patterns[border.style];
+      const boundaryRow = y1 === rect.y - 1 ? row : endRow, boundaryCol = x1 === rect.x - 1 ? col : endCol;
+      const previous = horizontal
+        ? col > 0 ? strongerBorder(this.style(boundaryRow - 1, col - 1).borderBottom as LineBorder, this.style(boundaryRow, col - 1).borderTop as LineBorder) : undefined
+        : row > 0 ? strongerBorder(this.style(row - 1, boundaryCol - 1).borderRight as LineBorder, this.style(row - 1, boundaryCol).borderLeft as LineBorder) : undefined;
+      const continuation = previous instanceof Object && (previous as LineBorder).style === border.style && (previous as LineBorder).color === border.color;
+      const startOffset = !horizontal && continuation && border.style !== 13 ? z : 0;
+      const length = (horizontal ? x2 - x1 : y2 - y1) + (border.style === 13 ? 0 : z);
+      const paint = (offset: number, run: number, delta: number, thickness: number) => {
+        const cross = Math.round((horizontal ? y1 : x1) - Math.floor(thickness / 2) * z + delta);
+        ctx.fillRect(horizontal ? x1 + offset : cross, horizontal ? cross : y1 + offset + startOffset, horizontal ? run : thickness * z, horizontal ? thickness * z : run);
+      };
+      const line = (delta: number, thickness: number) => {
+        for (let offset = 0, part = 0; offset < length - startOffset;) {
+          const run = pattern ? pattern[part % pattern.length] * z : length;
+          if (part % 2 === 0) paint(offset, Math.min(run, length - startOffset - offset), delta, thickness);
+          offset += run; part++;
+        }
+      };
+      if (pattern) { ctx.fillStyle = String(style.backColor ?? 'white'); paint(0, length - startOffset, 0, weight); ctx.fillStyle = border.color; }
+      if (border.style === 6) { ctx.fillStyle = String(style.backColor ?? 'white'); paint(0, length, 0, 1); ctx.fillStyle = border.color; line(-z, 1); line(z, 1); }
+      else if (border.style === 13) {
+        for (let offset = 0, part = 0; offset < length - startOffset;) {
+          const run = pattern![part % pattern!.length] * z;
+          if (part % 2 === 0) paint(offset, Math.min(run - z, length - startOffset - offset), 0, 1);
+          offset += run; part++;
+        }
+        // Slanted dash-dot has an upper row one pixel longer than the lower row.
+        for (let offset = 0, part = 0; offset < length - startOffset;) {
+          const run = pattern![part % pattern!.length] * z;
+          if (part % 2 === 0) paint(offset, Math.min(run, length - startOffset - offset), -z, 1);
+          offset += run; part++;
+        }
+      } else line(0, weight);
       ctx.restore();
     }
   }
   private drawHeaders(ctx: CanvasRenderingContext2D): void {
     const s = this.sheet!, selections = s.getSelections();
-    ctx.font = `${14.6667 * this.zoom}px Calibri`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    ctx.font = `${Number((14.6667 * this.zoom).toFixed(4))}px Calibri`; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
     for (const col of this.cols) if (this.headerHeight) {
       const selected = selections.some(r => r.col === -1 || (col.index >= r.col && col.index < r.col + r.colCount));
       ctx.save(); ctx.beginPath(); ctx.rect(col.min, 0, col.max - col.min, this.headerHeight); ctx.clip();
       ctx.fillStyle = selected ? '#e1e1e1' : 'white'; ctx.fillRect(col.position, 0, col.size, this.headerHeight);
       ctx.fillStyle = '#d4d4d4'; ctx.fillRect(Math.round(col.position + col.size) - 1, 0, 1, this.headerHeight);
       ctx.fillStyle = '#ababab'; ctx.fillRect(col.position, this.headerHeight - 1, col.size, 1);
-      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${14.6667 * this.zoom}px Calibri`;
+      if (selected) { ctx.fillStyle = '#217346'; ctx.fillRect(col.position - 1, this.headerHeight - 2, col.size + 1, 2); }
+      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${Number((14.6667 * this.zoom).toFixed(4))}px Calibri`;
       const text = s.getValue(0, col.index, 1);
-      ctx.fillText(text == null ? columnLabel(col.index) : String(text), col.position + col.size / 2 - 1, this.headerHeight / 2 + 1);
+      ctx.fillText(text == null ? columnLabel(col.index) : String(text), col.position + col.size / 2 - 0.5, fontMetrics(ctx.font).baseline + (this.headerHeight - fontMetrics(ctx.font).height - 3) / 2);
       ctx.restore();
     }
     for (const row of this.rows) if (this.headerWidth) {
@@ -359,14 +418,15 @@ export class WorkbookRenderer {
       ctx.fillStyle = selected ? '#e1e1e1' : 'white'; ctx.fillRect(0, row.position, this.headerWidth, row.size);
       ctx.fillStyle = '#d4d4d4'; ctx.fillRect(0, Math.round(row.position + row.size) - 1, this.headerWidth, 1);
       ctx.fillStyle = '#ababab'; ctx.fillRect(this.headerWidth - 1, row.position, 1, row.size);
-      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${14.6667 * this.zoom}px Calibri`;
+      if (selected) { ctx.fillStyle = '#217346'; ctx.fillRect(this.headerWidth - 2, row.position - 1, 2, row.size + 1); }
+      ctx.fillStyle = selected ? '#217346' : '#444'; ctx.font = `${selected ? 'bold ' : ''}${Number((14.6667 * this.zoom).toFixed(4))}px Calibri`;
       const text = s.getValue(row.index, 0, 2);
-      ctx.fillText(text == null ? String(row.index + 1) : String(text), this.headerWidth / 2 - 1, row.position + row.size / 2 + 1);
+      ctx.fillText(text == null ? String(row.index + 1) : String(text), this.headerWidth / 2 - 0.5, row.position + fontMetrics(ctx.font).baseline + (row.size - fontMetrics(ctx.font).height - 3) / 2);
       ctx.restore();
     }
     if (this.headerWidth && this.headerHeight) {
       ctx.fillStyle = 'white'; ctx.fillRect(0, 0, this.headerWidth - 1, this.headerHeight - 1);
-      ctx.fillStyle = '#e1e1e1'; ctx.beginPath(); ctx.moveTo(this.headerWidth - 4, 3); ctx.lineTo(this.headerWidth - 4, this.headerHeight - 4); ctx.lineTo(this.headerWidth - this.headerHeight + 3, this.headerHeight - 4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e1e1e1'; ctx.beginPath(); ctx.moveTo(this.headerWidth - 3, 2); ctx.lineTo(this.headerWidth - 3, this.headerHeight - 3); ctx.lineTo(this.headerWidth - this.headerHeight + 2, this.headerHeight - 3); ctx.closePath(); ctx.fill();
     }
   }
   private drawFreezeLines(ctx: CanvasRenderingContext2D): void {
@@ -380,7 +440,7 @@ export class WorkbookRenderer {
   drawSelection(): void {
     const ctx = this.selectionContext, s = this.sheet!;
     ctx.clearRect(0, 0, this.viewWidth, this.viewHeight);
-    if (this.workbook.options.hideSelection || this.interaction.isEditing) return;
+    if (this.workbook.options.hideSelection) return;
     ctx.save(); ctx.beginPath(); ctx.rect(Math.max(0, this.headerWidth - 2), Math.max(0, this.headerHeight - 2), this.viewWidth, this.viewHeight); ctx.clip();
     const active = this.cellRect(s.getActiveRowIndex(), s.getActiveColumnIndex());
     for (const selection of s.getSelections()) {
@@ -418,32 +478,34 @@ export class WorkbookRenderer {
     const ctx = this.tabContext, width = Number.parseFloat(this.tabs.style.width), options = this.workbook.options;
     if (!options.tabStripVisible) return;
     ctx.clearRect(0, 0, width, 28); ctx.fillStyle = '#f6f6f6'; ctx.fillRect(0, 0, width, 28);
-    ctx.fillStyle = '#ababab'; ctx.fillRect(0, 0, width, 1);
+    const edge = ctx.createLinearGradient(0, 0, this.viewWidth, 0); edge.addColorStop(0, '#d1d1d1'); edge.addColorStop(1, '#ababab');
+    ctx.fillStyle = edge; ctx.fillRect(0, 0, width, 1);
     this.tabHits = [];
     if (options.tabNavigationVisible) {
-      for (const [x, reverse] of [[28, true], [57, false]] as const) { ctx.fillStyle = '#bfbfbf'; ctx.beginPath(); ctx.moveTo(x + (reverse ? 2 : -2), 11); ctx.lineTo(x + (reverse ? -2 : 2), 14); ctx.lineTo(x + (reverse ? 2 : -2), 17); ctx.fill(); this.tabHits.push({ x: x - 12, width: 24, index: reverse ? -2 : -3 }); }
+      for (const [x, reverse] of [[28, true], [57, false]] as const) { ctx.fillStyle = !reverse && this.workbook.startSheetIndex() + this.tabHits.filter(hit => hit.index >= 0).length < this.workbook.sheets.length - 1 ? '#217346' : '#bfbfbf'; ctx.beginPath(); ctx.moveTo(x + (reverse ? 2 : -2), 11); ctx.lineTo(x + (reverse ? -2 : 2), 14); ctx.lineTo(x + (reverse ? 2 : -2), 17); ctx.fill(); this.tabHits.push({ x: x - 12, width: 24, index: reverse ? -2 : -3 }); }
     }
-    ctx.font = 'bold 10pt Calibri';
-    const overflow = this.workbook.sheets.reduce((sum, sheet) => sum + Math.ceil(ctx.measureText(sheet.name()).width + 24), 0) > width - (options.tabNavigationVisible ? 99 : 0) - 65;
+    ctx.font = 'bold 10pt "Segoe UI"';
+    const overflow = this.workbook.sheets.reduce((sum, sheet) => sum + Math.ceil(ctx.measureText(sheet.name()).width + 26), 0) > width - (options.tabNavigationVisible ? 114 : 0) - 81;
     const list = options.tabNavigationVisible && (options.allSheetsListVisible === 1 || (options.allSheetsListVisible === 2 && overflow));
-    if (list) { ctx.fillStyle = '#217346'; for (let y = 9; y <= 19; y += 5) ctx.fillRect(72, y, 14, 2); this.tabHits.push({ x: 66, width: 26, index: -4 }); }
-    let x = options.tabNavigationVisible ? list ? 115 : 99 : 0;
-    ctx.font = 'bold 10pt Calibri'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    if (list) { ctx.fillStyle = '#217346'; for (let y = 9; y <= 19; y += 5) ctx.fillRect(71, y, 15, 2); this.tabHits.push({ x: 66, width: 26, index: -4 }); }
+    let x = options.tabNavigationVisible ? list ? 114 : 99 : 0;
+    ctx.font = 'bold 10pt "Segoe UI"'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
     const active = this.workbook.getActiveSheetIndex();
     for (let i = this.workbook.startSheetIndex(); i < this.workbook.sheets.length; i++) {
       const sheet = this.workbook.sheets[i]; if (!sheet.visible()) continue;
-      const w = Math.ceil(ctx.measureText(sheet.name()).width + 24);
+      ctx.font = `${i === active ? 'bold ' : ''}10pt "Segoe UI"`;
+      const w = i === active ? Math.round(ctx.measureText(sheet.name()).width + 26) : Math.ceil(ctx.measureText(sheet.name()).width + 25);
       if (x + w > width - 40) break;
       const selected = i === active;
       ctx.fillStyle = selected ? 'white' : '#f6f6f6'; ctx.fillRect(x, 0, w, 25);
-      if (!selected && sheet.options.sheetTabColor) { ctx.fillStyle = sheet.options.sheetTabColor; ctx.fillRect(x + 2, 2, w - 4, 23); }
-      ctx.fillStyle = selected ? '#217346' : '#ababab'; ctx.fillRect(x, 0, 1, 25); ctx.fillRect(x + w - 1, 0, 1, 25);
-      if (selected) { ctx.fillStyle = sheet.options.sheetTabColor ?? '#217346'; ctx.fillRect(x, 24, w, 2); }
-      ctx.fillStyle = selected ? '#217346' : sheet.options.sheetTabColor ? 'white' : '#444'; ctx.font = `${selected || sheet.options.sheetTabColor ? 'bold ' : ''}10pt Calibri`; ctx.fillText(sheet.name(), x + w / 2, 13);
+      if (!selected && sheet.options.sheetTabColor) { ctx.fillStyle = sheet.options.sheetTabColor; ctx.fillRect(x + 2, 3, w - 4, 22); }
+      if (selected) { ctx.fillStyle = '#ababab'; ctx.fillRect(x, 0, 1, 25); ctx.fillRect(x + w - 1, 0, 1, 25); }
+      if (selected) { ctx.fillStyle = sheet.options.sheetTabColor ?? '#217346'; ctx.fillRect(x, 23, w, 2); }
+      ctx.fillStyle = selected ? '#217346' : sheet.options.sheetTabColor ? 'white' : '#444'; ctx.font = `${selected ? 'bold ' : ''}10pt "Segoe UI"`; ctx.textAlign = 'left'; ctx.fillText(sheet.name(), x + (selected ? 13 : 12), 13); ctx.textAlign = 'center';
       this.tabHits.push({ x, width: w, index: i }); x += w;
     }
     if (options.newTabVisible) {
-      if (overflow) { ctx.fillStyle = '#217346'; ctx.font = 'bold 10pt Calibri'; ctx.fillText('...', width - 71, 13); this.tabHits.push({ x: width - 84, width: 25, index: -4 }); }
+      if (overflow) { ctx.fillStyle = '#217346'; ctx.font = 'bold 10pt "Segoe UI"'; ctx.fillText('...', width - 71, 13); this.tabHits.push({ x: width - 84, width: 25, index: -4 }); }
       const cx = overflow ? width - 44 : Math.min(width - 20, x + 41); ctx.strokeStyle = '#7f7f7f'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, 14, 6.5, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#7f7f7f'; ctx.fillRect(cx - 3.5, 13, 7, 2); ctx.fillRect(cx - 1, 10.5, 2, 7);
       this.tabHits.push({ x: cx - 12, width: 24, index: -1 });

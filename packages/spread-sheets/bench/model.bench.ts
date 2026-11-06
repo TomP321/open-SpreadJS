@@ -12,6 +12,10 @@ describe('model performance', () => {
     const sheet = new Worksheet();
     for (let r = 0; r < 200_000; r++) sheet.setValue(r, 0, r);
   });
+  bench('setValue: 200k scattered rows across 50 columns', () => {
+    const sheet = new Worksheet(); sheet.setRowCount(1_000_000); sheet.setColumnCount(16384);
+    for (let r = 0; r < 200_000; r++) sheet.setValue(r, r % 50, r);
+  });
   bench('getValue: 200k numbers', () => {
     for (let r = 0; r < 200_000; r++) numeric.getValue(r, 0);
   });

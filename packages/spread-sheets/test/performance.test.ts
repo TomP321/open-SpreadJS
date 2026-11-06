@@ -38,19 +38,35 @@ it('distinguishes holes, special numbers and sparse metadata across chunks', () 
   expect([...cells.entries()]).toEqual([[1023, 0, { value: 43, style: 'styled' }]]);
 });
 
-it('guards retained CJS heap and buffers against per-cell allocation regressions', async () => {
+it.each([false, true])('guards retained CJS heap and buffers (scattered rows: %s)', async scattered => {
   const { execFileSync } = await import('node:child_process');
   const result = JSON.parse(execFileSync(process.execPath, ['--expose-gc', '-e', `
     const GC = require('./dist/gc.spread.sheets.cjs');
     global.gc(); const before = process.memoryUsage();
     const sheet = new GC.Spread.Sheets.Worksheet();
     const start = performance.now();
-    for (let row = 0; row < 200000; row++) sheet.setValue(row, 0, row);
+    for (let row = 0; row < 200000; row++) sheet.setValue(row, ${scattered ? 'row % 50' : '0'}, row);
     const elapsed = performance.now() - start;
     global.gc(); const after = process.memoryUsage();
-    console.log(JSON.stringify({ elapsed, retained: after.heapUsed + after.arrayBuffers - before.heapUsed - before.arrayBuffers, last: sheet.getValue(199999, 0) }));
+    console.log(JSON.stringify({ elapsed, retained: after.heapUsed + after.arrayBuffers - before.heapUsed - before.arrayBuffers, last: sheet.getValue(199999, ${scattered ? 49 : 0}) }));
   `], { encoding: 'utf8' })) as { elapsed: number; retained: number; last: number };
   expect(result.elapsed).toBeLessThan(350);
-  expect(result.retained).toBeLessThan(35 * 1024 * 1024);
+  expect(result.retained).toBeLessThan((scattered ? 25 : 35) * 1024 * 1024);
   expect(result.last).toBe(199999);
+});
+
+
+it('packs scattered-column writes and preserves secondary cells after primary-page deletion', () => {
+  const grid = new ValueGrid();
+  for (let r = 0; r < 4096; r++) grid.set(r, r % 50, r);
+  expect(grid.size).toBe(4096);
+  for (let r = 0; r < 4096; r++) expect(grid.get(r, r % 50)).toBe(r);
+  grid.set(0, 100, 'secondary');
+  for (let r = 0; r < 1024; r++) grid.delete(r, r % 50);
+  expect(grid.get(0, 100)).toBe('secondary');
+  grid.set(0, 100, 42);
+  expect([...grid.entries()].filter(([r, c]) => r === 0 && c === 100)).toEqual([[0, 100, 42]]);
+  grid.shift('col', 50, 2, false);
+  expect(grid.get(0, 102)).toBe(42);
+  grid.clear(); expect(grid.size).toBe(0);
 });
