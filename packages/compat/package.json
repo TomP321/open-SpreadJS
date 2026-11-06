@@ -1,0 +1,22 @@
+{
+  "name": "@opensheets/compat",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "inventory": "tsx scripts/inventory.ts",
+    "generate": "tsx scripts/generate.ts",
+    "coverage:api": "tsx scripts/coverage.ts",
+    "build": "tsx scripts/inventory.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "19.2.5",
+    "@mescius/spread-sheets-react": "19.2.5",
+    "@opensheets/spread-sheets": "workspace:*",
+    "@opensheets/spread-sheets-react": "workspace:*",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0"
+  }
+}

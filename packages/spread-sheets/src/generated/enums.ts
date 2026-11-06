@@ -1,0 +1,3678 @@
+// Generated from public API enum facts; no vendor implementation or comments.
+export namespace GC {
+export namespace Data {
+export enum RowColumnStates {
+"hover" = 1,
+"readonly" = 4,
+"active" = 16,
+"selected" = 32,
+"dirty" = 64,
+"inserted" = 128,
+"updated" = 256,
+"pin" = 1024,
+"primaryKey" = 2048,
+"required" = 4096,
+}
+}
+export namespace Data {
+export enum StateRuleDirection {
+"none" = 0,
+"row" = 1,
+"column" = 2,
+"both" = 3,
+}
+}
+export namespace Data {
+export enum ViewArea {
+"colHeader" = 1,
+"viewport" = 3,
+}
+}
+export namespace Pivot {
+export enum DataPosition {
+"row" = 0,
+"col" = 1,
+"none" = 2,
+}
+}
+export namespace Pivot {
+export enum DateGroupType {
+"seconds" = 0,
+"minutes" = 1,
+"hours" = 2,
+"days" = 3,
+"months" = 4,
+"quarters" = 5,
+"years" = 6,
+}
+}
+export namespace Pivot {
+export enum PivotAdvancedDateFilterBy {
+"month" = 1,
+"quarter" = 2,
+"year" = 3,
+}
+}
+export namespace Pivot {
+export enum PivotCaptionFilterOperator {
+"equalsTo" = 0,
+"notEqualsTo" = 1,
+"beginsWith" = 2,
+"doesNotBeginWith" = 3,
+"endsWith" = 4,
+"doesNotEndWith" = 5,
+"contains" = 6,
+"doesNotContain" = 7,
+"greaterThan" = 8,
+"greaterThanOrEqualsTo" = 9,
+"lessThan" = 10,
+"lessThanOrEqualsTo" = 11,
+"between" = 12,
+"notBetween" = 13,
+}
+}
+export namespace Pivot {
+export enum PivotConditionType {
+"caption" = 0,
+"date" = 1,
+"value" = 2,
+"top10" = 3,
+}
+}
+export namespace Pivot {
+export enum PivotDataType {
+"number" = 0,
+"string" = 1,
+"date" = 2,
+}
+}
+export namespace Pivot {
+export enum PivotDateFilterOperator {
+"equalsTo" = 0,
+"notEqualsTo" = 1,
+"before" = 2,
+"beforeEqualsTo" = 3,
+"after" = 4,
+"afterEqualsTo" = 5,
+"Between" = 6,
+"notBetween" = 7,
+"today" = 8,
+"yesterday" = 9,
+"tomorrow" = 10,
+"thisMonth" = 12,
+"lastMonth" = 13,
+"nextMonth" = 14,
+"thisWeek" = 15,
+"lastWeek" = 16,
+"nextWeek" = 17,
+"nextQuarter" = 18,
+"thisQuarter" = 19,
+"lastQuarter" = 20,
+"nextYear" = 21,
+"thisYear" = 22,
+"lastYear" = 23,
+"Q1" = 24,
+"Q2" = 25,
+"Q3" = 26,
+"Q4" = 27,
+"M1" = 28,
+"M2" = 29,
+"M3" = 30,
+"M4" = 31,
+"M5" = 32,
+"M6" = 33,
+"M7" = 34,
+"M8" = 35,
+"M9" = 36,
+"M10" = 37,
+"M11" = 38,
+"M12" = 39,
+"yearToDate" = 40,
+"dateToDate" = 41,
+}
+}
+export namespace Pivot {
+export enum PivotShowDataAs {
+"normal" = 0,
+"percentOfTotal" = 1,
+"percentOfRow" = 2,
+"percentOfCol" = 3,
+"percent" = 4,
+"percentOfParentRow" = 5,
+"percentOfParentCol" = 6,
+"percentOfParent" = 7,
+"difference" = 8,
+"percentDiff" = 9,
+"runTotal" = 10,
+"percentOfRunningTotal" = 11,
+"rankAscending" = 12,
+"rankDescending" = 13,
+"index" = 14,
+}
+}
+export namespace Pivot {
+export enum PivotShowDataAsBaseItemType {
+"item" = 0,
+"next" = 1,
+"previous" = 2,
+}
+}
+export namespace Pivot {
+export enum PivotSourceFieldType {
+"isCalcField" = 0,
+"isGroupField" = 1,
+}
+}
+export namespace Pivot {
+export enum PivotTop10FilterOperator {
+"top" = 1,
+"bottom" = -1,
+}
+}
+export namespace Pivot {
+export enum PivotTop10FilterType {
+"count" = 0,
+"percent" = 1,
+"sum" = 2,
+}
+}
+export namespace Pivot {
+export enum PivotValueFilterOperator {
+"equalsTo" = 0,
+"notEqualsTo" = 1,
+"greaterThan" = 2,
+"greaterThanOrEqualsTo" = 3,
+"lessThan" = 4,
+"lessThanOrEqualsTo" = 5,
+"between" = 6,
+"notBetween" = 7,
+}
+}
+export namespace Pivot {
+export enum SortType {
+"asc" = 0,
+"desc" = 1,
+"custom" = 2,
+}
+}
+export namespace Pivot {
+export enum SubtotalType {
+"average" = 0,
+"count" = 1,
+"countNums" = 2,
+"max" = 3,
+"min" = 4,
+"product" = 5,
+"stdDev" = 6,
+"stdDevp" = 7,
+"sum" = 8,
+"varr" = 9,
+"varp" = 10,
+}
+}
+export namespace Spread {
+export namespace CalcEngine {
+export enum ExpressionType {
+"unknow" = 0,
+"reference" = 1,
+"number" = 2,
+"string" = 3,
+"boolean" = 4,
+"error" = 5,
+"array" = 6,
+"function" = 7,
+"name" = 8,
+"operator" = 9,
+"parentheses" = 10,
+"missingArgument" = 11,
+"expand" = 12,
+"structReference" = 13,
+"LocalName" = 100,
+}
+}
+}
+export namespace Spread {
+export namespace CalcEngine {
+export namespace Functions {
+export enum AsyncFunctionEvaluateMode {
+"onRecalculation" = 0,
+"calculateOnce" = 1,
+"onInterval" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Commands {
+export enum Key {
+"left" = 37,
+"right" = 39,
+"up" = 38,
+"down" = 40,
+"tab" = 9,
+"enter" = 13,
+"shift" = 16,
+"ctrl" = 17,
+"space" = 32,
+"altkey" = 18,
+"home" = 36,
+"end" = 35,
+"pup" = 33,
+"pdn" = 34,
+"backspace" = 8,
+"del" = 46,
+"esc" = 27,
+"a" = 65,
+"c" = 67,
+"v" = 86,
+"x" = 88,
+"z" = 90,
+"y" = 89,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum CalcItemAggregation {
+"include" = 0,
+"exclude" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum DisplayFields {
+"downThenOver" = 0,
+"overThenDown" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum GrandTotalPosition {
+"none" = 0,
+"row" = 1,
+"col" = 2,
+"both" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum PivotAreaAxisType {
+"row" = 0,
+"col" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum PivotAreaReference {
+"cellReference" = 0,
+"getPivotData" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum PivotAreaType {
+"all" = 0,
+"button" = 1,
+"corner" = 5,
+"topRight" = 7,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum PivotPanelLayoutType {
+"stack" = 0,
+"flow" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum PivotPanelSection {
+"fields" = 1,
+"area" = 2,
+"viewList" = 4,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum PivotTableFieldType {
+"filterField" = 0,
+"rowField" = 1,
+"columnField" = 2,
+"valueField" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum PivotTableLayoutType {
+"compact" = 0,
+"outline" = 1,
+"tabular" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Pivot {
+export enum SubtotalsPosition {
+"none" = 0,
+"top" = 1,
+"bottom" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum AllowDragHeaderToMove {
+"none" = 0,
+"column" = 1,
+"row" = 2,
+"both" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum AllSheetsListVisibility {
+"hide" = 0,
+"show" = 1,
+"auto" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum AutoFitType {
+"cell" = 0,
+"cellWithHeader" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace AutoMerge {
+export enum AutoMergeDirection {
+"none" = 0,
+"column" = 1,
+"row" = 2,
+"columnRow" = 3,
+"rowColumn" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace AutoMerge {
+export enum AutoMergeMode {
+"free" = 0,
+"restricted" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace AutoMerge {
+export enum SelectionMode {
+"source" = 0,
+"merged" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ButtonImageType {
+"none" = 0,
+"custom" = 1,
+"clear" = 2,
+"cancel" = 3,
+"ok" = 4,
+"dropdown" = 5,
+"ellipsis" = 6,
+"left" = 7,
+"right" = 8,
+"plus" = 9,
+"minus" = 10,
+"undo" = 11,
+"redo" = 12,
+"search" = 13,
+"separator" = 14,
+"spinLeft" = 15,
+"spinRight" = 16,
+"collapse" = 17,
+"expand" = 18,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ButtonPosition {
+"left" = 0,
+"right" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ButtonVisibility {
+"always" = 0,
+"onSelected" = 1,
+"onEditing" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CalcEngine {
+export enum RangeReferenceRelative {
+"allAbsolute" = 0,
+"startRowRelative" = 1,
+"startColRelative" = 2,
+"endRowRelative" = 4,
+"endColRelative" = 8,
+"rowRelative" = 5,
+"colRelative" = 10,
+"allRelative" = 15,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CalculationMode {
+"auto" = 0,
+"manual" = 1,
+"partial" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CalculationType {
+"all" = 0,
+"rebuild" = 1,
+"minimal" = 2,
+"regular" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CalendarPage {
+"year" = 1,
+"month" = 2,
+"day" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CalendarStartDay {
+"monday" = 1,
+"tuesday" = 2,
+"wednesday" = 3,
+"thursday" = 4,
+"friday" = 5,
+"saturday" = 6,
+"sunday" = 7,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CaptionAlignment {
+"left" = 0,
+"right" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CellStatesType {
+"hover" = 1,
+"invalid" = 2,
+"readonly" = 4,
+"edit" = 8,
+"active" = 16,
+"selected" = 32,
+"dirty" = 64,
+"invalidFormula" = 128,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CellTypes {
+export enum CheckBoxTextAlign {
+"top" = 0,
+"bottom" = 1,
+"left" = 2,
+"right" = 3,
+"inside" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CellTypes {
+export enum Direction {
+"horizontal" = 0,
+"vertical" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CellTypes {
+export enum DivergeDirection {
+"topLeftToBottomRight" = 0,
+"bottomLeftToTopRight" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CellTypes {
+export enum EditorType {
+"textarea" = 0,
+"editableDiv" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CellTypes {
+export enum EditorValueType {
+"text" = 0,
+"index" = 1,
+"value" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CellTypes {
+export enum HyperLinkTargetType {
+"blank" = 0,
+"self" = 1,
+"parent" = 2,
+"top" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CellTypes {
+export enum SelectionMode {
+"single" = 0,
+"multiple" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace CellTypes {
+export enum TextAlign {
+"left" = 2,
+"right" = 3,
+"inside" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum AxisCrossPoint {
+"automatic" = "auto",
+"maximum" = "max",
+"minimum" = "min",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum AxisGroup {
+"primary" = 0,
+"secondary" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum AxisOrientation {
+"minMax" = 0,
+"maxMin" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum ChartType {
+"combo" = 0,
+"xyScatter" = 1,
+"radar" = 2,
+"doughnut" = 3,
+"area" = 8,
+"line" = 9,
+"pie" = 10,
+"bubble" = 11,
+"columnClustered" = 12,
+"columnStacked" = 13,
+"columnStacked100" = 14,
+"barClustered" = 18,
+"barStacked" = 19,
+"barStacked100" = 20,
+"lineStacked" = 24,
+"lineStacked100" = 25,
+"lineMarkers" = 26,
+"lineMarkersStacked" = 27,
+"lineMarkersStacked100" = 28,
+"xyScatterSmooth" = 33,
+"xyScatterSmoothNoMarkers" = 34,
+"xyScatterLines" = 35,
+"xyScatterLinesNoMarkers" = 36,
+"areaStacked" = 37,
+"areaStacked100" = 38,
+"radarMarkers" = 42,
+"radarFilled" = 43,
+"stockHLC" = 49,
+"stockOHLC" = 50,
+"stockVHLC" = 51,
+"stockVOHLC" = 52,
+"boxWhisker" = 53,
+"funnel" = 54,
+"paretoLine" = 55,
+"regionMap" = 56,
+"sunburst" = 57,
+"treemap" = 58,
+"waterfall" = 59,
+"clusteredColumn" = 60,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum ColorRule {
+"cycle" = 0,
+"withinLinear" = 1,
+"acrossLinear" = 2,
+"withinLinearReversed" = 3,
+"acrossLinearReversed" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum DataLabelPosition {
+"bestFit" = 0,
+"below" = 1,
+"center" = 2,
+"insideBase" = 3,
+"insideEnd" = 4,
+"left" = 5,
+"outsideEnd" = 6,
+"right" = 7,
+"above" = 8,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum DisplayBlanksAs {
+"connected" = 0,
+"gaps" = 1,
+"zero" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum DisplayUnit {
+"hundreds" = "hundreds",
+"thousands" = "thousands",
+"tenThousands" = "tenThousands",
+"hundredThousands" = "hundredThousands",
+"millions" = "millions",
+"tenMillions" = "tenMillions",
+"hundredMillions" = "hundredMillions",
+"billions" = "billions",
+"trillions" = "trillions",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum ErrorBarType {
+"both" = 0,
+"minus" = 1,
+"plus" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum ErrorBarValueType {
+"custom" = 0,
+"fixedValue" = 1,
+"percentage" = 2,
+"standardDeviation" = 3,
+"standardError" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum LegendPosition {
+"top" = 1,
+"right" = 2,
+"left" = 3,
+"bottom" = 4,
+"topRight" = 5,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum LineType {
+"solid" = 0,
+"dot" = 1,
+"dash" = 2,
+"lgDash" = 3,
+"dashDot" = 4,
+"lgDashDot" = 5,
+"lgDashDotDot" = 6,
+"sysDash" = 7,
+"sysDot" = 8,
+"sysDashDot" = 9,
+"sysDashDotDot" = 10,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum PatternType {
+"none" = 0,
+"dottedPercent5" = 1,
+"dottedPercent10" = 2,
+"dottedPercent20" = 3,
+"dottedPercent25" = 4,
+"dottedPercent30" = 5,
+"dottedPercent40" = 6,
+"dottedPercent50" = 7,
+"dottedPercent60" = 8,
+"dottedPercent70" = 9,
+"dottedPercent75" = 10,
+"dottedPercent80" = 11,
+"dottedPercent90" = 12,
+"darkHorizontal" = 13,
+"darkVertical" = 14,
+"darkDownwardDiagonal" = 15,
+"darkUpwardDiagonal" = 16,
+"smallCheckerBoard" = 17,
+"trellis" = 18,
+"lightHorizontal" = 19,
+"lightVertical" = 20,
+"lightDownwardDiagonal" = 21,
+"lightUpwardDiagonal" = 22,
+"smallGrid" = 23,
+"dottedDiamond" = 24,
+"wideDownwardDiagonal" = 25,
+"wideUpwardDiagonal" = 26,
+"dashedUpwardDiagonal" = 27,
+"dashedDownwardDiagonal" = 28,
+"narrowVertical" = 29,
+"narrowHorizontal" = 30,
+"dashedVertical" = 31,
+"dashedHorizontal" = 32,
+"largeConfetti" = 33,
+"largeGrid" = 34,
+"horizontalBrick" = 35,
+"largeCheckerBoard" = 36,
+"smallConfetti" = 37,
+"zigZag" = 38,
+"solidDiamond" = 39,
+"diagonalBrick" = 40,
+"outlinedDiamond" = 41,
+"plaid" = 42,
+"sphere" = 43,
+"weave" = 44,
+"dottedGrid" = 45,
+"divot" = 46,
+"shingle" = 47,
+"wave" = 48,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum RowCol {
+"rows" = 0,
+"columns" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum SymbolShape {
+"circle" = 0,
+"dash" = 1,
+"diamond" = 2,
+"dot" = 3,
+"none" = 4,
+"picture" = 5,
+"plus" = 6,
+"square" = 7,
+"star" = 8,
+"triangle" = 9,
+"x" = 10,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum TextDirection {
+"horz" = 0,
+"vert" = 1,
+"vert270" = 2,
+"eaVert" = 4,
+"wordArtVertRtl" = 6,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum TextUnderlineType {
+"none" = 0,
+"single" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum TickLabelPosition {
+"high" = 0,
+"low" = 1,
+"nextToAxis" = 2,
+"none" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum TickMark {
+"cross" = 0,
+"inside" = 1,
+"none" = 2,
+"outside" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum TimeUnit {
+"days" = 0,
+"months" = 1,
+"years" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Charts {
+export enum TrendlineType {
+"exponential" = 0,
+"linear" = 1,
+"logarithmic" = 2,
+"movingAverage" = 3,
+"polynomial" = 4,
+"power" = 5,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ClearPendingChangeType {
+"dirty" = 1,
+"insert" = 2,
+"delete" = 4,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ClipboardActionType {
+"copy" = 1,
+"cut" = 2,
+"reset" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ClipboardPasteOptions {
+"all" = 0,
+"values" = 1,
+"formatting" = 2,
+"formulas" = 3,
+"valuesAndFormatting" = 4,
+"formulasAndFormatting" = 5,
+"comments" = 6,
+"validation" = 7,
+"usingSourceTheme" = 8,
+"noBorder" = 9,
+"columnWidths" = 10,
+"formulasAndNumberFormatting" = 11,
+"valuesAndNumberFormatting" = 12,
+"valuesAndSourceFormatting" = 13,
+"allAndColumnWidth" = 14,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Collaboration {
+export enum BrowsingMode {
+"edit" = 0,
+"view" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Collaboration {
+export enum OpType {
+"addSheet" = 1,
+"removeSheet" = 2,
+"clearSheets" = 3,
+"reorderSheet" = 4,
+"setStartSheetIndex" = 5,
+"setActiveSheetId" = 6,
+"setWorkbookOptions" = 7,
+"addNamedStyle" = 8,
+"removeNamedStyle" = 9,
+"addSheetNamedStyle" = 10,
+"removeSheetNamedStyle" = 11,
+"addCustomTheme" = 12,
+"removeCustomTheme" = 13,
+"updateCustomTheme" = 14,
+"addSheetTabStyle" = 15,
+"removeSheetTabStyle" = 16,
+"clearSheetTabStyle" = 17,
+"updateDocProp" = 18,
+"updateDocPropForApp" = 19,
+"updateDocPropForCore" = 20,
+"addCustomDocProp" = 21,
+"removeCustomDocProp" = 22,
+"clearCustomDocProp" = 23,
+"updateCustomDocProp" = 24,
+"setCustomDocProps" = 25,
+"setTabSelected" = 26,
+"setSheetName" = 27,
+"setRange" = 28,
+"setCustomName" = 29,
+"setSheetScopeCustomName" = 30,
+"clearCustomName" = 31,
+"clearSheetScopeCustomName" = 32,
+"addRows" = 33,
+"deleteRows" = 34,
+"addSpan" = 35,
+"removeSpan" = 36,
+"updateSpan" = 37,
+"addColumns" = 39,
+"deleteColumns" = 40,
+"setRowCount" = 41,
+"setColumnCount" = 42,
+"setFrozen" = 43,
+"setAxisSize" = 45,
+"updateZoom" = 46,
+"setAxisOptions" = 47,
+"setWorksheetOptions" = 49,
+"setCurrentTheme" = 50,
+"clearRange" = 51,
+"setSheetVisible" = 52,
+"setFileInfo" = 53,
+"updateTopLeftPosition" = 54,
+"setWorkbookProperty" = 55,
+"setSheetBackgroundImage" = 56,
+"setCustomFunction" = 57,
+"setSheetScopeCustomFunction" = 58,
+"clearCustomFunction" = 59,
+"clearSheetScopeCustomFunction" = 60,
+"updateSheetDefaultsOptions" = 61,
+"setFormatStringName" = 62,
+"clearFormatStringName" = 63,
+"setSelectionPolicyAndUnit" = 64,
+"addSheetTab" = 65,
+"removeSheetTab" = 66,
+"clearSheetTabs" = 67,
+"setSheetTabSelected" = 68,
+"setSheetTabName" = 69,
+"setSheetTabVisible" = 70,
+"addNamedCellTemplate" = 71,
+"removeNamedCellTemplate" = 72,
+"clearNamedCellTemplates" = 73,
+"setSheetDataSource" = 74,
+"setValueForRemoteOp" = 75,
+"addExternalReference" = 101,
+"updateExternalReference" = 102,
+"sortSwap" = 111,
+"updateSortState" = 112,
+"setFilter" = 121,
+"updateFilterSortInfo" = 124,
+"updateFilterButtonVisibleInfo" = 125,
+"updateFilterRange" = 126,
+"updateFilterData" = 128,
+"setDirection" = 145,
+"showOutline" = 146,
+"insertGroupItem" = 147,
+"setGroupItems" = 148,
+"deleteGroupItem" = 149,
+"addComment" = 161,
+"removeComment" = 162,
+"updateComment" = 163,
+"addTable" = 171,
+"removeTable" = 172,
+"showHeader" = 173,
+"showFooter" = 174,
+"setTableProperty" = 175,
+"setTableLayoutStyle" = 176,
+"addTableRow" = 177,
+"removeTableRow" = 178,
+"updateTablePosition" = 179,
+"addTableColumn" = 180,
+"removeTableColumn" = 181,
+"setTableColumnProperty" = 182,
+"setTableDataManagerBindingConfig" = 183,
+"setTableColumns" = 184,
+"addShape" = 201,
+"removeShape" = 202,
+"reorderShape" = 203,
+"updateShapeProp" = 204,
+"updateShapeFormula" = 205,
+"updateShapeTransform" = 206,
+"reorderChildShape" = 209,
+"updateShapeCollectionOption" = 210,
+"updateChartSeries" = 221,
+"updateChart" = 222,
+"preserveUnsupportedChart" = 223,
+"addPivotCache" = 251,
+"removePivotCache" = 252,
+"updatePivotCache" = 253,
+"switchPivotCache" = 254,
+"updatePivotCacheField" = 255,
+"updatePivotCacheOptions" = 256,
+"addPivotTable" = 271,
+"removePivotTable" = 272,
+"updatePivotTableLayout" = 273,
+"updateFieldsModel" = 274,
+"addPivotField" = 275,
+"removePivotField" = 276,
+"updatePivotTableOptions" = 277,
+"addRule" = 301,
+"updateRule" = 302,
+"removeRule" = 303,
+"clearRule" = 304,
+"addAutoMerge" = 311,
+"removeAutoMerge" = 312,
+"setSheetAreaAutoMerge" = 313,
+"addSparklineEx" = 321,
+"removeSparklineEx" = 322,
+"updateSparklineGroup" = 323,
+"addSparklineGroup" = 324,
+"removeSparklineGroup" = 325,
+"groupSparkline" = 326,
+"setGroupSparklines" = 327,
+"addSparklineForGroup" = 328,
+"removeSparklineForGroup" = 329,
+"clearSparklineForGroup" = 330,
+"updateSparkline" = 331,
+"addCellState" = 351,
+"removeCellState" = 352,
+"updateCellState" = 353,
+"setCellState" = 354,
+"addDataValidator" = 361,
+"updateDataValidator" = 362,
+"removeDataValidator" = 363,
+"setDataValidatorRange" = 364,
+"setOutlineColumnOptions" = 371,
+"setOutlineColumnProperty" = 372,
+"setPrintInfo" = 381,
+"setPrintInfoOption" = 382,
+"addTableItemSlicerCache" = 391,
+"updateTableItemSlicerCacheProperty" = 392,
+"removeTableItemSlicerCache" = 393,
+"addPivotSlicerCache" = 394,
+"updatePivotSlicerCacheProperty" = 395,
+"removePivotSlicerCache" = 396,
+"updateSlicerProperty" = 397,
+"addThreadedComment" = 410,
+"updateThreadedComment" = 411,
+"removeThreadedComment" = 412,
+"addThreadedCommentReply" = 413,
+"updateThreadedCommentReply" = 414,
+"removeThreadedCommentReply" = 415,
+"setRelationships" = 421,
+"addDataManagerTable" = 423,
+"removeDataManagerTable" = 424,
+"setDataManagerTableName" = 425,
+"setDataManagerTableOptions" = 426,
+"setPrimaryKey" = 427,
+"addView" = 429,
+"removeView" = 430,
+"setViewsOptions" = 432,
+"setViewColumns" = 434,
+"setDataManagerSortInfo" = 437,
+"setDataManagerFilterInfo" = 438,
+"setDataManagerGroupInfo" = 439,
+"setPinnedColumns" = 440,
+"setPinnedRows" = 448,
+"setIndexMapForDisableAutoMode" = 449,
+"updateLocalRecord" = 441,
+"insertLocalRecord" = 442,
+"removeLocalRecord" = 443,
+"addLocalColumn" = 444,
+"removeLocalColumn" = 445,
+"updateLocalColumn" = 446,
+"setDataManagerTableSchema" = 447,
+"updateTableSheetDataView" = 451,
+"updateTableSheetOptions" = 452,
+"updateTableSheetRowActionOptions" = 453,
+"updateTableSheetCurrentTheme" = 454,
+"updateTableSheetDefaults" = 455,
+"updateTableSheetPrintInfo" = 456,
+"updateTableSheetFreeHeaderArea" = 457,
+"setTableSheetFilterInfo" = 458,
+"setTableSheetSortInfo" = 459,
+"setTableSheetJSON" = 460,
+"addRichDataImage" = 501,
+"removeRichDataImage" = 502,
+"setScenario" = 510,
+"setScenarioProp" = 512,
+"setScenarioOverrides" = 513,
+"setAppliedScenario" = 515,
+"setActiveScenario" = 517,
+"setBaseValues" = 518,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Collaboration {
+export enum PermissionTypes {
+"allowNonDataModifyingOperations" = 1,
+"allowHideRowsOrColumns" = 2,
+"allowResizeRowsOrColumns" = 4,
+"allowFilter" = 8,
+"allowSort" = 16,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Comments {
+export enum CommentState {
+"active" = 1,
+"edit" = 2,
+"normal" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Comments {
+export enum DisplayMode {
+"alwaysShown" = 1,
+"hoverShown" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum AverageConditionType {
+"above" = 0,
+"below" = 1,
+"equalOrAbove" = 2,
+"equalOrBelow" = 3,
+"above1StdDev" = 4,
+"below1StdDev" = 5,
+"above2StdDev" = 6,
+"below2StdDev" = 7,
+"above3StdDev" = 8,
+"below3StdDev" = 9,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum BarDirection {
+"leftToRight" = 0,
+"rightToLeft" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum ColorCompareType {
+"backgroundColor" = 0,
+"foregroundColor" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum ComparisonOperators {
+"equalsTo" = 0,
+"notEqualsTo" = 1,
+"greaterThan" = 2,
+"greaterThanOrEqualsTo" = 3,
+"lessThan" = 4,
+"lessThanOrEqualsTo" = 5,
+"between" = 6,
+"notBetween" = 7,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum ConditionType {
+"relationCondition" = 0,
+"numberCondition" = 1,
+"textCondition" = 2,
+"colorCondition" = 3,
+"formulaCondition" = 4,
+"dateCondition" = 5,
+"dateExCondition" = 6,
+"textLengthCondition" = 7,
+"top10Condition" = 8,
+"uniqueCondition" = 9,
+"averageCondition" = 10,
+"cellValueCondition" = 11,
+"areaCondition" = 12,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum CustomValueType {
+"empty" = 0,
+"nonEmpty" = 1,
+"error" = 2,
+"nonError" = 3,
+"formula" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum DataBarAxisPosition {
+"automatic" = 0,
+"cellMidPoint" = 1,
+"none" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum DateCompareType {
+"equalsTo" = 0,
+"notEqualsTo" = 1,
+"before" = 2,
+"beforeEqualsTo" = 3,
+"after" = 4,
+"afterEqualsTo" = 5,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum DateOccurringType {
+"today" = 0,
+"yesterday" = 1,
+"tomorrow" = 2,
+"last7Days" = 3,
+"thisMonth" = 4,
+"lastMonth" = 5,
+"nextMonth" = 6,
+"thisWeek" = 7,
+"lastWeek" = 8,
+"nextWeek" = 9,
+"nextQuarter" = 10,
+"thisQuarter" = 11,
+"lastQuarter" = 12,
+"nextYear" = 13,
+"thisYear" = 14,
+"lastYear" = 15,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum GeneralComparisonOperators {
+"equalsTo" = 0,
+"notEqualsTo" = 1,
+"greaterThan" = 2,
+"greaterThanOrEqualsTo" = 3,
+"lessThan" = 4,
+"lessThanOrEqualsTo" = 5,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum IconSetType {
+"threeArrowsColored" = 0,
+"threeArrowsGray" = 1,
+"threeTriangles" = 2,
+"threeStars" = 3,
+"threeFlags" = 4,
+"threeTrafficLightsUnrimmed" = 5,
+"threeTrafficLightsRimmed" = 6,
+"threeSigns" = 7,
+"threeSymbolsCircled" = 8,
+"threeSymbolsUncircled" = 9,
+"fourArrowsColored" = 10,
+"fourArrowsGray" = 11,
+"fourRedToBlack" = 12,
+"fourRatings" = 13,
+"fourTrafficLights" = 14,
+"fiveArrowsColored" = 15,
+"fiveArrowsGray" = 16,
+"fiveRatings" = 17,
+"fiveQuarters" = 18,
+"fiveBoxes" = 19,
+"noIcons" = 20,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum IconValueType {
+"number" = 1,
+"percent" = 4,
+"formula" = 7,
+"percentile" = 5,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum LogicalOperators {
+"or" = 0,
+"and" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum QuarterType {
+"quarter1" = 0,
+"quarter2" = 1,
+"quarter3" = 2,
+"quarter4" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum RuleType {
+"conditionRuleBase" = 0,
+"cellValueRule" = 1,
+"specificTextRule" = 2,
+"formulaRule" = 3,
+"dateOccurringRule" = 4,
+"top10Rule" = 5,
+"uniqueRule" = 6,
+"duplicateRule" = 7,
+"averageRule" = 8,
+"twoScaleRule" = 10,
+"threeScaleRule" = 11,
+"dataBarRule" = 12,
+"iconSetRule" = 13,
+"rowStateRule" = 14,
+"columnStateRule" = 15,
+"sparklineRule" = 16,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum ScaleValueType {
+"number" = 0,
+"lowestValue" = 1,
+"highestValue" = 2,
+"percent" = 3,
+"percentile" = 4,
+"automin" = 5,
+"formula" = 6,
+"automax" = 7,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum TextCompareType {
+"equalsTo" = 0,
+"notEqualsTo" = 1,
+"beginsWith" = 2,
+"doesNotBeginWith" = 3,
+"endsWith" = 4,
+"doesNotEndWith" = 5,
+"contains" = 6,
+"doesNotContain" = 7,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum TextComparisonOperators {
+"contains" = 0,
+"doesNotContain" = 1,
+"beginsWith" = 2,
+"endsWith" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ConditionalFormatting {
+export enum Top10ConditionType {
+"top" = 0,
+"bottom" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CopyPasteHeaderOptions {
+"noHeaders" = 0,
+"rowHeaders" = 1,
+"columnHeaders" = 2,
+"allHeaders" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CopyToOptions {
+"value" = 1,
+"formula" = 2,
+"comment" = 4,
+"outline" = 8,
+"sparkline" = 16,
+"span" = 32,
+"style" = 64,
+"tag" = 128,
+"bindingPath" = 256,
+"conditionalFormat" = 512,
+"hyperlink" = 1024,
+"defaultValue" = 2048,
+"altText" = 4096,
+"scenario" = 32768,
+"all" = 65535,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum CornerPosition {
+"leftTop" = 1,
+"rightTop" = 2,
+"leftBottom" = 4,
+"rightBottom" = 8,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum Aggregate {
+"firstValue" = 0,
+"sum" = 1,
+"count" = 2,
+"average" = 3,
+"max" = 4,
+"min" = 5,
+"countDistinct" = 12,
+"lastValue" = 13,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum AnimationEasing {
+"linear" = 0,
+"swing" = 1,
+"easeInQuad" = 2,
+"easeOutQuad" = 3,
+"easeInOutQuad" = 4,
+"easeInCubic" = 5,
+"easeOutCubic" = 6,
+"easeInOutCubic" = 7,
+"easeInQuart" = 8,
+"easeOutQuart" = 9,
+"easeInOutQuart" = 10,
+"easeInQuint" = 11,
+"easeOutQuint" = 12,
+"easeInOutQuint" = 13,
+"easeInSine" = 14,
+"easeOutSine" = 15,
+"easeInOutSine" = 16,
+"easeInExpo" = 17,
+"easeOutExpo" = 18,
+"easeInOutExpo" = 19,
+"easeInCirc" = 20,
+"easeOutCirc" = 21,
+"easeInOutCirc" = 22,
+"easeInBack" = 23,
+"easeOutBack" = 24,
+"easeInOutBack" = 25,
+"easeInBounce" = 26,
+"easeOutBounce" = 27,
+"easeInOutBounce" = 28,
+"easeInElastic" = 29,
+"easeOutElastic" = 30,
+"easeInOutElastic" = 31,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum AxisPosition {
+"none" = 0,
+"near" = 1,
+"far" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum AxisType {
+"x" = 0,
+"y" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum ComparisonOperator {
+"in" = "In",
+"equalsTo" = "EqualsTo",
+"greaterThan" = "GreaterThan",
+"greaterThanOrEqualsTo" = "GreaterThanOrEqualsTo",
+"lessThan" = "LessThan",
+"lessThanOrEqualsTo" = "LessThanOrEqualsTo",
+"notEqualsTo" = "NotEqualsTo",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum DataChartType {
+"column" = "Column",
+"rangeColumn" = "RangeColumn",
+"stackedColumn" = "StackedColumn",
+"percentStackedColumn" = "PercentStackedColumn",
+"bar" = "Bar",
+"rangeBar" = "RangeBar",
+"stackedBar" = "StackedBar",
+"percentStackedBar" = "PercentStackedBar",
+"area" = "Area",
+"rangeArea" = "RangeArea",
+"stackedArea" = "StackedArea",
+"percentStackedArea" = "PercentStackedArea",
+"line" = "Line",
+"pie" = "Pie",
+"donut" = "Donut",
+"rose" = "Rose",
+"radialStackedBar" = "RadialStackedBar",
+"sunburst" = "Sunburst",
+"polarCoordinatesBar" = "PolarCoordinatesBar",
+"polarCoordinatesStackedBar" = "PolarCoordinatesStackedBar",
+"radar" = "Radar",
+"filledRadar" = "FilledRadar",
+"scatter" = "Scatter",
+"bubble" = "Bubble",
+"treemap" = "Treemap",
+"funnel" = "Funnel",
+"waterfall" = "Waterfall",
+"candlestick" = "Candlestick",
+"ohlc" = "OHLC",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum DateMode {
+"milliSecond" = 0,
+"second" = 1,
+"minute" = 2,
+"hour" = 3,
+"day" = 4,
+"week" = 5,
+"month" = 6,
+"year" = 7,
+"quarter" = 8,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum EncodingField {
+"valueNames" = "VALUE_NAMES",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum FontStyle {
+"normal" = "Normal",
+"italic" = "Italic",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum FormatType {
+"hundreds" = "Hundreds",
+"thousands" = "Thousands",
+"tenThousand" = "10000",
+"hundredThousand" = "100000",
+"millions" = "Millions",
+"tenMillion" = "10000000",
+"hundredMillion" = "100000000",
+"billions" = "Billions",
+"trillions" = "Trillions",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum FunnelType {
+"default" = "Default",
+"bar" = "Bar",
+"pyramid" = "Pyramid",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum HAlign {
+"center" = "Center",
+"left" = "Left",
+"right" = "Right",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum LegendPosition {
+"none" = "None",
+"bottom" = "Bottom",
+"left" = "Left",
+"right" = "Right",
+"top" = "Top",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum LegendType {
+"color" = "Color",
+"size" = "Size",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum LineAspect {
+"default" = "Default",
+"spline" = "Spline",
+"stepLeft" = "StepLeft",
+"stepRight" = "StepRight",
+"stepCenter" = "StepCenter",
+"bezierCurve" = "BezierCurve",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum LogicalOperation {
+"and" = "AND",
+"or" = "OR",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum OrderType {
+"ascending" = "Ascending",
+"descending" = "Descending",
+"none" = "None",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum Orientation {
+"horizontal" = "Horizontal",
+"vertical" = "Vertical",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum OverlappingLabels {
+"show" = "Show",
+"hide" = "Hide",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum StringOperator {
+"in" = "In",
+"equalsTo" = "EqualsTo",
+"contains" = "Contains",
+"startsWith" = "StartsWith",
+"endsWith" = "EndsWith",
+"notEqualsTo" = "NotEqualsTo",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum SymbolShape {
+"dot" = "Dot",
+"box" = "Box",
+"diamond" = "Diamond",
+"triangle" = "Triangle",
+"x" = "X",
+"plus" = "Plus",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum TextOverflow {
+"clip" = "Clip",
+"ellipsis" = "Ellipsis",
+"wrap" = "Wrap",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum TextPosition {
+"center" = "Center",
+"inside" = "Inside",
+"outside" = "Outside",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum TickMark {
+"cross" = "Cross",
+"inside" = "Inside",
+"none" = "None",
+"outside" = "Outside",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum VAlign {
+"top" = "Top",
+"bottom" = "Bottom",
+"middle" = "Middle",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum ValueOptionType {
+"number" = 0,
+"date" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataCharts {
+export enum ValueScaleType {
+"date" = "Date",
+"linear" = "Linear",
+"ordinal" = "Ordinal",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataValidation {
+export enum CriteriaType {
+"anyValue" = 0,
+"wholeNumber" = 1,
+"decimalValues" = 2,
+"list" = 3,
+"date" = 4,
+"time" = 5,
+"textLength" = 6,
+"custom" = 7,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataValidation {
+export enum DataValidationResult {
+"forceApply" = 0,
+"discard" = 1,
+"retry" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataValidation {
+export enum ErrorStyle {
+"stop" = 0,
+"warning" = 1,
+"information" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataValidation {
+export enum HighlightPosition {
+"topLeft" = 0,
+"topRight" = 1,
+"bottomRight" = 2,
+"bottomLeft" = 3,
+"outsideLeft" = 4,
+"outsideRight" = 5,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace DataValidation {
+export enum HighlightType {
+"circle" = 0,
+"dogEar" = 1,
+"icon" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum DropdownListValue {
+"string" = 0,
+"array" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum DropDownType {
+"colorPicker" = 0,
+"dateTimePicker" = 1,
+"timePicker" = 2,
+"monthPicker" = 3,
+"list" = 4,
+"slider" = 5,
+"calculator" = 6,
+"workflowList" = 7,
+"multiColumn" = 8,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum EditorStatus {
+"ready" = 0,
+"enter" = 1,
+"edit" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum FileType {
+"excel" = 0,
+"ssjson" = 1,
+"csv" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Fill {
+export enum AutoFillType {
+"copyCells" = 0,
+"fillSeries" = 1,
+"fillFormattingOnly" = 2,
+"fillWithoutFormatting" = 3,
+"clearValues" = 4,
+"auto" = 5,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Fill {
+export enum FillDateUnit {
+"day" = 0,
+"weekday" = 1,
+"month" = 2,
+"year" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Fill {
+export enum FillDirection {
+"left" = 0,
+"right" = 1,
+"up" = 2,
+"down" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Fill {
+export enum FillSeries {
+"column" = 0,
+"row" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Fill {
+export enum FillType {
+"direction" = 0,
+"linear" = 1,
+"growth" = 2,
+"date" = 3,
+"auto" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Filter {
+export enum FilterActionType {
+"filter" = 0,
+"unfilter" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace GanttSheet {
+export enum DayOfWeek {
+"Sunday" = 0,
+"Monday" = 1,
+"Tuesday" = 2,
+"Wednesday" = 3,
+"Thursday" = 4,
+"Friday" = 5,
+"Saturday" = 6,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace GanttSheet {
+export enum GanttGridlineType {
+"empty" = 0,
+"thin" = 1,
+"dashed" = 3,
+"dotted" = 4,
+"dashDot" = 9,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace GanttSheet {
+export enum TimescaleTierMode {
+"middle" = 1,
+"middleBottom" = 2,
+"topMiddleBottom" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace GanttSheet {
+export enum TimescaleUnit {
+"years" = 1,
+"halfYears" = 2,
+"quarters" = 3,
+"months" = 4,
+"thirdsOfMonth" = 5,
+"weeks" = 6,
+"days" = 7,
+"hours" = 8,
+"minutes" = 9,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum GroupSort {
+"none" = 0,
+"group" = 1,
+"child" = 2,
+"full" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum HeaderAutoText {
+"blank" = 0,
+"numbers" = 1,
+"letters" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum HeaderOptions {
+"noHeaders" = 0,
+"rowHeaders" = 1,
+"columnHeaders" = 2,
+"allHeaders" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum HorizontalAlign {
+"left" = 0,
+"center" = 1,
+"right" = 2,
+"general" = 3,
+"centerContinuous" = 4,
+"distributed" = 5,
+"justify" = 6,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum HorizontalPosition {
+"left" = 0,
+"center" = 1,
+"right" = 2,
+"nearest" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Hyperlink {
+export enum HyperlinkTargetType {
+"blank" = 0,
+"self" = 1,
+"parent" = 2,
+"top" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum HyperlinkTargetType {
+"blank" = 0,
+"self" = 1,
+"parent" = 2,
+"top" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum IconPosition {
+"left" = 0,
+"right" = 1,
+"leftOfText" = 2,
+"rightOfText" = 3,
+"outsideLeft" = 4,
+"outsideRight" = 5,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ImageLayout {
+"stretch" = 0,
+"center" = 1,
+"zoom" = 2,
+"none" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ImeMode {
+"auto" = 1,
+"active" = 2,
+"inactive" = 4,
+"disabled" = 0,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum InsertShiftCell {
+"right" = 0,
+"down" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum InvalidOperationType {
+"setFormula" = 0,
+"copyPaste" = 1,
+"dragFill" = 2,
+"dragDrop" = 3,
+"changePartOfArrayFormula" = 4,
+"changeSheetName" = 5,
+"table" = 6,
+"filter" = 7,
+"sort" = 9,
+"pivotTable" = 10,
+"ptOverlapValue" = 11,
+"groupProtected" = 12,
+"editProtected" = 13,
+"cutProtected" = 14,
+"customName" = 15,
+"dataObjectCellTypeInsertData" = 16,
+"sizeLimitExceeded" = 18,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace IO {
+export enum ErrorCode {
+"fileIOError" = 0,
+"fileFormatError" = 1,
+"noPassword" = 2,
+"invalidPassword" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum LabelAlignment {
+"topLeft" = 0,
+"topCenter" = 1,
+"topRight" = 2,
+"bottomLeft" = 3,
+"bottomCenter" = 4,
+"bottomRight" = 5,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum LabelVisibility {
+"visible" = 0,
+"hidden" = 1,
+"auto" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum LayoutDirection {
+"horizontal" = 0,
+"vertical" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum LayoutDisplayAs {
+"inline" = 0,
+"popup" = 1,
+"tree" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum LineStyle {
+"empty" = 0,
+"thin" = 1,
+"medium" = 2,
+"dashed" = 3,
+"dotted" = 4,
+"thick" = 5,
+"double" = 6,
+"hair" = 7,
+"mediumDashed" = 8,
+"dashDot" = 9,
+"mediumDashDot" = 10,
+"dashDotDot" = 11,
+"mediumDashDotDot" = 12,
+"slantedDashDot" = 13,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ListType {
+"disc" = 0,
+"circle" = 1,
+"square" = 2,
+"decimal" = 3,
+"lowerAlpha" = 4,
+"upperAlpha" = 5,
+"lowerRoman" = 6,
+"upperRoman" = 7,
+"lowerGreek" = 8,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum MentionContextType {
+"threadedComment" = "threadedComment",
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum NumbersFitMode {
+"mask" = 0,
+"overflow" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum OpenMode {
+"normal" = 0,
+"lazy" = 1,
+"incremental" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Outlines {
+export enum OutlineDirection {
+"backward" = 0,
+"forward" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Outlines {
+export enum OutlineState {
+"expanded" = 0,
+"collapsed" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum PasteOperationOptions {
+"none" = 0,
+"add" = 1,
+"subtract" = 2,
+"multiply" = 3,
+"divide" = 4,
+"transform" = 5,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum PatternType {
+"solid" = 1,
+"darkGray" = 2,
+"mediumGray" = 3,
+"lightGray" = 4,
+"gray125" = 5,
+"gray0625" = 6,
+"darkHorizontal" = 7,
+"darkVertical" = 8,
+"darkDown" = 9,
+"darkUp" = 10,
+"darkGrid" = 11,
+"darkTrellis" = 12,
+"lightHorizontal" = 13,
+"lightVertical" = 14,
+"lightDown" = 15,
+"lightUp" = 16,
+"lightGrid" = 17,
+"lightTrellis" = 18,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Print {
+export enum PaperKind {
+"a2" = 66,
+"a3" = 8,
+"a3Extra" = 63,
+"a3ExtraTransverse" = 68,
+"a3Rotated" = 76,
+"a3Transverse" = 67,
+"a4" = 9,
+"a4Extra" = 53,
+"a4Plus" = 60,
+"a4Rotated" = 77,
+"a4Small" = 10,
+"a4Transverse" = 55,
+"a5" = 11,
+"a5Extra" = 64,
+"a5Rotated" = 78,
+"a5Transverse" = 61,
+"a6" = 70,
+"a6Rotated" = 83,
+"aPlus" = 57,
+"b4" = 12,
+"b4Envelope" = 33,
+"b4JisRotated" = 79,
+"b5" = 13,
+"b5Envelope" = 34,
+"b5Extra" = 65,
+"b5JisRotated" = 80,
+"b5Transverse" = 62,
+"b6Envelope" = 35,
+"b6Jis" = 88,
+"b6JisRotated" = 89,
+"bPlus" = 58,
+"c3Envelope" = 29,
+"c4Envelope" = 30,
+"c5Envelope" = 28,
+"c65Envelope" = 32,
+"c6Envelope" = 31,
+"cSheet" = 24,
+"custom" = 0,
+"dlEnvelope" = 27,
+"dSheet" = 25,
+"eSheet" = 26,
+"executive" = 7,
+"folio" = 14,
+"germanLegalFanfold" = 41,
+"germanStandardFanfold" = 40,
+"inviteEnvelope" = 47,
+"isoB4" = 42,
+"italyEnvelope" = 36,
+"japaneseDoublePostcard" = 69,
+"japaneseDoublePostcardRotated" = 82,
+"japaneseEnvelopeChouNumber3" = 73,
+"japaneseEnvelopeChouNumber3Rotated" = 86,
+"japaneseEnvelopeChouNumber4" = 74,
+"japaneseEnvelopeChouNumber4Rotated" = 87,
+"japaneseEnvelopeKakuNumber2" = 71,
+"japaneseEnvelopeKakuNumber2Rotated" = 84,
+"japaneseEnvelopeKakuNumber3" = 72,
+"japaneseEnvelopeKakuNumber3Rotated" = 85,
+"japaneseEnvelopeYouNumber4" = 91,
+"japaneseEnvelopeYouNumber4Rotated" = 92,
+"japanesePostcard" = 43,
+"japanesePostcardRotated" = 81,
+"ledger" = 4,
+"legal" = 5,
+"legalExtra" = 51,
+"letter" = 1,
+"letterExtra" = 50,
+"letterExtraTransverse" = 56,
+"letterPlus" = 59,
+"letterRotated" = 75,
+"letterSmall" = 2,
+"letterTransverse" = 54,
+"monarchEnvelope" = 37,
+"note" = 18,
+"number10Envelope" = 20,
+"number11Envelope" = 21,
+"number12Envelope" = 22,
+"number14Envelope" = 23,
+"number9Envelope" = 19,
+"personalEnvelope" = 38,
+"prc16K" = 93,
+"prc16KRotated" = 106,
+"prc32K" = 94,
+"prc32KBig" = 95,
+"prc32KBigRotated" = 108,
+"prc32KRotated" = 107,
+"prcEnvelopeNumber1" = 96,
+"prcEnvelopeNumber10" = 105,
+"prcEnvelopeNumber10Rotated" = 118,
+"prcEnvelopeNumber1Rotated" = 109,
+"prcEnvelopeNumber2" = 97,
+"prcEnvelopeNumber2Rotated" = 110,
+"prcEnvelopeNumber3" = 98,
+"prcEnvelopeNumber3Rotated" = 111,
+"prcEnvelopeNumber4" = 99,
+"prcEnvelopeNumber4Rotated" = 112,
+"prcEnvelopeNumber5" = 100,
+"prcEnvelopeNumber5Rotated" = 113,
+"prcEnvelopeNumber6" = 101,
+"prcEnvelopeNumber6Rotated" = 114,
+"prcEnvelopeNumber7" = 102,
+"prcEnvelopeNumber7Rotated" = 115,
+"prcEnvelopeNumber8" = 103,
+"prcEnvelopeNumber8Rotated" = 116,
+"prcEnvelopeNumber9" = 104,
+"prcEnvelopeNumber9Rotated" = 117,
+"quarto" = 15,
+"standard10x11" = 45,
+"standard10x14" = 16,
+"standard11x17" = 17,
+"standard12x11" = 90,
+"standard15x11" = 46,
+"standard9x11" = 44,
+"statement" = 6,
+"tabloid" = 3,
+"tabloidExtra" = 52,
+"usStandardFanfold" = 39,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Print {
+export enum PrintCentering {
+"none" = 0,
+"horizontal" = 1,
+"vertical" = 2,
+"both" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Print {
+export enum PrintPageOrder {
+"auto" = 0,
+"downThenOver" = 1,
+"overThenDown" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Print {
+export enum PrintPageOrientation {
+"portrait" = 1,
+"landscape" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Print {
+export enum PrintVisibilityType {
+"inherit" = 0,
+"hide" = 1,
+"show" = 2,
+"showOnce" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum RangeChangedAction {
+"dragDrop" = 0,
+"dragFill" = 1,
+"clear" = 2,
+"paste" = 3,
+"sort" = 4,
+"setArrayFormula" = 5,
+"evaluateFormula" = 6,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ReferenceStyle {
+"a1" = 0,
+"r1c1" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ResizeMode {
+"normal" = 0,
+"split" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ResizeZeroIndicator {
+"default" = 0,
+"enhanced" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum RowColumnStates {
+"hover" = 1,
+"invalid" = 2,
+"edit" = 8,
+"active" = 16,
+"selected" = 32,
+"dirty" = 64,
+"inserted" = 128,
+"invalidFormula" = 512,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ScrollbarAppearance {
+"skin" = 0,
+"mobile" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Search {
+export enum SearchFlags {
+"none" = 0,
+"ignoreCase" = 1,
+"exactMatch" = 2,
+"useWildCards" = 4,
+"blockRange" = 8,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Search {
+export enum SearchFoundFlags {
+"none" = 0,
+"cellText" = 1,
+"cellTag" = 4,
+"cellFormula" = 8,
+"cellComment" = 16,
+"cellThreadedComment" = 32,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Search {
+export enum SearchOrder {
+"zOrder" = 0,
+"nOrder" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum SelectionPolicy {
+"single" = 0,
+"range" = 1,
+"multiRange" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum SelectionUnit {
+"cell" = 0,
+"row" = 1,
+"column" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum ArrowheadLength {
+"short" = 0,
+"medium" = 1,
+"long" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum ArrowheadStyle {
+"none" = 0,
+"triangle" = 1,
+"stealth" = 2,
+"diamond" = 3,
+"oval" = 4,
+"open" = 5,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum ArrowheadWidth {
+"narrow" = 0,
+"medium" = 1,
+"wide" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum AutoShapeType {
+"rectangle" = 1,
+"parallelogram" = 2,
+"trapezoid" = 3,
+"diamond" = 4,
+"roundedRectangle" = 5,
+"octagon" = 6,
+"isoscelesTriangle" = 7,
+"rightTriangle" = 8,
+"oval" = 9,
+"hexagon" = 10,
+"cross" = 11,
+"regularPentagon" = 12,
+"can" = 13,
+"cube" = 14,
+"bevel" = 15,
+"foldedCorner" = 16,
+"smileyFace" = 17,
+"donut" = 18,
+"noSymbol" = 19,
+"blockArc" = 20,
+"heart" = 21,
+"lightningBolt" = 22,
+"sun" = 23,
+"moon" = 24,
+"arc" = 25,
+"doubleBracket" = 26,
+"doubleBrace" = 27,
+"plaque" = 28,
+"leftBracket" = 29,
+"rightBracket" = 30,
+"leftBrace" = 31,
+"rightBrace" = 32,
+"rightArrow" = 33,
+"leftArrow" = 34,
+"upArrow" = 35,
+"downArrow" = 36,
+"leftRightArrow" = 37,
+"upDownArrow" = 38,
+"quadArrow" = 39,
+"leftRightUpArrow" = 40,
+"bentArrow" = 41,
+"uTurnArrow" = 42,
+"leftUpArrow" = 43,
+"bentUpArrow" = 44,
+"curvedRightArrow" = 45,
+"curvedLeftArrow" = 46,
+"curvedUpArrow" = 47,
+"curvedDownArrow" = 48,
+"stripedRightArrow" = 49,
+"notchedRightArrow" = 50,
+"pentagon" = 51,
+"chevron" = 52,
+"rightArrowCallout" = 53,
+"leftArrowCallout" = 54,
+"upArrowCallout" = 55,
+"downArrowCallout" = 56,
+"leftRightArrowCallout" = 57,
+"upDownArrowCallout" = 58,
+"quadArrowCallout" = 59,
+"circularArrow" = 60,
+"flowchartProcess" = 61,
+"flowchartAlternateProcess" = 62,
+"flowchartDecision" = 63,
+"flowchartData" = 64,
+"flowchartPredefinedProcess" = 65,
+"flowchartInternalStorage" = 66,
+"flowchartDocument" = 67,
+"flowchartMultidocument" = 68,
+"flowchartTerminator" = 69,
+"flowchartPreparation" = 70,
+"flowchartManualInput" = 71,
+"flowchartManualOperation" = 72,
+"flowchartConnector" = 73,
+"flowchartOffpageConnector" = 74,
+"flowchartCard" = 75,
+"flowchartPunchedTape" = 76,
+"flowchartSummingJunction" = 77,
+"flowchartOr" = 78,
+"flowchartCollate" = 79,
+"flowchartSort" = 80,
+"flowchartExtract" = 81,
+"flowchartMerge" = 82,
+"flowchartStoredData" = 83,
+"flowchartDelay" = 84,
+"flowchartSequentialAccessStorage" = 85,
+"flowchartMagneticDisk" = 86,
+"flowchartDirectAccessStorage" = 87,
+"flowchartDisplay" = 88,
+"explosion1" = 89,
+"explosion2" = 90,
+"shape4pointStar" = 91,
+"shape5pointStar" = 92,
+"shape8pointStar" = 93,
+"shape16pointStar" = 94,
+"shape24pointStar" = 95,
+"shape32pointStar" = 96,
+"upRibbon" = 97,
+"downRibbon" = 98,
+"curvedUpRibbon" = 99,
+"curvedDownRibbon" = 100,
+"verticalScroll" = 101,
+"horizontalScroll" = 102,
+"wave" = 103,
+"doubleWave" = 104,
+"rectangularCallout" = 105,
+"roundedRectangularCallout" = 106,
+"ovalCallout" = 107,
+"cloudCallout" = 108,
+"lineCallout1" = 109,
+"lineCallout2" = 110,
+"lineCallout3" = 111,
+"lineCallout4" = 112,
+"lineCallout1AccentBar" = 113,
+"lineCallout2AccentBar" = 114,
+"lineCallout3AccentBar" = 115,
+"lineCallout4AccentBar" = 116,
+"lineCallout1NoBorder" = 117,
+"lineCallout2NoBorder" = 118,
+"lineCallout3NoBorder" = 119,
+"lineCallout4NoBorder" = 120,
+"lineCallout1BorderandAccentBar" = 121,
+"lineCallout2BorderandAccentBar" = 122,
+"lineCallout3BorderandAccentBar" = 123,
+"lineCallout4BorderandAccentBar" = 124,
+"actionButtonCustom" = 125,
+"actionButtonHome" = 126,
+"actionButtonHelp" = 127,
+"actionButtonInformation" = 128,
+"actionButtonBackorPrevious" = 129,
+"actionButtonForwardorNext" = 130,
+"actionButtonBeginning" = 131,
+"actionButtonEnd" = 132,
+"actionButtonReturn" = 133,
+"actionButtonDocument" = 134,
+"actionButtonSound" = 135,
+"actionButtonMovie" = 136,
+"balloon" = 137,
+"flowchartOfflineStorage" = 138,
+"leftRightRibbon" = 139,
+"diagonalStripe" = 140,
+"pie" = 141,
+"nonIsoscelesTrapezoid" = 142,
+"decagon" = 143,
+"heptagon" = 144,
+"dodecagon" = 145,
+"star6Point" = 146,
+"star7Point" = 147,
+"star10Point" = 148,
+"star12Point" = 149,
+"round1Rectangle" = 150,
+"round2SameRectangle" = 151,
+"round2DiagRectangle" = 152,
+"snipRoundRectangle" = 153,
+"snip1Rectangle" = 154,
+"snip2SameRectangle" = 155,
+"snip2DiagRectangle" = 156,
+"frame" = 157,
+"halfFrame" = 158,
+"tear" = 159,
+"chord" = 160,
+"corner" = 161,
+"mathPlus" = 162,
+"mathMinus" = 163,
+"mathMultiply" = 164,
+"mathDivide" = 165,
+"mathEqual" = 166,
+"mathNotEqual" = 167,
+"cornerTabs" = 168,
+"squareTabs" = 169,
+"plaqueTabs" = 170,
+"gear6" = 171,
+"gear9" = 172,
+"funnel" = 173,
+"pieWedge" = 174,
+"leftCircularArrow" = 175,
+"leftRightCircularArrow" = 176,
+"swooshArrow" = 177,
+"cloud" = 178,
+"chartX" = 179,
+"chartStar" = 180,
+"chartPlus" = 181,
+"lineInverse" = 182,
+"line" = 183,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum CompoundType {
+"simple" = 0,
+"double" = 1,
+"thickThin" = 2,
+"thinThick" = 3,
+"triple" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum ConnectorType {
+"straight" = 0,
+"elbow" = 1,
+"curve" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum FormControlType {
+"button" = "button",
+"spinButton" = "spinButton",
+"scrollBar" = "scrollBar",
+"listBox" = "listBox",
+"checkBox" = "checkBox",
+"optionButton" = "optionButton",
+"label" = "label",
+"groupBox" = "groupBox",
+"comboBox" = "comboBox",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum GradientFillType {
+"linear" = 0,
+"radial" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum HitTestLineEnd {
+"head" = "head",
+"tail" = "tail",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum HitTestType {
+"body" = "body",
+"border" = "border",
+"lineEnd" = "lineEnd",
+"rotate" = "rotate",
+"resize" = "resize",
+"connectionPoint" = "connectionPoint",
+"adjustment" = "adjustment",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum HorizontalAlign {
+"left" = 0,
+"center" = 1,
+"right" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum LinearGradientFillDirection {
+"linearRight" = 0,
+"topLeftToBottomRight" = 45,
+"linearDown" = 90,
+"topRightToBottomLeft" = 135,
+"linearLeft" = 180,
+"bottomRightToTopLeft" = 225,
+"linearUp" = 270,
+"bottomLeftToTopRight" = 315,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum LineCapStyle {
+"flat" = 2,
+"square" = 1,
+"round" = 0,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum LineJoinStyle {
+"round" = 0,
+"miter" = 1,
+"bevel" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum ListBoxSelectionType {
+"single" = "single",
+"multi" = "multi",
+"extend" = "extended",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum PresetLineDashStyle {
+"solid" = 0,
+"squareDot" = 1,
+"dash" = 2,
+"longDash" = 3,
+"dashDot" = 4,
+"longDashDot" = 5,
+"longDashDotDot" = 6,
+"sysDash" = 7,
+"sysDot" = 8,
+"sysDashDot" = 9,
+"dashDotDot" = 10,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum RadialGradientFillDirection {
+"fromCenter" = 0,
+"fromTopLeft" = 1,
+"fromTopRight" = 2,
+"fromBottomLeft" = 3,
+"fromBottomRight" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum ResizeHandleType {
+"topLeft" = "topLeft",
+"topCenter" = "topCenter",
+"topRight" = "topRight",
+"middleLeft" = "middleLeft",
+"middleRight" = "middleRight",
+"bottomLeft" = "bottomLeft",
+"bottomCenter" = "bottomCenter",
+"bottomRight" = "bottomRight",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum ResizeMode {
+"aspect" = 0,
+"horizontal" = 1,
+"vertical" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum ShapeFillType {
+"none" = 0,
+"solid" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum SnapMode {
+"none" = 0,
+"grid" = 1,
+"shape" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum TextDirection {
+"horz" = 0,
+"vert" = 1,
+"vert270" = 2,
+"wordArtVert" = 3,
+"eaVert" = 4,
+"eaVertLtr" = 5,
+"wordArtVertRtl" = 6,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum TextureFillAlignment {
+"topLeft" = 0,
+"top" = 1,
+"topRight" = 2,
+"left" = 3,
+"center" = 4,
+"right" = 5,
+"bottomLeft" = 6,
+"bottom" = 7,
+"bottomRight" = 8,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum TextureFillMirrorType {
+"none" = 0,
+"horizontal" = 1,
+"vertical" = 2,
+"both" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Shapes {
+export enum VerticalAlign {
+"top" = 0,
+"middle" = 1,
+"bottom" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum SheetArea {
+"corner" = 0,
+"colHeader" = 1,
+"rowHeader" = 2,
+"viewport" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum SheetTabState {
+"hover" = 1,
+"selected" = 2,
+"active" = 4,
+"protected" = 8,
+"normal" = 16,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum SheetTabVisible {
+"hidden" = 0,
+"visible" = 1,
+"veryHidden" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum SheetType {
+"tableSheet" = 0,
+"ganttSheet" = 1,
+"reportSheet" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ShowResizeTip {
+"none" = 0,
+"column" = 1,
+"row" = 2,
+"both" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ShowScrollTip {
+"none" = 0,
+"horizontal" = 1,
+"vertical" = 2,
+"both" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Slicers {
+export enum SlicerType {
+"table" = "table",
+"pivotTable" = "pivot",
+"pivotTimeline" = "timeline",
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Slicers {
+export enum TimelineLevel {
+"years" = 1,
+"quarters" = 2,
+"months" = 3,
+"days" = 4,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum SortState {
+"none" = 0,
+"ascending" = 1,
+"descending" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Sparklines {
+export enum DataOrientation {
+"vertical" = 0,
+"horizontal" = 1,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Sparklines {
+export enum EmptyValueStyle {
+"gaps" = 0,
+"zero" = 1,
+"connect" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Sparklines {
+export enum SparklineAxisMinMax {
+"individual" = 0,
+"group" = 1,
+"custom" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Sparklines {
+export enum SparklineType {
+"line" = 0,
+"column" = 1,
+"winloss" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum StorageType {
+"data" = 1,
+"style" = 2,
+"comment" = 4,
+"tag" = 8,
+"sparkline" = 16,
+"axis" = 32,
+"bindingPath" = 64,
+"hyperlink" = 256,
+"altText" = 512,
+"threadedComment" = 1024,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace Tables {
+export enum TableRemoveOptions {
+"none" = 0,
+"keepData" = 1,
+"keepStyle" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace TableSheet {
+export enum ActionType {
+"remove" = 0,
+"save" = 1,
+"reset" = 2,
+"addNewEmptyRow" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace TableSheet {
+export enum GroupLayoutMode {
+"tabular" = 0,
+"outline" = 1,
+"condensed" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace TableSheet {
+export enum GroupOutlinePosition {
+"none" = 0,
+"groupCell" = 1,
+"rowHeader" = 2,
+"groupCellAll" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace TableSheet {
+export enum ShowSourceOptions {
+"none" = 0,
+"field" = 1,
+"formula" = 2,
+"all" = 3,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum TabStripPosition {
+"bottom" = 0,
+"top" = 1,
+"left" = 2,
+"right" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum TextDecorationType {
+"underline" = 1,
+"lineThrough" = 2,
+"overline" = 4,
+"doubleUnderline" = 8,
+"accountingUnderline" = 16,
+"doubleAccountingUnderline" = 32,
+"none" = 0,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum TextDirectionType {
+"context" = 0,
+"leftToRight" = 1,
+"rightToLeft" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export namespace ThreadedComments {
+export enum ContentType {
+"text" = 0,
+"mention" = 1,
+"link" = 2,
+}
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum TransformScope {
+"byCell" = 0,
+"byRow" = 1,
+"byColumn" = 2,
+"byRange" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum UsedRangeType {
+"all" = 4294967295,
+"axis" = 1,
+"style" = 2,
+"rowStyle" = 4,
+"colStyle" = 8,
+"data" = 16,
+"formula" = 32,
+"span" = 64,
+"shape" = 128,
+"table" = 256,
+"sparkLine" = 512,
+"comment" = 1024,
+"slicer" = 2048,
+"pivottable" = 4096,
+"filter" = 8192,
+"dataValidation" = 16384,
+"conditionFormat" = 32768,
+"chart" = 65536,
+"picture" = 131072,
+"tag" = 262144,
+"dataRange" = 524288,
+"threadedComment" = 1048576,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum ValueType {
+"normal" = 0,
+"richText" = 1,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum VertAlign {
+"normal" = 0,
+"superscript" = 1,
+"subscript" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum VerticalAlign {
+"top" = 0,
+"center" = 1,
+"bottom" = 2,
+"justify" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum VerticalPosition {
+"top" = 0,
+"center" = 1,
+"bottom" = 2,
+"nearest" = 3,
+}
+}
+}
+export namespace Spread {
+export namespace Sheets {
+export enum VisualState {
+"normal" = 0,
+"highlight" = 1,
+"selected" = 2,
+"active" = 3,
+"hover" = 4,
+}
+}
+}
+export namespace Spread {
+export namespace Slicers {
+export enum FilteredOutDataType {
+"all" = 0,
+"byCurrentColumn" = 1,
+"byOtherColumns" = 2,
+}
+}
+}
+export namespace Spread {
+export namespace Slicers {
+export enum SlicerAggregateType {
+"average" = 1,
+"count" = 2,
+"counta" = 3,
+"max" = 4,
+"min" = 5,
+"product" = 6,
+"stdev" = 7,
+"stdevp" = 8,
+"sum" = 9,
+"vars" = 10,
+"varp" = 11,
+}
+}
+}
+}

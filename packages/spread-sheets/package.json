@@ -1,0 +1,32 @@
+{
+  "name": "@opensheets/spread-sheets",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.cjs",
+  "module": "./dist/gc.spread.sheets.esm.js",
+  "types": "./dist/gc.spread.sheets.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.d.ts",
+        "default": "./dist/gc.spread.sheets.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.d.cts",
+        "default": "./dist/gc.spread.sheets.cjs"
+      }
+    },
+    "./styles/*": "./styles/*",
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist",
+    "styles"
+  ],
+  "scripts": {
+    "build": "pnpm --filter @opensheets/compat generate && tsx scripts/clean.ts && tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {}
+}
