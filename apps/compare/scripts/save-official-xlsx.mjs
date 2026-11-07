@@ -1,0 +1,30 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'vite';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const appRoot = path.resolve(here, '..');
+const repoRoot = path.resolve(appRoot, '../..');
+process.env.PLAYWRIGHT_BROWSERS_PATH ??= path.join(repoRoot, '.playwright-browsers');
+const { chromium } = await import('@playwright/test');
+const raw = process.argv.slice(2).filter(a => a !== '--');
+const outIndex = raw.indexOf('--out');
+const source = (outIndex >= 0 ? raw.slice(0, outIndex) : raw).join(' ');
+const server = await createServer({ root: appRoot, logLevel: 'error', server: { port: 0, strictPort: false } });
+await server.listen();
+const browser = await chromium.launch();
+const page = await browser.newPage();
+page.on('pageerror', e => console.error('[page error]', e.message));
+await page.goto(server.resolvedUrls.local[0] + 'io-probe.html');
+await page.waitForFunction(() => window.__ioProbe?.ready, null, { timeout: 60000 });
+const result = await page.evaluate(async s => {
+  const r = await window.__ioProbe.run(s);
+  return r.official;
+}, source);
+await browser.close();
+await server.close();
+if (typeof result !== 'string') { console.error(result); process.exit(1); }
+await fs.mkdir(path.join(repoRoot, 'test-results/io'), { recursive: true });
+const out = outIndex >= 0 ? raw[outIndex + 1] : 'official.xlsx';
+await fs.writeFile(path.join(repoRoot, 'test-results/io', out), Buffer.from(result, 'base64'));
+console.log('wrote', out, Buffer.from(result, 'base64').length);

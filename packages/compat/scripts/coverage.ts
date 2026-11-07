@@ -32,6 +32,7 @@ function descriptorAt(apiPath: string): PropertyDescriptor | undefined {
 function implemented(descriptor?: PropertyDescriptor): boolean {
   if (!descriptor) return false;
   const value: unknown = descriptor.value ?? descriptor.get;
+  if (value === undefined) return false;
   return !(typeof value === 'function' && (value as unknown as Runtime)[STUB]);
 }
 function percent(done: number, total: number) {
@@ -111,7 +112,7 @@ for (const entry of inventory.entries) {
     }
     if (unsupported.length)
       gaps.push(
-        `- \`${entry.path}\` members throwing \`NotImplemented\`: ${unsupported.map((m) => `\`${m}\``).join(', ')}.`,
+        `- \`${entry.path}\` unsupported or add-on-only members: ${unsupported.map((m) => `\`${m}\``).join(', ')}.`,
       );
   } else if (entry.kind === 'enum') {
     counts.enumTotal++;

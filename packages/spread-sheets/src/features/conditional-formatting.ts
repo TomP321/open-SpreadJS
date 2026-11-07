@@ -340,6 +340,8 @@ export class NormalConditionRule extends ConditionRuleBase {
     const type = this.ruleTypeValue;
     if (type === RuleType.cellValueRule) {
       result.operator = this.operatorValue;
+      if (this.formulaValue) result.formula = this.formulaValue;
+      if (this.textValue) result.text = this.textValue;
       result.value1 = this.value1Value;
       if (this.operatorValue === 6 || this.operatorValue === 7) result.value2 = this.value2Value;
     } else if (type === RuleType.specificTextRule) {
@@ -379,13 +381,13 @@ const CFType = (GC.Spread.Sheets.ConditionalFormatting as unknown as { Condition
 
 export class ScaleRule extends ConditionRuleBase {
   minTypeValue = ScaleType.lowestValue;
-  minValueValue = 0;
+  minValueValue: number | string = 0;
   minColorValue = '';
   midTypeValue = ScaleType.percent;
-  midValueValue = 0;
+  midValueValue: number | string = 0;
   midColorValue = '';
   maxTypeValue = ScaleType.highestValue;
-  maxValueValue = 0;
+  maxValueValue: number | string = 0;
   maxColorValue = '';
   constructor(
     ruleType: number,
@@ -402,13 +404,13 @@ export class ScaleRule extends ConditionRuleBase {
   ) {
     super(ruleType, undefined, ranges);
     if (minType !== undefined) this.minTypeValue = minType;
-    if (minValue !== undefined) this.minValueValue = Number(minValue);
+    if (minValue !== undefined) this.minValueValue = minValue;
     if (minColor !== undefined) this.minColorValue = minColor;
     if (midType !== undefined) this.midTypeValue = midType;
-    if (midValue !== undefined) this.midValueValue = Number(midValue);
+    if (midValue !== undefined) this.midValueValue = midValue;
     if (midColor !== undefined) this.midColorValue = midColor;
     if (maxType !== undefined) this.maxTypeValue = maxType;
-    if (maxValue !== undefined) this.maxValueValue = Number(maxValue);
+    if (maxValue !== undefined) this.maxValueValue = maxValue;
     if (maxColor !== undefined) this.maxColorValue = maxColor;
   }
   private prop(key: string, value?: unknown): unknown {
@@ -449,13 +451,13 @@ export class ScaleRule extends ConditionRuleBase {
   override readJSON(json: JsonRecord): void {
     super.readJSON(json);
     if (json.minType !== undefined) this.minTypeValue = Number(json.minType);
-    if (json.minValue !== undefined) this.minValueValue = Number(json.minValue);
+    if (json.minValue !== undefined) this.minValueValue = json.minValue as number | string;
     if (json.minColor !== undefined) this.minColorValue = String(json.minColor);
     if (json.midType !== undefined) this.midTypeValue = Number(json.midType);
-    if (json.midValue !== undefined) this.midValueValue = Number(json.midValue);
+    if (json.midValue !== undefined) this.midValueValue = json.midValue as number | string;
     if (json.midColor !== undefined) this.midColorValue = String(json.midColor);
     if (json.maxType !== undefined) this.maxTypeValue = Number(json.maxType);
-    if (json.maxValue !== undefined) this.maxValueValue = Number(json.maxValue);
+    if (json.maxValue !== undefined) this.maxValueValue = json.maxValue as number | string;
     if (json.maxColor !== undefined) this.maxColorValue = String(json.maxColor);
   }
 }
@@ -772,7 +774,9 @@ function percentile(values: number[], pct: number): number {
   const low = Math.floor(position), high = Math.ceil(position);
   return values[low]! + (values[high]! - values[low]!) * (position - low);
 }
-function scaleValue(sheet: { getValue(r: number, c: number): unknown }, rule: ScaleRule, values: number[], type: number, value: number, isMin: boolean): number {
+function scaleValue(sheet: { getValue(r: number, c: number): unknown }, rule: ScaleRule, values: number[], type: number, rawValue: number | string, isMin: boolean): number {
+  const range = rule.ranges()[0];
+  const value = typeof rawValue === 'string' && rawValue.startsWith('=') ? Number(new Condition(1, {expected:rawValue}).getExpected(sheet, range?.row ?? 0, range?.col ?? 0)) : Number(rawValue);
   switch (type) {
     case ScaleType.lowestValue:
       return values.length ? values[0]! : 0;
@@ -865,6 +869,7 @@ function rangeRuleMatches(sheet: { getValue(r: number, c: number): unknown }, ru
 
 export class ConditionalFormats {
   private rules: ConditionRuleBase[] = [];
+  _xlsxImported = false;
   constructor(private sheet: unknown) {}
   private assignPriority(rule: ConditionRuleBase): void {
     for (const existing of this.rules) existing._setPriority(existing._priority() + 1);
@@ -1033,19 +1038,19 @@ export class ConditionalFormats {
         const scale = rule as ScaleRule;
         const values = numericValues(this.sheet as { getValue(r: number, c: number): unknown }, scale.ranges());
         if (!values.length || typeof value !== 'number') continue;
-        const min = scaleValue(this.sheet as { getValue(r: number, c: number): unknown }, scale, values, Number(scale.minType()), Number(scale.minValue()), true);
-        const max = scaleValue(this.sheet as { getValue(r: number, c: number): unknown }, scale, values, Number(scale.maxType()), Number(scale.maxValue()), false);
+        const min = scaleValue(this.sheet as { getValue(r: number, c: number): unknown }, scale, values, Number(scale.minType()), scale.minValue() as number | string, true);
+        const max = scaleValue(this.sheet as { getValue(r: number, c: number): unknown }, scale, values, Number(scale.maxType()), scale.maxValue() as number | string, false);
         if (max === min) { visual = { ...(visual ?? {}), backColor: String(scale.minColor()) }; continue; }
         const t = (value - min) / (max - min);
         if (type === RuleType.twoScaleRule)
-          visual = { ...(visual ?? {}), backColor: mixColor(String(scale.minColor()), String(scale.maxColor()), t) };
+          visual = { ...(visual ?? {}), backColor: mixColor(String(scale.minColor()), String(scale.maxColor()), t, this._xlsxImported ? Math.floor : Math.round) };
         else {
-          const mid = scaleValue(this.sheet as { getValue(r: number, c: number): unknown }, scale, values, Number(scale.midType()), Number(scale.midValue()), false);
+          const mid = scaleValue(this.sheet as { getValue(r: number, c: number): unknown }, scale, values, Number(scale.midType()), scale.midValue() as number | string, false);
           visual = {
             ...(visual ?? {}),
             backColor: value <= mid
-              ? mixColor(String(scale.minColor()), String(scale.midColor()), mid === min ? 0 : (value - min) / (mid - min))
-              : mixColor(String(scale.midColor()), String(scale.maxColor()), max === mid ? 1 : (value - mid) / (max - mid)),
+              ? mixColor(String(scale.minColor()), String(scale.midColor()), mid === min ? 0 : (value - min) / (mid - min), this._xlsxImported ? Math.floor : Math.round)
+              : mixColor(String(scale.midColor()), String(scale.maxColor()), max === mid ? 1 : (value - mid) / (max - mid), this._xlsxImported ? Math.floor : Math.round),
           };
         }
       } else if (type === RuleType.dataBarRule) {

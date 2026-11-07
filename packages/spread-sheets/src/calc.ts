@@ -37,6 +37,7 @@ export interface ICalcEngine {
   rebuildFormulas?(): void;
   /** Loads formulas with cached values after a JSON import. */
   loadFormulas?(): void;
+  getSpillRange?(sheet: Worksheet, row: number, col: number): { r1: number; c1: number; r2: number; c2: number } | undefined;
   recalcAll?(type?: number): void;
   calculate?(type?: number, address?: string): void;
 }

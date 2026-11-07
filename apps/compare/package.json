@@ -10,12 +10,14 @@
     "test": "vitest run --passWithNoTests",
     "test:visual": "playwright test",
     "oracle": "node scripts/oracle.mjs",
-    "probe": "node scripts/probe.mjs"
+    "probe": "node scripts/probe.mjs",
+    "io-probe": "node scripts/io-probe.mjs"
   },
   "dependencies": {
     "@mescius/spread-sheets": "19.2.5",
     "@mescius/spread-sheets-io": "19.2.5",
-    "@opensheets/spread-sheets": "workspace:*"
+    "@opensheets/spread-sheets": "workspace:*",
+    "@opensheets/spread-sheets-io": "workspace:*"
   },
   "devDependencies": {
     "@types/pngjs": "^6.0.5",

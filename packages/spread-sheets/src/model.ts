@@ -184,6 +184,8 @@ export class Worksheet {
   readonly columnOutlines = new Outline();
   private validationRecords: { ranges: Range[]; validator: DefaultDataValidator }[] = [];
   private rowFilterValue: RowFilterBase | null = null;
+  /** Workbook-scoped OOXML colours, supplied by the optional IO package. */
+  _ioThemeColors?: Record<string, string>;
   private sheetName: string;
   private parent?: Workbook;
   private areas = new Map<number, AreaData>();
@@ -1864,6 +1866,11 @@ export class Worksheet {
             // Validators are serialised once per range in sheet.validations.
           } else node[property] = serializeValue(value);
         }
+        if (options._ioArrayInfo && node.formula && !node.arrayInfo) {
+          const spill = this.calcEngine?.getSpillRange?.(this, r, c);
+          if (cell.arrayFormula) node.arrayInfo = { row: r, col: c, ...cell.arrayFormula };
+          else if (spill) node.arrayInfo = { row: r, col: c, rowCount: spill.r2 - r + 1, colCount: spill.c2 - c + 1, isDynamicArray: true };
+        }
         if (Object.keys(node).length) {
           const row = object(table[r]);
           row[c] = node;
@@ -1966,6 +1973,7 @@ export class Worksheet {
   }
   fromJSON(settings: object): void {
     const json = object(settings);
+    this._ioThemeColors = undefined;
     this.areas.clear();
     this.viewCellStore = undefined;
     this.viewAreaCache = undefined;
@@ -2567,7 +2575,9 @@ export class Workbook {
         ([, a], [, b]) => Number(object(a).index ?? 0) - Number(object(b).index ?? 0),
       );
       for (const [name, raw] of sheetEntries) {
-        const settings = clone(object(raw));
+        // The IO parser owns its temporary JSON and can transfer it without a
+        // second million-cell object graph. Public fromJSON still copies input.
+        const settings = options._ioOwnedData ? object(raw) : clone(object(raw));
         if (options.ignoreStyle) {
           delete settings.namedStyles;
           for (const area of ['data', 'rowHeaderData', 'colHeaderData']) {

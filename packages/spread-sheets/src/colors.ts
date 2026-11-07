@@ -62,11 +62,11 @@ export function resolveColor(input: string, palette = officeColors): string {
   if (cacheable && cssColorCache.size < 2048) cssColorCache.set(input, result);
   return result;
 }
-export function mixColor(from: string, to: string, ratio: number): string {
+export function mixColor(from: string, to: string, ratio: number, round = Math.round): string {
   const a = parseColor(from), b = parseColor(to);
   if (!a || !b) throw new Error(`Invalid colour: ${!a ? from : to}`);
   const t = clamp(ratio);
-  return `rgba(${a.map((v, i) => i === 3 ? v + (b[i] - v) * t : Math.round(v + (b[i] - v) * t)).join(',')})`;
+  return `rgba(${a.map((v, i) => i === 3 ? v + (b[i] - v) * t : round(v + (b[i] - v) * t)).join(',')})`;
 }
 /** Canvas and CSS already parse CSS colours; only spreadsheet theme tokens
  * need conversion on these hot paths. Headless interpolation uses parseColor. */

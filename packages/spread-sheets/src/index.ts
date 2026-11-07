@@ -153,5 +153,9 @@ export const Spread = {
 export const Pivot = Enums.Pivot;
 const GC = { ...Enums, Spread, Pivot };
 installFallbacks(GC);
+// These methods belong to the separately loaded IO add-on. The reference core
+// exposes undefined until that add-on patches the shared Workbook constructor.
+for (const method of ['import', 'export', 'open', 'save'])
+  Object.defineProperty(Workbook.prototype, method, { value: undefined, writable: true, configurable: true });
 export const Data = GC.Data;
 export default GC;

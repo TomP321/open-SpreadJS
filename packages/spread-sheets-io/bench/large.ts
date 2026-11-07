@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import { performance } from 'node:perf_hooks';
+import GC from '@mescius/spread-sheets';
+import '../dist/gc.spread.sheets.io.esm.js';
+const start=performance.now(),w=new GC.Spread.Sheets.Workbook(),s=w.getActiveSheet();s.setRowCount(100000);s.setColumnCount(10);w.suspendPaint();w.suspendCalcService();
+for(let r=0;r<100000;r++)for(let c=0;c<10;c++)s.setValue(r,c,c===8?'label '+(r%100):c===9?r%2===0:r*10+c);
+w.resumeCalcService();const populated=performance.now();
+const blob=await new Promise<Blob>((resolve,reject)=>w.export(resolve,reject,{fileType:0}));const exported=performance.now();
+const target=new GC.Spread.Sheets.Workbook();await new Promise((resolve,reject)=>target.import(blob as File,resolve,reject,{fileType:0}));const imported=performance.now();
+const sheet=target.getActiveSheet();if(sheet.getValue(99999,7)!==999997||sheet.getValue(99999,8)!=='label 99'||sheet.getValue(99999,9)!==false)throw new Error('Benchmark data corruption');
+const metrics={rows:100000,columns:10,cells:1000000,populateMs:populated-start,exportMs:exported-populated,importMs:imported-exported,xlsxBytes:blob.size,heapMiB:process.memoryUsage().heapUsed/1024/1024};
+console.log(JSON.stringify(metrics,null,2));fs.mkdirSync('../../test-results/io',{recursive:true});fs.writeFileSync('../../test-results/io/benchmark.json',JSON.stringify(metrics,null,2)+'\n');w.destroy();target.destroy();

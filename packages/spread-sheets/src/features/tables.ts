@@ -42,14 +42,22 @@ function styleFromTheme(style?: ThemeStyleJSON): Style | undefined {
   return result;
 }
 /** Resolves theme colour tokens against the active document palette. */
-function resolveThemeStyle(style: Style | undefined): Style | undefined {
+function resolveThemeStyle(style: Style | undefined, palette?: Record<string, string>): Style | undefined {
   if (!style) return undefined;
   const result = Object.assign(new Style(), style);
-  for (const key of ['backColor', 'foreColor']) if (typeof result[key] === 'string') result[key] = resolveColor(result[key]);
+  const color = (value: unknown) => {
+    if (typeof value !== 'string' || !palette?.[value]) return resolveColor(value);
+    const base = value.replace(/ -?\d+(?:\.\d+)?$/, '');
+    // Public built-in palette facts include the reference's quantized tints.
+    for (const known of [THEME_COLORS, THEME_COLORS_2013])
+      if (known[value] && known[base]?.toLowerCase() === palette[base]?.toLowerCase()) return known[value];
+    return palette[value];
+  };
+  for (const key of ['backColor', 'foreColor']) if (typeof result[key] === 'string') result[key] = color(result[key]);
   for (const key of ['borderLeft', 'borderRight', 'borderTop', 'borderBottom', 'borderHorizontal', 'borderVertical']) {
     const border = result[key] as LineBorder | undefined;
     if (!border) continue;
-    const resolved = new LineBorder(String(resolveColor(border.color)), border.style);
+    const resolved = new LineBorder(String(color(border.color)), border.style);
     (resolved as unknown as JsonRecord).level = 20;
     result[key] = resolved;
   }
@@ -57,9 +65,6 @@ function resolveThemeStyle(style: Style | undefined): Style | undefined {
 }
 function mergeStyle(target: Style, source?: Style): void {
   if (source) Object.assign(target, source);
-}
-function themeStyle(theme: TableTheme, key: keyof ThemeJSON): Style | undefined {
-  return theme._style(key);
 }
 
 export class TableStyle {
@@ -141,12 +146,19 @@ export class TableTheme {
     for (const key of THEME_SIZES) if (data[key] !== undefined) this.sizes.set(key, Number(data[key]));
   }
   private resolved = new Map<string, Style>();
-  _style(key: string): Style | undefined {
-    let style = this.resolved.get(key);
+  private paletteStyles = new WeakMap<object, Map<string, Style>>();
+  _style(key: string, palette?: Record<string, string>): Style | undefined {
+    let cache = this.resolved;
+    if (palette) {
+      let stored = this.paletteStyles.get(palette);
+      if (!stored) this.paletteStyles.set(palette, stored = new Map());
+      cache = stored;
+    }
+    let style = cache.get(key);
     if (!style) {
-      const resolved = resolveThemeStyle(this.styles.get(key));
+      const resolved = resolveThemeStyle(this.styles.get(key), palette);
       if (!resolved) return undefined;
-      this.resolved.set(key, (style = resolved));
+      cache.set(key, (style = resolved));
     }
     return style;
   }
@@ -168,6 +180,7 @@ export class TableTheme {
       const style = value instanceof Style ? value : styleFromProps(value);
       this.styles.set(key, style);
       this.resolved.clear();
+      this.paletteStyles = new WeakMap();
       (this.raw as Record<string, unknown>)[key] = styleToJSON(style);
     }
     return this;
@@ -755,31 +768,33 @@ export class Table {
     if (col < this.col || col >= this.col + this.colCount) return null;
     if (row !== header && row !== footer && !(row >= data.row && row < data.row + data.rowCount)) return null;
     const result = new Style();
+    const palette = this.sheet?._ioThemeColors;
+    const role = (key: keyof ThemeJSON) => this.tableStyle._style(key, palette);
     const c = col - this.col;
     if (row === header) {
-      mergeStyle(result, themeStyle(this.tableStyle, 'headerRowStyle'));
-      if (c === 0) mergeStyle(result, themeStyle(this.tableStyle, 'firstHeaderCellStyle'));
-      if (c === this.colCount - 1) mergeStyle(result, themeStyle(this.tableStyle, 'lastHeaderCellStyle'));
-      if (this.options.highlightFirstColumn && c === 0) mergeStyle(result, themeStyle(this.tableStyle, 'highlightFirstColumnStyle'));
-      if (this.options.highlightLastColumn && c === this.colCount - 1) mergeStyle(result, themeStyle(this.tableStyle, 'highlightLastColumnStyle'));
-      const whole = this.tableStyle._style('wholeTableStyle');
+      mergeStyle(result, role('headerRowStyle'));
+      if (c === 0) mergeStyle(result, role('firstHeaderCellStyle'));
+      if (c === this.colCount - 1) mergeStyle(result, role('lastHeaderCellStyle'));
+      if (this.options.highlightFirstColumn && c === 0) mergeStyle(result, role('highlightFirstColumnStyle'));
+      if (this.options.highlightLastColumn && c === this.colCount - 1) mergeStyle(result, role('highlightLastColumnStyle'));
+      const whole = this.tableStyle._style('wholeTableStyle', palette);
       const borders = result as JsonRecord;
       if (!borders.borderTop && whole?.borderTop) borders.borderTop = cloneBorder(whole.borderTop);
       if (!borders.borderBottom && whole?.borderBottom) borders.borderBottom = cloneBorder(whole.borderBottom);
       if (c === 0 && !borders.borderLeft && whole?.borderLeft) borders.borderLeft = cloneBorder(whole.borderLeft);
       if (c === this.colCount - 1 && !borders.borderRight && whole?.borderRight) borders.borderRight = cloneBorder(whole.borderRight);
     } else if (row === footer) {
-      mergeStyle(result, themeStyle(this.tableStyle, 'footerRowStyle'));
-      if (c === 0) mergeStyle(result, themeStyle(this.tableStyle, 'firstFooterCellStyle'));
-      if (c === this.colCount - 1) mergeStyle(result, themeStyle(this.tableStyle, 'lastFooterCellStyle'));
-      const whole = this.tableStyle._style('wholeTableStyle');
+      mergeStyle(result, role('footerRowStyle'));
+      if (c === 0) mergeStyle(result, role('firstFooterCellStyle'));
+      if (c === this.colCount - 1) mergeStyle(result, role('lastFooterCellStyle'));
+      const whole = this.tableStyle._style('wholeTableStyle', palette);
       const borders = result as JsonRecord;
       if (!borders.borderTop && whole?.borderTop) borders.borderTop = cloneBorder(whole.borderTop);
       if (!borders.borderBottom && whole?.borderBottom) borders.borderBottom = cloneBorder(whole.borderBottom);
       if (c === 0 && !borders.borderLeft && whole?.borderLeft) borders.borderLeft = cloneBorder(whole.borderLeft);
       if (c === this.colCount - 1 && !borders.borderRight && whole?.borderRight) borders.borderRight = cloneBorder(whole.borderRight);
     } else {
-      const whole = this.tableStyle._style('wholeTableStyle');
+      const whole = this.tableStyle._style('wholeTableStyle', palette);
       if (whole) {
         const backgrounds = Object.assign(new Style(), whole);
         delete backgrounds.borderLeft;
@@ -793,11 +808,11 @@ export class Table {
       const r = row - data.row;
       const isFirstRow = r === 0, isLastRow = r === data.rowCount - 1;
       if (this.options.bandRows)
-        mergeStyle(result, themeStyle(this.tableStyle, r % 2 === 0 ? 'firstRowStripStyle' : 'secondRowStripStyle'));
+        mergeStyle(result, role(r % 2 === 0 ? 'firstRowStripStyle' : 'secondRowStripStyle'));
       if (this.options.bandColumns)
-        mergeStyle(result, themeStyle(this.tableStyle, c % 2 === 0 ? 'firstColumnStripStyle' : 'secondColumnStripStyle'));
-      if (this.options.highlightFirstColumn && c === 0) mergeStyle(result, themeStyle(this.tableStyle, 'highlightFirstColumnStyle'));
-      if (this.options.highlightLastColumn && c === this.colCount - 1) mergeStyle(result, themeStyle(this.tableStyle, 'highlightLastColumnStyle'));
+        mergeStyle(result, role(c % 2 === 0 ? 'firstColumnStripStyle' : 'secondColumnStripStyle'));
+      if (this.options.highlightFirstColumn && c === 0) mergeStyle(result, role('highlightFirstColumnStyle'));
+      if (this.options.highlightLastColumn && c === this.colCount - 1) mergeStyle(result, role('highlightLastColumnStyle'));
       const borders = result as JsonRecord;
       const horizontal = whole?.borderHorizontal;
       if (horizontal) {

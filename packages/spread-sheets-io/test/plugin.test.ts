@@ -1,0 +1,7 @@
+import { createRequire } from 'node:module';
+import { expect, it } from 'vitest';
+import { Workbook } from '../../spread-sheets/src/model.js';
+import { install, type IoWorkbook } from '../src/install.js';
+const require=createRequire(import.meta.url);
+it('leaves IO absent in the core until the side-effect plugin is loaded',()=>{const core=require('../../spread-sheets/dist/gc.spread.sheets.cjs');const wb=new core.Spread.Sheets.Workbook();for(const k of ['import','export','open','save'])expect(typeof wb[k]).toBe('undefined');require('../dist/gc.spread.sheets.io.cjs');for(const k of ['import','export','open','save'])expect(typeof wb[k]).toBe('function');wb.destroy();});
+it('matches synchronous invalid-object errors, asynchronous Blob errors and return values',async()=>{install({Spread:{Sheets:{Workbook}}});const wb=new Workbook();const io=wb as unknown as IoWorkbook&{import(file:unknown,ok:(...a:unknown[])=>void,err:(...a:unknown[])=>void,o:object):void};const events:unknown[]=[];expect(io.import('bad',()=>{},e=>events.push(e),{fileType:0})).toBeUndefined();expect(events).toEqual([{errorCode:1,errorMessage:'Incorrect file format.'}]);events.length=0;const p=new Promise<void>(resolve=>{io.import(new Blob(['bad']),()=>{},e=>{events.push(e);resolve();},{fileType:0});events.push('returned');});expect(events).toEqual(['returned']);await p;expect(events[1]).toEqual({errorCode:1,errorMessage:'Incorrect file format.'});wb.destroy();});
