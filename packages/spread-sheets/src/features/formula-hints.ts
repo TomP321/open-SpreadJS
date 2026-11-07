@@ -1,3 +1,4 @@
+import { functionCatalog } from '../calc/function-catalog.js';
 import { builtinNames } from '../calc/evaluate.js';
 import type { Workbook } from '../model.js';
 
@@ -14,9 +15,6 @@ export function builtinHintNames(): string[] {
 }
 
 const dynamicNames = new Set(['BYCOL', 'BYROW', 'CHOOSECOLS', 'CHOOSEROWS', 'DROP', 'EXPAND', 'FILTER', 'GROUPBY', 'HSTACK', 'MAKEARRAY', 'MAP', 'PIVOTBY', 'RANDARRAY', 'REDUCE', 'SCAN', 'SEQUENCE', 'SORT', 'SORTBY', 'TAKE', 'TEXTSPLIT', 'TOCOL', 'TOROW', 'UNIQUE', 'VSTACK', 'WRAPCOLS', 'WRAPROWS']);
-
-const parameters: Record<string, string[]> = { SCATTERSPARKLINE: ['points1', '[points2]', '[minX]', '[maxX]', '[minY]', '[maxY]', '[hLine]', '[vLine]', '[xMinZone]', '[xMaxZone]', '[yMinZone]', '[yMaxZone]', '[tags]', '[drawSymbol]', '[drawLines]', '[color1]', '[color2]', '[dash]'], BOXPLOTSPARKLINE: ['points', 'boxPlotClass', '[showAverage]', '[scaleStart]', '[scaleEnd]', '[acceptableStart]', '[acceptableEnd]', '[colorScheme]', '[style]', '[vertical]'], SPREADSPARKLINE: ['points', '[showAverage]', '[scaleStart]', '[scaleEnd]', '[style]', '[colorScheme]', '[vertical]'], SUM: ['number1', '[number2]'], SUBSTITUTE: ['text', 'old_text', 'new_text', '[instance_num]'], SUBTOTAL: ['function_num', 'ref1', '[ref2]'], SUMIF: ['range', 'criteria', '[sum_range]'], SUMIFS: ['sum_range', 'criteria_range1', 'criteria1'], AVERAGE: ['number1', '[number2]'], IF: ['logical_test', 'value_if_true', '[value_if_false]'], VLOOKUP: ['lookup_value', 'table_array', 'col_index_num', '[range_lookup]'], COUNTIF: ['range', 'criteria'] };
-const descriptions: Record<string, string> = { SCATTERSPARKLINE: 'Plots pairs of values as a compact scatter chart.', BOXPLOTSPARKLINE: 'Shows the distribution of values as a compact box plot.', SPREADSPARKLINE: 'Displays the distribution of values in a compact chart.', SUBSTITUTE: 'Replaces matching text with new text.', SUBTOTAL: 'Calculates a subtotal for a range.', SUM: 'Adds numbers together.', SUMIF: 'Adds values that meet a condition.', SUMIFS: 'Adds values that meet multiple conditions.' };
 
 export interface HintDescription { name?: string; description?: string; parameters?: { name: string; optional?: boolean; repeatable?: boolean }[] }
 /** Find the innermost open function call, ignoring commas inside strings and nested expressions. */
@@ -64,15 +62,21 @@ export class FormulaHints {
       if (!help) return;
       const call = activeFormulaCall(text, caret); if (!call) return;
       const name = call.name; const custom = this.wb.getCustomFunction(name) as { description?: () => { parameters?: { name: string }[] } } | undefined;
-      const params = this.extra().find(d => d.name?.toUpperCase() === name)?.parameters?.map(p => p.name) ?? custom?.description?.().parameters?.map(p => p.name) ?? parameters[name]; if (!params?.length) return;
-      panel.setAttribute('role', 'tooltip'); panel.style.padding = '5px'; const index = call.argument;
-      panel.append(name + '('); params.forEach((p, i) => { if (i) panel.append(', '); const part = document.createElement(i === Math.min(index, params.length - 1) ? 'b' : 'span'); part.textContent = p; panel.append(part); }); panel.append(')'); this.panel = panel;
+      const customParams = this.extra().find(d => d.name?.toUpperCase() === name)?.parameters?.map(p => p.name) ?? custom?.description?.().parameters?.map(p => p.name);
+      const entry = customParams ? undefined : functionCatalog[name];
+      const params = customParams ?? entry?.parameters; if (!params) return;
+      panel.setAttribute('role', 'tooltip'); panel.style.padding = '5px'; let index = call.argument;
+      if (entry && params.at(-1) === '...') {
+        const repeatFrom = entry.repeatFrom ?? params.length - 2;
+        if (index >= repeatFrom) index = repeatFrom + (index - repeatFrom) % (params.length - 1 - repeatFrom);
+      }
+      panel.append(name + '('); params.forEach((p, i) => { if (i) panel.append(', '); const part = document.createElement(i === index ? 'b' : 'span'); part.textContent = p; panel.append(part); }); panel.append(')'); this.panel = panel;
     }
     document.body.append(panel);
   }
   private renderRows(): void {
     const panel = this.panel!; panel.replaceChildren();
-    this.names.forEach((name, index) => { const description = this.extra().find(d => d.name?.toUpperCase() === name)?.description ?? descriptions[name]; const row = document.createElement('div'); row.setAttribute('role', 'option'); row.setAttribute('aria-selected', String(index === this.selected)); row.style.cssText = `box-sizing:border-box;height:${index === this.selected && description ? 42 : 22}px;padding:0 10px;cursor:default;${index === this.selected ? 'background:#f5f5f5;' : ''}`; const label = document.createElement('div'); label.style.cssText = 'font:13px/22px inconsolata, monospace, Arial, sans-serif;color:#222'; label.textContent = name; row.append(label); if (index === this.selected && description) { const desc = document.createElement('div'); desc.style.cssText = 'font:11px/18px Arial;color:#666;white-space:nowrap;overflow:hidden'; desc.textContent = description; row.append(desc); } row.addEventListener('mousedown', e => e.preventDefault()); row.addEventListener('dblclick', () => this.accept()); panel.append(row); });
+    this.names.forEach((name, index) => { const description = this.extra().find(d => d.name?.toUpperCase() === name)?.description ?? functionCatalog[name]?.description; const row = document.createElement('div'); row.setAttribute('role', 'option'); row.setAttribute('aria-selected', String(index === this.selected)); row.style.cssText = `box-sizing:border-box;height:${index === this.selected && description ? 42 : 22}px;padding:0 10px;cursor:default;${index === this.selected ? 'background:#f5f5f5;' : ''}`; const label = document.createElement('div'); label.style.cssText = 'font:13px/22px inconsolata, monospace, Arial, sans-serif;color:#222'; label.textContent = name; row.append(label); if (index === this.selected && description) { const desc = document.createElement('div'); desc.style.cssText = 'font:11px/18px Arial;color:#666;white-space:nowrap;overflow:hidden'; desc.textContent = description; row.append(desc); } row.addEventListener('mousedown', e => e.preventDefault()); row.addEventListener('dblclick', () => this.accept()); panel.append(row); });
   }
   private accept(): void { const name = this.names[this.selected]; if (!name) return; const isName = [...this.wb.getCustomNames(), ...this.wb.getActiveSheet().getCustomNames()].some(n => n.getName().toUpperCase() === name); this.insert(this.start, this.end, name + (isName ? '' : '(')); }
   key(event: KeyboardEvent): boolean {
