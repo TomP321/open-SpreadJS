@@ -496,5 +496,13 @@ export function drawFilterGlyph(ctx: CanvasRenderingContext2D, cx: number, cy: n
     paintSortArrow(ctx, cx, cy, 7, sort === 1);
     return;
   }
-  paintSortArrow(ctx, cx, cy, 7, false);
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cx - 4, cy - 2);
+  ctx.lineTo(cx + 4, cy - 2);
+  ctx.lineTo(cx, cy + 2);
+  ctx.closePath();
+  ctx.fillStyle = '#354b75';
+  ctx.fill();
+  ctx.restore();
 }

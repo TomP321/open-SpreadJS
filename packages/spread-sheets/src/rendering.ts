@@ -918,7 +918,7 @@ export class WorkbookRenderer {
       if (selected && sheet.options.sheetTabColor) { const gradient = ctx.createLinearGradient(0, 14, 0, 24); gradient.addColorStop(0, '#ffffff'); gradient.addColorStop(1, resolveColor(sheet.options.sheetTabColor)); ctx.fillStyle = gradient; ctx.fillRect(x + 1, 14, w - 2, 10); }
       if (!selected && sheet.options.sheetTabColor) { ctx.fillStyle = resolveColor(sheet.options.sheetTabColor); ctx.fillRect(x + 2, 3, w - 4, 22); }
       if (selected) { ctx.fillStyle = '#ababab'; ctx.fillRect(x, 0, 1, 25); ctx.fillRect(x + w - 1, 0, 1, 25); }
-      if (selected) { ctx.fillStyle = resolveColor(sheet.options.sheetTabColor ?? '#217346'); ctx.fillRect(x, 23, w, 2); }
+      if (selected) { ctx.fillStyle = '#217346'; ctx.fillRect(x, 23, w, 2); }
       ctx.fillStyle = selected ? '#217346' : sheet.options.sheetTabColor ? 'white' : '#444'; ctx.font = `${selected ? 'bold ' : ''}10pt "Segoe UI"`; ctx.textAlign = 'left'; ctx.fillText(sheet.name(), x + (selected ? 13 : 12), 13); ctx.textAlign = 'center';
       this.tabHits.push({ x, width: w, index: i }); x += w;
     }
