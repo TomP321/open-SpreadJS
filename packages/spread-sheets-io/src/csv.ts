@@ -4,7 +4,10 @@ export function parseCsv(text:string,columnDelimiter=',',rowDelimiter='\r\n'):st
   if(!columnDelimiter||!rowDelimiter||columnDelimiter===rowDelimiter)throw new Error('Invalid CSV delimiters');
   const out:string[][]=[];let row:string[]=[],field='',quoted=false,atStart=true,i=text.charCodeAt(0)===0xfeff?1:0;
   while(i<text.length){
-    if(quoted){if(text[i]==='"'){if(text[i+1]==='"'){field+='"';i+=2;}else{quoted=false;i++;}}else field+=text[i++];continue;}
+    if(quoted){if(text[i]==='"'){if(text[i+1]==='"'){field+='"';i+=2;}else{quoted=false;i++;}}else if(columnDelimiter.length>1&&text.startsWith(columnDelimiter,i)){
+      // The v19 reader consumes the first delimiter character inside quotes.
+      field+=columnDelimiter.slice(1);i+=columnDelimiter.length;
+    }else field+=text[i++];continue;}
     if(atStart&&text[i]==='"'){quoted=true;atStart=false;i++;continue;}
     if(text.startsWith(columnDelimiter,i)){row.push(field);field='';atStart=true;i+=columnDelimiter.length;continue;}
     // With the default CRLF option the trial accepts LF files as well.

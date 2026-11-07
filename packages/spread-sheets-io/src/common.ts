@@ -14,11 +14,11 @@ export function range(a: string): Rect { const [s,e=s] = a.split(':'); const [r,
 export function rangeAddress(r: Rect): string { const a = address(r.row,r.col); return r.rowCount===1&&r.colCount===1 ? a : `${a}:${address(r.row+r.rowCount-1,r.col+r.colCount-1)}`; }
 export function normalFormula(f: string): string { return f.replace(/^=/,'').replace(/_xlfn\.(?:_xlws\.)?|_xlws\./g,''); }
 /** Shift A1 references without touching quoted string literals or sheet names. */
-export function shiftFormula(formula: string, dr: number, dc: number): string {
-  const re = /"(?:[^"]|"")*"|'(?:[^']|'')*'!|(?:\[[^\]]*\])|(?<![\w.])(?:(\$?)([A-Za-z]{1,3})(\$?)(\d+)|(\$?)([A-Za-z]{1,3}):(\$?)([A-Za-z]{1,3})|(\$?)(\d+):(\$?)(\d+))(?![\w.(])/g;
+export function shiftFormula(formula: string, dr: number, dc: number, signature = false): string {
+  const re = /"(?:[^"]|"")*"|'(?:[^']|'')*'!|[A-Za-z_][A-Za-z\d_.]*!|(?:\[[^\]]*\])|(?<![\w.])(?:(\$?)([A-Za-z]{1,3})(\$?)(\d+)|(\$?)([A-Za-z]{1,3}):(\$?)([A-Za-z]{1,3})|(\$?)(\d+):(\$?)(\d+))(?![\w.(])/g;
   return formula.replace(re, (all: string, ca: string,c: string,ra: string,r: string,c1a: string,c1: string,c2a: string,c2: string,r1a: string,r1: string,r2a: string,r2: string) => {
-    const col = (s: string,a: string) => { let n = 0; for (const ch of s.toUpperCase()) n=n*26+ch.charCodeAt(0)-64; n=n-1+(a?0:dc); return n<0||n>16383 ? '#REF!' : a+columnName(n); };
-    const row = (s: string,a: string) => { const n = +s+(a?0:dr); return n<1||n>1048576 ? '#REF!' : a+n; };
+    const col = (s: string,a: string) => { let n = 0; for (const ch of s.toUpperCase()) n=n*26+ch.charCodeAt(0)-64; n=n-1+(a?0:dc); return signature?`{C${a}${n}}`:n<0||n>16383 ? '#REF!' : a+columnName(n); };
+    const row = (s: string,a: string) => { const n = +s+(a?0:dr); return signature?`{R${a}${n}}`:n<1||n>1048576 ? '#REF!' : a+n; };
     if (c) {const cc=col(c,ca),rr=row(r,ra); return cc==='#REF!'||rr==='#REF!' ? '#REF!' : cc+rr;}
     if (c1) return `${col(c1,c1a)}:${col(c2,c2a)}`;
     if (r1) return `${row(r1,r1a)}:${row(r2,r2a)}`;

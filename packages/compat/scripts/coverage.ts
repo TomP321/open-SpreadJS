@@ -15,6 +15,9 @@ const declared = new Map(declarations.entries.map((e) => [`${e.kind}:${e.path}`,
 const { default: GC } = (await import(
   pathToFileURL(path.join(repoRoot, 'packages/spread-sheets/dist/gc.spread.sheets.esm.js')).href
 )) as { default: object };
+// IO is a separately installed add-on, just as in the reference. Reflect it
+// after loading its side effects; core-only absence has distribution tests.
+await import(pathToFileURL(path.join(repoRoot, 'packages/spread-sheets-io/dist/gc.spread.sheets.io.esm.js')).href);
 const STUB = Symbol.for('@opensheets/NotImplemented');
 type Runtime = Record<string | symbol, unknown>;
 function descriptorAt(apiPath: string): PropertyDescriptor | undefined {
@@ -143,6 +146,8 @@ const lines = [
   'Classes count implemented constructors (their remaining members may be partial). Methods include static methods and namespace functions, counting overloads once. Enums count only when every declared value matches at runtime and in our declarations. Explicit NotImplemented fallbacks do not count as implemented. Declaration presence is not behavioral compatibility.',
   '',
   'M5 includes partial UI/module behavior despite implemented constructors/methods. Advanced filter presets and paste modes warn NotImplemented; date-mask editing throws NotImplemented. See [STATUS.md](STATUS.md#m5--partial-acceptance-gates-remain-red) for the bounded behavior, remaining modules and failed visual gates.',
+  '',
+  'The runtime inventory loads our optional `@opensheets/spread-sheets-io` side effects. `Workbook.import` and `export` cover the bounded XLSX/CSV/SSJSON implementation; `open` delegates named Excel files and reports SJS as unsupported, and `save` is an explicit unsupported callback. Core-only builds intentionally omit all four methods, matching the reference. IO gaps and failed differential/visual gates are recorded in [STATUS.md](STATUS.md#m7a--io-plugin-partial).',
   '',
   '| Namespace | Classes | Methods | Enums | Declarations |',
   '| --- | ---: | ---: | ---: | ---: |',

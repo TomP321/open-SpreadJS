@@ -75,5 +75,6 @@ export function install(GC:IoGC):void {
     if(!file)return;const name=(file as File).name??'';if(/\.(?:xlsx|xltx|xlsm|xltm)$/i.test(name)){Reflect.get(this,'import').call(this,file,success,error,{...options,fileType:0});return;}queueMicrotask(()=>error?.({errorCode:0,errorMessage:'NotImplemented: SJS open'}));
   }});
   Object.defineProperty(proto,'save',{configurable:true,writable:true,value:function(this:IoWorkbook,_success?:IoCallback,error?:IoCallback){queueMicrotask(()=>error?.({errorCode:0,errorMessage:'NotImplemented: SJS save'}));}});
+  Object.defineProperty(Reflect.get(proto,'save'),Symbol.for('@opensheets/NotImplemented'),{value:true});
 }
 void arr;void obj;

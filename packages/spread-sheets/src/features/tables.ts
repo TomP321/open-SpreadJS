@@ -50,7 +50,7 @@ function resolveThemeStyle(style: Style | undefined, palette?: Record<string, st
     const base = value.replace(/ -?\d+(?:\.\d+)?$/, '');
     // Public built-in palette facts include the reference's quantized tints.
     for (const known of [THEME_COLORS, THEME_COLORS_2013])
-      if (known[value] && known[base]?.toLowerCase() === palette[base]?.toLowerCase()) return known[value];
+      if (known[value] && known[base] && palette[base] && known[base].toLowerCase() === palette[base].toLowerCase()) return known[value];
     return palette[value];
   };
   for (const key of ['backColor', 'foreColor']) if (typeof result[key] === 'string') result[key] = color(result[key]);

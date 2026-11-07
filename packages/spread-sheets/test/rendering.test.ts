@@ -1,12 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
-import { axisSlots, columnLabel, strongerBorder, wrappedLines } from '../src/rendering.js';
+import { axisSlots, columnLabel, selectionBounds, strongerBorder, wrappedLines } from '../src/rendering.js';
 import { AxisLayout } from '../src/structures.js';
-import { LineBorder } from '../src/primitives.js';
+import { LineBorder, Range } from '../src/primitives.js';
 import { decodeTSV, encodeTSV, seriesValue } from '../src/interaction.js';
 import { Workbook } from '../src/model.js';
 import { Events } from '../src/events.js';
 
 describe('viewport layout', () => {
+  it('expands displayed selections across intersecting merged cells without changing the stored range', () => {
+    const selection = new Range(0, 0, 1, 1);
+    const merged = new Range(0, 0, 1, 3);
+    expect(selectionBounds(selection, [merged])).toEqual(merged);
+    expect(selection.colCount).toBe(1);
+    expect(selectionBounds(new Range(1, 0, 1, 1), [merged])).toEqual(new Range(1, 0, 1, 1));
+    expect(selectionBounds(new Range(0, 1, 2, 1), [merged, new Range(1, 0, 2, 1)]))
+      .toEqual(new Range(0, 0, 3, 3));
+  });
   it('visits only visible rows of a million-row axis with hidden and frozen items', () => {
     const axis = new AxisLayout(1_000_000, 20);
     axis.setVisible(10001, false);

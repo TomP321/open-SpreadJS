@@ -14,6 +14,17 @@ function sheetWithValues(rows: unknown[][]): InstanceType<typeof Worksheet> {
 }
 
 describe('tables', () => {
+  it('resolves imported untinted and tinted table colours from each sheet palette', () => {
+    const first = sheetWithValues([['Header'], [1], [2]]);
+    const second = sheetWithValues([['Header'], [1], [2]]);
+    first._ioThemeColors = {'Accent 1':'#5b9bd5','Accent 1 80':'#deebf7','Accent 1 20':'#9dc3e6'};
+    second._ioThemeColors = {'Accent 1':'#112233','Accent 1 80':'#ddeeff','Accent 1 20':'#445566'};
+    for (const s of [first, second]) s.tables.add('T', 0, 0, 3, 1, AnyThemes.medium2);
+    expect(first.getActualStyle(0, 0).backColor).toBe('#5b9bd5');
+    expect(second.getActualStyle(0, 0).backColor).toBe('#112233');
+    expect(second.getActualStyle(1, 0).backColor).toBe('#ddeeff');
+    expect(first.getActualStyle(0, 0).backColor).toBe('#5b9bd5');
+  });
   it('creates tables with inferred columns, style and JSON', () => {
     const sheet = sheetWithValues([
       ['Name', 'Qty'],

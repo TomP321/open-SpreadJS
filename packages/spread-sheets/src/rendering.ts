@@ -16,6 +16,26 @@ import { usingThemedDocument } from './features/tables.js';
 export interface Rect { x: number; y: number; width: number; height: number }
 export interface AxisSlot { index: number; position: number; size: number; min: number; max: number }
 
+/** A selected merged cell occupies its full displayed rectangle. */
+export function selectionBounds(selection: Range, spans: Range[]): Range {
+  let result = selection;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const span of spans) {
+      if (span.row >= result.row + result.rowCount || result.row >= span.row + span.rowCount ||
+          span.col >= result.col + result.colCount || result.col >= span.col + span.colCount) continue;
+      const row = Math.min(result.row, span.row), col = Math.min(result.col, span.col);
+      const rows = Math.max(result.row + result.rowCount, span.row + span.rowCount) - row;
+      const cols = Math.max(result.col + result.colCount, span.col + span.colCount) - col;
+      if (row !== result.row || col !== result.col || rows !== result.rowCount || cols !== result.colCount) {
+        result = new Range(row, col, rows, cols); changed = true;
+      }
+    }
+  }
+  return result;
+}
+
 /** Layout visits visible items only, including independently clipped frozen panes. */
 export function axisSlots(axis: AxisLayout, origin: number, extent: number, offset: number, zoom: number, leading: number, trailing: number): AxisSlot[] {
   const slots: AxisSlot[] = [];
@@ -306,7 +326,14 @@ export class WorkbookRenderer {
     const right = Math.min(this.viewWidth, this.headerWidth + s._columnLayout().prefixSum(s.getColumnCount()) * this.zoom);
     ctx.fillStyle = 'white'; ctx.fillRect(0, 0, right, bottom);
     const spans = s.getSpans();
-    const paintedSpans = new Set<Range>();
+    const paintedSpans = new Map<Range, Set<string>>();
+    const alreadyPainted = (span: Range, row: AxisSlot, col: AxisSlot) => {
+      let panes = paintedSpans.get(span);
+      if (!panes) paintedSpans.set(span, panes = new Set());
+      const key = `${row.min}:${col.min}`;
+      if (panes.has(key)) return true;
+      panes.add(key); return false;
+    };
     const hasRules = s.conditionalFormats._hasRules();
     const hasComments = s.comments._hasAny();
     const hasValidations = (s as unknown as { validationRecords: unknown[] }).validationRecords.length > 0;
@@ -315,8 +342,7 @@ export class WorkbookRenderer {
     for (const row of this.rows) for (const col of this.cols) {
       const span = spans.find(span => span.contains(row.index, col.index));
       if (span) {
-        if (paintedSpans.has(span)) continue;
-        paintedSpans.add(span);
+        if (alreadyPainted(span, row, col)) continue;
       }
       const r = span?.row ?? row.index, c = span?.col ?? col.index;
       const rect = span ? this.rangeRect(span, row, col) : { x: col.position, y: row.position, width: col.size, height: row.size };
@@ -333,7 +359,7 @@ export class WorkbookRenderer {
     paintedSpans.clear();
     for (const row of this.rows) for (const col of this.cols) {
       const span = spans.find(span => span.contains(row.index, col.index));
-      if (span) { if (paintedSpans.has(span)) continue; paintedSpans.add(span); }
+      if (span && alreadyPainted(span, row, col)) continue;
       const r = span?.row ?? row.index, c = span?.col ?? col.index;
       const rect = span ? this.rangeRect(span, row, col) : { x: col.position, y: row.position, width: col.size, height: row.size };
       this.clipCell(ctx, row, col, () => {
@@ -834,7 +860,7 @@ export class WorkbookRenderer {
     ctx.save(); ctx.beginPath(); ctx.rect(Math.max(0, this.headerWidth - 2), Math.max(0, this.headerHeight - 2), this.viewWidth, this.viewHeight); ctx.clip();
     const active = this.cellRect(s.getActiveRowIndex(), s.getActiveColumnIndex());
     for (const selection of s.getSelections()) {
-      const range = selection.normalized(s.getRowCount(), s.getColumnCount());
+      const range = selectionBounds(selection.normalized(s.getRowCount(), s.getColumnCount()), s.getSpans());
       for (const rowPane of this.panes(this.rows)) for (const colPane of this.panes(this.cols)) {
         const r = this.rows.find(r => r.index >= range.row && r.index < range.row + range.rowCount && r.min === rowPane.min);
         const c = this.cols.find(c => c.index >= range.col && c.index < range.col + range.colCount && c.min === colPane.min);

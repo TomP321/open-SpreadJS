@@ -30,7 +30,26 @@ const ioCases:Record<string,string>={
   'm7-csv-delimiters':String.raw`(async()=>{const loaded=await helpers.importFile(new Blob(['"a||b"||42ENDtrue||"two\nlines"']),{fileType:2,columnDelimiter:'||',rowDelimiter:'END'});return {loaded,values:sheet.getArray(0,0,2,2)};})()`,
   'm7-callback-timing-and-errors':String.raw`(async()=>{const result=[];for(const [file,ft]of [['bad',0],[new Blob(['bad']),0],[new Blob(['bad']),1],[new Blob(['a,b']),2]]){const events=[];const ret=wb.import(file,(...a)=>events.push(['ok',a]),(...a)=>events.push(['error',a]),{fileType:ft});events.push(['return',ret]);await new Promise(r=>setTimeout(r,250));result.push(events);}for(const ft of [1,2,99]){const events=[];const ret=wb.export(b=>events.push(['ok',b.type]),e=>events.push(['error',e]),{fileType:ft,range:{sheetIndex:0,row:0,column:0,rowCount:1,columnCount:1}});events.push(['return',ret]);await new Promise(r=>setTimeout(r,50));result.push(events);}return result;})()`,
   'm7-ssjson-include-flags':String.raw`(async()=>{sheet.name('Json');sheet.setValue(0,0,42);sheet.setFormula(1,0,'A1+1');sheet.setStyle(0,0,Object.assign(new GC.Spread.Sheets.Style(),{backColor:'#ff0000'}));const b=await new Promise((r,j)=>wb.export(r,j,{fileType:1,includeStyles:false,includeFormulas:false}));const result=await helpers.importFile(b,{fileType:1});const s=wb.getSheetFromName('Json');return {result,values:s.getArray(0,0,2,1),formula:s.getFormula(1,0),backColor:s.getActualStyle(0,0).backColor??null};})()`,
+  'm7-sjs-save':String.raw`(async()=>{sheet.setValue(0,0,'SJS data');return await new Promise(resolve=>wb.save(blob=>resolve({ok:true,type:blob.type}),error=>resolve({ok:false,error})));})()`,
 };
-for(const [name,source]of Object.entries(ioCases))test(name,async({page})=>{await page.goto('/io-probe.html');await page.waitForFunction(()=>window.__ioProbe?.ready);const r=await page.evaluate(s=>window.__ioProbe.run(s),source);expect(r.ours).toEqual(r.official);});
+for(const [name,source]of Object.entries(ioCases))test(name,async({page})=>{await page.goto('/io-probe.html');await page.waitForFunction(()=>window.__ioProbe?.ready);const r=await page.evaluate(s=>window.__ioProbe.run(s),source);const dir=path.resolve('../../test-results/io');await fs.mkdir(dir,{recursive:true});await fs.writeFile(path.join(dir,name+'.json'),JSON.stringify(r,null,2));expect(r.ours).toEqual(r.official);});
 
 test('m7-core: IO methods remain absent without the plugin',async({page})=>{await page.goto('/probe.html');await page.waitForFunction(()=>window.__probe?.ready);const r=await page.evaluate(()=>window.__probe.run(`['import','export','open','save'].map(k=>typeof wb[k])`));expect(r.ours).toEqual(r.official);});
+
+test('m7-browser-distribution: global GC side effects preserve the host constructor',async({page})=>{
+  await page.setContent('<!doctype html><html><body></body></html>');
+  // Both paths contain only our independently authored distributions.
+  await page.addScriptTag({path:path.resolve('../../packages/spread-sheets/dist/gc.spread.sheets.all.min.js')});
+  await page.evaluate(()=>{const GC=Reflect.get(window,'GC');Reflect.set(window,'__m7Constructor',GC.Spread.Sheets.Workbook);});
+  await page.addScriptTag({path:path.resolve('../../packages/spread-sheets-io/dist/gc.spread.sheets.io.umd.js')});
+  const result=await page.evaluate(async()=>{
+    const GC=Reflect.get(window,'GC') as typeof import('@opensheets/spread-sheets').default;
+    const wb=new GC.Spread.Sheets.Workbook(),target=new GC.Spread.Sheets.Workbook();
+    wb.getActiveSheet().setValue(0,0,'Global GC 日本語');wb.getActiveSheet().setFormula(0,1,'1+2');
+    const blob=await new Promise<Blob>((resolve,reject)=>wb.export(resolve,reject,{fileType:0}));
+    await new Promise((resolve,reject)=>target.import(blob as File,resolve,reject,{fileType:0}));
+    const result={same:GC.Spread.Sheets.Workbook===Reflect.get(window,'__m7Constructor'),type:blob.type,values:target.getActiveSheet().getArray(0,0,1,2),formula:target.getActiveSheet().getFormula(0,1)};
+    wb.destroy();target.destroy();return result;
+  });
+  expect(result).toEqual({same:true,type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',values:[['Global GC 日本語',3]],formula:'1+2'});
+});

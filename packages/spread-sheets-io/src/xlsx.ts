@@ -12,7 +12,7 @@ function outline(items:unknown):RecordValue {return {items:arr(items)};}
 const knownSheetSections=new Set(['sheetPr','dimension','sheetViews','sheetFormatPr','cols','sheetData','sheetProtection','autoFilter','mergeCells','conditionalFormatting','dataValidations','hyperlinks','printOptions','pageMargins','pageSetup','headerFooter','tableParts','legacyDrawing']);
 function namesRead(node:XmlNode|undefined,sheets:RecordValue[],workbook:RecordValue):void {
   const names:RecordValue[]=[];
-  for(const n of children(node,'definedName')){const a=n.attrs,formula=textOf(n);if(a.name==='_xlnm.Print_Area'||a.name==='_xlnm.Print_Titles'){const s=sheets[+(a.localSheetId??0)];if(s){const p=obj(s.printInfo);p[a.name==='_xlnm.Print_Area'?'printArea':'printTitles']=formula;s.printInfo=p;}continue;}
+  for(const n of children(node,'definedName')){const a=n.attrs,formula=textOf(n);if(a.name==='_xlnm.Print_Area'||a.name==='_xlnm.Print_Titles'){const s=sheets[+(a.localSheetId??0)];if(s){const p=obj(s.printInfo);p[a.name==='_xlnm.Print_Area'?'printArea':'printTitles']=formula;s.printInfo=p;s.names=[...arr(s.names),{name:a.name.slice(6),formula:normalFormula(formula).replace(/'([A-Za-z_][A-Za-z\d_.]*)'!/g,'$1!'),row:0,col:0}];}continue;}
     const entry={name:a.name,formula:normalFormula(formula),row:0,col:0,...(a.comment?{comment:a.comment}:{})};
     if(a.localSheetId!==undefined){const s=sheets[+a.localSheetId];if(s)s.names=[...arr(s.names),entry];}else names.push(entry);
   }
@@ -85,7 +85,7 @@ export function readXlsx(bytes:Uint8Array,options:IoOptions={}):XlsxResult {
 function ownStyle(value:unknown,names:Map<string,RecordValue>,seen=new Set<string>()):RecordValue {if(typeof value==='string'){if(seen.has(value))return {};seen.add(value);return ownStyle(names.get(value),names,seen);}const s=obj(value);return {...(s.parentName?ownStyle(s.parentName,names,seen):{}),...s};}
 function namesXml(json:RecordValue,sheets:RecordValue[]):string {
   const all:string[]=[];const emit=(n:unknown,i?:number)=>{const x=obj(n);all.push(tag('definedName',{name:x.name,localSheetId:i,comment:x.comment},escapeXml(normalFormula(String(x.formula??'')))));};
-  arr(json.names).forEach(n=>emit(n));sheets.forEach((s,i)=>{arr(s.names).forEach(n=>emit(n,i));for(const [key,name]of [['printArea','_xlnm.Print_Area'],['printTitles','_xlnm.Print_Titles']])if(obj(s.printInfo)[key])all.push(tag('definedName',{name,localSheetId:i},escapeXml(obj(s.printInfo)[key])));});return all.length?tag('definedNames',{},all.join('')):'';
+  arr(json.names).forEach(n=>emit(n));sheets.forEach((s,i)=>{arr(s.names).forEach(n=>{const x=obj(n);if(x.name==='Print_Area'||x.name==='Print_Titles'){if(!obj(s.printInfo)[x.name==='Print_Area'?'printArea':'printTitles'])emit({...x,name:'_xlnm.'+x.name},i);}else emit(n,i);});for(const [key,name]of [['printArea','_xlnm.Print_Area'],['printTitles','_xlnm.Print_Titles']])if(obj(s.printInfo)[key])all.push(tag('definedName',{name,localSheetId:i},escapeXml(obj(s.printInfo)[key])));});return all.length?tag('definedNames',{},all.join('')):'';
 }
 function topLevelRaw(xml:string):{name:string;raw:string}[] {
   if(!xml)return [];const noData=xml.replace(/<(?:\w+:)?sheetData\b[^>]*>[\s\S]*?<\/(?:\w+:)?sheetData>/,'<sheetData/>');const root=parseXml(noData);return root.children.map(n=>({name:n.name,raw:section(noData,n.name)}));
@@ -115,18 +115,24 @@ export function writeXlsx(json:RecordValue,options:IoOptions={},state?:IoState):
     const colXml=[...colIndices].sort((a,b)=>+a-+b).map(k=>{const c=obj(cols[k]),o=obj(colOutlines[+k]),st=options.includeStyles===false?undefined:colStyles[k]?styles.add({...defaultStyle,...ownStyle(obj(colStyles[k]).style,sheetNames)}):undefined;return tag('col',{min:+k+1,max:+k+1,width:c.size===undefined?undefined:Math.floor(Number(c.size)/7*256)/256,customWidth:c.size===undefined?undefined:1,hidden:c.visible===false?1:undefined,style:st,outlineLevel:o.level===undefined?undefined:Math.max(0,Number(o.level)+1),collapsed:o.collapsed?1:undefined});}).join('');
     const rowIndices=new Set([...Object.keys(cells),...Object.keys(rows),...Object.keys(rowStyles),...Object.keys(rowOutlines)]);
     const xmlRows:string[]=[];
-    const sharedMasters=new Map<string,{id:number;row:number;col:number;formula:string}>();
+    const sharedMasters=new Map<string,{id:number;row:number;col:number;lastRow:number}>(),sharedRanges:{id:number;row:number;col:number;lastRow:number}[]=[];
     for(const rk of [...rowIndices].sort((a,b)=>+a-+b)){
       const r=+rk,info=obj(rows[rk]),o=obj(rowOutlines[r]),rowStyle=ownStyle(obj(rowStyles[rk]).style,sheetNames),xmlCells:string[]=[];
       for(const [ck,raw]of Object.entries(obj(cells[rk])).sort(([a],[b])=>+a-+b)){
-        const c=+ck,cell=obj(raw);let value=cell.value;const style=options.includeStyles===false?{}:{...ownStyle(obj(colStyles[ck]).style,sheetNames),...rowStyle,...ownStyle(cell.style,sheetNames)};
+        const c=+ck,cell=obj(raw);let value=cell.value;
+        // The core's implicit Body theme font is a default, not a direct cell
+        // style: materializing it would override table fonts and explicit Arial.
+        const inherited=Object.keys(defaultStyle).some(k=>k!=='themeFont')?defaultStyle:{};
+        const explicit={...ownStyle(obj(colStyles[ck]).style,sheetNames),...rowStyle,...ownStyle(cell.style,sheetNames)};
+        const style=options.includeStyles===false?{}:{...inherited,...explicit};
+        if((explicit.font||explicit.fontFamily)&&explicit.themeFont===undefined)delete style.themeFont;
         const d=typeof value==='string'?/^\/OADate\(([-\d.]+)\)\/$/.exec(value):null;if(d){value=+d[1];if(!style.formatter)style.formatter='M/d/yyyy';}
         let formula=options.includeFormulas===false?undefined:cell.formula as string|undefined;
         if(value===undefined&&!formula&&!Object.keys(style).length&&options.includeEmptyRegionCells!==true)continue;
         const a:RecordValue={r:address(r,c)};if(options.includeStyles!==false){const si=styles.add(style);if(si)a.s=si;}
         let f='';
         if(formula){formula=normalFormula(formula);const ai=obj(cell.arrayInfo??cell.arrayFormula);if(ai.isDynamicArray){a.cm=1;hasDynamic=true;}if(ai.rowCount&&ai.colCount)f=tag('f',{t:'array',ref:rangeAddress({row:r,col:c,rowCount:Number(ai.rowCount),colCount:Number(ai.colCount)}),aca:ai.isDynamicArray?1:undefined},escapeXml(formula));
-          else if(options.exportSharedFormula){const translated=shiftFormula(formula,-r,-c),master=sharedMasters.get(translated);if(master)f=tag('f',{t:'shared',si:master.id});else {const id=sharedMasters.size;sharedMasters.set(translated,{id,row:r,col:c,formula});f=tag('f',{t:'shared',si:id,ref:address(r,c)},escapeXml(formula));}}
+          else if(options.exportSharedFormula!==false){const translated=c+':'+shiftFormula(formula,-r,-c,true),master=sharedMasters.get(translated);if(master&&master.lastRow===r-1){master.lastRow=r;f=tag('f',{t:'shared',si:master.id});}else {const id=sharedRanges.length,next={id,row:r,col:c,lastRow:r};sharedMasters.set(translated,next);sharedRanges.push(next);f=tag('f',{t:'shared',si:id,ref:`__opensheets_shared_${id}__`},escapeXml(formula));}}
           else f=tag('f',{},escapeXml(formula));
         }
         let v='';if(typeof value==='number'){if(Number.isFinite(value))v=tag('v',{},String(value));else{a.t='e';v=tag('v',{},'#NUM!');}}
@@ -150,7 +156,9 @@ export function writeXlsx(json:RecordValue,options:IoOptions={},state?:IoState):
     const af=s.rowFilter?writeAutoFilter(s.rowFilter,(()=>{const r=obj(obj(s.rowFilter).range) as unknown as Rect;return {...r,row:Math.max(0,r.row-1),rowCount:r.rowCount+(r.row>0?1:0)};})()):'';
     const preserved=topLevelRaw(oldXml).filter(n=>!knownSheetSections.has(n.name)).map(n=>n.raw).join('');
     const rootAttrs=oldRoot?.attrs??{xmlns:MAIN,'xmlns:r':REL};
-    files[path]=declaration+tag('worksheet',rootAttrs,pr+tag('dimension',{ref:`A1:${address(countRows-1,countCols-1)}`})+view+tag('sheetFormatPr',{defaultRowHeight:Number(defaults.rowHeight??20)*0.75,defaultColWidth:Math.floor(Number(defaults.colWidth??62)/7*256)/256})+(colXml?tag('cols',{},colXml):'')+tag('sheetData',{},xmlRows.join(''))+protection+af+merge+(options.includeStyles===false?'':writeConditional(s.conditionalFormats,styles,warnings))+writeValidations(s.validations)+hyperlinks+printXml+commentDrawing+(tables.length?tag('tableParts',{count:tables.length},tables.join('')):'')+preserved);
+    const sharedById=new Map(sharedRanges.map(m=>[m.id,m]));
+    const rowXml=xmlRows.join('').replace(/ref="__opensheets_shared_(\d+)__"/g,(_,id:string)=>{const m=sharedById.get(+id)!;return `ref="${rangeAddress({row:m.row,col:m.col,rowCount:m.lastRow-m.row+1,colCount:1})}"`;});
+    files[path]=declaration+tag('worksheet',rootAttrs,pr+tag('dimension',{ref:`A1:${address(countRows-1,countCols-1)}`})+view+tag('sheetFormatPr',{defaultRowHeight:Number(defaults.rowHeight??20)*0.75,defaultColWidth:Math.floor(Number(defaults.colWidth??62)/7*256)/256})+(colXml?tag('cols',{},colXml):'')+tag('sheetData',{},rowXml)+protection+af+merge+(options.includeStyles===false?'':writeConditional(s.conditionalFormats,styles,warnings))+writeValidations(s.validations)+hyperlinks+printXml+commentDrawing+(tables.length?tag('tableParts',{count:tables.length},tables.join('')):'')+preserved);
     if(rels.length)files[relsPath(path)]=relationshipXml(rels);else delete files[relsPath(path)];
   });
   const oldBook=xmlFile(oldFiles,bookPath),bookRoot=oldBook?parseXml(oldBook):undefined;

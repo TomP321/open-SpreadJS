@@ -15,4 +15,9 @@ describe('style and shared formula mapping',()=>{
   it('maps indexed, theme, system colors and positive/negative tint',()=>{expect(readTheme(themeXml())).toHaveLength(12);expect(readColor(parseXml('<color theme="4"/>'))).toBe('#4f81bd');expect(readColor(parseXml('<color indexed="10"/>'))).toBe('#ff0000');expect(tintColor('000000',0.5)).toBe('808080');expect(tintColor('FFFFFF',-0.5)).toBe('808080');expect(colorXml('Accent 1 40')).toBe('<color theme="4" tint="0.4"/>');});
   it('round-trips fonts, alignment, protection, fills, borders and custom number formats',()=>{const w=new StyleWriter();const id=w.add({font:'italic bold 12pt Arial',foreColor:'#ff0000',backColor:'#00ff00',borderLeft:{style:6,color:'#0000ff'},formatter:'0.0000',hAlign:2,vAlign:1,wordWrap:true,shrinkToFit:true,textIndent:2,textOrientation:-30,locked:false,hidden:true});const r=readStyles(w.xml());expect(r.styles[id]).toMatchObject({font:'italic bold 12pt Arial',foreColor:'#ff0000',backColor:'#00ff00',borderLeft:{style:6,color:'#0000ff'},formatter:'0.0000',hAlign:2,vAlign:1,wordWrap:true,shrinkToFit:true,textIndent:2,textOrientation:-30,locked:false,hidden:true});expect(w.add({formatter:'0.00'})).toBe(w.add({formatter:'0.00'}));});
   it('shifts mixed/absolute references but protects strings, names and structured references',()=>{expect(shiftFormula('SUM(A1,$B2,C$3,$D$4,"A1",\'A1\'!E5,Table1[A1],A:A,1:2)',2,1)).toBe('SUM(B3,$B4,D$3,$D$4,"A1",\'A1\'!F7,Table1[A1],B:B,3:4)');expect(shiftFormula('A1',-1,0)).toBe('#REF!');});
+  it('protects unquoted sheet names that resemble references and distinguishes negative relative offsets',()=>{
+    expect(shiftFormula('A1!B2+Sheet1!$C3',2,1)).toBe('A1!C4+Sheet1!$C5');
+    expect(shiftFormula('A1',-2,0,true)).not.toBe(shiftFormula('A2',-2,0,true));
+    expect(shiftFormula('A1+$B$1',-2,0,true)).toBe(shiftFormula('A2+$B$1',-3,0,true));
+  });
 });
