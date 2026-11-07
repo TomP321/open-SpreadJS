@@ -9,6 +9,7 @@ import { adjustFormula } from './range.js';
 import { Events } from './events.js';
 import { notImplemented } from './not-implemented.js';
 import { GeneralFormatter } from './formatter.js';
+import { FormulaHints } from './features/formula-hints.js';
 
 export function encodeTSV(rows: unknown[][]): string {
   return rows.map(row => row.map(value => {
@@ -45,6 +46,9 @@ interface Drag { kind: 'select' | 'resizeRow' | 'resizeCol' | 'fill' | 'move'; s
 
 export class Interaction {
   private abort = new AbortController();
+  private hints: FormulaHints;
+  private formulaLayer?: HTMLElement;
+  private referenceLayers: HTMLElement[] = [];
   private drag?: Drag;
   private anchor: Cell = { row: 0, col: 0 };
   private editing?: { sheet: Worksheet; row: number; col: number; oldValue: unknown };
@@ -57,6 +61,7 @@ export class Interaction {
   private touch?: { x: number; y: number; moved: boolean };
   constructor(readonly view: WorkbookRenderer) {
     const { root, overlay, editor, tabs } = view, signal = this.abort.signal;
+    this.hints = new FormulaHints(view.workbook, editor, (start, end, value) => { editor.setRangeText(value, start, end, 'end'); editor.dispatchEvent(new Event('input', { bubbles: true })); editor.focus(); });
     root.addEventListener('keydown', event => this.keydown(event), { signal });
     overlay.addEventListener('pointerdown', event => this.pointerDown(event), { signal });
     overlay.addEventListener('pointermove', event => this.pointerMove(event), { signal });
@@ -84,6 +89,7 @@ export class Interaction {
       const mask = active?.sheet.getActualStyle(active.row, active.col).mask as MaskOptions | undefined;
       if (mask?.pattern) { const position = editor.selectionStart; editor.value = applyMask(editor.value, mask, true); editor.setSelectionRange(position, position); }
       this.positionEditor();
+      this.hints.update(editor.value, editor.selectionStart);
       const edit = this.editing; if (edit) edit.sheet._emit(Events.EditChange, { sheet: edit.sheet, sheetName: edit.sheet.name(), row: edit.row, col: edit.col, editingText: editor.value });
     }, { signal });
     tabs.addEventListener('pointerdown', event => {
@@ -172,6 +178,11 @@ export class Interaction {
     s._emit(Events.EditChange, { sheet: s, sheetName: s.name(), row, col, editingText: editor.value });
     s._emit(Events.EditorStatusChanged, { sheet: s, sheetName: s.name(), oldStatus: 0, newStatus: 2 });
   }
+  updateFromFormulaBar(value: string): void {
+    if (!this.editing) return;
+    this.view.editor.value = value; this.positionEditor(); this.hints.close();
+    const edit = this.editing; edit.sheet._emit(Events.EditChange, { sheet: edit.sheet, sheetName: edit.sheet.name(), row: edit.row, col: edit.col, editingText: value });
+  }
   positionEditor(): void {
     if (!this.editing) return;
     const { row, col, sheet } = this.editing, rect = this.view.cellRect(row, col), style = sheet.getActualStyle(row, col), editor = this.view.editor;
@@ -180,7 +191,32 @@ export class Interaction {
     const width = style.wordWrap ? rect.width - 1 : Math.min(this.view.viewWidth - rect.x, Math.max(rect.width - 1, Math.ceil(measured) + 1));
     Object.assign(editor.style, { left: `${rect.x - 2}px`, top: `${rect.y - 2}px`, width: `${width + 4}px`, height: `${Math.max(rect.height - 1, editor.value.split('\n').length * 19 * this.view.zoom) + 4}px`, font: this.view.font(style), color: String(style.foreColor ?? getComputedStyle(this.view.root.parentElement!.parentElement!).color), background: String(style.backColor ?? 'white'), textAlign: style.hAlign === 2 ? 'right' : style.hAlign === 1 ? 'center' : 'left', padding: '0px' });
     editor.scrollLeft = 0;
-
+    this.renderFormulaOverlay();
+  }
+  private renderFormulaOverlay(): void {
+    this.formulaLayer?.remove(); this.formulaLayer = undefined;
+    for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = [];
+    const editor = this.view.editor, sheet = this.editing?.sheet, text = editor.value;
+    if (!sheet || !text.startsWith('=')) return;
+    const layer = document.createElement('div'); layer.className = 'opensheets-formula-color';
+    Object.assign(layer.style, { position: 'absolute', zIndex: '4', boxSizing: 'border-box', overflow: 'hidden', whiteSpace: 'pre-wrap', pointerEvents: 'none', border: '2px solid transparent', left: editor.style.left, top: editor.style.top, width: editor.style.width, height: editor.style.height, font: editor.style.font, textAlign: editor.style.textAlign, background: editor.style.background, color: editor.style.color });
+    const colors = ['#2867c7', '#d14a32', '#8c4ca6', '#22945b']; let referenceIndex = 0, last = 0;
+    const token = /\b([A-Za-z_][A-Za-z0-9_.]*)(?=\s*\()|\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?/g;
+    for (const match of text.matchAll(token)) {
+      const index = match.index; layer.append(document.createTextNode(text.slice(last, index))); const span = document.createElement('span'); span.textContent = match[0];
+      if (!match[1]) {
+        const color = colors[referenceIndex++ % colors.length]; span.style.color = color;
+        const col = (letters: string) => [...letters.toUpperCase()].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
+        const row1 = Number(match[3]) - 1, col1 = col(match[2]), row2 = match[5] ? Number(match[5]) - 1 : row1, col2 = match[4] ? col(match[4]) : col1;
+        if (row1 >= 0 && col1 >= 0 && row2 < sheet.getRowCount() && col2 < sheet.getColumnCount()) {
+          const a = this.view.cellRect(Math.min(row1, row2), Math.min(col1, col2)), b = this.view.cellRect(Math.max(row1, row2), Math.max(col1, col2));
+          const border = document.createElement('div'); Object.assign(border.style, { position: 'absolute', pointerEvents: 'none', zIndex: '3', boxSizing: 'border-box', border: `2px solid ${color}`, background: `${color}18`, left: `${a.x}px`, top: `${a.y}px`, width: `${b.x + b.width - a.x}px`, height: `${b.y + b.height - a.y}px` }); this.view.root.append(border); this.referenceLayers.push(border);
+        }
+      }
+      layer.append(span); last = index + match[0].length;
+    }
+    layer.append(document.createTextNode(text.slice(last))); this.view.root.append(layer); this.formulaLayer = layer;
+    editor.style.background = 'transparent'; editor.style.color = 'transparent'; editor.style.caretColor = '#222';
   }
   endEdit(ignoreValueChange = false): boolean {
     const edit = this.editing; if (!edit) return true;
@@ -192,7 +228,7 @@ export class Interaction {
       this.view.workbook.commandManager().execute({ cmd: 'editCell', sheetName: sheet.name(), row, col, newValue: value });
       if (text.startsWith('=')) sheet._emit(Events.UserFormulaEntered, { ...info, formula: text.slice(1) });
     }
-    this.editing = undefined; this.view.editor.style.display = 'none'; this.view.root.focus();
+    this.hints.close(); this.formulaLayer?.remove(); this.formulaLayer = undefined; for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = []; this.editing = undefined; this.view.editor.style.display = 'none'; this.view.root.focus();
     sheet._emit(Events.EditEnded, { ...info, newValue: sheet.getValue(row, col) });
     sheet._emit(Events.EditorStatusChanged, { sheet, sheetName: sheet.name(), oldStatus: 2, newStatus: 0 });
     this.view.schedule(); return true;
@@ -208,6 +244,7 @@ export class Interaction {
   private keydown(event: KeyboardEvent): void {
     if (event.isComposing) return;
     if (this.editing) {
+      if (this.hints.key(event)) return;
       if (event.key === 'Escape') { event.preventDefault(); this.endEdit(true); }
       else if ((event.key === 'Enter' && !event.altKey) || event.key === 'Tab') {
         event.preventDefault(); if (this.endEdit()) this.navigate(event.key === 'Enter' ? (event.shiftKey ? -1 : 1) : 0, event.key === 'Tab' ? (event.shiftKey ? -1 : 1) : 0);
@@ -722,5 +759,5 @@ export class Interaction {
   editingAt(row: number, col: number): boolean {
     return !!this.editing && this.editing.row === row && this.editing.col === col;
   }
-  destroy(): void { this.abort.abort(); if (this.ants) clearInterval(this.ants); this.closeMenu(); }
+  destroy(): void { this.hints.close(); this.formulaLayer?.remove(); for (const layer of this.referenceLayers) layer.remove(); this.abort.abort(); if (this.ants) clearInterval(this.ants); this.closeMenu(); }
 }

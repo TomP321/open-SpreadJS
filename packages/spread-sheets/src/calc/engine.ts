@@ -1708,6 +1708,9 @@ export class CalcEngine implements EvalHost {
   get workbookRef(): Workbook {
     return this.workbook;
   }
+  formulaFunctionNames(sheet: Worksheet): string[] {
+    return [...this.customFunctions.keys(), ...this.globalFunctions.keys(), ...(this.sheetFunctions.get(sheet)?.keys() ?? [])];
+  }
   get functionNames(): string[] {
     return builtinNames();
   }

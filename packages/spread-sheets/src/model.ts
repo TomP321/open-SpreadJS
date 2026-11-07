@@ -2276,6 +2276,7 @@ export class Workbook {
     }
   }
   _renderer(): WorkbookRenderer | undefined { return this.renderer; }
+  _formulaFunctionNames(sheet: Worksheet): string[] { return this.calc?.formulaFunctionNames(sheet) ?? []; }
   _calcEngine(): CalcEngine | undefined { return this.calc; }
   calculate(type = 0, address?: string): void { this.calc?.calculate(type, address); }
   addCustomFunction(fn: import('./calc/functions-api.js').CalcFunction): void { this.calc?.addFunction(fn); }

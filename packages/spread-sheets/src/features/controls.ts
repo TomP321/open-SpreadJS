@@ -3,18 +3,17 @@ import type { Workbook } from '../model.js';
 import { Events, type EventInfo, type ModelEvent } from '../events.js';
 import { sparklineRange } from './sparklines.js';
 import { columnLabel } from '../rendering.js';
-import { builtinNames } from '../calc/evaluate.js';
+import { FormulaHints } from './formula-hints.js';
 const controls = new WeakMap<HTMLElement, object>();
 function hostElement(host: HTMLElement | string): HTMLElement { const element = typeof host === 'string' ? document.getElementById(host) : host; if (!element) throw new Error('Control host not found'); return element; }
 export function findControl<T>(host: HTMLElement | string): T | undefined { return controls.get(hostElement(host)) as T | undefined; }
 interface FunctionDescription { name?: string; description?: string; parameters?: { name: string; optional?: boolean; repeatable?: boolean }[] }
-const functionParameters: Record<string, string[]> = { SUM: ['number1', '[number2]'], AVERAGE: ['number1', '[number2]'], IF: ['logical_test', 'value_if_true', 'value_if_false'], VLOOKUP: ['lookup_value', 'table_array', 'col_index_num', '[range_lookup]'], COUNTIF: ['range', 'criteria'], SUMIF: ['range', 'criteria', '[sum_range]'] };
 export class FormulaTextBox {
   private wb?: Workbook;
   private automatic = true;
   private help = true;
   private input?: HTMLInputElement | HTMLTextAreaElement | HTMLElement;
-  private hints?: HTMLElement;
+  private hints?: FormulaHints;
   private descriptions = new Map<string, FunctionDescription>();
   private abort = new AbortController();
   private original: Node[];
@@ -42,10 +41,21 @@ export class FormulaTextBox {
       if (this.input !== this.host) { this.input.contentEditable = 'true'; this.input.className = 'opensheets-formula-input'; this.host.replaceChildren(this.input); }
       this.input.setAttribute('aria-label', 'Formula bar'); this.input.setAttribute('role', 'textbox'); this.input.spellcheck = false;
       const signal = this.abort.signal;
-      this.input.addEventListener('input', () => this.showSuggestions(), { signal });
+      this.input.addEventListener('input', () => {
+        const sheet = this.wb?.getActiveSheet(), input = this.input;
+        if (sheet && input) {
+          const value = this.text();
+          if (!sheet.isEditing()) sheet.startEdit(false, value);
+          const editor = sheet._view()?.editor;
+          if (editor && sheet.isEditing()) { sheet._view()?.interaction.updateFromFormulaBar(value); input.focus(); }
+        }
+        this.showSuggestions();
+      }, { signal });
       this.input.addEventListener('keydown', e => this.key(e as KeyboardEvent), { signal });
-      this.input.addEventListener('blur', () => { setTimeout(() => { if (!this.hints?.contains(document.activeElement)) this.hints?.remove(); }, 100); }, { signal });
+      this.input.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== this.input) this.hints?.close(); }, 100); }, { signal });
     }
+    this.hints?.close();
+    this.hints = new FormulaHints(value, this.input, (start, end, replacement) => { const text = this.text(); this.text(text.slice(0, start) + replacement + text.slice(end)); this.input?.dispatchEvent(new Event('input', { bubbles: true })); this.input?.focus(); }, () => [...this.descriptions.values()]);
     for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditEnded]) this.wb.bind(event, this.bound);
     this.wb.bind(Events.EditChange, this.editChanged);
     this.refresh(); return value;
@@ -56,38 +66,21 @@ export class FormulaTextBox {
     this.text(s.getFormula(row, col) ? '=' + s.getFormula(row, col) : s.getText(row, col));
   }
   private key(event: KeyboardEvent): void {
-    if (event.key === 'Escape') { event.preventDefault(); this.hints?.remove(); this.refresh(true); this.wb?.focus(); return; }
-    const entries = [...this.hints?.querySelectorAll<HTMLButtonElement>('button') ?? []];
-    if (entries.length && ['ArrowDown', 'ArrowUp', 'Tab'].includes(event.key)) {
-      event.preventDefault(); const index = entries.indexOf(document.activeElement as HTMLButtonElement);
-      if (event.key === 'Tab') entries[Math.max(0, index)]?.click(); else entries[(index + (event.key === 'ArrowDown' ? 1 : -1) + entries.length) % entries.length]?.focus(); return;
-    }
+    if (this.hints?.key(event)) return;
+    if (event.key === 'Escape') { event.preventDefault(); this.wb?.getActiveSheet().endEdit(true); this.refresh(true); this.wb?.focus(); return; }
     if (event.key === 'Enter' && !event.altKey) {
       event.preventDefault(); if (!this.wb) return;
       const sheet = this.wb.getActiveSheet(), row = sheet.getActiveRowIndex(), col = sheet.getActiveColumnIndex(), text = this.text();
-      this.wb.commandManager().execute({ cmd: 'editCell', row, col, sheetName: sheet.name(), newValue: text.startsWith('=') ? text : new GeneralFormatter().parse(text) });
-      this.hints?.remove(); this.wb.focus(); this.refresh(true);
+      if (sheet.isEditing()) sheet.endEdit();
+      else this.wb.commandManager().execute({ cmd: 'editCell', row, col, sheetName: sheet.name(), newValue: text.startsWith('=') ? text : new GeneralFormatter().parse(text) });
+      this.hints?.close(); this.wb.focus(); this.refresh(true);
     }
   }
   private showSuggestions(): void {
-    this.hints?.remove(); const text = this.text(); if (!text.startsWith('=')) return;
-    const partial = /([A-Za-z][A-Za-z0-9.]*)$/.exec(text), call = /([A-Za-z][A-Za-z0-9.]*)\(([^()]*)$/.exec(text);
-    const panel = document.createElement('div'); panel.className = 'opensheets-formula-hints';
-    const rect = this.host.getBoundingClientRect(); Object.assign(panel.style, { position: 'fixed', left: `${rect.left}px`, top: `${rect.bottom}px`, zIndex: '100', background: 'white', color: '#333', border: '1px solid #aaa', font: '12px Arial', boxShadow: '1px 2px 5px #0003', maxHeight: '240px', overflow: 'auto', minWidth: '160px' });
-    if (partial && this.automatic) {
-      panel.setAttribute('role', 'listbox');
-      const names = [...new Set([...builtinNames(), ...this.descriptions.keys()])].filter(name => name.startsWith(partial[1].toUpperCase())).sort();
-      for (const name of names.slice(0, 50)) { const button = document.createElement('button'); button.textContent = name; button.setAttribute('role', 'option'); button.style.cssText = 'display:block;width:100%;border:0;background:white;text-align:left;padding:4px 8px;font:inherit'; button.addEventListener('click', () => { this.text(text.slice(0, -partial[1].length) + name + '('); this.input?.focus(); this.showSuggestions(); }); button.addEventListener('keydown', e => this.key(e)); panel.append(button); }
-      if (!names.length) return;
-    } else if (call && this.help) {
-      const name = call[1].toUpperCase(), description = this.descriptions.get(name), params = description?.parameters?.map(p => p.name) ?? functionParameters[name];
-      if (!params) return;
-      panel.setAttribute('role', 'tooltip'); const signature = document.createElement('div'); signature.style.padding = '5px'; const index = call[2].split(',').length - 1;
-      signature.append(name + '('); params.forEach((p, i) => { if (i) signature.append(', '); const part = document.createElement(i === Math.min(index, params.length - 1) ? 'b' : 'span'); part.textContent = p; signature.append(part); }); signature.append(')'); panel.append(signature);
-    } else return;
-    document.body.append(panel); this.hints = panel;
+    const input = this.input; const caret = input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement ? input.selectionStart ?? this.text().length : this.text().length;
+    this.hints?.update(this.text(), caret, this.automatic, this.help);
   }
-  destroy(): void { if (this.wb) { for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditEnded]) this.wb.unbind(event, this.bound); this.wb.unbind(Events.EditChange, this.editChanged); } this.abort.abort(); this.hints?.remove(); if (this.input !== this.host) this.host.replaceChildren(...this.original); controls.delete(this.host); this.wb = undefined; }
+  destroy(): void { if (this.wb) { for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditEnded]) this.wb.unbind(event, this.bound); this.wb.unbind(Events.EditChange, this.editChanged); } this.abort.abort(); this.hints?.close(); if (this.input !== this.host) this.host.replaceChildren(...this.original); controls.delete(this.host); this.wb = undefined; }
 }
 export class NameBox {
   options: { dropDownMaxHeight?: number; enableAddCustomName?: boolean; enableNavigateToRange?: boolean; showCustomNameListIndicator?: boolean };
