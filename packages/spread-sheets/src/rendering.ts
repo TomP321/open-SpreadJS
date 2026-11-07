@@ -387,7 +387,7 @@ export class WorkbookRenderer {
             // Icon-only rules suppress the cell text.
           } else if (iconWidth) {
             this.drawText(ctx, r, c, value, style, { ...rect, x: rect.x + iconWidth + 2, width: Math.max(0, rect.width - iconWidth - 2) }, false);
-          } else if (hyperlink) {
+          } else if (hyperlink && s._isFreshHyperlink(r, c)) {
             this.drawHyperlinkText(ctx, r, c, value, style, rect, hyperlink);
           } else this.drawText(ctx, r, c, value, style, rect, !span);
         }
@@ -899,7 +899,7 @@ export class WorkbookRenderer {
     ctx.fillStyle = edge; ctx.fillRect(0, 0, width, 1);
     this.tabHits = [];
     if (options.tabNavigationVisible) {
-      for (const [x, reverse] of [[28, true], [57, false]] as const) { ctx.fillStyle = resolveColor((reverse ? this.workbook.startSheetIndex() > 0 : this.workbook.startSheetIndex() < this.workbook.sheets.length - 1) ? '#217346' : '#bfbfbf'); ctx.beginPath(); ctx.moveTo(x + (reverse ? 2 : -2), 11); ctx.lineTo(x + (reverse ? -2 : 2), 14); ctx.lineTo(x + (reverse ? 2 : -2), 17); ctx.fill(); this.tabHits.push({ x: x - 12, width: 24, index: reverse ? -2 : -3 }); }
+      for (const [x, reverse] of [[28, true], [57, false]] as const) { const start = this.workbook.startSheetIndex(); const available = this.workbook.sheets.some((sheet, index) => !!sheet.visible() && (reverse ? index < start : index > start)); ctx.fillStyle = resolveColor(available ? '#217346' : '#bfbfbf'); ctx.beginPath(); ctx.moveTo(x + (reverse ? 2 : -2), 11); ctx.lineTo(x + (reverse ? -2 : 2), 14); ctx.lineTo(x + (reverse ? 2 : -2), 17); ctx.fill(); this.tabHits.push({ x: x - 12, width: 24, index: reverse ? -2 : -3 }); }
     }
     ctx.font = 'bold 10pt "Segoe UI"';
     const overflow = this.workbook.sheets.reduce((sum, sheet) => sum + Math.ceil(ctx.measureText(sheet.name()).width + 26), 0) > width - (options.tabNavigationVisible ? 114 : 0) - 81;
@@ -915,6 +915,7 @@ export class WorkbookRenderer {
       if (x + w > width - 40) break;
       const selected = i === active;
       ctx.fillStyle = selected ? 'white' : '#f6f6f6'; ctx.fillRect(x, 0, w, 25);
+      if (selected && sheet.options.sheetTabColor) { const gradient = ctx.createLinearGradient(0, 14, 0, 24); gradient.addColorStop(0, '#ffffff'); gradient.addColorStop(1, resolveColor(sheet.options.sheetTabColor)); ctx.fillStyle = gradient; ctx.fillRect(x + 1, 14, w - 2, 10); }
       if (!selected && sheet.options.sheetTabColor) { ctx.fillStyle = resolveColor(sheet.options.sheetTabColor); ctx.fillRect(x + 2, 3, w - 4, 22); }
       if (selected) { ctx.fillStyle = '#ababab'; ctx.fillRect(x, 0, 1, 25); ctx.fillRect(x + w - 1, 0, 1, 25); }
       if (selected) { ctx.fillStyle = resolveColor(sheet.options.sheetTabColor ?? '#217346'); ctx.fillRect(x, 23, w, 2); }

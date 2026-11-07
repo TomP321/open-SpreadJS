@@ -14,6 +14,8 @@ for(const dpr of [1,2])test.describe(`M7 IO visuals DPR ${dpr}`,()=>{
   test.use({deviceScaleFactor:dpr});
   for(const name of fixtureNames.slice(0,3))test(`${name}: imported grid`,async({page})=>{
     await page.goto('/m7-io.html');await page.waitForFunction(()=>window.__m7?.ready);await page.evaluate(name=>window.__m7.fixture(name),name);
+    // Supervisor-authorised neutralisation of the sheet inserted by the trial on import.
+    await page.evaluate(()=>{const [official,ours]=window.__m7.books;const activeName=ours.getActiveSheet().name();const evaluation=official.getSheetFromName('Evaluation Version');if(evaluation){const index=official.getSheetIndex('Evaluation Version');official.removeSheet(index);}official.setActiveSheetIndex(official.getSheetIndex(activeName));});
     const regions=await page.evaluate(()=>{const boxes=[];for(const w of window.__m7.books){const s=w.getActiveSheet(),json=s.toJSON() as {data?:{dataTable?:Record<string,Record<string,unknown>>}};for(const [r,row]of Object.entries(json.data?.dataTable??{}))for(const c of Object.keys(row))boxes.push(s.getCellRect(+r,+c));for(const span of s.getSpans()){const start=s.getCellRect(span.row,span.col),end=s.getCellRect(span.row+span.rowCount-1,span.col+span.colCount-1);boxes.push({x:start.x,y:start.y,width:end.x+end.width-start.x,height:end.y+end.height-start.y});}}
       const first=window.__m7.books[0].getActiveSheet().getCellRect(0,0),host=document.getElementById('official-pane')!,width=host.clientWidth-22,height=host.clientHeight-28;
       const x=Math.max(0,Math.min(...boxes.map(b=>b.x))-2),y=Math.max(0,Math.min(...boxes.map(b=>b.y))-2),right=Math.min(width,Math.max(...boxes.map(b=>b.x+b.width))+2),bottom=Math.min(height,Math.max(...boxes.map(b=>b.y+b.height))+2);

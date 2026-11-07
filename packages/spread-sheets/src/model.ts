@@ -1780,6 +1780,10 @@ export class Worksheet {
     if (fresh) return { command: '', drawUnderline: true, isVisited: false, target: 0, tooltip: '', url: '', ...record };
     return { command: '', drawUnderline: true, target: 0, tooltip: '', url: '', ...record };
   }
+  _isFreshHyperlink(row: number, col: number): boolean {
+    const hyperlink = this.cell(row, col, VIEW)?.hyperlink;
+    return !!hyperlink && Object.prototype.hasOwnProperty.call(hyperlink, '_fresh');
+  }
   setHyperlink(row: number, col: number, value: JsonRecord | null, area = VIEW): void {
     const cell = this.ensure(row, col, area);
     if (!value) delete cell.hyperlink;
