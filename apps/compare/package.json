@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@mescius/spread-sheets": "19.2.5",
+    "@mescius/spread-sheets-io": "19.2.5",
     "@opensheets/spread-sheets": "workspace:*"
   },
   "devDependencies": {

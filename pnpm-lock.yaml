@@ -41,6 +41,9 @@ importers:
       '@mescius/spread-sheets':
         specifier: 19.2.5
         version: 19.2.5
+      '@mescius/spread-sheets-io':
+        specifier: 19.2.5
+        version: 19.2.5
       '@opensheets/spread-sheets':
         specifier: workspace:*
         version: link:../../packages/spread-sheets
@@ -86,6 +89,9 @@ importers:
   packages/compat:
     devDependencies:
       '@mescius/spread-sheets':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-io':
         specifier: 19.2.5
         version: 19.2.5
       '@mescius/spread-sheets-react':
@@ -707,6 +713,9 @@ packages:
 
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
+
+  '@mescius/spread-sheets-io@19.2.5':
+    resolution: {integrity: sha512-1KSMwZY+26YdAymzGfkIqaC0h5pYwKkQkaRuCqQnjUprvOirYV8lPFaRgDWHsmoBlI7hZk+dtbMNJUVqhSL4DQ==}
 
   '@mescius/spread-sheets-react@19.2.5':
     resolution: {integrity: sha512-M5awmQoF6d5v4bderYAL79gsT68TaipFMFj2RnHJMouhlLHlv1q+nWh+x3Krpwsh2OoOrh85m3g68vdJtO/Twg==}
@@ -2102,6 +2111,10 @@ snapshots:
       keyv: 5.6.0
 
   '@keyv/serialize@1.1.1': {}
+
+  '@mescius/spread-sheets-io@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
 
   '@mescius/spread-sheets-react@19.2.5':
     dependencies:
