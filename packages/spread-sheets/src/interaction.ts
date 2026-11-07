@@ -99,6 +99,9 @@ export class Interaction {
       this.hints.update(editor.value, editor.selectionStart);
       const edit = this.editing; if (edit) edit.sheet._emit(Events.EditChange, { sheet: edit.sheet, sheetName: edit.sheet.name(), row: edit.row, col: edit.col, editingText: editor.value });
     }, { signal });
+    const updateHintCaret = () => { if (this.editing) this.hints.update(editor.value, editor.selectionStart); };
+    editor.addEventListener('click', updateHintCaret, { signal });
+    editor.addEventListener('keyup', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) updateHintCaret(); }, { signal });
     tabs.addEventListener('pointerdown', event => {
       const hit = this.tabHit(event.clientX); if (!hit) return;
       const pointing = hit.index >= 0 && this.canPoint();

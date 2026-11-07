@@ -46,7 +46,7 @@ export class FormulaTextBox {
         if (sheet && input) {
           const value = this.text();
           const selection = window.getSelection(); const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : undefined;
-          const caret = input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement ? input.selectionStart ?? value.length : range && input.contains(range.startContainer) ? range.startOffset : value.length;
+          const caret = this.caret();
           if (!sheet.isEditing()) sheet.startEdit(false, value);
           const editor = sheet._view()?.editor;
           if (editor && sheet.isEditing()) { sheet._view()?.interaction.updateFromFormulaBar(value, input, caret); input.focus(); if (range && !(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) { selection?.removeAllRanges(); selection?.addRange(range); } }
@@ -54,6 +54,8 @@ export class FormulaTextBox {
         this.showSuggestions();
       }, { signal });
       this.input.addEventListener('keydown', e => this.key(e as KeyboardEvent), { signal });
+      this.input.addEventListener('click', () => this.showSuggestions(), { signal });
+      this.input.addEventListener('keyup', e => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes((e as KeyboardEvent).key)) this.showSuggestions(); }, { signal });
       this.input.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== this.input) this.hints?.close(); }, 100); }, { signal });
     }
     this.hints?.close();
@@ -78,9 +80,16 @@ export class FormulaTextBox {
       this.hints?.close(); this.wb.focus(); this.refresh(true);
     }
   }
+  private caret(): number {
+    const input = this.input; if (!input) return 0;
+    if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) return input.selectionStart ?? this.text().length;
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || !input.contains(selection.anchorNode)) return this.text().length;
+    const range = selection.getRangeAt(0).cloneRange(); range.selectNodeContents(input); range.setEnd(selection.anchorNode!, selection.anchorOffset);
+    return range.toString().length;
+  }
   private showSuggestions(): void {
-    const input = this.input; const caret = input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement ? input.selectionStart ?? this.text().length : this.text().length;
-    this.hints?.update(this.text(), caret, this.automatic, this.help);
+    this.hints?.update(this.text(), this.caret(), this.automatic, this.help);
   }
   destroy(): void { if (this.wb) { for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditEnded]) this.wb.unbind(event, this.bound); this.wb.unbind(Events.EditChange, this.editChanged); } this.abort.abort(); this.hints?.close(); if (this.input !== this.host) this.host.replaceChildren(...this.original); controls.delete(this.host); this.wb = undefined; }
 }

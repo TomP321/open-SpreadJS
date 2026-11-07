@@ -19,6 +19,27 @@ const parameters: Record<string, string[]> = { SCATTERSPARKLINE: ['points1', '[p
 const descriptions: Record<string, string> = { SCATTERSPARKLINE: 'Plots pairs of values as a compact scatter chart.', BOXPLOTSPARKLINE: 'Shows the distribution of values as a compact box plot.', SPREADSPARKLINE: 'Displays the distribution of values in a compact chart.', SUBSTITUTE: 'Replaces matching text with new text.', SUBTOTAL: 'Calculates a subtotal for a range.', SUM: 'Adds numbers together.', SUMIF: 'Adds values that meet a condition.', SUMIFS: 'Adds values that meet multiple conditions.' };
 
 export interface HintDescription { name?: string; description?: string; parameters?: { name: string; optional?: boolean; repeatable?: boolean }[] }
+/** Find the innermost open function call, ignoring commas inside strings and nested expressions. */
+export function activeFormulaCall(text: string, caret: number): { name: string; argument: number } | undefined {
+  const stack: { name?: string; argument: number; delimiter: string }[] = [];
+  const before = text.slice(0, caret);
+  let quote = '';
+  for (let i = 0; i < before.length; i++) {
+    const char = before[i];
+    if (quote) {
+      if (char === quote) { if (before[i + 1] === quote) i++; else quote = ''; }
+    } else if (char === '"' || char === "'") quote = char;
+    else if (char === '(' || char === '{' || char === '[') {
+      const match = char === '(' ? /([A-Za-z_][A-Za-z0-9_.]*)\s*$/.exec(before.slice(0, i)) : null;
+      stack.push({ name: match?.[1].toUpperCase(), argument: 0, delimiter: char });
+    } else if (char === ')' || char === '}' || char === ']') {
+      const opening = char === ')' ? '(' : char === '}' ? '{' : '[';
+      if (stack.at(-1)?.delimiter === opening) stack.pop();
+    } else if (char === ',' && stack.length) stack[stack.length - 1].argument++;
+  }
+  const call = [...stack].reverse().find(entry => entry.name);
+  return call?.name ? { name: call.name, argument: call.argument } : undefined;
+}
 export class FormulaHints {
   private panel?: HTMLElement;
   private names: string[] = [];
@@ -41,10 +62,10 @@ export class FormulaHints {
       this.panel = panel; this.renderRows();
     } else {
       if (!help) return;
-      const call = /([A-Za-z_][A-Za-z0-9_.]*)\(([^()]*)$/.exec(before); if (!call) return;
-      const name = call[1].toUpperCase(); const custom = this.wb.getCustomFunction(name) as { description?: () => { parameters?: { name: string }[] } } | undefined;
+      const call = activeFormulaCall(text, caret); if (!call) return;
+      const name = call.name; const custom = this.wb.getCustomFunction(name) as { description?: () => { parameters?: { name: string }[] } } | undefined;
       const params = this.extra().find(d => d.name?.toUpperCase() === name)?.parameters?.map(p => p.name) ?? custom?.description?.().parameters?.map(p => p.name) ?? parameters[name]; if (!params?.length) return;
-      panel.setAttribute('role', 'tooltip'); panel.style.padding = '5px'; const index = call[2].split(',').length - 1;
+      panel.setAttribute('role', 'tooltip'); panel.style.padding = '5px'; const index = call.argument;
       panel.append(name + '('); params.forEach((p, i) => { if (i) panel.append(', '); const part = document.createElement(i === Math.min(index, params.length - 1) ? 'b' : 'span'); part.textContent = p; panel.append(part); }); panel.append(')'); this.panel = panel;
     }
     document.body.append(panel);
