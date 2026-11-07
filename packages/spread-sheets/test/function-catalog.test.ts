@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
+import '../src/calc/engine.js';
 import { functionCatalog } from '../src/calc/function-catalog.js';
-import { FormulaHints } from '../src/features/formula-hints.js';
+import { FormulaHints, builtinHintNames } from '../src/features/formula-hints.js';
 import type { Workbook } from '../src/model.js';
 
 describe('function catalog', () => {
@@ -35,6 +36,16 @@ describe('function catalog', () => {
     expect(document.querySelector('[role=tooltip]')?.textContent).toBe(`${name}(${signature})`);
     expect(functionCatalog[name].description.trim()).not.toBe('');
     hints.close();
+  });
+  it('gives every autocomplete function a description and signature', () => {
+    const names = [...new Set(builtinHintNames().map(name => name.toUpperCase()))].sort();
+    for (const name of names) {
+      const entry = functionCatalog[name];
+      expect(entry, `catalog entry for ${name}`).toBeDefined();
+      expect(entry.description.trim(), `description for ${name}`).not.toBe('');
+      expect(Array.isArray(entry.parameters), `signature for ${name}`).toBe(true);
+      for (const parameter of entry.parameters) expect(parameter.trim(), `parameter in ${name}`).not.toBe('');
+    }
   });
   it.each([
     ['=CASCADESPARKLINE(A1,1,', '[labelsRange]'],
@@ -102,6 +113,25 @@ describe('function catalog', () => {
     ['=BIN2OCT(1,', '[places]'],
     ['=BINOM.DIST.RANGE(1,2,3,', '[number_s2]'],
     ['=BULLETSPARKLINE(1,2,3,', '[good]'],
+    ['=EURO("DEM",', undefined],
+    ['=LAG(1,', '[offset_value]'],
+    ['=LAG(1,2,', '[default_value]'],
+    ['=NTILE(3,', undefined],
+    ['=OBJECT("a",1,', '[property2]'],
+    ['=OBJECT("a",1,"b",2,', '[property2]'],
+    ['=OBJECT("a",1,"b",2,3,', '[expression2]'],
+    ['=PIESPARKLINE(A1,', '[color1]'],
+    ['=PIESPARKLINE(A1,1,2,', '[color1]'],
+    ['=QUERY("T","c",', '[returnObject]'],
+    ['=R.YOY(A1,B1,', '[ContextCell2]'],
+    ['=R.CURRENTPAGE(', '[use_grouped_context]'],
+    ['=REFRESH(A1,1,', '[interval]'],
+    ['=SJS.ENDWITH("a","b",', '[match_mode]'],
+    ['=SJS.FISCALYEAR(1,', '[start_month]'],
+    ['=SJS.TABLE(A1,B1,C1,', '[inputs2]'],
+    ['=SJS.TABLE(A1,B1,C1,D1,E1,F1,', '[input_cell2]'],
+    ['=SJS.UUID(', '[number]'],
+    ['=WINDOWDEF(', '[partition_by]'],
   ])('highlights the active argument in %s', (formula, expected) => {
     const hints = new FormulaHints({ getCustomFunction: () => undefined } as unknown as Workbook, document.createElement('div'), () => {});
     hints.update(formula, formula.length);
