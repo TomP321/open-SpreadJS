@@ -1,0 +1,1196 @@
+[
+  {
+    "text": "Add Record",
+    "name": "reportSheetAddRecord",
+    "command": "reportSheetAddRecord",
+    "iconClass": "gc-spread-reportSheetAddRecord",
+    "workArea": "viewport"
+  },
+  {
+    "text": "Delete Record",
+    "name": "reportSheetDeleteRecord",
+    "command": "reportSheetDeleteRecord",
+    "iconClass": "gc-spread-reportSheetDeleteRecord",
+    "workArea": "viewport"
+  },
+  {
+    "text": "Submit",
+    "name": "reportSheetSubmit",
+    "command": "reportSheetSubmit",
+    "iconClass": "gc-spread-reportSheetSubmit",
+    "workArea": "viewport"
+  },
+  {
+    "text": "Reset Current Cell",
+    "name": "reportSheetResetCellValue",
+    "command": "reportSheetResetCellValue",
+    "iconClass": "gc-spread-reportSheetResetCellValue",
+    "workArea": "viewport"
+  },
+  {
+    "text": "Collapse All",
+    "name": "reportSheetCollapseAll",
+    "command": "reportSheetCollapseAll",
+    "iconClass": "gc-spread-reportSheetCollapseAll",
+    "workArea": "viewport"
+  },
+  {
+    "text": "Expand All",
+    "name": "reportSheetExpandAll",
+    "command": "reportSheetExpandAll",
+    "iconClass": "gc-spread-reportSheetExpandAll",
+    "workArea": "viewport"
+  },
+  {
+    "text": "Copy",
+    "name": "gc.spread.copy",
+    "command": "gc.spread.contextMenu.copy",
+    "iconClass": "gc-spread-copy",
+    "workArea": "viewportcolHeaderrowHeaderslicercornerpivotTabletimeline",
+    "metaData": {
+      "viewModePermissions": 31
+    }
+  },
+  {
+    "text": "Cut",
+    "name": "gc.spread.cut",
+    "command": "gc.spread.contextMenu.cut",
+    "iconClass": "gc-spread-cut",
+    "workArea": "viewportcolHeaderrowHeaderslicercornertimeline"
+  },
+  {
+    "text": "Paste Options:",
+    "name": "gc.spread.pasteOptions",
+    "iconClass": "gc-spread-pasteOptions",
+    "type": "groupHeader",
+    "workArea": "viewportcolHeaderrowHeaderslicercornertimeline"
+  },
+  {
+    "command": "gc.spread.contextMenu.pasteAll",
+    "name": "gc.spread.pasteAll",
+    "iconClass": "gc-spread-pasteAll",
+    "group": "gc.spread.pasteOptions",
+    "text": "All",
+    "workArea": "viewportcolHeaderrowHeaderslicercornertimeline"
+  },
+  {
+    "command": "gc.spread.contextMenu.pasteFormula",
+    "name": "gc.spread.pasteFormula",
+    "iconClass": "gc-spread-pasteFormula",
+    "group": "gc.spread.pasteOptions",
+    "text": "Formulas",
+    "workArea": "viewportcolHeaderrowHeadercorner"
+  },
+  {
+    "command": "gc.spread.contextMenu.pasteValues",
+    "name": "gc.spread.pasteValues",
+    "iconClass": "gc-spread-pasteValues",
+    "group": "gc.spread.pasteOptions",
+    "text": "Values",
+    "workArea": "viewportcolHeaderrowHeadercorner"
+  },
+  {
+    "command": "gc.spread.contextMenu.pasteFormatting",
+    "name": "gc.spread.pasteFormatting",
+    "iconClass": "gc-spread-pasteFormatting",
+    "group": "gc.spread.pasteOptions",
+    "text": "Formatting",
+    "workArea": "viewportcolHeaderrowHeadercorner"
+  },
+  {
+    "command": "gc.spread.contextMenu.pasteValuesFormatting",
+    "name": "gc.spread.pasteValuesFormatting",
+    "iconClass": "gc-spread-pasteValuesFormatting",
+    "group": "gc.spread.pasteOptions",
+    "text": "Values&Formatting",
+    "workArea": "viewportcolHeaderrowHeadercorner"
+  },
+  {
+    "command": "gc.spread.contextMenu.pasteFormulaFormatting",
+    "name": "gc.spread.pasteFormulaFormatting",
+    "iconClass": "gc-spread-pasteFormulaFormatting",
+    "group": "gc.spread.pasteOptions",
+    "text": "Formula&Formatting",
+    "workArea": "viewportcolHeaderrowHeadercorner"
+  },
+  {
+    "text": "Paste Special...",
+    "name": "gc.spread.pasteSpecial",
+    "command": "openPasteSpecialDialog",
+    "workArea": "viewportcolHeaderrowHeadercorner",
+    "type": "splitSubMenu",
+    "subMenu": [
+      {
+        "text": "Paste",
+        "name": "gc.spread.pasteSpecialPasteGroup",
+        "type": "groupHeader"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteAll",
+        "name": "gc.spread.pasteSpecial.pasteAll",
+        "iconClass": "gc-spread-pasteAll",
+        "group": "gc.spread.pasteSpecialPasteGroup",
+        "text": "All"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteFormula",
+        "name": "gc.spread.pasteSpecial.pasteFormula",
+        "iconClass": "gc-spread-pasteFormula",
+        "group": "gc.spread.pasteSpecialPasteGroup",
+        "text": "Formulas"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteFormulaAndNumberFormat",
+        "name": "gc.spread.formulaAndNumberFormat",
+        "iconClass": "gc-spread-pasteFormulaAndNumberFormat",
+        "group": "gc.spread.pasteSpecialPasteGroup",
+        "text": "Formula & Number Formatting"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteKeepSourceFormatting",
+        "name": "gc.spread.keepSourceFormatting",
+        "iconClass": "gc-spread-pasteKeepSourceFormat",
+        "group": "gc.spread.pasteSpecialPasteGroup",
+        "text": "Keep Source Formatting"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteNoBorders",
+        "name": "gc.spread.noBorders",
+        "iconClass": "gc-spread-pasteNoBorders",
+        "group": "gc.spread.pasteSpecialPasteGroup",
+        "text": "No Borders"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteColumnWidth",
+        "name": "gc.spread.keepSourceColumnWidth",
+        "iconClass": "gc-spread-pasteColumnWidth",
+        "group": "gc.spread.pasteSpecialPasteGroup",
+        "text": "Keep Source Column Widths"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteTranspose",
+        "name": "gc.spread.transpose",
+        "iconClass": "gc-spread-pasteTranspose",
+        "group": "gc.spread.pasteSpecialPasteGroup",
+        "text": "Transpose"
+      },
+      {
+        "text": "Values",
+        "name": "gc.spread.pasteSpecialPasteValueGroup",
+        "type": "groupHeader"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteValues",
+        "name": "gc.spread.pasteSpecial.pasteValues",
+        "iconClass": "gc-spread-pasteValues",
+        "group": "gc.spread.pasteSpecialPasteValueGroup",
+        "text": "Values"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteValueAndNumberFormats",
+        "name": "gc.spread.pasteValueAndNumberFormat",
+        "iconClass": "gc-spread-pasteValueAndNumberFormats",
+        "group": "gc.spread.pasteSpecialPasteValueGroup",
+        "text": "Values & Number Formatting"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteValueAndSourceFormats",
+        "name": "gc.spread.pasteValueAndSourceFormat",
+        "iconClass": "gc-spread-valueAndSourceFormats",
+        "group": "gc.spread.pasteSpecialPasteValueGroup",
+        "text": "Values & Source Formatting"
+      },
+      {
+        "text": "Other Paste Options",
+        "name": "gc.spread.pasteSpecialOtherOptionsGroup",
+        "type": "groupHeader"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteFormatting",
+        "name": "gc.spread.pasteSpecial.pasteFormatting",
+        "iconClass": "gc-spread-pasteValuesFormatting",
+        "group": "gc.spread.pasteSpecialOtherOptionsGroup",
+        "text": "Formatting"
+      },
+      {
+        "command": "gc.spread.contextMenu.pasteLink",
+        "name": "gc.spread.pasteLink",
+        "iconClass": "gc-spread-pasteLink",
+        "group": "gc.spread.pasteSpecialOtherOptionsGroup",
+        "text": "Paste Link"
+      },
+      {
+        "type": "separator"
+      },
+      {
+        "command": "openPasteSpecialDialog",
+        "name": "gc.spread.pasteSpecial.pasteSpecial",
+        "text": "Paste Special..."
+      }
+    ]
+  },
+  {
+    "text": "Paste",
+    "name": "gc.spread.paste",
+    "command": "gc.spread.contextMenu.pasteValues",
+    "iconClass": "gc-spread-pasteOptions",
+    "workArea": "viewportcolHeaderrowHeadercorner"
+  },
+  {
+    "text": "Paste",
+    "name": "gc.spread.ganttSheetPaste",
+    "command": "gc.spread.contextMenu.pasteGanttValues",
+    "iconClass": "gc-spread-pasteOptions",
+    "workArea": "viewportcolHeaderrowHeadercorner"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Pin/Unpin Rows",
+    "name": "gc.spread.pinRows",
+    "command": "gc.spread.contextMenu.pinRows",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Pin/Unpin Columns",
+    "name": "gc.spread.pinColumns",
+    "command": "gc.spread.contextMenu.pinColumns",
+    "workArea": "colHeader"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Modify Column",
+    "name": "gc.spread.colHeadermodifyColumn",
+    "command": "gc.spread.contextMenu.modifyColumn",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Remove Column",
+    "name": "gc.spread.colHeaderremoveColumn",
+    "command": "gc.spread.contextMenu.removeColumn",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Set/Unset Primary Key",
+    "name": "gc.spread.colHeadersetPrimaryKey",
+    "command": "gc.spread.contextMenu.setPrimaryKey",
+    "workArea": "colHeader"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Scroll To Task",
+    "name": "gc.spread.scrollToTask",
+    "command": "gc.spread.contextMenu.scrollToTask",
+    "workArea": "GanttRowHeaderGanttField"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Insert Task",
+    "name": "gc.spread.insertTask",
+    "command": "gc.spread.contextMenu.insertTask",
+    "workArea": "GanttRowHeaderGanttField"
+  },
+  {
+    "text": "Delete Task",
+    "name": "gc.spread.deleteTask",
+    "command": "gc.spread.contextMenu.deleteTask",
+    "workArea": "GanttRowHeaderGanttField"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Indent Task",
+    "name": "gc.spread.indentGanttTask",
+    "command": "gc.spread.contextMenu.indentGanttTask",
+    "workArea": "GanttRowHeaderGanttField"
+  },
+  {
+    "text": "Outdent Task",
+    "name": "gc.spread.outdentGanttTask",
+    "command": "gc.spread.contextMenu.outdentGanttTask",
+    "workArea": "GanttRowHeaderGanttField"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Manually Schedule",
+    "name": "gc.spread.manuallySchedule",
+    "command": "gc.spread.contextMenu.manuallySchedule",
+    "workArea": "GanttRowHeaderGanttField"
+  },
+  {
+    "text": "Auto Schedule",
+    "name": "gc.spread.autoSchedule",
+    "command": "gc.spread.contextMenu.autoSchedule",
+    "workArea": "GanttRowHeaderGanttField"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Hide Column",
+    "name": "gc.spread.hideGanttColumn",
+    "command": "gc.spread.contextMenu.hideGanttColumn",
+    "workArea": "GanttColumn"
+  },
+  {
+    "text": "Unhide Column",
+    "name": "gc.spread.unHideGanttColumn",
+    "command": "gc.spread.contextMenu.unHideGanttColumn",
+    "workArea": "GanttColumn"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Promote",
+    "name": "gc.spread.rowHeaderpromote",
+    "command": "gc.spread.contextMenu.promote",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Demote",
+    "name": "gc.spread.rowHeaderdemote",
+    "command": "gc.spread.contextMenu.demote",
+    "workArea": "rowHeader"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Move Up",
+    "name": "gc.spread.rowHeadermoveUp",
+    "command": "gc.spread.contextMenu.moveUp",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Move Down",
+    "name": "gc.spread.rowHeadermoveDown",
+    "command": "gc.spread.contextMenu.moveDown",
+    "workArea": "rowHeader"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Add After",
+    "name": "gc.spread.rowHeaderaddAfter",
+    "command": "gc.spread.contextMenu.addAfter",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Add Before",
+    "name": "gc.spread.rowHeaderaddBefore",
+    "command": "gc.spread.contextMenu.addBefore",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Add Above",
+    "name": "gc.spread.rowHeaderaddAbove",
+    "command": "gc.spread.contextMenu.addAbove",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Add Below",
+    "name": "gc.spread.rowHeaderaddBelow",
+    "command": "gc.spread.contextMenu.addBelow",
+    "workArea": "rowHeader"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Expand All Levels",
+    "name": "gc.spread.colHeaderexpandAllLevels",
+    "command": "gc.spread.contextMenu.expandAllLevels",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Collapse All Levels",
+    "name": "gc.spread.colHeadercollapseAllLevels",
+    "command": "gc.spread.contextMenu.collapseAllLevels",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 1",
+    "name": "gc.spread.colHeaderexpandLevel1",
+    "command": "gc.spread.contextMenu.expandLevel1",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 2",
+    "name": "gc.spread.colHeaderexpandLevel2",
+    "command": "gc.spread.contextMenu.expandLevel2",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 3",
+    "name": "gc.spread.colHeaderexpandLevel3",
+    "command": "gc.spread.contextMenu.expandLevel3",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 4",
+    "name": "gc.spread.colHeaderexpandLevel4",
+    "command": "gc.spread.contextMenu.expandLevel4",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 5",
+    "name": "gc.spread.colHeaderexpandLevel5",
+    "command": "gc.spread.contextMenu.expandLevel5",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 6",
+    "name": "gc.spread.colHeaderexpandLevel6",
+    "command": "gc.spread.contextMenu.expandLevel6",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 7",
+    "name": "gc.spread.colHeaderexpandLevel7",
+    "command": "gc.spread.contextMenu.expandLevel7",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 8",
+    "name": "gc.spread.colHeaderexpandLevel8",
+    "command": "gc.spread.contextMenu.expandLevel8",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Expand to Level 9",
+    "name": "gc.spread.colHeaderexpandLevel9",
+    "command": "gc.spread.contextMenu.expandLevel9",
+    "workArea": "colHeader"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Clear Contents",
+    "command": "gc.spread.contextMenu.clearContents",
+    "name": "gc.spread.clearContents",
+    "workArea": "viewportcolHeaderrowHeadercorner"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Insert Copied Cells",
+    "name": "gc.spread.rowHeaderinsertCopiedCells",
+    "command": "gc.spread.contextMenu.rowHeaderinsertCopiedCells",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Insert Cut Cells",
+    "name": "gc.spread.rowHeaderinsertCutCells",
+    "command": "gc.spread.contextMenu.rowHeaderinsertCutCells",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Insert Copied Cells",
+    "name": "gc.spread.colHeaderinsertCopiedCells",
+    "command": "gc.spread.contextMenu.colHeaderinsertCopiedCells",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Insert Cut Cells",
+    "name": "gc.spread.colHeaderinsertCutCells",
+    "command": "gc.spread.contextMenu.colHeaderinsertCutCells",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Insert Copied Cells...",
+    "name": "gc.spread.insertCopiedCells",
+    "subMenu": [
+      {
+        "text": "Shift Cells Right",
+        "name": "gc.spread.insertCopiedCellsshiftCellsRight",
+        "command": "gc.spread.contextMenu.insertCopiedCellsshiftCellsRight",
+        "iconClass": "gc-spread-shiftCellsRight"
+      },
+      {
+        "text": "Shift Cells Down",
+        "name": "gc.spread.insertCopiedCellsshiftCellsDown",
+        "command": "gc.spread.contextMenu.insertCopiedCellsshiftCellsDown",
+        "iconClass": "gc-spread-shiftCellsDown"
+      }
+    ],
+    "workArea": "viewport"
+  },
+  {
+    "text": "Insert Cut Cells...",
+    "name": "gc.spread.insertCutCells",
+    "subMenu": [
+      {
+        "text": "Shift Cells Right",
+        "name": "gc.spread.insertCutCellsshiftCellsRight",
+        "command": "gc.spread.contextMenu.insertCutCellsshiftCellsRight",
+        "iconClass": "gc-spread-shiftCellsRight"
+      },
+      {
+        "text": "Shift Cells Down",
+        "name": "gc.spread.insertCutCellsshiftCellsDown",
+        "command": "gc.spread.contextMenu.insertCutCellsshiftCellsDown",
+        "iconClass": "gc-spread-shiftCellsDown"
+      }
+    ],
+    "workArea": "viewportrowHeadercolHeader"
+  },
+  {
+    "text": "Insert",
+    "name": "gc.spread.insertRows",
+    "command": "gc.spread.contextMenu.insertRows",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Insert",
+    "name": "gc.spread.insertColumns",
+    "command": "gc.spread.contextMenu.insertColumns",
+    "workArea": "colHeader"
+  },
+  {
+    "text": "Delete",
+    "name": "gc.spread.deleteRows",
+    "command": "gc.spread.contextMenu.deleteRows",
+    "workArea": "rowHeader"
+  },
+  {
+    "text": "Delete",
+    "name": "gc.spread.deleteColumns",
+    "command": "gc.spread.contextMenu.deleteColumns",
+    "workArea": "colHeader"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Insert",
+    "name": "gc.spread.tableInsert",
+    "subMenu": [
+      {
+        "text": "Table Columns to the Left",
+        "name": "gc.spread.tableInsertColumnsLeft",
+        "command": "tableInsertColumnsLeftForContextMenu",
+        "iconClass": "gc-spread-tableInsertColumnsLeft"
+      },
+      {
+        "text": "Table Columns to the Right",
+        "name": "gc.spread.tableInsertColumnsRight",
+        "command": "tableInsertColumnsRightForContextMenu",
+        "iconClass": "gc-spread-tableInsertColumnsRight"
+      },
+      {
+        "text": "Table Rows Above",
+        "name": "gc.spread.tableInsertRowsAbove",
+        "command": "tableInsertRowsAboveForContextMenu",
+        "iconClass": "gc-spread-tableInsertRowsAbove"
+      },
+      {
+        "text": "Table Row Below",
+        "name": "gc.spread.tableInsertRowsBelow",
+        "command": "tableInsertRowsBelowForContextMenu",
+        "iconClass": "gc-spread-tableInsertRowsBelow"
+      },
+      {
+        "text": "Entire Sheet Row",
+        "name": "gc.spread.tableInsertEntireSheetRows",
+        "command": "gc.spread.contextMenu.insertRows",
+        "iconClass": "gc-spread-tableInsertRowsAbove"
+      }
+    ],
+    "workArea": "table"
+  },
+  {
+    "text": "Delete",
+    "name": "gc.spread.tableDelete",
+    "subMenu": [
+      {
+        "text": "Table Columns",
+        "name": "gc.spread.tableDeleteColumns",
+        "command": "tableDeleteColumnsForContextMenu",
+        "iconClass": "gc-spread-tableDeleteColumns"
+      },
+      {
+        "text": "Table Rows",
+        "name": "gc.spread.tableDeleteRows",
+        "command": "tableDeleteRowsForContextMenu",
+        "iconClass": "gc-spread-tableDeleteRows"
+      },
+      {
+        "text": "Entire Sheet Row",
+        "name": "gc.spread.tableDeleteEntireSheetRows",
+        "command": "gc.spread.contextMenu.deleteRows",
+        "iconClass": "gc-spread-tableDeleteRows"
+      }
+    ],
+    "workArea": "table"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Insert",
+    "name": "gc.spread.insertSheet",
+    "command": "gc.spread.contextMenu.insertSheet",
+    "workArea": "sheetTab"
+  },
+  {
+    "text": "Delete",
+    "name": "gc.spread.deleteSheet",
+    "command": "gc.spread.contextMenu.deleteSheet",
+    "iconClass": "gc-spread-deleteSheet",
+    "workArea": "sheetTab"
+  },
+  {
+    "text": "Rename",
+    "name": "gc.spread.startEditSheetName",
+    "command": "startEditSheetName",
+    "iconClass": "gc-spread-startEditSheetName",
+    "workArea": "sheetTab",
+    "needKeepFocus": true
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Filter",
+    "name": "gc.spread.filter",
+    "command": "gc.spread.contextMenu.filter",
+    "workArea": "viewportcorner",
+    "metaData": {
+      "viewModePermissions": 8
+    }
+  },
+  {
+    "text": "Sort",
+    "name": "gc.spread.sort",
+    "subMenu": [
+      {
+        "text": "Sort A to Z",
+        "name": "gc.spread.sortAscend",
+        "command": "gc.spread.contextMenu.sortAscend",
+        "iconClass": "gc-spread-sortAscend"
+      },
+      {
+        "text": "Sort Z to A",
+        "name": "gc.spread.sortDescend",
+        "command": "gc.spread.contextMenu.sortDescend",
+        "iconClass": "gc-spread-sortDescend"
+      }
+    ],
+    "metaData": {
+      "viewModePermissions": 16
+    },
+    "workArea": "viewportcorner"
+  },
+  {
+    "text": "Sort A to Z",
+    "name": "gc.spread.slicerSortAscend",
+    "command": "gc.spread.contextMenu.slicerSortAscend",
+    "iconClass": "gc-spread-sortAscend",
+    "workArea": "slicer",
+    "metaData": {
+      "viewModePermissions": 16
+    }
+  },
+  {
+    "text": "Sort Z to A",
+    "name": "gc.spread.slicerSortDescend",
+    "command": "gc.spread.contextMenu.slicerSortDescend",
+    "iconClass": "gc-spread-sortDescend",
+    "workArea": "slicer",
+    "metaData": {
+      "viewModePermissions": 16
+    }
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "New Threaded Comment",
+    "name": "gc.spread.insertThreadedComment",
+    "command": "gc.spread.contextMenu.insertThreadedComment",
+    "iconClass": "gc-spread-insertThreadedComment",
+    "workArea": "viewportcorner",
+    "needKeepFocus": true
+  },
+  {
+    "text": "Reply to Threaded Comment",
+    "name": "gc.spread.replyToThreadedComment",
+    "command": "gc.spread.contextMenu.replyToThreadedComment",
+    "iconClass": "gc-spread-replyToThreadedComment",
+    "workArea": "viewportcorner",
+    "needKeepFocus": true
+  },
+  {
+    "text": "Insert Comment",
+    "name": "gc.spread.insertComment",
+    "command": "gc.spread.contextMenu.insertComment",
+    "iconClass": "gc-spread-insertComment",
+    "workArea": "viewportcorner",
+    "needKeepFocus": true
+  },
+  {
+    "text": "Edit Comment",
+    "name": "gc.spread.editComment",
+    "command": "gc.spread.contextMenu.editComment",
+    "iconClass": "gc-spread-editComment",
+    "workArea": "viewportcorner",
+    "needKeepFocus": true
+  },
+  {
+    "text": "Delete Threaded Comment",
+    "name": "gc.spread.deleteThreadedComment",
+    "command": "gc.spread.contextMenu.deleteThreadedComment",
+    "iconClass": "gc-spread-deleteThreadedComment",
+    "workArea": "viewportcorner"
+  },
+  {
+    "text": "Delete Comment",
+    "name": "gc.spread.deleteComment",
+    "command": "gc.spread.contextMenu.deleteComment",
+    "iconClass": "gc-spread-deleteComment",
+    "workArea": "viewportcorner"
+  },
+  {
+    "text": "Show/Hide Comment",
+    "name": "gc.spread.toggleComment",
+    "command": "gc.spread.contextMenu.toggleComment",
+    "workArea": "viewportcorner"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Hide",
+    "name": "gc.spread.hideRows",
+    "command": "gc.spread.contextMenu.hideRows",
+    "workArea": "rowHeader",
+    "metaData": {
+      "viewModePermissions": 2
+    }
+  },
+  {
+    "text": "Unhide",
+    "name": "gc.spread.unhideRows",
+    "command": "gc.spread.contextMenu.unhideRows",
+    "workArea": "rowHeader",
+    "metaData": {
+      "viewModePermissions": 2
+    }
+  },
+  {
+    "text": "Hide",
+    "name": "gc.spread.hideColumns",
+    "command": "gc.spread.contextMenu.hideColumns",
+    "workArea": "colHeader",
+    "metaData": {
+      "viewModePermissions": 2
+    }
+  },
+  {
+    "text": "Unhide",
+    "name": "gc.spread.unhideColumns",
+    "command": "gc.spread.contextMenu.unhideColumns",
+    "workArea": "colHeader",
+    "metaData": {
+      "viewModePermissions": 2
+    }
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Hide",
+    "name": "gc.spread.hideSheet",
+    "command": "gc.spread.contextMenu.hideSheet",
+    "workArea": "sheetTab"
+  },
+  {
+    "text": "Unhide",
+    "name": "gc.spread.unhideSheet",
+    "command": "gc.spread.contextMenu.unhideSheet",
+    "workArea": "sheetTab"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Remove",
+    "name": "gc.spread.removeSlicer",
+    "command": "gc.spread.contextMenu.removeSlicer",
+    "workArea": "slicertimeline"
+  },
+  {
+    "type": "separator"
+  },
+  {
+    "text": "Sort",
+    "name": "gc.spread.sort",
+    "subMenu": [
+      {
+        "text": "Sort A to Z",
+        "name": "gc.spread.sortAscend",
+        "command": "pivotSort",
+        "iconClass": "gc-spread-sortAscend",
+        "commandOptions": {
+          "subType": 0
+        },
+        "placeholder": "SortType"
+      },
+      {
+        "text": "Sort Z to A",
+        "name": "gc.spread.sortDescend",
+        "command": "pivotSort",
+        "iconClass": "gc-spread-sortDescend",
+        "commandOptions": {
+          "subType": 1
+        },
+        "placeholder": "SortType"
+      },
+      {
+        "text": "More Sort Options...",
+        "name": "gc.spread.sortMoreOptions",
+        "command": "createDialogForPivotSort"
+      }
+    ],
+    "workArea": "pivotHeaderpivotContent"
+  },
+  {
+    "text": "Refresh",
+    "name": "gc.spread.pivotpivotRefresh",
+    "command": "pivotRefresh",
+    "iconClass": "gc-spread-pivotRefresh",
+    "workArea": "pivotPageFilterpivotTopLeftpivotContentpivotHeaderpivotGrandTotalpivotEmptyLabel"
+  },
+  {
+    "text": "Remove {0}",
+    "name": "gc.spread.pivotremoveField",
+    "command": "removeField",
+    "iconClass": "gc-spread-removeField",
+    "workArea": "pivotPageFilterpivotTopLeftpivotContentpivotHeader",
+    "placeholder": "FieldName"
+  },
+  {
+    "text": "Remove GrandTotal",
+    "name": "gc.spread.pivotremovePivotGrandTotal",
+    "command": "removePivotGrandTotal",
+    "workArea": "pivotGrandTotal"
+  },
+  {
+    "text": "Summarize Values By",
+    "name": "gc.spread.pivotpivotSummarizeValuesBy",
+    "command": "emptyCommand",
+    "subMenu": [
+      {
+        "text": "Sum",
+        "name": "gc.spread.pivotSum",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "subTotalType": 8
+        }
+      },
+      {
+        "text": "Count",
+        "name": "gc.spread.pivotCount",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "subTotalType": 1
+        }
+      },
+      {
+        "text": "Average",
+        "name": "gc.spread.pivotAverage",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "subTotalType": 0
+        }
+      },
+      {
+        "text": "Max",
+        "name": "gc.spread.pivotMax",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "subTotalType": 3
+        }
+      },
+      {
+        "text": "Min",
+        "name": "gc.spread.pivotMin",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "subTotalType": 4
+        }
+      },
+      {
+        "text": "Product",
+        "name": "gc.spread.pivotProduct",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "subTotalType": 5
+        }
+      }
+    ],
+    "workArea": "pivotTopLeftpivotContentpivotGrandTotal"
+  },
+  {
+    "text": "Show Value As",
+    "name": "gc.spread.pivotpivotShowValueAs",
+    "command": "emptyCommand",
+    "subMenu": [
+      {
+        "text": "No Calculation",
+        "name": "gc.spread.pivotNoCalculation",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "showValueAsType": 0
+        }
+      },
+      {
+        "text": "% of Grand Total",
+        "name": "gc.spread.pivotGrandtotal",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "showValueAsType": 1
+        }
+      },
+      {
+        "text": "% of Column Total",
+        "name": "gc.spread.pivotColumnTotal",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "showValueAsType": 3
+        }
+      },
+      {
+        "text": "% of Row Total",
+        "name": "gc.spread.pivotRowTotal",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "showValueAsType": 2
+        }
+      },
+      {
+        "text": "% Of...",
+        "name": "gc.spread.pivotOf",
+        "command": "OpenPivotShowValueAsDialog",
+        "commandOptions": {
+          "showValueAsType": 4
+        }
+      },
+      {
+        "text": "% of Parent Row Total",
+        "name": "gc.spread.pivotParentRowTotal",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "showValueAsType": 5
+        }
+      },
+      {
+        "text": "% of Parent Column Total",
+        "name": "gc.spread.pivotParentColumnTotal",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "showValueAsType": 6
+        }
+      },
+      {
+        "text": "% of Parent Total...",
+        "name": "gc.spread.pivotOfParentTotal",
+        "command": "OpenPivotShowValueAsDialog",
+        "commandOptions": {
+          "showValueAsType": 7
+        }
+      },
+      {
+        "text": "Difference From...",
+        "name": "gc.spread.pivotDifferenceFrom",
+        "command": "OpenPivotShowValueAsDialog",
+        "commandOptions": {
+          "showValueAsType": 8
+        }
+      },
+      {
+        "text": "% Difference From...",
+        "name": "gc.spread.pivotPercentDifferenceFro",
+        "command": "OpenPivotShowValueAsDialog",
+        "commandOptions": {
+          "showValueAsType": 9
+        }
+      },
+      {
+        "text": "Running Total In...",
+        "name": "gc.spread.pivotRunningTotalIn",
+        "command": "OpenPivotShowValueAsDialog",
+        "commandOptions": {
+          "showValueAsType": 10
+        }
+      },
+      {
+        "text": "% Running Total In...",
+        "name": "gc.spread.pivotPercentRunningTotalIn",
+        "command": "OpenPivotShowValueAsDialog",
+        "commandOptions": {
+          "showValueAsType": 11
+        }
+      },
+      {
+        "text": "Rank Smallest to Largest...",
+        "name": "gc.spread.pivotRankSmallestToLargest",
+        "command": "OpenPivotShowValueAsDialog",
+        "commandOptions": {
+          "showValueAsType": 12
+        }
+      },
+      {
+        "text": "Rank Largest to Smallest...",
+        "name": "gc.spread.pivotRankLargestToSmallest",
+        "command": "OpenPivotShowValueAsDialog",
+        "commandOptions": {
+          "showValueAsType": 13
+        }
+      },
+      {
+        "text": "Index",
+        "name": "gc.spread.pivotIndex",
+        "command": "UpdatePivotValueFieldCmd",
+        "commandOptions": {
+          "showValueAsType": 14
+        }
+      }
+    ],
+    "workArea": "pivotTopLeftpivotContent"
+  },
+  {
+    "text": "Filter",
+    "name": "gc.spread.pivotpivotFilter",
+    "iconClass": "gc-spread-pivotFilter",
+    "command": "emptyCommand",
+    "subMenu": [
+      {
+        "text": "Clear Filter From {0}",
+        "name": "gc.spread.pivotClearFilterFrom",
+        "command": "ClearCommand",
+        "iconClass": "gc-spread-pivotClearFilterFrom",
+        "placeholder": "FieldName",
+        "commandOptions": {
+          "clearType": 0
+        }
+      },
+      {
+        "text": "Keep Only Selected Items",
+        "name": "gc.spread.pivotKeepOnlySelectedItems",
+        "command": "filterFieldLabelValue",
+        "commandOptions": {
+          "subType": 1
+        }
+      },
+      {
+        "text": "Hide Selected Items",
+        "name": "gc.spread.pivotHideSelectedItems",
+        "command": "filterFieldLabelValue",
+        "commandOptions": {
+          "subType": 2
+        }
+      },
+      {
+        "text": "Top 10...",
+        "name": "gc.spread.pivotTop10",
+        "command": "createDialogForValueFilter",
+        "commandOptions": {
+          "isTop10": true
+        }
+      },
+      {
+        "text": "Label Filters...",
+        "name": "gc.spread.pivotLabelFilters",
+        "command": "createDialogForLabelFilter"
+      },
+      {
+        "text": "Value Filters...",
+        "name": "gc.spread.pivotValueFilters",
+        "command": "createDialogForValueFilter"
+      }
+    ],
+    "workArea": "pivotHeader"
+  },
+  {
+    "text": "Subtotal {0}",
+    "name": "gc.spread.pivotpivotShowSubtotal",
+    "command": "pivotShowSubtotal",
+    "workArea": "pivotTopLeftpivotHeader",
+    "placeholder": "FieldName"
+  },
+  {
+    "text": "Expand/Collapse",
+    "name": "gc.spread.pivotpivotExpandOrCollapse",
+    "command": "emptyCommand",
+    "subMenu": [
+      {
+        "text": "Expand",
+        "name": "gc.spread.pivotExpand",
+        "command": "pivotExpand",
+        "iconClass": "gc-spread-pivotExpand"
+      },
+      {
+        "text": "Collapse",
+        "name": "gc.spread.pivotCollapse",
+        "command": "pivotCollapse",
+        "iconClass": "gc-spread-pivotCollapse"
+      },
+      {
+        "text": "Expand Entire Field",
+        "name": "gc.spread.pivotExpandEntireField",
+        "command": "pivotExpandEntireField",
+        "iconClass": "gc-spread-pivotExpandEntireField"
+      },
+      {
+        "text": "Collapse Entire Field",
+        "name": "gc.spread.pivotCollapseEntireField",
+        "command": "pivotCollapseEntireField",
+        "iconClass": "gc-spread-pivotCollapseEntireField"
+      }
+    ],
+    "workArea": "pivotHeader"
+  },
+  {
+    "text": "Group...",
+    "name": "gc.spread.pivotpivotTableGroup",
+    "command": "OpenPivotGroupDialog",
+    "iconClass": "gc-spread-pivotTableGroup",
+    "workArea": "pivotHeader"
+  },
+  {
+    "text": "Ungroup...",
+    "name": "gc.spread.pivotpivotTableUnGroup",
+    "command": "pivotTableUnGroup",
+    "iconClass": "gc-spread-pivotTableUnGroup",
+    "workArea": "pivotHeader"
+  },
+  {
+    "text": "Show Details",
+    "name": "gc.spread.pivotpivotShowDetails",
+    "command": "pivotShowDetails",
+    "iconClass": "gc-spread-pivotShowDetails",
+    "workArea": "pivotContent"
+  },
+  {
+    "text": "Value Field Settings...",
+    "name": "gc.spread.pivotopenValueFieldSettingDialogCmd",
+    "command": "openValueFieldSettingDialogCmd",
+    "iconClass": "gc-spread-openValueFieldSettingDialogCmd",
+    "workArea": "pivotTopLeftpivotContentpivotGrandTotal"
+  }
+]

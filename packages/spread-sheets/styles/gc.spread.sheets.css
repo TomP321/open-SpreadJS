@@ -1,5 +1,5 @@
 /* OpenSheets: independently authored styles based on observable runtime layout. */
-.opensheets-host { position: relative; overflow: hidden; background: #fff; color: #000; }
+.opensheets-host { position: relative; overflow: hidden; background: #fff; }
 .opensheets-host .opensheets-viewport { position: absolute; inset: 0; overflow: hidden; outline: none; background: #f6f6f6; font: 11pt Calibri; user-select: none; touch-action: none; }
 .opensheets-host .gc-sheet-canvas, .opensheets-host .gc-selection-canvas, .opensheets-host .gc-tab-strip { position: absolute; left: 0; top: 0; display: block; }
 .opensheets-host .gc-selection-canvas { cursor: cell; }
@@ -33,3 +33,89 @@
 
 .opensheets-host .gc-cell-editor { border: 2px solid #5292f7; box-shadow: 1px 2px 5px #0006; }
 .opensheets-host .gc-ui-contextmenu-container { font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
+/* Popup layout measured from public runtime DOM; icon drawings live in TS. */
+.opensheets-host .gc-ui-contextmenu-container { width: 248px; min-width: 0; box-sizing: border-box; border: 1px solid #ccc; padding: 0 2px; background: white; color: #444; box-shadow: 1px 2px 5px #0005; }
+.opensheets-host .gc-ui-contextmenu-menuitem { position: relative; }
+.opensheets-host .gc-ui-contextmenu-menuitem-content { box-sizing: border-box; display: flex; align-items: center; position: relative; min-height: 26px; padding: 0 4px; white-space: nowrap; cursor: default; outline: none; }
+.opensheets-host .gc-ui-contextmenu-menuitem-content:hover, .opensheets-host .gc-ui-contextmenu-menuitem-content:focus { background: #e1e1e1; }
+.opensheets-host .gc-ui-contextmenu-icon { width: 26px; flex: 0 0 26px; display: inline-flex; align-items: center; }
+.opensheets-host .gc-ui-contextmenu-text { line-height: 26px; }
+.opensheets-host .gc-ui-contextmenu-group-header { background: #ddd; font-weight: bold; height: 28px; }
+.opensheets-host .gc-ui-contextmenu-groupitems-container { display: flex; height: 44px; align-items: center; padding-left: 28px; }
+.opensheets-host .gc-ui-contextmenu-groupitem { width: 34px; }
+.opensheets-host .gc-ui-contextmenu-groupitem .gc-ui-contextmenu-menuitem-content { height: 32px; padding: 4px; }
+.opensheets-host .gc-ui-contextmenu-groupitem canvas { width: 24px !important; height: 24px !important; }
+.opensheets-host .gc-ui-contextmenu-separator { height: 1px; background: #e1e1e1; margin: 1px 3px 1px 18px; }
+.opensheets-host .gc-ui-contextmenu-disabled { color: #aaa; }
+.opensheets-host .gc-ui-contextmenu-disabled canvas { opacity: .4; }
+.opensheets-host .opensheets-menu-arrow { position: absolute; right: 7px; border-left: 4px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.opensheets-host .opensheets-submenu { position: absolute; top: -1px; left: 100%; }
+.opensheets-host .opensheets-filter-menu { position: absolute; z-index: 12; width: 239px; height: 412px; min-width: 239px; min-height: 350px; box-sizing: border-box; border: 1px solid #ababab; background: #fff; box-shadow: 2px 3px 5px #0004; resize: both; overflow: hidden; font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; color: #222; }
+.opensheets-host .opensheets-filter-command { display: block; position: relative; border: 0; margin: 0; padding: 0 18px 0 29px; background: transparent; color: inherit; font: inherit; text-align: left; height: 26px; width: 100%; white-space: nowrap; cursor: default; }
+.opensheets-host .opensheets-filter-command > canvas { position: absolute; left: 5px; top: 3.5px; }
+.opensheets-host .opensheets-filter-command:disabled { color: #c4bec2; }
+.opensheets-host .opensheets-filter-command:disabled canvas { opacity: .35; }
+.opensheets-host .opensheets-filter-command:not(:disabled):hover, .opensheets-host .opensheets-filter-command:focus { background: #e1e1e1; outline: none; }
+.opensheets-host .opensheets-filter-has-submenu::after { content: ''; position: absolute; right: 7px; top: 10px; border-left: 4px solid #999; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.opensheets-host .opensheets-filter-has-submenu:disabled::after { border-left-color: #ddd; }
+.opensheets-host .opensheets-filter-submenu { position: absolute; left: 100%; top: 130px; display: none; min-width: 180px; background: white; border: 1px solid #ababab; box-shadow: 2px 3px 5px #0004; z-index: 14; }
+.opensheets-host .opensheets-filter-menu:has(.opensheets-filter-submenu:hover), .opensheets-host .opensheets-filter-menu:has(.opensheets-filter-command:hover) { overflow: visible; }
+.opensheets-host .opensheets-filter-search { position: absolute; left: 28px; top: 168px; width: calc(100% - 54px); height: 21px; border: 1px solid #ababab; border-radius: 0; padding: 0; box-sizing: border-box; font: 12px Arial; }
+.opensheets-host .opensheets-filter-check-actions { position: absolute; left: 28px; top: 193px; display: flex; gap: 7px; }
+.opensheets-host .opensheets-filter-check-actions button { display: inline-flex; align-items: flex-start; border: 0; padding: 0; background: transparent; color: #1e395b; font: inherit; height: 16px; }
+.opensheets-host .opensheets-filter-values { position: absolute; left: 25px; top: 222px; border: 1px solid #a2a9b7; border-radius: 2px; }
+.opensheets-host .opensheets-filter-footer { position: absolute; bottom: 3px; left: 36px; right: 18px; display: flex; gap: 2px; }
+.opensheets-host .opensheets-filter-footer button { flex: 1; height: 27px; min-width: 60px; padding: 1px 6px; border: 1px solid #acacac; border-radius: 0; background: linear-gradient(#eee,#e5e5e5); font: 12px Arial; }
+.opensheets-host .opensheets-filter-footer button:hover { background: #dcecf7; }
+.opensheets-host .opensheets-custom-filter { position: absolute; z-index: 15; left: 5px; top: 100px; width: 640px; max-width: calc(100% - 12px); border: 1px solid #a2a9b7; color: #1e395b; background: #f0f0f0; font: 12px Arial; }
+.opensheets-host .opensheets-dialog-header { height: 34px; background: white; padding: 10px 12px; box-sizing: border-box; }
+.opensheets-host .opensheets-dialog-header button { float: right; border: 0; background: none; color: inherit; }
+.opensheets-host .opensheets-dialog-body { padding: 5px 12px; }
+.opensheets-host .opensheets-dialog-body p { margin: 10px 15px; }
+.opensheets-host .opensheets-filter-condition { display: flex; gap: 10px; margin: 0 12px 8px 30px; }
+.opensheets-host .opensheets-filter-condition select { width: 30%; }
+.opensheets-host .opensheets-filter-condition input { flex: 1; min-width: 0; }
+.opensheets-host .opensheets-filter-condition select, .opensheets-host .opensheets-filter-condition input { height: 25px; box-sizing: border-box; border: 1px solid #888; border-radius: 5px; background: white; font: 12px Arial; }
+.opensheets-host .opensheets-filter-conjunction { margin: 12px 30px; }
+.opensheets-host .opensheets-filter-hint { white-space: pre-line; font-size: 10px; }
+.opensheets-host .opensheets-dialog-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 8px 12px 18px; }
+.opensheets-host .opensheets-dialog-footer button { width: 75px; height: 23px; border: 1px solid #bbb; background: #e1e1e1; font: 12px Arial; }
+.opensheets-host .opensheets-filter-menu { outline: none; }
+.opensheets-host .opensheets-floating-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.opensheets-host .opensheets-floating-object { position: absolute; pointer-events: auto; outline: none; box-sizing: border-box; }
+.opensheets-host .opensheets-floating-content { width: 100%; height: 100%; overflow: hidden; }
+.opensheets-host .opensheets-floating-object.selected { outline: 1px solid #777; }
+.opensheets-host .opensheets-floating-handle { display: none; position: absolute; width: 7px; height: 7px; margin: -4px; border: 1px solid #666; background: white; box-sizing: border-box; }
+.opensheets-host .selected.resizable .opensheets-floating-handle { display: block; }
+.opensheets-host .handle-nw { left: 0; top: 0; cursor: nw-resize; }.opensheets-host .handle-n { left: 50%; top: 0; cursor: n-resize; }.opensheets-host .handle-ne { left: 100%; top: 0; cursor: ne-resize; }.opensheets-host .handle-w { left: 0; top: 50%; cursor: w-resize; }.opensheets-host .handle-e { left: 100%; top: 50%; cursor: e-resize; }.opensheets-host .handle-sw { left: 0; top: 100%; cursor: sw-resize; }.opensheets-host .handle-s { left: 50%; top: 100%; cursor: s-resize; }.opensheets-host .handle-se { left: 100%; top: 100%; cursor: se-resize; }
+.opensheets-formula-input { min-height: 20px; padding: 3px; box-sizing: border-box; font: 11pt Calibri; white-space: pre-wrap; outline: none; background: white; color: black; }
+.opensheets-name-input { width: 100%; height: 100%; min-height: 22px; border: 1px solid #ccc; padding: 2px 4px; box-sizing: border-box; font: 11pt Calibri; }
+.opensheets-status-bar { display: flex; gap: 16px; align-items: center; min-height: 22px; border-top: 1px solid #ccc; background: #f6f6f6; font: 12px 'Segoe UI', Arial; color: #444; padding: 0 8px; box-sizing: border-box; }
+.opensheets-status-item[data-align=right]:first-of-type { margin-left: auto; }
+.opensheets-status-item input[type=range] { width: 100px; height: 18px; vertical-align: middle; accent-color: #217346; }
+.opensheets-host .gc-ui-contextmenu-menuitem, .opensheets-host .gc-ui-contextmenu-nonselective-menuitem { margin: 0; padding: 0; border: 0; }
+.opensheets-host .gc-ui-contextmenu-menuitem-content { margin: 0; border: 0; }
+.opensheets-host .gc-ui-contextmenu-groupitems-container { margin: 0; border: 0; padding-top: 0; padding-bottom: 0; height: 50px; }
+.opensheets-host .gc-ui-contextmenu-icon { margin: 0; padding: 0; border: 0; }
+.opensheets-host .gc-ui-contextmenu-separator { padding: 0; border: 0; }
+.opensheets-status-bar { background: #217346; color: white; font: 10px Arial; gap: 10px; min-height: 24px; border: 0; padding: 0 12px; }
+.opensheets-status-item.status-average { margin-left: auto; }
+.opensheets-status-item input[type=range] { appearance: none; -webkit-appearance: none; background: transparent; width: 140px; height: 16px; }
+.opensheets-status-item input[type=range]::-webkit-slider-runnable-track { height: 1px; background: white; }
+.opensheets-status-item input[type=range]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 3px; height: 12px; margin-top: -5px; background: white; }
+
+.opensheets-host .opensheets-custom-filter { position: fixed; left: calc(50vw - 421px); top: calc(50vh - 131px); width: 842px; height: 262px; max-width: calc(100vw - 20px); box-sizing: border-box; }
+.opensheets-host .opensheets-sheet-list { width: 202px; padding: 0; font-size: 14px; }
+.opensheets-host .opensheets-sheet-list .gc-ui-contextmenu-icon { width: 16px; flex-basis: 16px; }
+.opensheets-host .gc-ui-contextmenu-container { outline: none; }
+.opensheets-status-bar { width: 100%; height: 100%; padding: 0 8px; }
+.opensheets-name-input { text-align: center; padding: 0 20px 0 0; border: 0; font: 13px Calibri; }
+.opensheets-name-arrow { position: absolute; right: 0; top: 0; width: 20px; height: 100%; padding: 0; border: 0; background: transparent; }
+.opensheets-name-arrow::after { content: ''; position: absolute; top: calc(50% - 2px); left: 7px; border-top: 5px solid #777; border-left: 3px solid transparent; border-right: 3px solid transparent; }
+.opensheets-name-list { position: absolute; top: 100%; left: 0; min-width: 160px; overflow: auto; background: white; border: 1px solid #aaa; z-index: 30; }
+.opensheets-name-list button { display: block; width: 100%; border: 0; background: white; padding: 4px 8px; text-align: left; }
+.opensheets-name-list button:hover { background: #e1e1e1; }
+
+.opensheets-name-container { position: relative; display: flex; width: calc(100% + 2px); height: calc(100% + 2px); border: 1px solid #c6c6c6; box-sizing: border-box; background: white; }
+.opensheets-formula-input { font: inherit; color: inherit; padding: 0; min-height: 100%; }
+.opensheets-status-bar { font: 10.6667px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }

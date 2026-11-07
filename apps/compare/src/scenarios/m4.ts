@@ -3,7 +3,7 @@ import type { Scenario } from './index.js';
 
 type Sheet = GC.Spread.Sheets.Worksheet;
 type Library = typeof GC;
-function libraryFor(sheet: Sheet): Library {
+export function libraryFor(sheet: Sheet): Library {
   if (typeof window === 'undefined') return GC;
   const scope = window as unknown as {
     __compare?: { official?: unknown; ours?: unknown };
@@ -28,16 +28,12 @@ function scenario(name: string, title: string, run: (sheet: Sheet, library: Libr
   };
 }
 
-const iconGalleryGlyphCells: Scenario['glyphCells'] = Array.from({ length: 20 }, (_, index) => [
-  (index % 4) * 6,
-  1 + Math.floor(index / 4) * 2,
-  5,
-  1,
-] as [number, number, number, number]);
-const tableThemeGlyphCells: Scenario['glyphCells'] = [0, 5, 10, 15, 20].flatMap(row => [
-  [row, 0, 1, 3] as [number, number, number, number],
-  [row, 5, 1, 3] as [number, number, number, number],
-]);
+const iconGlyph = (row: number, col: number) => ({ row, col, x: 1, y: 2, width: 18, height: 16 });
+const filterGlyph = (row: number, col: number) => ({ row, col, x: -20, y: -19, width: 18, height: 17 });
+const iconGalleryGlyphCells: Scenario['glyphCells'] = Array.from({ length: 20 }, (_, index) =>
+  Array.from({ length: 5 }, (_, r) => iconGlyph((index % 4) * 6 + r, 1 + Math.floor(index / 4) * 2))).flat();
+const tableThemeGlyphCells: Scenario['glyphCells'] = [0, 5, 10, 15, 20].flatMap(row =>
+  [0, 1, 2, 5, 6, 7].map(col => filterGlyph(row, col)));
 
 export const dataFeatureScenarios: Scenario[] = [
   scenario('m4-tables-basic', 'Tables with styles', (s, G) => {
@@ -55,7 +51,7 @@ export const dataFeatureScenarios: Scenario[] = [
     t2.setColumnName(0, 'Name'); t2.setColumnName(1, 'Count'); t2.setColumnName(2, 'Cost');
     for (let r = 1; r < 4; r++) { s.setValue(6 + r, 0, `Row ${r}`); s.setValue(6 + r, 1, r * 2); s.setValue(6 + r, 2, r * 3); }
     for (let r = 6; r < 10; r++) s.setRowHeight(r, 24);
-  }, [[0, 0, 1, 3], [6, 0, 1, 3]]),
+  }, [0, 6].flatMap(row => [0, 1, 2].map(col => filterGlyph(row, col)))),
   scenario('m4-table-themes', 'Table theme gallery', (s, G) => {
     const names = ['light1', 'light9', 'light18', 'medium2', 'medium9', 'medium16', 'medium28', 'dark1', 'dark5', 'dark11'] as const;
     names.forEach((name, index) => {
@@ -80,7 +76,7 @@ export const dataFeatureScenarios: Scenario[] = [
     const table = s.tables.add('Filtered', 10, 0, names.length + 1, 2, G.Spread.Sheets.Tables.TableThemes.medium4);
     for (let i = 0; i <= names.length; i++) { s.setValue(10 + i, 0, i === 0 ? 'Name' : names[i - 1]); s.setValue(10 + i, 1, i * 5); }
     table.filterButtonVisible(1, false);
-  }, [[10, 0, 1, 1]]),
+  }, [filterGlyph(10, 0)]),
   scenario('m4-cf-rules', 'Conditional formatting rules', (s, G) => {
     const CF = G.Spread.Sheets.ConditionalFormatting;
     for (let r = 0; r < 12; r++) {
@@ -100,7 +96,7 @@ export const dataFeatureScenarios: Scenario[] = [
     s.conditionalFormats.addIconSetRule(CF.IconSetType.fiveRatings, [new G.Spread.Sheets.Range(8, 8, 4, 1)]);
     for (let r = 0; r < 12; r++) for (let c = 8; c < 9; c++) s.setValue(r, c, (r * 37) % 100);
     s.setColumnWidth(4, 100); s.setColumnWidth(6, 110);
-  }, [[0, 8, 12, 1]]),
+  }, Array.from({ length: 12 }, (_, row) => iconGlyph(row, 8))),
   scenario('m4-cf-databars', 'Data bar scaling', (s, G) => {
     const CF = G.Spread.Sheets.ConditionalFormatting;
     const values = [1, 2, 3, 4, 5, 10, 25];
@@ -145,7 +141,7 @@ export const dataFeatureScenarios: Scenario[] = [
     s.setValue(5, 0, new Date(2019, 5, 5));
     s.setColumnWidth(0, 110);
     s.setActiveCell(1, 0);
-  }, [[1, 0, 1, 1]]),
+  }, []),
   scenario('m4-cell-types', 'Cell types', (s, G) => {
     const CT = G.Spread.Sheets.CellTypes;
     s.setValue(0, 0, 'Cell types');
@@ -164,7 +160,12 @@ export const dataFeatureScenarios: Scenario[] = [
     const bl = new CT.ButtonList(); bl.items(['Left', 'Center', 'Right']); s.setCellType(3, 2, bl); s.setValue(3, 2, 'Center');
     s.setColumnWidth(0, 130); s.setColumnWidth(2, 150);
     for (let r = 0; r < 6; r++) s.setRowHeight(r, 26);
-  }, [[1, 0, 1, 1], [2, 0, 1, 1], [4, 0, 1, 1], [1, 2, 1, 1], [2, 2, 1, 1]]),
+  }, [
+    ...[1, 2].map(row => ({ row, col: 0, x: 4, y: 4, width: 15, height: 15 })),
+    { row: 4, col: 0, x: -18, y: 1, width: 17, height: 24 },
+    ...[1, 48, 95].map(x => ({ row: 1, col: 2, x, y: 3, width: 13, height: 13 })),
+    ...[1, 63].map(x => ({ row: 2, col: 2, x, y: 2, width: 13, height: 13 })),
+  ]),
   scenario('m4-comments', 'Comment indicators and notes', (s, G) => {
     s.setValue(1, 1, 'Cell with note');
     s.setValue(3, 1, 'Always shown');
@@ -176,7 +177,7 @@ export const dataFeatureScenarios: Scenario[] = [
     s.comments.add(5, 1, 'Indicator only');
     s.setColumnWidth(1, 140);
     for (let r = 0; r < 7; r++) s.setRowHeight(r, 24);
-  }, [[1, 1, 1, 1], [5, 1, 1, 1]]),
+  }, [1, 5].map(row => ({ row, col: 1, x: -7, y: 0, width: 7, height: 7 }))),
   scenario('m4-hyperlinks', 'Hyperlink cell rendering', (s, G) => {
     s.setValue(1, 1, 'Example');
     s.setHyperlink(1, 1, { url: 'https://example.com', tooltip: 'Example site' });

@@ -222,7 +222,7 @@ test('M4 cell types, outline buttons, filter menus and table auto-expand', async
   await page.evaluate(() => new Promise(requestAnimationFrame));
   const header = await page.evaluate(() => window.__compare!.ours.getActiveSheet().getCellRect(0, 3));
   await page.mouse.click(pane.x + header.x + header.width - 12, pane.y + 12);
-  await page.getByRole('menuitem', { name: 'Sort A to Z' }).click();
+  await page.getByRole('menuitem', { name: 'Sort Ascending', exact: true }).click();
   await page.waitForFunction(() => [0, 1, 2].every((r) => window.__compare!.ours.getActiveSheet().getValue(r, 3) === r + 1));
 
   await page.evaluate(() => {

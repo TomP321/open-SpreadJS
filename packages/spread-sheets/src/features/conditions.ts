@@ -1,3 +1,4 @@
+import { resolveColor } from '../colors.js';
 /**
  * Conditional-formatting conditions shared by conditional formatting, data
  * validation and row filters. Conditions compare a candidate value with a
@@ -470,8 +471,11 @@ export class Condition {
         const text = asText(actual);
         return values.some((value) => asText(value) === text);
       }
-      case ConditionType.colorCondition:
-        return false;
+      case ConditionType.colorCondition: {
+        const style = (evaluator as Worksheet)?.getActualStyle?.(baseRow, baseColumn);
+        const color = style?.[this.cmp === 1 ? 'foreColor' : 'backColor'];
+        return typeof color === 'string' && resolveColor(color) === resolveColor(String(this.args.expected));
+      }
       default:
         return false;
     }

@@ -1,3 +1,9 @@
+import { getNamedPatterns, namedPattern, validatePattern } from './features/input-mask.js';
+import { FormulaTextBox, NameBox, StatusBar, StatusItem, findControl } from './features/controls.js';
+import { CellBindingSource } from './features/binding.js';
+import { FloatingObject, FloatingObjectCollection, Picture } from './features/floating-objects.js';
+import { Sparkline, SparklineGroup, SparklineSetting } from './features/sparklines.js';
+import { ContextMenu, MenuView } from './features/context-menu.js';
 import { GC as Enums } from './generated/enums.js';
 import { Workbook, Worksheet } from './model.js';
 import { CellRange } from './range.js';
@@ -67,6 +73,14 @@ export const Spread = {
       ...CalcEngineApi,
       Functions: GlobalCalcEngineApi.Functions,
     },
+    InputMask: { getNamedPatterns, namedPattern, validatePattern },
+    FormulaTextBox: { FormulaTextBox, findControl },
+    NameBox: { NameBox, findControl },
+    StatusBar: { StatusBar, StatusItem, findControl },
+    Bindings: { CellBindingSource },
+    FloatingObjects: { FloatingObject, FloatingObjectCollection, Picture },
+    Sparklines: { ...Enums.Spread.Sheets.Sparklines, Sparkline, SparklineGroup, SparklineSetting },
+    ContextMenu: { ContextMenu, MenuView },
     Workbook,
     Worksheet,
     CellRange,

@@ -1,3 +1,4 @@
+import { CalcError, SparklineExValue, isErrorString } from './calc/values.js';
 import { GeneralFormatter, dateToSerial, serialToDate } from './formatter.js';
 import { LineBorder, Style, styleProperties } from './primitives.js';
 export type JsonRecord = Record<string, unknown>;
@@ -25,6 +26,11 @@ export function deserializeValue(value: unknown): unknown {
     if (date) return serialToDate(Number(date[1]));
   }
   if (Array.isArray(value)) return value.map(deserializeValue);
+  if (value && typeof value === 'object') {
+    const record = value as JsonRecord;
+    if (record.typeName === 'SparklineExValue' && typeof record.name === 'string') return new SparklineExValue(record.name, object(deserializeValue(record.value)));
+    if (typeof record.error === 'string' && isErrorString(record.error)) return new CalcError(record.error);
+  }
   if (value && typeof value === 'object')
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, deserializeValue(v)]));
   return value;

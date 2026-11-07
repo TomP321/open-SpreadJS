@@ -1,0 +1,425 @@
+[
+  {
+    "id": "codex-m5-gettext-error",
+    "steps": [
+      {
+        "$js": "sheet.setValue(0,0,GC.Spread.CalcEngine.CalcError.parse('#NAME?'))"
+      }
+    ],
+    "read": [
+      "js:sheet.getText(0,0)"
+    ]
+  },
+  {
+    "id": "codex-m5-gettext-array",
+    "steps": [
+      {
+        "$js": "sheet.setValue(0,0,[1,2])"
+      }
+    ],
+    "read": [
+      "js:sheet.getText(0,0)"
+    ]
+  },
+  {
+    "id": "codex-m5-gettext-matrix",
+    "steps": [
+      {
+        "$js": "sheet.setValue(0,0,[[1,2],[3,4]])"
+      }
+    ],
+    "read": [
+      "js:sheet.getText(0,0)"
+    ]
+  },
+  {
+    "id": "codex-m5-gettext-object",
+    "steps": [
+      {
+        "$js": "sheet.setValue(0,0,({foo:1}))"
+      }
+    ],
+    "read": [
+      "js:sheet.getText(0,0)"
+    ]
+  },
+  {
+    "id": "codex-m5-gettext-richtext",
+    "steps": [
+      {
+        "$js": "sheet.setValue(0,0,({richText:[{text:'Hello'},{text:' world'}]}))"
+      }
+    ],
+    "read": [
+      "js:sheet.getText(0,0)"
+    ]
+  },
+  {
+    "id": "codex-m5-gettext-nan",
+    "steps": [
+      {
+        "$js": "sheet.setValue(0,0,NaN)"
+      }
+    ],
+    "read": [
+      "js:sheet.getText(0,0)"
+    ]
+  },
+  {
+    "id": "codex-m5-gettext-infinity",
+    "steps": [
+      {
+        "$js": "sheet.setValue(0,0,Infinity)"
+      }
+    ],
+    "read": [
+      "js:sheet.getText(0,0)"
+    ]
+  },
+  {
+    "id": "codex-m5-barcode-absent",
+    "formula": "BC_QRCODE(\"hello\")",
+    "read": [
+      "H1",
+      "js:sheet.getText(0,7)"
+    ]
+  },
+  {
+    "id": "codex-m5-sparkline-0",
+    "steps": [
+      {
+        "$js": "sheet.setArray(0,0,[[1],[3],[-2],[5]]); sheet.setSparkline(0,2,new GC.Spread.Sheets.Range(0,0,4,1),0,0,new GC.Spread.Sheets.Sparklines.SparklineSetting())"
+      }
+    ],
+    "read": [
+      "js:sheet.getSparkline(0,2)===null",
+      "js:sheet.getSparkline(0,2) ? [sheet.getSparkline(0,2).row,sheet.getSparkline(0,2).column,sheet.getSparkline(0,2).sparklineType(),sheet.getSparkline(0,2).dataOrientation(),sheet.getSparkline(0,2).data()] : null",
+      "js:sheet.toJSON().sparklineGroups"
+    ]
+  },
+  {
+    "id": "codex-m5-sparkline-1",
+    "steps": [
+      {
+        "$js": "sheet.setArray(0,0,[[1],[3],[-2],[5]]); sheet.setSparkline(0,2,new GC.Spread.Sheets.Range(0,0,4,1),0,1,new GC.Spread.Sheets.Sparklines.SparklineSetting())"
+      }
+    ],
+    "read": [
+      "js:sheet.getSparkline(0,2)===null",
+      "js:sheet.getSparkline(0,2) ? [sheet.getSparkline(0,2).row,sheet.getSparkline(0,2).column,sheet.getSparkline(0,2).sparklineType(),sheet.getSparkline(0,2).dataOrientation(),sheet.getSparkline(0,2).data()] : null",
+      "js:sheet.toJSON().sparklineGroups"
+    ]
+  },
+  {
+    "id": "codex-m5-sparkline-2",
+    "steps": [
+      {
+        "$js": "sheet.setArray(0,0,[[1],[3],[-2],[5]]); sheet.setSparkline(0,2,new GC.Spread.Sheets.Range(0,0,4,1),0,2,new GC.Spread.Sheets.Sparklines.SparklineSetting())"
+      }
+    ],
+    "read": [
+      "js:sheet.getSparkline(0,2)===null",
+      "js:sheet.getSparkline(0,2) ? [sheet.getSparkline(0,2).row,sheet.getSparkline(0,2).column,sheet.getSparkline(0,2).sparklineType(),sheet.getSparkline(0,2).dataOrientation(),sheet.getSparkline(0,2).data()] : null",
+      "js:sheet.toJSON().sparklineGroups"
+    ]
+  },
+  {
+    "id": "codex-m5-sparkline-options",
+    "steps": [
+      {
+        "$js": "sheet.setSparkline(4,2,new GC.Spread.Sheets.Range(0,0,4,1),0,1,new GC.Spread.Sheets.Sparklines.SparklineSetting({showMarkers:true,seriesColor:'red',displayXAxis:true,lineWeight:2}))"
+      }
+    ],
+    "read": [
+      "js:sheet.getSparkline(4,2) ? sheet.getSparkline(4,2).setting().options : null",
+      "js:sheet.toJSON().sparklineGroups"
+    ]
+  },
+  {
+    "id": "codex-m5-sparkline-group",
+    "steps": [
+      {
+        "$js": "sheet.setSparkline(4,2,new GC.Spread.Sheets.Range(0,0,4,1),0,0,new GC.Spread.Sheets.Sparklines.SparklineSetting());sheet.setSparkline(5,2,new GC.Spread.Sheets.Range(0,0,4,1),0,1,new GC.Spread.Sheets.Sparklines.SparklineSetting());sheet.groupSparkline([sheet.getSparkline(4,2),sheet.getSparkline(5,2)])"
+      }
+    ],
+    "read": [
+      "js:sheet.toJSON().sparklineGroups"
+    ],
+    "cells": {
+      "A1": 1,
+      "A2": 2
+    }
+  },
+  {
+    "id": "codex-m5-sparkline-remove",
+    "steps": [
+      {
+        "$js": "sheet.setSparkline(0,2,'A1:A3',0,0,new GC.Spread.Sheets.Sparklines.SparklineSetting())"
+      },
+      {
+        "$js": "sheet.removeSparkline(0,2)"
+      }
+    ],
+    "read": [
+      "js:sheet.getSparkline(0,2)===null",
+      "js:sheet.toJSON().sparklineGroups"
+    ]
+  },
+  {
+    "id": "codex-m5-formula-linesparkline",
+    "cells": {
+      "A1": 1,
+      "A2": 3,
+      "A3": -2,
+      "A4": 5
+    },
+    "formula": "LINESPARKLINE(A1:A4,0)",
+    "read": [
+      "H1",
+      "js:sheet.getText(0,7)"
+    ]
+  },
+  {
+    "id": "codex-m5-formula-columnsparkline",
+    "cells": {
+      "A1": 1,
+      "A2": 3,
+      "A3": -2,
+      "A4": 5
+    },
+    "formula": "COLUMNSPARKLINE(A1:A4,0)",
+    "read": [
+      "H1",
+      "js:sheet.getText(0,7)"
+    ]
+  },
+  {
+    "id": "codex-m5-formula-winlosssparkline",
+    "cells": {
+      "A1": 1,
+      "A2": 3,
+      "A3": -2,
+      "A4": 5
+    },
+    "formula": "WINLOSSSPARKLINE(A1:A4,0)",
+    "read": [
+      "H1",
+      "js:sheet.getText(0,7)"
+    ]
+  },
+  {
+    "id": "codex-m5-formula-piesparkline",
+    "cells": {
+      "A1": 1,
+      "A2": 3,
+      "A3": -2,
+      "A4": 5
+    },
+    "formula": "PIESPARKLINE(A1:A4)",
+    "read": [
+      "H1",
+      "js:sheet.getText(0,7)"
+    ]
+  },
+  {
+    "id": "codex-m5-floating-add",
+    "steps": [
+      {
+        "$js": "sheet.floatingObjects.add(new GC.Spread.Sheets.FloatingObjects.FloatingObject('Note',12,20,100,80))"
+      }
+    ],
+    "read": [
+      "js:sheet.floatingObjects.all().length",
+      "js:sheet.floatingObjects.get('Note') ? sheet.floatingObjects.get('Note').toJSON() : null"
+    ]
+  },
+  {
+    "id": "codex-m5-floating-properties",
+    "steps": [
+      {
+        "$js": "const o=new GC.Spread.Sheets.FloatingObjects.FloatingObject('Note',12,20,100,80);sheet.floatingObjects.add(o);o.isLocked(false);o.allowResize(false);o.dynamicMove(false);o.x(50);o.y(60);o.isVisible(false)"
+      }
+    ],
+    "read": [
+      "js:sheet.floatingObjects.get('Note') ? sheet.floatingObjects.get('Note').toJSON() : null"
+    ]
+  },
+  {
+    "id": "codex-m5-picture-add",
+    "steps": [
+      {
+        "$js": "sheet.pictures.add('Photo','https://example.com/photo.png',10,20,100,80)"
+      }
+    ],
+    "read": [
+      "js:sheet.pictures.get('Photo') ? sheet.pictures.get('Photo').toJSON() : null",
+      "js:sheet.pictures.zIndex('Photo')"
+    ]
+  },
+  {
+    "id": "codex-m5-nested-cellbinding",
+    "steps": [
+      {
+        "$js": "sheet.setBindingPath(1,1,'person.name');sheet.setBindingPath(2,1,'person.age');sheet.setDataSource(new GC.Spread.Sheets.Bindings.CellBindingSource({person:{name:'Alice',age:30}}))"
+      },
+      {
+        "$js": "sheet.setValue(1,1,'Bob')"
+      }
+    ],
+    "read": [
+      "js:sheet.getValue(1,1)",
+      "js:sheet.getValue(2,1)",
+      "js:sheet.getDataSource() ? sheet.getDataSource().getSource() : null"
+    ]
+  },
+  {
+    "id": "codex-m5-nested-columnbinding",
+    "steps": [
+      {
+        "$js": "sheet.autoGenerateColumns=false;sheet.bindColumns([{name:'person.name',displayName:'Name'}]);sheet.setDataSource([{person:{name:'Alice'}},{person:{name:'Bob'}}])"
+      },
+      {
+        "$js": "sheet.setValue(1,0,'Carol')"
+      }
+    ],
+    "read": [
+      "js:sheet.getArray(0,0,2,1)",
+      "js:sheet.getDataSource()"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-23",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"000-000\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-24",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"a{2}\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-25",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"[a0_]{8}\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-26",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"0{2,4}\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-27",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"[\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-28",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-29",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"\\\\\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-30",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"9\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-31",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"L\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-validate-32",
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.validatePattern(\"&\")"
+    ]
+  },
+  {
+    "id": "codex-m5-mask-named",
+    "steps": [
+      {
+        "$js": "GC.Spread.Sheets.InputMask.namedPattern('codexM5Phone','000-000')"
+      },
+      {
+        "$js": "GC.Spread.Sheets.InputMask.namedPattern('codexM5Phone',null)"
+      }
+    ],
+    "read": [
+      "js:GC.Spread.Sheets.InputMask.namedPattern('codexM5Phone')",
+      "js:GC.Spread.Sheets.InputMask.getNamedPatterns().filter(x=>x.name==='codexM5Phone')"
+    ]
+  },
+  {
+    "id": "codex-m5-context-default",
+    "steps": [
+      {
+        "$js": "wb.contextMenu.menuData.push({name:'test',text:'Custom',workArea:'viewport'});wb.contextMenu.menuView.maxHeight(250);wb.contextMenu.menuView.scrollable(false)"
+      }
+    ],
+    "read": [
+      "js:wb.contextMenu.menuData.filter(x=>['gc.spread.copy','gc.spread.cut','gc.spread.sort','test'].includes(x.name))",
+      "js:wb.contextMenu.menuView.maxHeight()",
+      "js:wb.contextMenu.menuView.scrollable()"
+    ]
+  },
+  {
+    "id": "codex-m5-table-binding",
+    "steps": [
+      {
+        "$js": "const T=GC.Spread.Sheets.Tables;const t=sheet.tables.add('People',0,0,2,2);t.bindingPath('rows');sheet.setDataSource(new GC.Spread.Sheets.Bindings.CellBindingSource({rows:[{name:'A',age:30},{name:'B',age:40}]}))"
+      },
+      {
+        "$call": [
+          "setValue",
+          1,
+          1,
+          35
+        ]
+      }
+    ],
+    "read": [
+      "js:sheet.tables.findByName(\"People\") ? sheet.tables.findByName(\"People\").range() : null",
+      "js:sheet.getArray(0,0,3,2)",
+      "js:sheet.tables.findByName(\"People\") ? sheet.tables.findByName(\"People\").toJSON().columns : null"
+    ]
+  },
+  {
+    "id": "codex-m5-status-defaults",
+    "read": [
+      "js:(()=>{const h=document.createElement('div');document.body.append(h);const bar=new GC.Spread.Sheets.StatusBar.StatusBar(h);const result=bar.all().map(i=>({name:i.name,value:i.value,visible:i.visible,align:i.align,menuContent:i.menuContent}));bar.dispose();h.remove();return result})()"
+    ]
+  },
+  {
+    "id": "codex-m5-formula-box-defaults",
+    "read": [
+      "js:(()=>{const h=document.createElement('div');const box=new GC.Spread.Sheets.FormulaTextBox.FormulaTextBox(h);const result=[box.autoComplete(),box.showHelp(),box.text(),box.workbook()];box.destroy();return result})()"
+    ]
+  },
+  {
+    "id": "codex-m5-live-table-calculation",
+    "read": [
+      "js:sheet.getValue(4,0)"
+    ],
+    "steps": [
+      {
+        "$js": "const records=[{amount:2},{amount:4}];const t=sheet.tables.add('BoundValues',0,0,3,1);t.bind([new GC.Spread.Sheets.Tables.TableColumn(1,'amount','Amount')],undefined,records);sheet.setFormula(4,0,'SUM(A2:A3)');sheet._m5Records=records"
+      },
+      {
+        "$js": "sheet._m5Records[0].amount=8;wb.calculate()"
+      }
+    ]
+  }
+]

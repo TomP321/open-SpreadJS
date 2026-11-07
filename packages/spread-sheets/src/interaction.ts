@@ -1,3 +1,7 @@
+import { applyMask, type MaskOptions } from './features/input-mask.js';
+import { filterMenu } from './features/filter-menu.js';
+import { compactMenu, renderMenu, type MenuItemData } from './features/context-menu.js';
+import { HideRowFilter, type RowFilterBase } from './features/filters.js';
 import type { WorkbookRenderer } from './rendering.js';
 import type { Worksheet } from './model.js';
 import { Range } from './primitives.js';
@@ -76,6 +80,9 @@ export class Interaction {
     root.addEventListener('paste', event => this.paste(event), { signal });
     root.addEventListener('contextmenu', event => this.contextMenu(event), { signal });
     editor.addEventListener('input', () => {
+      const active = this.editing;
+      const mask = active?.sheet.getActualStyle(active.row, active.col).mask as MaskOptions | undefined;
+      if (mask?.pattern) { const position = editor.selectionStart; editor.value = applyMask(editor.value, mask, true); editor.setSelectionRange(position, position); }
       this.positionEditor();
       const edit = this.editing; if (edit) edit.sheet._emit(Events.EditChange, { sheet: edit.sheet, sheetName: edit.sheet.name(), row: edit.row, col: edit.col, editingText: editor.value });
     }, { signal });
@@ -83,7 +90,7 @@ export class Interaction {
       if (!this.endEdit()) return;
       const hit = this.tabHit(event.clientX); if (!hit) return;
       const wb = view.workbook;
-      if (hit.index === -4) { this.sheetList(); }
+      if (hit.index === -4) { event.stopPropagation(); this.sheetList(); }
       else if (hit.index === -1) { wb.addSheet(wb.getSheetCount()); wb.setActiveSheetIndex(wb.getSheetCount() - 1); }
       else if (hit.index === -2) { wb.startSheetIndex(Math.max(0, wb.startSheetIndex() - 1)); wb.repaint(); }
       else if (hit.index === -3) { wb.startSheetIndex(Math.min(wb.getSheetCount() - 1, wb.startSheetIndex() + 1)); wb.repaint(); }
@@ -91,7 +98,7 @@ export class Interaction {
         wb._emit(Events.SheetTabClick, { sheet: wb.getSheet(hit.index), sheetName: wb.getSheet(hit.index).name(), sheetTabIndex: hit.index });
         wb.setActiveSheetIndex(hit.index); this.tabDrag = hit.index; this.tabPointerX = event.clientX; tabs.setPointerCapture(event.pointerId);
       }
-      root.focus();
+      if (this.menu) this.menu.focus(); else root.focus();
     }, { signal });
     tabs.addEventListener('pointerup', event => {
       if (this.tabDrag !== undefined && Math.abs(event.clientX - this.tabPointerX) > 5 && view.workbook.options.allowSheetReorder) {
@@ -105,6 +112,7 @@ export class Interaction {
       this.tabDrag = undefined;
     }, { signal });
     tabs.addEventListener('dblclick', event => this.renameTab(event), { signal });
+    document.addEventListener('keydown', event => { if (this.menu && event.key === 'Escape') { event.preventDefault(); this.closeMenu(); root.focus(); } }, { signal });
     document.addEventListener('pointerdown', event => { if (this.menu && !this.menu.contains(event.target as Node)) this.closeMenu(); }, { signal });
     this.registerCommands();
   }
@@ -156,6 +164,8 @@ export class Interaction {
     const editor = this.view.editor;
     this.editing = { sheet: s, row, col, oldValue: s.getValue(row, col) };
     editor.value = defaultText ?? (s.getFormula(row, col) ? '=' + s.getFormula(row, col) : s.getValue(row, col) instanceof Date ? s.getText(row, col) : String(s.getValue(row, col) ?? ''));
+    const mask = s.getActualStyle(row, col).mask as MaskOptions | undefined;
+    if (mask?.pattern) editor.value = applyMask(editor.value, mask, true);
     editor.style.display = 'block'; this.positionEditor(); editor.focus();
     if (selectAll) editor.select(); else editor.setSelectionRange(editor.value.length, editor.value.length);
     s._emit('EditStarted', this.info({ row, col }));
@@ -187,6 +197,8 @@ export class Interaction {
     this.view.schedule(); return true;
   }
   private parseText(text: string, row: number, col: number): unknown {
+    const mask = this.view.sheet!.getActualStyle(row, col).mask as MaskOptions | undefined;
+    if (mask?.pattern) return applyMask(text, mask);
     if (!text) return null;
     const format = this.view.sheet!.getFormatter(row, col);
     const formatter = format instanceof GeneralFormatter ? format : new GeneralFormatter(typeof format === 'string' ? format : 'General');
@@ -346,11 +358,8 @@ export class Interaction {
         : s.rowFilter();
       if (filter && filter.range) {
         const relative = filterHit.col - filter.range.col;
-        this.showMenu(x, y, [
-          ['Sort A to Z', () => filter.sortColumn(relative, true)],
-          ['Sort Z to A', () => filter.sortColumn(relative, false)],
-          ['Clear Filter', () => filter.unfilter(relative)],
-        ]);
+        const cell = filterHit.kind === 'table' ? view.cellRect((filterHit.table as { headerIndex(): number }).headerIndex(), filterHit.col) : { x: view.cellRect(0, filterHit.col).x, y: 0, width: 0, height: view.headerHeight };
+        this.openFilter(filter as RowFilterBase, relative, cell.x, cell.y + cell.height, filterHit.kind === 'table' ? s.getText((filterHit.table as { headerIndex(): number }).headerIndex(), filterHit.col) : String.fromCharCode(65 + filterHit.col));
       }
       return true;
     }
@@ -487,13 +496,11 @@ export class Interaction {
   }
   private sheetList(hidden = false): void {
     this.closeMenu();
-    const menu = document.createElement('div'); menu.className = 'gc-contextmenu gc-ui-contextmenu-container'; menu.setAttribute('role', 'menu');
-    Object.assign(menu.style, { left: '66px', bottom: '28px', maxHeight: `${this.view.viewHeight - 20}px`, overflow: 'auto' });
-    this.view.workbook.sheets.forEach((sheet, index) => {
-      if (hidden ? !!sheet.visible() : !sheet.visible()) return;
-      const item = document.createElement('button'); item.textContent = sheet.name(); item.className = 'gc-contextmenu-menuitem gc-ui-contextmenu-menuitem';
-      item.addEventListener('click', () => { if (hidden) sheet.visible(true); this.view.workbook.setActiveSheetIndex(index); this.view.workbook.startSheetIndex(index); this.closeMenu(); }); menu.append(item);
-    });
+    const wb = this.view.workbook;
+    const items: MenuItemData[] = wb.sheets.flatMap((sheet, index) => (hidden ? !!sheet.visible() : !sheet.visible()) ? [] : [{ name: String(index), text: sheet.name(), iconClass: index === wb.getActiveSheetIndex() ? 'check' : undefined }]);
+    const menu = renderMenu(wb.contextMenu, items, item => { const index = Number(item.name); if (hidden) wb.getSheet(index).visible(true); wb.setActiveSheetIndex(index); wb.startSheetIndex(index); this.closeMenu(); });
+    menu.classList.add('opensheets-sheet-list');
+    Object.assign(menu.style, { left: '81px', bottom: '22px', maxHeight: `${this.view.viewHeight - 20}px`, overflow: 'auto' });
     this.view.root.append(menu); this.menu = menu;
   }
   private renameTab(event: MouseEvent): void {
@@ -627,48 +634,81 @@ export class Interaction {
     s._emit(Events.DragDropBlock, info); if (info.cancel) return;
     this.undoableMutation('dragDrop', [source, new Range(row, col, source.rowCount, source.colCount)], () => s.moveTo(source.row, source.col, row, col, source.rowCount, source.colCount)); s.setSelection(row, col, source.rowCount, source.colCount); s._emit(Events.DragDropBlockCompleted, info);
   }
+  openFilter(filter: RowFilterBase, column: number, x: number, y: number, title: string): void {
+    this.closeMenu();
+    const root = filterMenu(this.view.sheet!, filter, column, title, () => this.closeMenu(), dialog => {
+      this.closeMenu(); this.view.root.append(dialog); this.menu = dialog;
+    });
+    // The trial aligns to the cell's left and clamps to the host edge.
+    Object.assign(root.style, { left: `${Math.max(5, Math.min(x + this.view.cellRect(0, filter.range!.col + column).width - 239, this.view.width - 244))}px`, top: `${Math.max(0, Math.min(y, this.view.height - 416))}px` });
+    this.view.root.append(root); this.menu = root; root.focus();
+  }
   private contextMenu(event: MouseEvent): void {
-    if (!this.view.workbook.options.allowContextMenu || this.editing) return;
+    const wb = this.view.workbook;
+    if (!wb.options.allowContextMenu || this.editing) return;
     event.preventDefault(); this.closeMenu();
-    const menu = document.createElement('div'); menu.className = 'gc-contextmenu gc-ui-contextmenu-container'; menu.setAttribute('role', 'menu');
-    const { x, y } = this.point(event); Object.assign(menu.style, { left: `${Math.min(x, this.view.width - 180)}px`, top: `${Math.min(y, this.view.height - 240)}px` });
-    const wb = this.view.workbook, tab = y >= this.view.viewHeight ? this.tabHit(event.clientX) : undefined;
+    const { x, y } = this.point(event), tab = y >= this.view.viewHeight ? this.tabHit(event.clientX) : undefined;
     if (tab && tab.index >= 0) wb.setActiveSheetIndex(tab.index);
-    const s = this.view.sheet!;
-    if (!tab) {
-      const hit = this.hit(event);
-      if (hit && !s.getSelections().some(range => range.contains(hit.row, hit.col))) {
-        if (hit.row < 0 || hit.col < 0) s._setUserSelections([new Range(hit.row, hit.col, hit.row < 0 ? -1 : 1, hit.col < 0 ? -1 : 1)], Math.max(0, hit.row), Math.max(0, hit.col));
-        else s.setActiveCell(hit.row, hit.col);
-      }
+    const s = this.view.sheet!, hit = this.hit(event);
+    if (!tab && hit && !s.getSelections().some(range => range.contains(hit.row, hit.col))) {
+      if (hit.row < 0 || hit.col < 0) s._setUserSelections([new Range(hit.row, hit.col, hit.row < 0 ? -1 : 1, hit.col < 0 ? -1 : 1)], Math.max(0, hit.row), Math.max(0, hit.col));
+      else s.setActiveCell(hit.row, hit.col);
     }
-    const range = s.getSelections().at(-1)!;
-    const items: [string, () => void][] = tab ? [
-      ['Insert', () => wb.addSheet(wb.getActiveSheetIndex())],
-      ['Delete', () => { if (wb.getSheetCount() > 1) wb.removeSheet(wb.getActiveSheetIndex()); }],
-      ['Rename', () => this.renameTab(event)],
-      ['Hide', () => { if (wb.sheets.filter(sheet => sheet.visible()).length > 1) { s.visible(false); const next = wb.sheets.findIndex(sheet => !!sheet.visible()); wb.setActiveSheetIndex(next); } }],
-      ['Unhide', () => this.sheetList(true)],
-    ] : [
-      ['Copy', () => document.execCommand('copy')], ['Cut', () => document.execCommand('cut')],
-      ['Paste Options:', () => { void navigator.clipboard?.readText().then(text => this.pasteValues(decodeTSV(text))); }],
-      ['Clear Contents', () => this.clearValues()],
-      ...(range.col < 0 || range.row < 0 ? [
-      ['Insert', () => { if (range.row < 0) s.addColumns(Math.max(0, range.col), Math.max(1, range.colCount)); else s.addRows(Math.max(0, range.row), Math.max(1, range.rowCount)); }],
-      ['Delete', () => { if (range.row < 0) s.deleteColumns(Math.max(0, range.col), Math.max(1, range.colCount)); else s.deleteRows(Math.max(0, range.row), Math.max(1, range.rowCount)); }],
-      ] as [string, () => void][] : [
-        ['Filter', () => notImplemented('ContextMenu.Filter (requires filtering module)')],
-        ['Sort', () => notImplemented('ContextMenu.Sort (requires sorting module)')],
-        ['New Threaded Comment', () => notImplemented('ContextMenu.ThreadedComment')],
-        ['Insert Comment', () => notImplemented('ContextMenu.CommentUI')],
-      ] as [string, () => void][]),
-    ];
-    if (!tab && (range.col < 0 || range.row < 0)) items.push(['Hide', () => { if (range.col < 0) for (let r = range.row; r < range.row + range.rowCount; r++) s.setRowVisible(r, false); else for (let c = range.col; c < range.col + range.colCount; c++) s.setColumnVisible(c, false); }], ['Unhide', () => { if (range.col < 0) for (let r = Math.max(0, range.row - 1); r <= range.row + range.rowCount; r++) s.setRowVisible(r, true); else for (let c = Math.max(0, range.col - 1); c <= range.col + range.colCount; c++) s.setColumnVisible(c, true); }]);
-    for (const [label, action] of items) {
-      const item = document.createElement('button'); item.textContent = label; item.className = 'gc-contextmenu-menuitem gc-ui-contextmenu-menuitem gc-ui-contextmenu-menuitem-content gc-ui-contextmenu-text'; item.setAttribute('role', 'menuitem');
-      item.addEventListener('click', () => { this.closeMenu(); action(); }); menu.append(item);
+    const area = tab ? 'sheetTab' : !hit || hit.row < 0 && hit.col < 0 ? 'corner' : hit.row < 0 ? 'colHeader' : hit.col < 0 ? 'rowHeader' : 'viewport';
+    const table = hit && hit.row >= 0 && hit.col >= 0 ? s.tables.find(hit.row, hit.col) : null;
+    const comment = s.comments.get(s.getActiveRowIndex(), s.getActiveColumnIndex());
+    const excluded = new Set(['gc.spread.pasteSpecial', 'gc.spread.paste', 'gc.spread.ganttSheetPaste', 'gc.spread.insertCopiedCells', 'gc.spread.insertCutCells', 'gc.spread.rowHeaderinsertCopiedCells', 'gc.spread.rowHeaderinsertCutCells', 'gc.spread.colHeaderinsertCopiedCells', 'gc.spread.colHeaderinsertCutCells', 'gc.spread.pinRows', 'gc.spread.pinColumns', 'gc.spread.colHeadermodifyColumn', 'gc.spread.colHeaderremoveColumn', 'gc.spread.colHeadersetPrimaryKey', 'gc.spread.rowHeaderpromote', 'gc.spread.rowHeaderdemote', 'gc.spread.rowHeadermoveUp', 'gc.spread.rowHeadermoveDown', 'gc.spread.rowHeaderaddAfter', 'gc.spread.rowHeaderaddBefore', 'gc.spread.rowHeaderaddAbove', 'gc.spread.rowHeaderaddBelow', 'gc.spread.replyToThreadedComment', 'gc.spread.deleteThreadedComment']);
+    const menu = wb.contextMenu;
+    const items = compactMenu(menu.menuData.filter(item => {
+      if (item.visible === false || excluded.has(item.name ?? '') || item.name?.startsWith('reportSheet')) return false;
+      if (/colHeader(?:expand|collapse)/.test(item.name ?? '') && s.columnOutlines.getMaxLevel() < 0) return false;
+      if (item.type === 'separator') return true;
+      if (['gc.spread.editComment', 'gc.spread.deleteComment', 'gc.spread.toggleComment'].includes(item.name ?? '') && !comment) return false;
+      if (['gc.spread.insertComment', 'gc.spread.insertThreadedComment'].includes(item.name ?? '') && (comment || area === 'corner')) return false;
+      return !item.workArea || item.workArea.includes(area) || !!table && item.workArea.includes('table');
+    }).map(item => item.name === 'gc.spread.unhideSheet' ? { ...item, disable: !wb.sheets.some(sheet => !sheet.visible()) } : { ...item }));
+    const hitInfo = tab ? { tabStripHitInfo: { sheetTab: { sheetName: s.name(), sheetIndex: wb.getActiveSheetIndex() } }, x, y } : { worksheetHitInfo: { x, y, row: Math.max(0, hit?.row ?? 0), col: Math.max(0, hit?.col ?? 0), rowViewportIndex: hit && hit.row < 0 ? -1 : 1, colViewportIndex: hit && hit.col < 0 ? -1 : 1, hitTestType: area === 'corner' ? 0 : area === 'colHeader' ? 1 : area === 'rowHeader' ? 2 : 3 }, x, y };
+    if (menu.onOpenMenu(menu.menuData, items, hitInfo, wb)) return;
+    const root = renderMenu(menu, items, (item, host, e) => {
+      const options = menu.menuView.getCommandOptions(item, host, e);
+      this.closeMenu(); this.menuCommand(item, options, event);
+    });
+    this.view.root.append(root); this.menu = root;
+    root.style.left = `${Math.max(0, Math.min(x, this.view.width - root.offsetWidth))}px`;
+    root.style.top = `${Math.max(0, Math.min(y, this.view.height - root.offsetHeight))}px`;
+    root.focus();
+  }
+  private menuCommand(item: MenuItemData, options: unknown, event: MouseEvent): void {
+    const wb = this.view.workbook, s = this.view.sheet!, range = s.getSelections().at(-1)!;
+    const action = item.name?.replace('gc.spread.', '') ?? '';
+    if (typeof item.command === 'function') { item.command(wb, options); return; }
+    if (item.command && Object.hasOwn(wb.commandManager(), item.command)) { wb.commandManager().execute({ cmd: item.command, sheetName: s.name(), commandOptions: options }); return; }
+    switch (action) {
+      case 'copy': document.execCommand('copy'); return;
+      case 'cut': document.execCommand('cut'); return;
+      case 'pasteFormula': case 'pasteFormatting': case 'pasteValuesFormatting': case 'pasteFormulaFormatting': console.warn(`NotImplemented: ContextMenu.${action}`); return;
+      case 'pasteAll': case 'pasteValues':
+        if (this.clipboard) this.pasteValues(this.clipboard.values.map(row => row.map(v => v == null ? '' : String(v))));
+        else void navigator.clipboard?.readText().then(text => this.pasteValues(decodeTSV(text))); return;
+      case 'clearContents': this.clearValues(); return;
+      case 'insertRows': s.addRows(Math.max(0, range.row), Math.max(1, range.rowCount)); return;
+      case 'insertColumns': s.addColumns(Math.max(0, range.col), Math.max(1, range.colCount)); return;
+      case 'deleteRows': s.deleteRows(Math.max(0, range.row), Math.max(1, range.rowCount)); return;
+      case 'deleteColumns': s.deleteColumns(Math.max(0, range.col), Math.max(1, range.colCount)); return;
+      case 'hideRows': case 'unhideRows': for (let r = Math.max(0, range.row - (action === 'unhideRows' ? 1 : 0)); r < range.row + range.rowCount + (action === 'unhideRows' ? 1 : 0); r++) s.setRowVisible(r, action === 'unhideRows'); return;
+      case 'hideColumns': case 'unhideColumns': for (let c = Math.max(0, range.col - (action === 'unhideColumns' ? 1 : 0)); c < range.col + range.colCount + (action === 'unhideColumns' ? 1 : 0); c++) s.setColumnVisible(c, action === 'unhideColumns'); return;
+      case 'insertSheet': wb.addSheet(wb.getActiveSheetIndex()); return;
+      case 'deleteSheet': if (wb.getSheetCount() > 1) wb.removeSheet(wb.getActiveSheetIndex()); return;
+      case 'startEditSheetName': this.renameTab(event); return;
+      case 'hideSheet': if (wb.sheets.filter(sheet => sheet.visible()).length > 1) { s.visible(false); wb.setActiveSheetIndex(wb.sheets.findIndex(sheet => !!sheet.visible())); } return;
+      case 'unhideSheet': this.sheetList(true); return;
+      case 'filter': { const used = s._usedRange(); const filter = new HideRowFilter(new Range(0, 0, used.row + 1, used.col + 1)); s.rowFilter(filter); return; }
+      case 'sortAscend': case 'sortDescend': { const used = s._usedRange(); s.sortRange(0, 0, used.row + 1, used.col + 1, true, [{ index: s.getActiveColumnIndex(), ascending: action === 'sortAscend' }]); return; }
+      case 'insertComment': { const comment = s.comments.add(s.getActiveRowIndex(), s.getActiveColumnIndex(), ''); comment.displayMode(1); return; }
+      case 'deleteComment': s.comments.remove(s.getActiveRowIndex(), s.getActiveColumnIndex()); return;
+      case 'toggleComment': { const comment = s.comments.get(s.getActiveRowIndex(), s.getActiveColumnIndex()); if (comment) comment.displayMode(comment.displayMode() === 1 ? 0 : 1); return; }
+      default: notImplemented(`ContextMenu.${item.command ?? action}`);
     }
-    this.view.root.append(menu); this.menu = menu;
   }
   private closeMenu(): void { this.menu?.remove(); this.menu = undefined; }
   /** True while the in-cell editor is open on a cell. */

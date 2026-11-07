@@ -1,3 +1,4 @@
+import { CellBindingSource, getPath, setPath } from './binding.js';
 /**
  * Tables: range model, column metadata, built-in themes, structured-reference
  * support and JSON round-trip. Styles are resolved lazily so table edits are
@@ -502,6 +503,7 @@ export class Table {
   bindingPath(value?: string): unknown {
     if (value === undefined) return this.options.bindingPath;
     this.options.bindingPath = value;
+    this._refreshBinding();
     return this;
   }
   style(value?: string | TableTheme): unknown {
@@ -533,6 +535,7 @@ export class Table {
     return this;
   }
   rowFilter(): HideRowFilter {
+    this.filter._table(this.tableName);
     return this.filter;
   }
   getColumnName(tableColumnIndex: number): string {
@@ -631,11 +634,30 @@ export class Table {
   getSlicerData(): unknown {
     return null;
   }
-  adjustTableRangeForBind(): void {}
+  adjustTableRangeForBind(): void { this._refreshBinding(); }
+  private boundRecords(): Record<string, unknown>[] | null {
+    const source = this.dataSource ?? this.sheet?.getDataSource();
+    const records = source instanceof CellBindingSource ? source.getValue(this.options.bindingPath) : this.options.bindingPath ? getPath(source, this.options.bindingPath) : source;
+    return Array.isArray(records) ? records : null;
+  }
+  _refreshBinding(): void {
+    const records = this.boundRecords(); if (!records || !this.sheet) return;
+    this.sheet._enableBindings();
+    if (this.options.autoGenerateColumns && !this.columns.some(c => c.dataField())) this.columns = Object.keys(records[0] ?? {}).map((key, i) => new TableColumn(i + 1, key, key));
+    this.colCount = Math.max(1, this.columns.length);
+    this.rowCount = records.length;
+    this.sheet.suspendPaint(); this.sheet.suspendDirty();
+    try { this.writeHeaderValues(); const range = this.dataRange(); for (let r = 0; r < records.length; r++) for (let c = 0; c < this.columns.length; c++) { const path = String(this.columns[c].dataField() ?? this.columns[c].name() ?? ''); this.sheet.setValue(range.row + r, range.col + c, getPath(records[r], path)); } }
+    finally { this.sheet.resumeDirty(); this.sheet.resumePaint(); }
+    this.sheet._tablesChanged();
+  }
+  _bindingValue(row: number, col: number): { value: unknown } | undefined { const records = this.boundRecords(), range = this.dataRange(); if (!records || !range.contains(row, col)) return undefined; const record = records[row - range.row], column = this.columns[col - range.col]; return { value: record && column ? getPath(record, String(column.dataField() ?? column.name())) : null }; }
+  _setBindingValue(row: number, col: number, value: unknown): void { const records = this.boundRecords(), range = this.dataRange(); if (!records || !range.contains(row, col)) return; const record = records[row - range.row], column = this.columns[col - range.col]; if (record && column) setPath(record, String(column.dataField() ?? column.name()), value); }
   bind(columns: TableColumn[], path?: string, dataSource?: object | string): this {
     this.bindColumns(columns);
     if (path !== undefined) this.options.bindingPath = path;
     if (dataSource !== undefined) this.dataSource = dataSource;
+    this._refreshBinding();
     return this;
   }
   bindColumns(columns: TableColumn[]): void {
@@ -931,6 +953,7 @@ export class CustomTableThemeManager {
 export class TableManager {
   private tables: Table[] = [];
   constructor(private sheet: Worksheet) {}
+  _hasAny(): boolean { return this.tables.length > 0; }
   add(
     name?: string,
     row?: number,

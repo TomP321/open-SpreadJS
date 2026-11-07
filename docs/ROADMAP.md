@@ -30,3 +30,7 @@
 Cell types, conditional formatting, data validation, tables, filter/sort, outlines,
 comments, sparklines, shapes/floating objects, charts, Excel IO (xlsx), print/PDF,
 pivot tables, slicers, TableSheet, Designer.
+
+## M5 — core UI fidelity and remaining core modules (in progress)
+
+The model/API, formatter safety, shared colour parsing, popup/control scaffolding and additional comparison coverage are implemented to the bounded extent recorded in STATUS.md. The milestone is not accepted: tightened glyph and popup comparisons still fail and several advanced core behaviours remain incomplete. Preserve these failures and the supervisor's thresholds until the implementation meets them; do not treat constructor coverage or JSON pass-through as completion.

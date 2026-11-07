@@ -1,3 +1,4 @@
+import { SparklineExValue } from './values.js';
 /**
  * Calculation engine: dependency tracking, incremental recalculation, dynamic
  * array spills and iterative circular reference solving.
@@ -164,7 +165,7 @@ export class CalcEngine implements EvalHost {
     const value = sheet._fastValue(row, col);
     if (value === null || value === undefined) return null;
     if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') return value;
-    if (value instanceof Date) return value;
+    if (value instanceof Date || value instanceof SparklineExValue) return value;
     if (value instanceof CalcError) return value;
     if (value instanceof CalcArray) return value.at(0, 0);
     if (value && typeof value === 'object' && 'error' in value)

@@ -1,3 +1,7 @@
+import { CellBindingSource, getPath, setPath } from './features/binding.js';
+import { FloatingObjectCollection } from './features/floating-objects.js';
+import { Sparkline, SparklineGroup, SparklineSetting } from './features/sparklines.js';
+import { ContextMenu } from './features/context-menu.js';
 import { WorkbookRenderer, type Rect } from './rendering.js';
 import { GC } from './generated/enums.js';
 import { notImplemented } from './not-implemented.js';
@@ -150,6 +154,21 @@ class Batching {
 }
 
 export class Worksheet {
+  readonly floatingObjects = new FloatingObjectCollection(this);
+  readonly pictures = new FloatingObjectCollection(this, '1');
+  private sparklineCells = new Map<string, Sparkline>();
+  getSparkline(row: number, col: number): Sparkline | null { return this.sparklineCells.get(`${row}:${col}`) ?? null; }
+  setSparkline(row: number, col: number, dataRange: Range | string, orientation: number, type: number, setting = new SparklineSetting(), dateRange?: Range | string, dateOrientation?: number): Sparkline {
+    this.removeSparkline(row, col);
+    const spark = new Sparkline(row, col, undefined, orientation, type, setting); spark._reference(dataRange); spark._sheet = this;
+    if (dateRange && typeof dateRange !== "string") spark.dateAxisData(dateRange);
+    if (dateOrientation !== undefined) spark.dateAxisOrientation(dateOrientation);
+    this.sparklineCells.set(`${row}:${col}`, spark); this.batch.invalidate(); return spark;
+  }
+  removeSparkline(row: number, col: number): void { const spark = this.getSparkline(row, col); if (spark) (spark.group() as SparklineGroup).remove(spark); this.sparklineCells.delete(`${row}:${col}`); this.batch.invalidate(); }
+  groupSparkline(sparklines: Sparkline[]): SparklineGroup { const first = sparklines[0]; if (!first) throw new Error("No sparklines to group"); const group = new SparklineGroup(first.sparklineType() as number, (first.setting() as SparklineSetting).clone()); sparklines.forEach(s => group.add(s)); this.batch.invalidate(); return group; }
+  ungroupSparkline(group: SparklineGroup): void { for (const spark of [...group._members]) { const single = new SparklineGroup(group.sparklineType, group.setting.clone()); single.add(spark); } this.batch.invalidate(); }
+
   autoGenerateColumns = true;
   readonly options: WorksheetOptions;
   readonly defaults: {
@@ -187,6 +206,10 @@ export class Worksheet {
   private policy = 2;
   private unit = 0;
   private source: Record<string, unknown>[] | null = null;
+  private cellSource?: CellBindingSource;
+  private hasBoundValues = false;
+  _enableBindings(): void { this.hasBoundValues = true; }
+  _hasBindingValues(): boolean { return this.hasBoundValues; }
   private boundColumns = new Map<number, { name: string; displayName?: string; size?: number }>();
   private settings: JsonRecord = {
     visible: 1,
@@ -268,6 +291,7 @@ export class Worksheet {
   private viewCellStore?: CellStore<CellData>;
   private viewAreaCache?: AreaData;
   _fastValue(row: number, col: number): unknown {
+    if (this.hasBoundValues) return this.getValue(row, col);
     return this.viewCellStore ? (this.viewCellStore.getValue(row, col) ?? null) : null;
   }
   _viewCellStore(): CellStore<CellData> | undefined {
@@ -317,6 +341,13 @@ export class Worksheet {
     coordinate(row);
     coordinate(col);
     if (valueType !== ValueType.normal) notImplemented('GC.Spread.Sheets.Worksheet.getValue(valueType)');
+    if (area === VIEW && this.hasBoundValues) {
+      if (this.cellSource) { const path = this.getBindingPath(row, col); if (path) return this.cellSource.getValue(path) ?? null; }
+      const tableValue = this.tables._hasAny() ? this.tables.find(row, col)?._bindingValue(row, col) : undefined;
+      if (tableValue) return tableValue.value ?? null;
+      const column = this.boundColumns.get(col);
+      if (this.source?.[row] && column) return getPath(this.source[row], column.name) ?? null;
+    }
     return this.areas.get(area)?.cells.getValue(row, col) ?? null;
   }
   setValue(row: number, col: number, value: unknown, area = VIEW, ignoreRecalc = false): void {
@@ -326,7 +357,11 @@ export class Worksheet {
     if (area === VIEW) this.calcEngine?.cellWriting?.(this, row, col);
     const cell = data.cells.peek(row, col), oldFormula = cell?.formula;
     data.cells.setValue(row, col, value);
-    if (area === VIEW && this.source?.[row] && this.boundColumns.has(col)) this.source[row][this.boundColumns.get(col)!.name] = value;
+    if (area === VIEW && this.hasBoundValues) {
+      if (this.source?.[row] && this.boundColumns.has(col)) setPath(this.source[row], this.boundColumns.get(col)!.name, value);
+      if (this.cellSource && this.getBindingPath(row, col)) this.cellSource.setValue(this.getBindingPath(row, col), value);
+      if (this.tables._hasAny()) this.tables.find(row, col)?._setBindingValue(row, col, value);
+    }
     if (cell) this.prune(row, col, area);
     if (!Object.is(oldValue, value ?? null) || oldFormula !== undefined) {
       if (area === VIEW) this.markDirty(row, col, oldValue, value ?? null);
@@ -472,11 +507,14 @@ export class Worksheet {
       else this.calcEngine.valueChanged?.(this, change.row, change.col, change.value);
     if (queue.length || all) this.calcEngine.recalculate(this, all);
   }
-  getDataSource(): Record<string, unknown>[] | null { return this.source; }
-  setDataSource(data: Record<string, unknown>[] | null, reset = true): void {
+  getDataSource(): Record<string, unknown>[] | CellBindingSource | null { return this.cellSource ?? this.source; }
+  setDataSource(data: Record<string, unknown>[] | CellBindingSource | null, reset = true): void {
+    if (data) this.hasBoundValues = true;
+    this.cellSource = data instanceof CellBindingSource ? data : undefined;
+    if (this.cellSource) { this.source = null; this.tables.all().forEach(t => t._refreshBinding()); this.batch.invalidate(); this.recalcAll(); return; }
     if (data !== null && !Array.isArray(data)) notImplemented('Worksheet.setDataSource(non-array)');
-    this.source = data;
-    if (reset && data) this.setRowCount(data.length);
+    this.source = data as Record<string, unknown>[] | null;
+    if (reset && Array.isArray(data)) this.setRowCount(data.length);
     if (data && this.autoGenerateColumns && !this.boundColumns.size) this.bindColumns(Object.keys(data[0] ?? {}).map(name => ({ name })));
     this.loadBinding();
   }
@@ -492,7 +530,7 @@ export class Worksheet {
     try { for (const [col, column] of this.boundColumns) {
       this.setValue(0, col, column.displayName ?? column.name, SheetArea.colHeader);
       if (column.size !== undefined) this.setColumnWidth(col, column.size);
-      this.source?.forEach((item, row) => this.setValue(row, col, item[column.name]));
+      this.source?.forEach((item, row) => this.setValue(row, col, getPath(item, column.name)));
     } } finally { this.resumeDirty(); this.resumePaint(); }
   }
   getArray(row: number, col: number, rowCount: number, colCount: number, getFormula = false): unknown[][] {
@@ -630,7 +668,7 @@ export class Worksheet {
     };
     for (const style of [data.defaultStyle, data.colStyles.get(col), data.rowStyles.get(row)])
       Object.assign(result, resolve(style));
-    if (area === VIEW && row >= 0 && col >= 0 && this.tables.all().length) {
+    if (area === VIEW && row >= 0 && col >= 0 && this.tables._hasAny()) {
       const tableStyle = this._tableStyleAt(row, col);
       if (tableStyle) Object.assign(result, resolve(tableStyle));
     }
@@ -1902,8 +1940,12 @@ export class Worksheet {
       });
     const conditionalJSON = this.conditionalFormats.toJSON();
     if (conditionalJSON.rules) result.conditionalFormats = conditionalJSON;
-    if (this.tables.all().length) result.tables = this.tables.all().map((table) => table.toJSON());
+    if (this.tables._hasAny()) result.tables = this.tables.all().map((table) => table.toJSON());
+    if (this.sparklineCells.size) result.sparklineGroups = [...new Set([...this.sparklineCells.values()].map(s => s.group() as SparklineGroup))].map(g => g.toJSON());
     if (this.rowFilterValue) result.rowFilter = this.rowFilterValue.toJSON();
+    if (!this.sparklineCells.size) delete result.sparklineGroups;
+    const objects = [...this.floatingObjects.all(), ...this.pictures.all()];
+    if (objects.length) result.floatingObjects = objects.map(o => o.toJSON()); else delete result.floatingObjects;
     result.cellStates ??= {};
     result.states ??= {};
     result.outlineColumnOptions ??= {};
@@ -2068,6 +2110,13 @@ export class Worksheet {
           for (let c = rect.col; c < rect.col + rect.colCount; c++)
             this.ensure(r, c).validator = record.validator;
     }
+    this.floatingObjects._fromJSON(list(json.floatingObjects).map(object));
+    this.pictures._fromJSON(list(json.floatingObjects).map(object));
+    this.sparklineCells.clear();
+    for (const raw of list(json.sparklineGroups)) {
+      const g = object(raw), setting = new SparklineSetting(object(g.setting) as Record<string, string | number | boolean>), group = new SparklineGroup(Number(g.sparklineType), setting);
+      for (const data of list(g.sparklines)) { const spark = Sparkline.fromJSON(object(data), group.sparklineType, setting); spark._sheet = this; group.add(spark); this.sparklineCells.set(`${spark.row}:${spark.column}`, spark); }
+    }
     this.conditionalFormats.fromJSON(json.conditionalFormats ?? {});
     this.tables._clear();
     this.tables._fromJSON(json.tables);
@@ -2126,6 +2175,7 @@ export class Worksheet {
 }
 
 export class Workbook {
+  contextMenu = new ContextMenu();
   sheets: Worksheet[] = [];
   readonly options: LiveWorkbookOptions;
   name = '';
@@ -2187,7 +2237,7 @@ export class Workbook {
           if (typeof before.formula === 'string') {
             sheet.setFormula(row, col, before.formula);
             sheet._setCalculatedValue(row, col, before.value);
-          } else sheet.setValue(row, col, before.value);
+          } else { sheet.setFormula(row, col, null); sheet.setValue(row, col, before.value); }
         } else if (typeof options.newValue === 'string' && options.newValue.startsWith('='))
           sheet.setFormula(row, col, options.newValue);
         else {

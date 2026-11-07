@@ -249,7 +249,7 @@ export function makeCriterion(criteria: ScalarValue): Criterion {
     const target = typeof criteria === 'number' ? criteria : criteria instanceof Date ? dateToSerial(criteria) : criteria;
     return { match: (value) => equalsLiteral(value, target) };
   }
-  let text = criteria;
+  let text = String(criteria);
   let op: '=' | '<>' | '<' | '>' | '<=' | '>=';
   op = '=';
   const operator = /^(<=|>=|<>|=|<|>)/.exec(text);

@@ -186,6 +186,8 @@ export class RowFilterBase {
   showFilterButton = true;
   private suppressFilteredOut = false;
   protected sheet?: Worksheet;
+  private tableName?: string;
+  _table(name: string): void { this.tableName = name; }
   constructor(range?: Range) {
     this.range = range ? new Range(range.row, range.col, range.rowCount, range.colCount) : null;
     this.extendedRange = this.range;
@@ -292,12 +294,13 @@ export class RowFilterBase {
         this.setRowVisible(row, false);
       }
     }
-    sheet._emit(Events.RangeFiltering, this.eventArgs(col === undefined ? columns : [col], Filter.FilterActionType.filter));
-    sheet._emit(Events.RangeFiltered, this.eventArgs(col === undefined ? columns : [col], Filter.FilterActionType.filter));
+    sheet._emit(this.tableName ? Events.TableFiltering : Events.RangeFiltering, this.eventArgs(col === undefined ? columns : [col], Filter.FilterActionType.filter));
+    sheet._emit(this.tableName ? Events.TableFiltered : Events.RangeFiltered, this.eventArgs(col === undefined ? columns : [col], Filter.FilterActionType.filter));
   }
   private eventArgs(columns: number[], action: number): JsonRecord {
     return {
       action,
+      ...(this.tableName ? { tableName: this.tableName } : {}),
       sheet: this.sheet,
       range: this.range ? new Range(this.range.row, this.range.col, this.range.rowCount, this.range.colCount) : null,
       filteredRows: [...this.range ? Array.from({ length: this.range.rowCount }, (_, i) => this.range!.row + i) : []].filter(
@@ -312,7 +315,7 @@ export class RowFilterBase {
     if (!sheet) return;
     const columns = col === undefined ? [...this.filteredColumns] : [col];
     const info = this.eventArgs(columns, Filter.FilterActionType.unfilter);
-    sheet._emit(Events.RangeFilterClearing, info);
+    sheet._emit(this.tableName ? Events.TableFilterClearing : Events.RangeFilterClearing, info);
     for (const c of columns) this.filteredColumns.delete(c);
     if (col === undefined) this.filtered.clear();
     else if (this.range)
@@ -321,7 +324,7 @@ export class RowFilterBase {
     for (let row = this.range?.row ?? 0; row < (this.range?.row ?? 0) + (this.range?.rowCount ?? 0); row++) {
       if (!this.filtered.has(row)) this.setRowVisible(row, true);
     }
-    sheet._emit(Events.RangeFilterCleared, info);
+    sheet._emit(this.tableName ? Events.TableFilterCleared : Events.RangeFilterCleared, info);
   }
   reset(): void {
     this.items.clear();
@@ -382,8 +385,13 @@ export class RowFilterBase {
     this.dialogVisible = (json.dialogVisibleInfo as JsonRecord | undefined) ?? {};
     this.showFilterButton = json.showFilterButton !== false;
   }
-  openFilterDialog(_hitInfo: unknown): void {
-    // UI hook: the renderer owns the dropdown; the model exposes it for callers.
+  openFilterDialog(hitInfo: unknown): void {
+    const hit = hitInfo as { col?: number; x?: number; y?: number; row?: number };
+    const view = this.sheet?._view();
+    if (!view || !this.range) return;
+    const column = Math.max(0, (hit.col ?? this.range.col) - this.range.col);
+    const cell = view.cellRect(hit.row ?? this.range.row, this.range.col + column);
+    view.interaction.openFilter(this, column, hit.x ?? cell.x, hit.y ?? cell.y, this.sheet!.getText(Math.max(0, this.range.row - 1), this.range.col + column));
   }
   onFilter(_args: unknown): void {}
 }

@@ -126,7 +126,12 @@ export interface LambdaValue {
   context: EvalEnvironment;
 }
 
-export type ScalarValue = number | string | boolean | Date | CalcError | null;
+export class SparklineExValue {
+  readonly typeName = 'SparklineExValue';
+  constructor(public name: string, public value: Record<string, unknown>) {}
+  toString(): string { return ''; }
+}
+export type ScalarValue = number | string | boolean | Date | CalcError | SparklineExValue | null;
 export type Value = ScalarValue | ReferenceValue | CalcArray | LambdaValue | MissingValue;
 
 export function isLambda(value: unknown): value is LambdaValue {

@@ -2,6 +2,67 @@
 
 M0/M1, the Part A storage fix, M2 and M3 are implemented. M4 adds the data features (tables, sorting/filtering, conditional formatting, data validation, cell types, legacy comments, hyperlinks and outlines) with the differential and visual coverage described below. Full v19 behavioral parity remains incomplete. No files have been committed.
 
+## M5 — partial, acceptance gates remain red
+
+M5 is **not complete**. The tightened visual tests and the new popup tests intentionally retain their failures. No supervisor-owned oracle inputs/harness files or pixel thresholds were changed, no official implementation/CSS/dependency-cache contents were read, and no captured reference pixels were embedded. Public runtime `contextMenu.menuData` was observed to populate `features/context-menu-data.json`; its labels, commands and metadata are public API data, not implementation code.
+
+Implemented in this pass:
+
+- General formatting of CalcError, arrays, nonfinite numbers and application objects; rich-text display remains supported. The absent barcode plugin produces `#NAME?`. Cell painting catches errors, warns once per message and unwinds nested canvas saves so later cells, headers and tabs can paint. Undoing a formula edit now restores the prior non-formula cell correctly.
+- A shared headless CSS colour parser covers CSS keywords, short/long hex with alpha, RGB/RGBA percentages, HSL/HSLA and the existing public Office/theme colour tokens. CF interpolation, canvas styles/borders, cell types, picture styling and tabs use the resolver. This does not implement custom Theme management or establish every tint/culture combination.
+- Filter popup: staged value checkboxes, search, check/uncheck, OK/Cancel, resizing, value sorting, colour commands, text/number/date submenu shells and a two-condition custom dialog. Table filters emit TableFiltering/TableFiltered rather than sheet RangeFiltering/RangeFiltered. Top/average and week/month/year presets warn NotImplemented rather than executing a different filter. Exact popup rendering and the remaining preset semantics are incomplete.
+- ContextMenu/MenuView public objects, independent mutable menuData, context filtering, onOpenMenu cancellation/modification, custom item creation/command options, registered commands, separators, independently drawn icons, paste-button group, sort submenu, disabled states and Escape. Some built-in actions (including distinct paste modes and advanced table/comment commands), complete keyboard traversal and styling remain incomplete.
+- Tab navigation state correction and an all-sheets menu whose opening pointer event no longer immediately dismisses it. Full tab colour/unhide dialogs and menu parity remain pending. Checkbox/button caption baselines were adjusted against black-box observations.
+- `glyphCells` now contains `{row,col,x,y,width,height}` CSS-pixel rectangles. Negative x/y offsets anchor to the cell's far edge. Table header text, captions and list text are no longer excluded as whole cells. The smaller regions expose unresolved icon/list differences; earlier M4 glyph pass numbers below are historical. Conditional-format rules and comment-indicator scenarios pass at both DPRs, but the icon gallery at DPR2 and the cell-type scenario remain red.
+- Line/column/winloss Sparkline, SparklineSetting and SparklineGroup models, worksheet add/get/group/ungroup/remove, settings, markers, basic axes, renderer and group JSON. Seven formula chart functions are registered: line/column/winloss, pie, area, horizontal/vertical bar. The bounded line/column/winloss plus formula/pie visual scenario passes at both DPRs. Other sparkline extensions/formulas, date-axis placement, structural changes, exhaustive group scaling and broader rendering/JSON parity remain pending.
+- FloatingObject/Picture collections, geometry/flags/anchors, HTML content, image styling, selection, pointer move/resize handles, collection stacking and JSON. Complex frozen/merged layout, structural changes, cross-collection stacking, clipboard/undo integration and exhaustive picture/stretch behaviour remain partial.
+- FormulaTextBox binding/edit commit/undo, function-name autocomplete and a limited set of argument signatures; NameBox address/range navigation and naming; StatusBar selection summaries, zoom and custom StatusItem lifecycle. The bounded control visual scenario passes at both DPRs; full name-list/status-menu UI, range-selection editing, function help and broader control styling remain partial.
+- Nested record paths, CellBindingSource, live cell/column binding and table record binding/write-back, including SUM recalculation after external record changes. Unbound reads/writes keep the direct sparse-storage path. External DataView/GC.Data.Table sources and full binding/structural/JSON behaviour remain unsupported.
+- InputMask registration and string-pattern validation/editing (character restrictions, groups, repeats, case, literals/placeholders and exclusion flags). Date-field editing explicitly throws NotImplemented; full caret/deletion, formula-derived masks and alternative/date rules need further conformance work. Scroll/resize tips, drag-fill smart tag and cut/copy details remain at their prior partial/NotImplemented implementation. Touch-toolbar availability in the trial core has not been established by a dedicated differential case; implementation and interaction coverage remain outstanding.
+
+API coverage is a reflection inventory, **not a claim that these partial modules have full behavioural parity**. The 39 added oracle cases and bounded scenarios do not cover every new public method/setting. Paired popup tests cover the listed filter/menu/list UIs, but full control autocomplete/tooltips, floating handles, masks, tab dialogs and all remaining Part B interactions still need dedicated paired tests. Validation and evidence follow below.
+
+### M5 validation (2026-11-07)
+
+- `pnpm -r build` passes; the core was rebuilt after the final sparkline drawing correction. `pnpm -r typecheck && pnpm -r test`, `pnpm lint` and `pnpm coverage:api` pass. Unit totals: **640** (core 374, compare 4, React 7, compat 255), including 34 new M5 unit cases.
+- Oracle: **1373/1373**, including **39/39** `codex-m5-core.json` cases; official 21.8 s / ours 2.6 s in the final check. Original cases and harness are unchanged.
+- API reflection: **74/207 constructors**, **791/1796 methods/functions**, **252/252 enums**, **1369/1369 declarations**. These counts include partial implementations and are not a behavioural completion percentage.
+- Full Playwright run: **113 passed / 31 failed (144 total, 7.1 min)**. Of 98 paired workbook comparisons, 95 pass; cell types at DPR1/DPR2 and the icon gallery at DPR2 fail. All 28 paired popup tests fail their pixel comparison; the remaining 18 functional/reference/metrics tests pass. New M5 workbook scenarios pass at both DPRs. The strict content/header 0.5%, tabs 1% and glyphs 12% thresholds are unchanged. Popup union comparisons use the content threshold without a watermark mask.
+- The full-run scroll gate passes: p95 **5.0 ms**, maximum **10.2 ms**, interval p95 **17.7 ms**, 264 painted cells; source samples are in `test-results/compare/performance.json`.
+- Matched scrolling workload against the original HEAD in the same browser/environment: baseline p95 **3.2 ms**, maximum **6.4 ms**, interval p95 **17.3 ms**; M5 p95 **3.6 ms**, maximum **4.2 ms**, interval p95 **18.1 ms**. Both paint 264 cells and honour suspension. This is a 0.4 ms p95 increase, not evidence of identical performance; both are below the existing 16 ms rendering / 25 ms interval limits. Samples: `test-results/compare/m5-matched-scroll.json`.
+- Cold CJS 200k-cell writes (dense 1 / dense 20 / scattered 50 columns): **68.1 / 88.7 / 65.9 ms**, retained heap plus buffers **6.40 / 5.78 / 6.52 MB**. Same-environment HEAD writes were **67.7 / 84.4 / 65.7 ms**. Dense-20 exceeds the historical 80 ms target in both builds; that target is not claimed met.
+- Evidence: `test-results/compare/report.html`, per-case `*-diff.json` and unmodified captures, `m5-complete-browser.log`, `m5-complete-build.log`, `m5-complete-checks.log`, `m5-delivery-verification.log`, `m5-bench-final.json.log`, `m5-baseline-bench.log`, and `test-results/oracle/report.json`. Runtime captures stay in ignored test output and are not embedded in source. No commit was made.
+
+Current bounded visual measurements (percent, DPR1 / DPR2):
+
+| Region | DPR1 | DPR2 | Limit |
+| --- | ---: | ---: | ---: |
+| Cell types — content | 0.479% | 0.665% | <0.5% |
+| Cell types — glyphs | 17.264% | 13.462% | <12% |
+| Icon gallery — glyphs | 11.156% | 12.440% | <12% |
+| CF rules — glyphs | 7.465% | 8.529% | <12% |
+| M5 charts — content | 0.010% | 0.022% | <0.5% |
+| M5 controls — content | 0.154% | 0.148% | <0.5% |
+
+Popup differences (whole popup union, no mask; every row remains over the unchanged 0.5% limit):
+
+| Popup | DPR1 | DPR2 |
+| --- | ---: | ---: |
+| Table filter | 1.339% | 1.106% |
+| Sheet filter | 2.385% | 2.216% |
+| Cell context | 8.483% | 8.034% |
+| Row/column header context | 7.427% | 7.074% |
+| Corner context | 8.657% | 8.423% |
+| Table context | 7.481% | 6.984% |
+| Tab context | 11.405% | 11.627% |
+| Text submenu | 13.177% | 9.611% |
+| Number submenu | 11.643% | 8.152% |
+| Date submenu | 12.259% | 9.846% |
+| Sort by colour | 24.948% | 25.366% |
+| Filter by colour | 33.718% | 34.143% |
+| Custom filter dialog | 5.071% | 4.415% |
+| All sheets list | 12.278% | 11.718% |
+
 ## Delivered
 
 - Strict TypeScript pnpm workspace, ESM/default/named and direct CommonJS exports, browser global GC, public declarations, React host, playground and comparison app.
@@ -44,24 +105,24 @@ M0/M1, the Part A storage fix, M2 and M3 are implemented. M4 adds the data featu
 - M4 hyperlinks: `setHyperlink`/`getHyperlink`, url/command/tooltip/target/link colours/underline/visited state, copy and move quirks, clearing with storage masks, theme-aware hyperlink colour (`#0563C1` in the Excel 2013 theme, `#0000FF` without a stylesheet) and serialization.
 - M4 outlines: row and column grouping with levels, expand/collapse extents and summary rows, `OutlineInfo`/`itemsData`, change serialization, scaled outline gutters and level buttons, group brackets and +/− buttons in both header gutters, and header-size changes consumed by renderer, hit-testing and `getCellRect`.
 - M4 UI: filter dropdown menu (sort A→Z, sort Z→A, clear), outline expand/collapse buttons, checkbox/combo/list cell-type interaction, hyperlink activation, comment/validation events and table row-change events. Context-menu Filter/Sort entries no longer throw NotImplemented.
-- M4 visual scenarios: `m4-tables-basic`, `m4-table-themes`, `m4-filter-buttons`, `m4-cf-rules`, `m4-cf-databars`, `m4-icon-sets-gallery`, `m4-validation`, `m4-cell-types`, `m4-comments`, `m4-hyperlinks` and `m4-outlines`, all within the content/header/tab pixel gates at DPR 1 and 2. Declared pictogram cells are measured by a separate `glyphs` gate (12%) and excluded from content/header denominators; filter dropdowns, funnels and sort arrows, icon-set glyphs, checkbox/radio, outline buttons, comment triangles and validation arrows are all vector-drawn.
+- M4 visual scenarios: `m4-tables-basic`, `m4-table-themes`, `m4-filter-buttons`, `m4-cf-rules`, `m4-cf-databars`, `m4-icon-sets-gallery`, `m4-validation`, `m4-cell-types`, `m4-comments`, `m4-hyperlinks` and `m4-outlines`, historically within the content/header/tab pixel gates at DPR 1 and 2 before M5 tightened the glyph regions. Declared pictogram cells are measured by a separate `glyphs` gate (12%) and excluded from content/header denominators; filter dropdowns, funnels and sort arrows, icon-set glyphs, checkbox/radio, outline buttons, comment triangles and validation arrows are all vector-drawn.
 - Verified performance (built ESM bundle, Node 20, this machine): parse 100k formulas **~265 ms**; incremental recalculation of a 100k-cell dependency chain **~0.43 s** without stack overflow (first parse+register+calculate ~1.6–2.0 s); one input change under 10k dependent `SUM(A1:A100)` formulas **~37–40 ms** (Vitest bench mean 36.7 ms, steady-state built-bundle runs 34–46 ms; the test guards with a wider bound because the Vitest module runner is noisier).
 
 ## Partial and pending
 
 - M2 is bounded by the checked scenarios. Border dash/double rasterization, font fitting/wrapping, some header subpixels, and tab/navigation geometry still differ slightly. Alternate theme filenames are supplied as aliases to the independently authored white theme; distinct dark/colorful palettes are pending. Background images remain deferred as requested. Multi-header styling, right-to-left layout, complex frozen/merged intersections, full touch gestures and accessibility need broader conformance work.
 - Context-menu labels and basic commands are present, but the trial's paste icon group, advanced submenus, dialogs and full menu customization are incomplete. The new filter/sort menus are functional but the trial's full AutoFilter dialog, colour/custom filters and comment editing UI remain partial. Native clipboard permission flows, HTML formatting from other applications, cross-sheet rich clipboard data, complete tab/selection traversal edge cases and all SpreadJS shortcut/action exports require more work. Resize tips and scroll tips currently use browser tooltips. Drag previews, smart tags, data validation and protected-cell exceptions are incomplete.
-- React routes declared event callbacks and supported option props. Theme switching and the React convenience props for outline info remain limited. Array records are supported as dataSource; CellBindingSource/DataView sources and nested binding paths remain unsupported. Declared cell-type props store metadata, while advanced custom editors remain outside the checked scenarios.
+- React routes declared event callbacks and supported option props. Theme switching and the React convenience props for outline info remain limited. Array records, nested paths and CellBindingSource are now supported by the bounded M5 implementation above; DataView/GC.Data.Table integration remains unsupported. Declared cell-type props store metadata, while advanced custom editors remain outside the checked scenarios.
 - Calc engine limits: structured references evaluate for the common table forms; 3-D/external references remain unsupported. `ExcelCompatibleCalcMode` is exposed but does not switch coercion rules (the trial's default coercion is implemented). Asynchronous custom functions expose the API and settle synchronous `evaluateAsync` results, but interval/on-recalculation scheduling and worker evaluation are not wired. Complex-number functions can differ from the trial in the last floating-point digit of the printed string. `GETPIVOTDATA` returns `#REF!`, `FILTERXML` returns `#VALUE!` and `WEBSERVICE` returns the trial's empty string because those backing modules are out of scope; `CELL`, `INFO`, the `CUBE*` family and `RTD` are not registered, matching the trial's `#NAME?`. Legacy `EUROCONVERT` legacy-to-legacy conversion is simplified. 3-D (`Sheet1:Sheet2!A1`) and external-workbook references are unsupported; table structured references are covered by M4 oracle cases. Legacy CSE array formulas work for evaluation but their JSON metadata and collision semantics are partial. `NameInfo.getExpression()` returns formula text rather than a public `Expression` object. R1C1 relative columns at the sheet edge do not wrap the way the trial's renderer does, and SCC evaluation order for complex overlapping circular ranges can differ from the trial; simple cycles, self-references and the documented iterative options match.
 - Formatting is verified by the named table, not every possible Excel format. Unsupported SSF syntax throws NotImplemented. Non-Gregorian calendars, DBNum forms, specialized localized formats and arbitrary custom-format parsing need further conformance work. FormatMode is absent from both the v19.2.5 public declarations and core trial export; no guessed legacy enum was added.
-- Advanced serialization transformations (header/frozen conversion, saveAsView, R1C1 export, incremental loading) explicitly throw. Binding sources beyond array records, rich-text ValueType variants, calculation options beyond model batching and advanced copied objects remain outside the tested M1 behavior. Advanced JSON pass-through is not implementation of those modules.
+- Advanced serialization transformations (header/frozen conversion, saveAsView, R1C1 export, incremental loading) explicitly throw. Binding sources and floating objects now have the bounded M5 implementation above. Rich-text ValueType variants, calculation options beyond model batching and advanced copied objects remain outside the tested M1 behavior. Advanced JSON pass-through is not implementation of those modules.
 - The event comparison verifies every constant available in the core trial. Nine declared constants belong to absent add-ons: RowOperation and eight TableSheet filter/sort events. Ours exports those declared names too. This is a recorded reference-runtime exception, not a missing API surface.
 - Comments support legacy notes and basic pointer-free UI; threaded comments, rich-text comment editing, hover previews/editing dialogs and full comment layout parity remain limited. Advanced table/chart/pivot modules remain outside M4.
 - Public declarations include unsupported members for source compatibility; declarations and numeric API coverage do not establish behavioral parity. Unsupported members throw NotImplemented. See [API_COVERAGE.md](API_COVERAGE.md) for the generated inventory and limits.
 
-## Validation
+## M4 validation baseline (historical)
 
-Verified on 2026-11-06:
+Verified on 2026-11-06, before M5 tightened glyph regions:
 
 - `pnpm -r build` — passed; Vite reports bundle-size warnings.
 - `pnpm -r typecheck && pnpm -r test` — passed, 606 unit tests (340 core, 4 compare, 7 React, 255 compat).
@@ -87,6 +148,6 @@ Verified on 2026-11-06:
 | values | 0.439% |
 | zoom | 0.618% |
 
-All screenshot scenarios pass their region gates: content and headers <0.5%, tabs <1%, and declared vector-glyph rectangles <12%. The M4 glyph results range from 0% to 11.7%; the closest is `m4-cf-rules` at DPR 2 (11.693%). Remaining differences are described above and in [RENDERING.md](RENDERING.md). The generated `test-results/compare/report.html` contains every per-scenario screenshot and pixel diff; `runtime-metrics.json` and `performance.json` retain runtime measurements.
+At the historical M4 baseline, all screenshot scenarios passed their then-declared region gates: content and headers <0.5%, tabs <1%, and declared vector-glyph rectangles <12%. The M4 glyph results range from 0% to 11.7%; the closest is `m4-cf-rules` at DPR 2 (11.693%). Remaining differences are described above and in [RENDERING.md](RENDERING.md). The generated `test-results/compare/report.html` contains every per-scenario screenshot and pixel diff; `runtime-metrics.json` and `performance.json` retain runtime measurements.
 
 Reference fixtures and their regeneration instructions are in `packages/spread-sheets/test/fixtures/README.md`. Browser artifacts are ignored outputs under `test-results/compare/`. Vendor implementation JavaScript and stylesheet contents were never inspected or copied; the browser loads them only as opaque reference assets. Only public declarations and public runtime observations informed this work.

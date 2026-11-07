@@ -1,3 +1,4 @@
+import { mixColor } from '../colors.js';
 /**
  * Conditional formatting rules: cell-value, text, formula, date, top/bottom,
  * unique/duplicate, average, two-/three-colour scales, data bars and icon sets.
@@ -797,17 +798,6 @@ function scaleValue(sheet: { getValue(r: number, c: number): unknown }, rule: Sc
       return isMin ? 0 : 1;
   }
 }
-function parseColor(color: string): [number, number, number] {
-  if (/^#[0-9a-f]{6}$/i.test(color)) return [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)];
-  if (/^#[0-9a-f]{3}$/i.test(color)) return [parseInt(color[1]! + color[1]!, 16), parseInt(color[2]! + color[2]!, 16), parseInt(color[3]! + color[3]!, 16)];
-  return [0, 0, 0];
-}
-function mixColor(from: string, to: string, t: number): string {
-  const a = parseColor(from), b = parseColor(to);
-  const channel = (i: number) => Math.round(a[i]! + (b[i]! - a[i]!) * Math.max(0, Math.min(1, t)));
-  return `rgba(${channel(0)},${channel(1)},${channel(2)},1)`;
-}
-
 /** Range-level rule matching (top/bottom, unique, duplicate, average). */
 function rangeRuleMatches(sheet: { getValue(r: number, c: number): unknown }, rule: ConditionRuleBase, row: number, column: number, value: unknown): boolean {
   const type = rule.ruleType();

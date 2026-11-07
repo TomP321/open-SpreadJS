@@ -1,3 +1,6 @@
+import { SparklineExValue } from './calc/values.js';
+import { paintFormulaSparkline } from './features/sparklines.js';
+import { canvasColor as resolveColor } from './colors.js';
 import type { Workbook, Worksheet } from './model.js';
 import { Range, Style, type LineBorder } from './primitives.js';
 import { Events } from './events.js';
@@ -106,6 +109,9 @@ export class WorkbookRenderer {
   private dirtyCells: [number, number][] = [];
   private styleCache = new Map<string, Style>();
   private formatters = new Map<string, GeneralFormatter>();
+  private floatingLayer?: HTMLElement;
+  private contextDepth = 0;
+  private paintWarnings = new Set<string>();
   width = 0; height = 0; viewWidth = 0; viewHeight = 0;
   headerWidth = 40; headerHeight = 20; rowGutter = 0; colGutter = 0; zoom = 1;
   scrollX = 0; scrollY = 0;
@@ -126,6 +132,9 @@ export class WorkbookRenderer {
     stripEdge.style.cssText = 'position:absolute;left:0;height:1px;pointer-events:none;background:linear-gradient(to right,#d1d1d1,#ababab)';
     this.tabs = element('canvas', 'gc-tab-strip', this.root);
     this.context = this.canvas.getContext('2d')!;
+    const save = this.context.save.bind(this.context), restore = this.context.restore.bind(this.context);
+    this.context.save = () => { this.contextDepth++; save(); };
+    this.context.restore = () => { if (this.contextDepth > 0) this.contextDepth--; restore(); };
     this.selectionContext = this.overlay.getContext('2d')!;
     this.tabContext = this.tabs.getContext('2d')!;
     this.editor = element('textarea', 'gc-cell-editor', this.root); this.editor.style.display = 'none';
@@ -292,7 +301,7 @@ export class WorkbookRenderer {
       }
       ctx.clip();
     }
-    ctx.fillStyle = String(this.workbook.options.grayAreaBackColor ?? '#ababab'); ctx.fillRect(0, 0, this.viewWidth, this.viewHeight);
+    ctx.fillStyle = resolveColor(String(this.workbook.options.grayAreaBackColor ?? '#ababab')); ctx.fillRect(0, 0, this.viewWidth, this.viewHeight);
     const bottom = Math.min(this.viewHeight, this.headerHeight + s._rowLayout().prefixSum(s.getRowCount()) * this.zoom);
     const right = Math.min(this.viewWidth, this.headerWidth + s._columnLayout().prefixSum(s.getColumnCount()) * this.zoom);
     ctx.fillStyle = 'white'; ctx.fillRect(0, 0, right, bottom);
@@ -313,10 +322,10 @@ export class WorkbookRenderer {
       const rect = span ? this.rangeRect(span, row, col) : { x: col.position, y: row.position, width: col.size, height: row.size };
       this.clipCell(ctx, row, col, () => {
         const style = this.style(r, c);
-        ctx.fillStyle = typeof style.backColor === 'string' ? style.backColor : 'white';
+        ctx.fillStyle = resolveColor(typeof style.backColor === 'string' ? style.backColor : 'white');
         const hideGrid = !!style.backColor;
         ctx.fillRect(rect.x - (hideGrid ? 1 : 0), rect.y - (hideGrid ? 1 : 0), rect.width + (hideGrid ? 1 : 0), rect.height + (hideGrid ? 1 : 0));
-        ctx.fillStyle = s.options.gridline.color;
+        ctx.fillStyle = resolveColor(s.options.gridline.color);
         if (!hideGrid && s.options.gridline.showVerticalGridline) ctx.fillRect(Math.round(rect.x + rect.width) - 1, rect.y, 1, rect.height);
         if (!hideGrid && s.options.gridline.showHorizontalGridline) ctx.fillRect(rect.x, Math.round(rect.y + rect.height) - 1, rect.width, 1);
       });
@@ -327,14 +336,16 @@ export class WorkbookRenderer {
       if (span) { if (paintedSpans.has(span)) continue; paintedSpans.add(span); }
       const r = span?.row ?? row.index, c = span?.col ?? col.index;
       const rect = span ? this.rangeRect(span, row, col) : { x: col.position, y: row.position, width: col.size, height: row.size };
-      const style = this.style(r, c), value = s.getValue(r, c);
       this.clipCell(ctx, row, col, () => {
+        const style = this.style(r, c), value = s.getValue(r, c);
         const visual = hasRules ? s.conditionalFormats._visualFor(r, c, value) : null;
         if (visual?.backColor) {
-          ctx.fillStyle = visual.backColor;
+          ctx.fillStyle = resolveColor(visual.backColor);
           ctx.fillRect(rect.x, rect.y, rect.width - 1, rect.height - 1);
         }
         if (visual?.bar) this.drawDataBar(ctx, rect, visual.bar);
+        s.getSparkline(r, c)?.paintSparkline(ctx, rect.x, rect.y, rect.width, rect.height);
+        if (value instanceof SparklineExValue) paintFormulaSparkline(ctx, value, rect.x, rect.y, rect.width, rect.height);
         const cellType = style.cellType ? s.getCellType(r, c) : DEFAULT_CELL_TYPE;
         const custom = cellType && !isDefaultCellType(cellType) && cellType !== null;
         const hyperlink = s.getHyperlink(r, c) as { linkColor?: string; visitedLinkColor?: string; drawUnderline?: boolean } | null;
@@ -349,8 +360,7 @@ export class WorkbookRenderer {
           if (visual?.icon?.iconOnly) {
             // Icon-only rules suppress the cell text.
           } else if (iconWidth) {
-            this.drawText(ctx, r, c, value, style, rect, !span);
-            void iconWidth;
+            this.drawText(ctx, r, c, value, style, { ...rect, x: rect.x + iconWidth + 2, width: Math.max(0, rect.width - iconWidth - 2) }, false);
           } else if (hyperlink) {
             this.drawHyperlinkText(ctx, r, c, value, style, rect, hyperlink);
           } else this.drawText(ctx, r, c, value, style, rect, !span);
@@ -368,12 +378,29 @@ export class WorkbookRenderer {
     this.drawFreezeLines(ctx);
     ctx.restore();
     this.drawSelection(); this.drawTabs();
+    const objects = [...s.floatingObjects.all(), ...s.pictures.all()];
+    if (objects.length || this.floatingLayer) {
+      if (!this.floatingLayer) this.floatingLayer = element('div', 'opensheets-floating-layer', this.root);
+      this.floatingLayer.style.width = `${this.viewWidth}px`; this.floatingLayer.style.height = `${this.viewHeight}px`;
+      this.floatingLayer.querySelectorAll<HTMLElement>('.opensheets-floating-object').forEach(el => el.style.display = 'none');
+      objects.forEach((item, index) => item._render(this, this.floatingLayer!, index));
+    }
     this.interaction.positionEditor();
     this.fullDirty = false; this.dirtyCells.length = 0;
     this.metrics.frames++; this.metrics.lastFrameMs = performance.now() - start;
   }
   private clipCell(ctx: CanvasRenderingContext2D, row: AxisSlot, col: AxisSlot, action: () => void): void {
-    ctx.save(); ctx.beginPath(); ctx.rect(col.min, row.min, col.max - col.min, row.max - row.min); ctx.clip(); action(); ctx.restore();
+    const previousDepth = this.contextDepth;
+    ctx.save();
+    try {
+      ctx.beginPath(); ctx.rect(col.min, row.min, col.max - col.min, row.max - row.min); ctx.clip(); action();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!this.paintWarnings.has(message)) {
+        this.paintWarnings.add(message);
+        console.warn(`OpenSheets: could not paint cell ${row.index},${col.index}: ${message}`);
+      }
+    } finally { while (this.contextDepth > previousDepth) ctx.restore(); }
   }
   rangeRect(range: Range, row?: AxisSlot, col?: AxisSlot): Rect {
     const s = this.sheet!, rows = s._rowLayout(), cols = s._columnLayout();
@@ -408,7 +435,7 @@ export class WorkbookRenderer {
   private drawText(ctx: CanvasRenderingContext2D, row: number, col: number, value: unknown, style: Style, rect: Rect, overflow: boolean): void {
     const text = this.text(row, col, value, style);
     if (!text) return;
-    const z = this.zoom; ctx.font = this.font(style); ctx.fillStyle = String(style.foreColor ?? 'black');
+    const z = this.zoom; ctx.font = this.font(style); ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     const align = style.hAlign === 3 || style.hAlign === undefined ? typeof value === 'number' || value instanceof Date ? 2 : typeof value === 'boolean' ? 1 : 0 : Number(style.hAlign);
     const indent = Number(style.textIndent ?? 0) * 8 * z;
     const pad = 1;
@@ -428,7 +455,7 @@ export class WorkbookRenderer {
         if (this.sheet!.getValue(row, c) != null || this.sheet!.getFormula(row, c) || neighbour.backColor || this.sheet!.getSpan(row, c)) break;
         left -= axis.getSize(c) * z;
       }
-      ctx.fillStyle = String(style.backColor ?? 'white'); ctx.fillRect(left, rect.y, right - left, rect.height - 1); ctx.fillStyle = String(style.foreColor ?? 'black');
+      ctx.fillStyle = resolveColor(String(style.backColor ?? 'white')); ctx.fillRect(left, rect.y, right - left, rect.height - 1); ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     }
     ctx.save(); ctx.beginPath(); ctx.rect(left, rect.y, right - left, rect.height - 1); ctx.clip();
     let fontSize = Number((ctx.font.match(/([\d.]+)px/) ?? [0, 14.6667 * z])[1]);
@@ -458,7 +485,7 @@ export class WorkbookRenderer {
       [strongerBorder(style.borderRight as LineBorder, this.style(row, endCol).borderLeft as LineBorder), rect.x + rect.width - 1, rect.y - 1, rect.x + rect.width - 1, rect.y + rect.height - 1],
     ];
     for (const [border, x1, y1, x2, y2] of sides) if (border && border.style) {
-      ctx.save(); ctx.fillStyle = border.color;
+      ctx.save(); ctx.fillStyle = resolveColor(border.color);
       const z = this.zoom, horizontal = y1 === y2;
       const weight = border.style === 6 ? 1 : borderWeight(border) >= 30 ? 3 : borderWeight(border) >= 20 ? 2 : 1;
       const patterns: Record<number, number[]> = { 3: [3, 1], 4: [2, 2], 7: [1, 1], 8: [9, 3], 9: [8, 2, 2, 2], 10: [9, 3, 3, 3], 11: [9, 3, 3, 3, 3, 3], 12: [9, 3, 3, 3, 3, 3], 13: [11, 1, 5, 1] };
@@ -482,14 +509,14 @@ export class WorkbookRenderer {
         }
       };
       if (pattern) {
-        ctx.fillStyle = String(style.backColor ?? 'white'); paint(0, length - startOffset, 0, weight);
+        ctx.fillStyle = resolveColor(String(style.backColor ?? 'white')); paint(0, length - startOffset, 0, weight);
         // Slanted dash-dot measures its runs without the trailing cell-edge pixel.
         // Extend the backing far enough to suppress the gridline there too; vertical
         // sides only extend their leading column, like the official raster.
         if (border.style === 13) paint(length - startOffset, z, 0, horizontal ? weight : 1);
-        ctx.fillStyle = border.color;
+        ctx.fillStyle = resolveColor(border.color);
       }
-      if (border.style === 6) { ctx.fillStyle = String(style.backColor ?? 'white'); paint(0, length, 0, 1); ctx.fillStyle = border.color; line(-z, 1); line(z, 1); }
+      if (border.style === 6) { ctx.fillStyle = resolveColor(String(style.backColor ?? 'white')); paint(0, length, 0, 1); ctx.fillStyle = resolveColor(border.color); line(-z, 1); line(z, 1); }
       else if (border.style === 13) {
         for (let offset = 0, part = 0; offset < length - startOffset;) {
           const run = pattern![part % pattern!.length] * z;
@@ -522,21 +549,23 @@ export class WorkbookRenderer {
     ctx.clip();
     if (bar.gradient) {
       const gradient = ctx.createLinearGradient(left, 0, left + Math.max(1, width), 0);
-      gradient.addColorStop(0, bar.color);
+      gradient.addColorStop(0, resolveColor(bar.color));
       gradient.addColorStop(1, '#ffffff');
       ctx.fillStyle = gradient;
-    } else ctx.fillStyle = bar.color;
+    } else ctx.fillStyle = resolveColor(bar.color);
     ctx.fillRect(left, rect.y + 1, width, rect.height - 3);
     if (bar.showBorder) {
-      ctx.strokeStyle = bar.borderColor ?? bar.color;
+      ctx.strokeStyle = resolveColor(bar.borderColor ?? bar.color);
       ctx.lineWidth = 1;
       ctx.strokeRect(left + 0.5, rect.y + 1.5, width - 1, rect.height - 4);
     }
     ctx.restore();
   }
   private drawIcon(ctx: CanvasRenderingContext2D, icon: { iconSetType: number; iconIndex: number; iconOnly: boolean }, rect: Rect): number {
-    const size = Math.min(18, Math.max(10, rect.height - 2));
-    const x = Math.round(rect.x) + 1, y = Math.round(rect.y + (rect.height - size) / 2);
+    const arrows = [0, 1, 10, 11, 15, 16].includes(icon.iconSetType);
+    const size = Math.min((arrows || icon.iconSetType === 7 ? 16 : 18) * this.zoom, Math.max(1, rect.height - 2));
+    const offset = icon.iconSetType === 3 ? 1 : icon.iconSetType === 4 ? 2 : icon.iconSetType === 13 || icon.iconSetType === 17 ? 3 : icon.iconSetType === 7 || icon.iconSetType === 6 ? 1 : 0;
+    const x = Math.round(rect.x) + offset, y = Math.round(rect.y + (rect.height - size) / 2) - 1 + ([3, 6, 13, 17].includes(icon.iconSetType) ? 1 : 0);
     drawIconSet(ctx, icon.iconSetType, icon.iconIndex, x, y, size);
     return size;
   }
@@ -547,11 +576,11 @@ export class WorkbookRenderer {
     if (!comment) return;
     const size = Number(comment.indicatorSize()) || 6;
     ctx.save();
-    ctx.fillStyle = String(comment.indicatorColor() ?? 'red');
+    ctx.fillStyle = resolveColor(String(comment.indicatorColor() ?? 'red'));
     ctx.beginPath();
-    ctx.moveTo(rect.x + rect.width - size - 1, rect.y + 1);
-    ctx.lineTo(rect.x + rect.width - 1, rect.y + 1);
-    ctx.lineTo(rect.x + rect.width - 1, rect.y + size + 1);
+    ctx.moveTo(rect.x + rect.width - size, rect.y);
+    ctx.lineTo(rect.x + rect.width - 1, rect.y);
+    ctx.lineTo(rect.x + rect.width - 1, rect.y + size - 1);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
@@ -582,7 +611,7 @@ export class WorkbookRenderer {
     if (this.workbook.options.highlightInvalidData && value != null && typeof sheet.isValid === 'function' && !sheet.isValid(row, col, value)) {
       const style = typeof validator.highlightStyle === 'function' ? validator.highlightStyle() : undefined;
       ctx.save();
-      ctx.strokeStyle = style?.color ?? 'red';
+      ctx.strokeStyle = resolveColor(style?.color ?? 'red');
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.ellipse(rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width / 2 + 4, rect.height / 2 + 4, 0, 0, Math.PI * 2);
@@ -791,7 +820,7 @@ export class WorkbookRenderer {
     }
   }
   private drawFreezeLines(ctx: CanvasRenderingContext2D): void {
-    const s = this.sheet!; ctx.fillStyle = s.options.frozenlineColor;
+    const s = this.sheet!; ctx.fillStyle = resolveColor(s.options.frozenlineColor);
     for (const [slots, count, trailing, isRow] of [[this.rows, s.frozenRowCount(), s.frozenTrailingRowCount(), true], [this.cols, s.frozenColumnCount(), s.frozenTrailingColumnCount(), false]] as const) {
       const axis = isRow ? s._rowLayout() : s._columnLayout();
       for (const boundary of [count ? slots.find(slot => slot.index >= count)?.min : undefined, trailing ? slots.find(slot => slot.index >= axis.count - trailing)?.min : undefined])
@@ -813,24 +842,24 @@ export class WorkbookRenderer {
         const rect = this.rangeRect(range, r, c);
         ctx.save(); ctx.beginPath(); ctx.rect(Math.max(this.headerWidth - 2, colPane.min - 2), Math.max(this.headerHeight - 2, rowPane.min - 2), colPane.max - colPane.min + 3, rowPane.max - rowPane.min + 3); ctx.clip();
         if (range.rowCount > 1 || range.colCount > 1) {
-          ctx.fillStyle = String(s.options.selectionBackColor ?? 'rgba(0,0,0,0.185)');
+          ctx.fillStyle = resolveColor(String(s.options.selectionBackColor ?? 'rgba(0,0,0,0.185)'));
           const inset = s.getSelections().length > 1 ? 1 : 0;
           ctx.fillRect(rect.x + inset, rect.y + inset, rect.width - 1 - inset * 2, rect.height - 1 - inset * 2);
           ctx.clearRect(active.x, active.y, active.width, active.height);
         }
-        ctx.strokeStyle = s.getSelections().length > 1 ? 'white' : String(s.options.selectionBorderColor ?? '#217346'); ctx.lineWidth = s.getSelections().length > 1 ? 1 : 2;
+        ctx.strokeStyle = resolveColor(s.getSelections().length > 1 ? 'white' : String(s.options.selectionBorderColor ?? '#217346')); ctx.lineWidth = s.getSelections().length > 1 ? 1 : 2;
         if (s.getSelections().length === 1) ctx.strokeRect(Math.round(rect.x) - 1, Math.round(rect.y) - 1, Math.round(rect.width) + 1, Math.round(rect.height) + 1);
         const inTable = !!this.sheet!._tableAt(s.getActiveRowIndex(), s.getActiveColumnIndex());
         if (!inTable && s.getSelections().length === 1 && this.workbook.options.allowUserDragFill && range.rowCount < s.getRowCount() && range.colCount < s.getColumnCount()) {
           ctx.fillStyle = 'white'; ctx.fillRect(rect.x + rect.width - 5, rect.y + rect.height - 5, 7, 7);
-          ctx.fillStyle = String(s.options.selectionBorderColor ?? '#217346'); ctx.fillRect(rect.x + rect.width - 3, rect.y + rect.height - 3, 5, 5);
+          ctx.fillStyle = resolveColor(String(s.options.selectionBorderColor ?? '#217346')); ctx.fillRect(rect.x + rect.width - 3, rect.y + rect.height - 3, 5, 5);
         }
         ctx.restore();
       }
     }
-    if (s.getSelections().length > 1) { ctx.strokeStyle = String(s.options.selectionBorderColor ?? '#217346'); ctx.lineWidth = 1; ctx.strokeRect(active.x + 1.5, active.y + 1.5, active.width - 4, active.height - 4); }
+    if (s.getSelections().length > 1) { ctx.strokeStyle = resolveColor(String(s.options.selectionBorderColor ?? '#217346')); ctx.lineWidth = 1; ctx.strokeRect(active.x + 1.5, active.y + 1.5, active.width - 4, active.height - 4); }
     if (this.copiedRange && this.workbook.options.cutCopyIndicatorVisible) {
-      const rect = this.rangeRect(this.copiedRange); ctx.strokeStyle = this.workbook.options.cutCopyIndicatorBorderColor; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.lineDashOffset = -(performance.now() / 120 % 7);
+      const rect = this.rangeRect(this.copiedRange); ctx.strokeStyle = resolveColor(this.workbook.options.cutCopyIndicatorBorderColor); ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.lineDashOffset = -(performance.now() / 120 % 7);
       ctx.strokeRect(rect.x - 1, rect.y - 1, rect.width, rect.height);
     }
     ctx.restore();
@@ -844,7 +873,7 @@ export class WorkbookRenderer {
     ctx.fillStyle = edge; ctx.fillRect(0, 0, width, 1);
     this.tabHits = [];
     if (options.tabNavigationVisible) {
-      for (const [x, reverse] of [[28, true], [57, false]] as const) { ctx.fillStyle = !reverse && this.workbook.startSheetIndex() + this.tabHits.filter(hit => hit.index >= 0).length < this.workbook.sheets.length - 1 ? '#217346' : '#bfbfbf'; ctx.beginPath(); ctx.moveTo(x + (reverse ? 2 : -2), 11); ctx.lineTo(x + (reverse ? -2 : 2), 14); ctx.lineTo(x + (reverse ? 2 : -2), 17); ctx.fill(); this.tabHits.push({ x: x - 12, width: 24, index: reverse ? -2 : -3 }); }
+      for (const [x, reverse] of [[28, true], [57, false]] as const) { ctx.fillStyle = resolveColor((reverse ? this.workbook.startSheetIndex() > 0 : this.workbook.startSheetIndex() < this.workbook.sheets.length - 1) ? '#217346' : '#bfbfbf'); ctx.beginPath(); ctx.moveTo(x + (reverse ? 2 : -2), 11); ctx.lineTo(x + (reverse ? -2 : 2), 14); ctx.lineTo(x + (reverse ? 2 : -2), 17); ctx.fill(); this.tabHits.push({ x: x - 12, width: 24, index: reverse ? -2 : -3 }); }
     }
     ctx.font = 'bold 10pt "Segoe UI"';
     const overflow = this.workbook.sheets.reduce((sum, sheet) => sum + Math.ceil(ctx.measureText(sheet.name()).width + 26), 0) > width - (options.tabNavigationVisible ? 114 : 0) - 81;
@@ -860,9 +889,9 @@ export class WorkbookRenderer {
       if (x + w > width - 40) break;
       const selected = i === active;
       ctx.fillStyle = selected ? 'white' : '#f6f6f6'; ctx.fillRect(x, 0, w, 25);
-      if (!selected && sheet.options.sheetTabColor) { ctx.fillStyle = sheet.options.sheetTabColor; ctx.fillRect(x + 2, 3, w - 4, 22); }
+      if (!selected && sheet.options.sheetTabColor) { ctx.fillStyle = resolveColor(sheet.options.sheetTabColor); ctx.fillRect(x + 2, 3, w - 4, 22); }
       if (selected) { ctx.fillStyle = '#ababab'; ctx.fillRect(x, 0, 1, 25); ctx.fillRect(x + w - 1, 0, 1, 25); }
-      if (selected) { ctx.fillStyle = sheet.options.sheetTabColor ?? '#217346'; ctx.fillRect(x, 23, w, 2); }
+      if (selected) { ctx.fillStyle = resolveColor(sheet.options.sheetTabColor ?? '#217346'); ctx.fillRect(x, 23, w, 2); }
       ctx.fillStyle = selected ? '#217346' : sheet.options.sheetTabColor ? 'white' : '#444'; ctx.font = `${selected ? 'bold ' : ''}10pt "Segoe UI"`; ctx.textAlign = 'left'; ctx.fillText(sheet.name(), x + (selected ? 13 : 12), 13); ctx.textAlign = 'center';
       this.tabHits.push({ x, width: w, index: i }); x += w;
     }

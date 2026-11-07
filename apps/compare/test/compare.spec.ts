@@ -51,12 +51,10 @@ for (const dpr of [1, 2]) {
           return { x: left, y: top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
         };
         type GlyphSheet = { getCellRect(row: number, col: number): { x: number; y: number; width: number; height: number } };
-        const addGlyphCell = (s: GlyphSheet, cell: [number, number, number, number]) => {
-          const [row, col, rowCount, colCount] = cell;
-          if (rowCount <= 0 || colCount <= 0) return;
-          const first = s.getCellRect(row, col), last = s.getCellRect(row + rowCount - 1, col + colCount - 1);
-          if (!first || !last) return;
-          const rect = clip({ x: first.x, y: first.y, width: last.x + last.width - first.x, height: last.y + last.height - first.y });
+        const addGlyphCell = (s: GlyphSheet, glyph: { row: number; col: number; x: number; y: number; width: number; height: number }) => {
+          const cell = s.getCellRect(glyph.row, glyph.col);
+          if (!cell) return;
+          const rect = clip({ x: cell.x + (glyph.x < 0 ? cell.width + glyph.x : glyph.x), y: cell.y + (glyph.y < 0 ? cell.height + glyph.y : glyph.y), width: glyph.width, height: glyph.height });
           if (rect.width && rect.height) glyphBoxes.push(rect);
         };
         let headerWidth = 0, headerHeight = 0;
@@ -71,6 +69,8 @@ for (const dpr of [1, 2]) {
           ])];
           const rows = indexes(s.getViewportTopRow(1), s.getViewportBottomRow(1), s.frozenRowCount(), s.frozenTrailingRowCount(), s.getRowCount());
           const cols = indexes(s.getViewportLeftColumn(1), s.getViewportRightColumn(1), s.frozenColumnCount(), s.frozenTrailingColumnCount(), s.getColumnCount());
+          const objects = [...s.floatingObjects.all(), ...s.pictures.all()];
+          for (const item of objects) { if (item.isVisible()) boxes.push({ x: first.x + item.x() * s.zoom(), y: first.y + item.y() * s.zoom(), width: item.width() * s.zoom(), height: item.height() * s.zoom() }); }
           const spans = s.getSpans(), measure = document.createElement('canvas').getContext('2d')!;
           for (const r of rows) for (const c of cols) {
             const rect = s.getCellRect(r, c);
@@ -115,7 +115,7 @@ for (const dpr of [1, 2]) {
         }
         for (const pane of ['official', 'ours']) {
           const element = document.getElementById(`${pane}-pane`)!, hostRect = element.getBoundingClientRect();
-          for (const editor of element.querySelectorAll<HTMLElement>('[contenteditable=true],textarea')) {
+          for (const editor of element.querySelectorAll<HTMLElement>('[contenteditable=true],textarea,[data-m5-control]')) {
             const rect = editor.getBoundingClientRect();
             if (rect.width && rect.height) boxes.push({ x: rect.x - hostRect.x - 6, y: rect.y - hostRect.y - 6, width: rect.width + 12, height: rect.height + 12 });
           }

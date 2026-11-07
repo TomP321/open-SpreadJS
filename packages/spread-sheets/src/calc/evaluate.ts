@@ -1,3 +1,4 @@
+import { SparklineExValue } from './values.js';
 /**
  * Formula evaluator: turns an AST into a value, applying SpreadJS coercion
  * rules (numeric text conversion, implicit intersection, array semantics).
@@ -314,10 +315,10 @@ export function sumReferenceValues(ctx: EvalContext, value: ReferenceValue): num
   void ctx;
   for (const area of value.areas) {
     const sheet = area.sheet;
-    const store = sheet._viewCellStore();
+    const store = sheet._viewCellStore(), bound = sheet._hasBindingValues();
     for (let row = area.r1; row <= area.r2; row++) {
       for (let col = area.c1; col <= area.c2; col++) {
-        const raw = store ? store.getValue(row, col) : null;
+        const raw = bound ? sheet.getValue(row, col) : store ? store.getValue(row, col) : null;
         const cell = raw === undefined ? null : raw;
         if (typeof cell === 'number') total += cell;
         else if (cell instanceof CalcError) return cell;
@@ -899,7 +900,9 @@ function textOf(value: ScalarValue): string {
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
   if (typeof value === 'number') return numberToText(value);
   if (value instanceof Date) return numberToText(dateToSerial(value));
-  raiseError(value);
+  if (value instanceof SparklineExValue) return '';
+  if (isError(value)) raiseError(value);
+  raise(ErrorCode.value);
 }
 
 export function excelPower(base: number, exponent: number): number | CalcError {

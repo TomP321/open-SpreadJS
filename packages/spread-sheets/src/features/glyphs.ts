@@ -27,11 +27,11 @@ function paintArrow(
   palette: Palette,
 ): void {
   const half = size / 2;
-  const top = -half * 1.02;
-  const headHeight = size * 0.42;
-  const headWidth = size * 1.06;
-  const shaftWidth = size * 0.36;
-  const bottom = half * 1.0;
+  const top = -half * 0.85;
+  const headHeight = size * 0.38;
+  const headWidth = size * (palette === GRAY ? 0.85 : 0.75);
+  const shaftWidth = size * 0.26;
+  const bottom = half * 0.85;
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(rotation);
@@ -124,11 +124,11 @@ function paintStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: 
     ctx.fillStyle = YELLOW.fill;
     ctx.fillRect(cx - outer, cy - outer, outer, outer * 2);
     ctx.restore();
-    ctx.strokeStyle = '#7f7f7f';
+    ctx.strokeStyle = '#666666';
   } else {
-    ctx.strokeStyle = '#7f7f7f';
+    ctx.strokeStyle = '#666666';
   }
-  ctx.lineWidth = Math.max(0.8, size / 22);
+  ctx.lineWidth = Math.max(1.1, size / 22);
   ctx.stroke();
   ctx.restore();
 }
@@ -171,11 +171,7 @@ function paintCircle(
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  const gradient = ctx.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
-  gradient.addColorStop(0, palette.light);
-  gradient.addColorStop(0.45, palette.fill);
-  gradient.addColorStop(1, palette.fill);
-  ctx.fillStyle = gradient;
+  ctx.fillStyle = palette.fill;
   ctx.fill();
   ctx.strokeStyle = stroke;
   ctx.lineWidth = Math.max(0.8, radius / 6.5);
@@ -187,17 +183,9 @@ function paintRimmedLight(ctx: CanvasRenderingContext2D, cx: number, cy: number,
   const half = size / 2;
   const side = size * 0.88;
   ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(cx - side / 2, cy - side / 2, side, side, size * 0.07);
-  const frame = ctx.createLinearGradient(cx - half, cy - half, cx + half, cy + half);
-  frame.addColorStop(0, '#686868');
-  frame.addColorStop(1, '#292929');
-  ctx.fillStyle = frame;
-  ctx.fill();
-  ctx.strokeStyle = '#262626';
-  ctx.lineWidth = Math.max(0.7, size / 24);
-  ctx.stroke();
-  paintCircle(ctx, cx, cy, half * 0.29, palette);
+  ctx.fillStyle = '#444444';
+  ctx.fillRect(cx - side / 2, cy - side / 2, side, side);
+  paintCircle(ctx, cx, cy, half * 0.61, palette);
   ctx.restore();
 }
 
@@ -283,22 +271,17 @@ function paintSymbolCircle(
   paintSymbol(ctx, kind, cx, cy, size, '#ffffff', 'rgba(0,0,0,0.28)');
 }
 
-function paintRatings(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, bars: number, index: number): void {
-  const total = size * 0.82;
-  const gap = size * 0.055;
-  const barWidth = (total - gap * (bars - 1)) / bars;
-  const bottom = y + size * 0.86;
-  const left = x + size * 0.09;
-  const topHeight = size * 0.58;
-  for (let i = 0; i < bars; i++) {
-    const height = size * 0.28 + topHeight * (bars === 1 ? 1 : i / (bars - 1));
-    const bx = left + i * (barWidth + gap);
-    const by = bottom - height;
-    ctx.fillStyle = i <= index ? BLUE : '#d9d9d9';
-    ctx.fillRect(bx, by, barWidth, height);
-    ctx.strokeStyle = '#595959';
-    ctx.lineWidth = Math.max(0.65, size / 26);
-    ctx.strokeRect(bx + 0.35, by + 0.35, Math.max(0.5, barWidth - 0.7), Math.max(0.5, height - 0.7));
+function paintRatings(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, ratings: number, index: number): void {
+  // Four connected bars; the four-rating set skips the single-filled state.
+  const unit = size / 18;
+  const filled = ratings === 4 ? index === 0 ? 0 : index + 1 : index;
+  for (let i = 0; i < 4; i++) {
+    const height = (7 + 3 * i) * unit;
+    const bx = x + (2 + 3 * i) * unit, by = y + 17 * unit - height;
+    ctx.fillStyle = i < filled ? BLUE : '#bfbfbf';
+    ctx.fillRect(bx, by, 4 * unit, height);
+    ctx.strokeStyle = '#7f7f7f'; ctx.lineWidth = unit;
+    ctx.strokeRect(bx + unit / 2, by + unit / 2, 3 * unit, height - unit);
   }
 }
 
@@ -331,15 +314,15 @@ function paintQuarters(ctx: CanvasRenderingContext2D, cx: number, cy: number, si
 }
 
 function paintBoxes(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, index: number): void {
-  const gap = size * 0.07;
-  const total = size * 0.8;
+  const gap = size / 18;
+  const total = size * 15 / 18;
   const box = (total - gap) / 2;
-  const left = x + size * 0.1;
-  const top = y + size * 0.1;
+  const left = x + size * 2 / 18;
+  const top = y + size * 2 / 18;
   for (let i = 0; i < 4; i++) {
     const bx = left + (i % 2) * (box + gap);
     const by = top + Math.floor(i / 2) * (box + gap);
-    ctx.fillStyle = i < index ? BLUE : '#c9c9c9';
+    ctx.fillStyle = i < index ? BLUE : '#b5b5b5';
     ctx.fillRect(bx, by, box, box);
     ctx.strokeStyle = '#595959';
     ctx.lineWidth = Math.max(0.65, size / 26);

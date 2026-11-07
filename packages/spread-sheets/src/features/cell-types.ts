@@ -1,3 +1,4 @@
+import { canvasColor as resolveColor } from '../colors.js';
 /**
  * Cell types. The Base class is extensible exactly like the documented custom
  * cell type tutorial: paint/paintContent draw, getHitInfo/process* handle
@@ -150,7 +151,7 @@ export class Base {
     ctx.rect(x, y, w - 1, h - 1);
     ctx.clip();
     ctx.font = String(style.font ?? DEFAULT_FONT);
-    ctx.fillStyle = String(style.foreColor ?? 'black');
+    ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textBaseline = 'middle';
     const align = Number(style.hAlign ?? 0);
     ctx.textAlign = align === 2 ? 'right' : align === 1 ? 'center' : 'left';
@@ -203,7 +204,7 @@ export class Corner extends Base {
 
 function drawCheckMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string): void {
   ctx.save();
-  ctx.strokeStyle = color;
+  ctx.strokeStyle = resolveColor(color);
   ctx.lineWidth = Math.max(2, size / 7);
   ctx.lineCap = 'round';
   ctx.beginPath();
@@ -214,7 +215,7 @@ function drawCheckMark(ctx: CanvasRenderingContext2D, x: number, y: number, size
   ctx.restore();
 }
 function drawMixedMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string): void {
-  ctx.fillStyle = color;
+  ctx.fillStyle = resolveColor(color);
   ctx.fillRect(x + size * 0.25, y + size * 0.45, size * 0.5, Math.max(1.5, size / 9));
 }
 function drawCheckBox(
@@ -316,10 +317,10 @@ export class CheckBox extends Base {
     if (text) {
       ctx.save();
       ctx.font = String(style.font ?? DEFAULT_FONT);
-      ctx.fillStyle = String(style.foreColor ?? 'black');
+      ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
-      ctx.fillText(text, left + size + 3, top + size / 2);
+      ctx.fillText(text, left + size + 3, top + size / 2 + 1);
       ctx.restore();
     }
     void context;
@@ -363,17 +364,17 @@ export class Button extends Base {
     const left = x + Number(this.props.marginLeft ?? 1), top = y + Number(this.props.marginTop ?? 1);
     const right = x + w - 1 - Number(this.props.marginRight ?? 1), bottom = y + h - 1 - Number(this.props.marginBottom ?? 1);
     ctx.save();
-    ctx.fillStyle = String(this.props.buttonBackColor ?? '#e7eef7');
+    ctx.fillStyle = resolveColor(String(this.props.buttonBackColor ?? '#e7eef7'));
     ctx.fillRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
     ctx.strokeStyle = '#707070';
     ctx.lineWidth = 1;
     ctx.strokeRect(left + 0.5, top + 0.5, Math.max(0, right - left - 1), Math.max(0, bottom - top - 1));
     const text = String(this.props.text ?? '') || this.format(value, (style.formatter as string) ?? 'General');
     ctx.font = String(style.font ?? DEFAULT_FONT);
-    ctx.fillStyle = String(style.foreColor ?? 'black');
+    ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, left + 2, (top + bottom) / 2 + 1);
+    ctx.fillText(text, left + 2, (top + bottom) / 2 + 2);
     ctx.restore();
   }
 }
@@ -435,7 +436,7 @@ export class ComboBox extends Base {
     const text = this.displayText(value);
     ctx.save();
     ctx.font = String(style.font ?? DEFAULT_FONT);
-    ctx.fillStyle = String(style.foreColor ?? 'black');
+    ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.fillText(text, x + 1, y + h / 2 - 2);
@@ -519,7 +520,7 @@ export class HyperLink extends Base {
     ctx.rect(x, y, w - 1, h - 1);
     ctx.clip();
     ctx.font = String(style.font ?? DEFAULT_FONT);
-    ctx.fillStyle = String(this.props.linkColor ?? '#0066cc');
+    ctx.fillStyle = resolveColor(String(this.props.linkColor ?? '#0066cc'));
     ctx.textBaseline = 'top';
     ctx.fillText(text, x, y + 3);
     const width = ctx.measureText(text).width;
@@ -623,7 +624,7 @@ export class CheckBoxList extends ItemListBase {
     const size = Number(this.props.boxSize) || 13;
     ctx.save();
     ctx.font = String(style.font ?? DEFAULT_FONT);
-    ctx.fillStyle = String(style.foreColor ?? 'black');
+    ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textBaseline = 'middle';
     let px = x + 1;
     const top = y + 3;
@@ -631,9 +632,9 @@ export class CheckBoxList extends ItemListBase {
       const text = String((item as JsonRecord)?.text ?? item);
       const checked = selected.includes(String(text)) || selected.includes(String(index));
       drawCheckBox(ctx, px, top, size, checked, '#ffffff', String(style.foreColor ?? '#000000'));
-      ctx.fillStyle = String(style.foreColor ?? 'black');
+      ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
       ctx.fillText(text, px + size + 4, top + size / 2 + 2);
-      px += size + 6 + ctx.measureText(text).width + 12;
+      px += size + 6 + ctx.measureText(text).width + 18;
     });
     ctx.restore();
   }
@@ -677,18 +678,18 @@ export class RadioButtonList extends ItemListBase {
       ctx.arc(cx, cy, size / 2 - 1.5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
-      ctx.strokeStyle = String(style.foreColor ?? '#000000');
+      ctx.strokeStyle = resolveColor(String(style.foreColor ?? '#000000'));
       ctx.lineWidth = 1;
       ctx.stroke();
       if (checked) {
         ctx.beginPath();
         ctx.arc(cx, cy, size / 2 - 4, 0, Math.PI * 2);
-        ctx.fillStyle = String(style.foreColor ?? '#000000');
+        ctx.fillStyle = resolveColor(String(style.foreColor ?? '#000000'));
         ctx.fill();
       }
-      ctx.fillStyle = String(style.foreColor ?? 'black');
+      ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
       ctx.fillText(text, px + size + 4, top + size / 2 + 3);
-      px += size + 8 + ctx.measureText(text).width + 14;
+      px += size + 8 + ctx.measureText(text).width + 16;
     });
     ctx.restore();
   }
@@ -735,10 +736,10 @@ export class ButtonList extends ItemListBase {
       const active = selected.includes(String(text)) || selected.includes(String(index));
       const width = ctx.measureText(text).width + padding * 2;
       if (active) {
-        ctx.fillStyle = String(this.selectedBackColor());
+        ctx.fillStyle = resolveColor(String(this.selectedBackColor()));
         ctx.fillRect(px, y + 2, width, h - 3);
-        ctx.fillStyle = String(this.selectedForeColor());
-      } else ctx.fillStyle = String(style.foreColor ?? 'black');
+        ctx.fillStyle = resolveColor(String(this.selectedForeColor()));
+      } else ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
       ctx.textAlign = 'center';
       ctx.fillText(text, px + width / 2, y + h / 2 + 3);
       px += width + spacing;
@@ -786,7 +787,7 @@ export class RangeTemplate extends Base {
     if (!sheet) return;
     ctx.save();
     ctx.font = String(style.font ?? DEFAULT_FONT);
-    ctx.fillStyle = String(style.foreColor ?? 'black');
+    ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textBaseline = 'middle';
     ctx.fillText(String(sheet.getValue(this.row, this.col) ?? ''), x + 2, y + 2);
     ctx.restore();

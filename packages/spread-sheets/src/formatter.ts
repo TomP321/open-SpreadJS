@@ -100,6 +100,10 @@ export class GeneralFormatter {
   format(value: unknown, data?: FormattedData): string {
     if (value == null) return '';
     if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+    // SSF accepts primitive text/numbers, whereas the public formatter also
+    // accepts calculation errors, arrays and arbitrary application objects.
+    if (typeof value === 'object' && !(value instanceof Date)) return String(value);
+    if (typeof value === 'number' && !Number.isFinite(value)) return String(value);
     const culture = this.culture();
     const format = this.pattern;
     const section = sectionFor(format, value);
