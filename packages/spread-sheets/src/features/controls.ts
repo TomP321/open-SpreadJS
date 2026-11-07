@@ -4,6 +4,7 @@ import { Events, type EventInfo, type ModelEvent } from '../events.js';
 import { sparklineRange } from './sparklines.js';
 import { columnLabel } from '../rendering.js';
 import { FormulaHints } from './formula-hints.js';
+import { colorSpans } from './formula-color.js';
 const controls = new WeakMap<HTMLElement, object>();
 function hostElement(host: HTMLElement | string): HTMLElement { const element = typeof host === 'string' ? document.getElementById(host) : host; if (!element) throw new Error('Control host not found'); return element; }
 export function findControl<T>(host: HTMLElement | string): T | undefined { return controls.get(hostElement(host)) as T | undefined; }
@@ -29,8 +30,40 @@ export class FormulaTextBox {
   remove(name: string): void { this.descriptions.delete(name.toUpperCase()); }
   text(value?: string): string {
     if (!this.wb || !this.input) return '';
-    if (value !== undefined) { if (this.input instanceof HTMLInputElement || this.input instanceof HTMLTextAreaElement) this.input.value = value; else this.input.textContent = value; }
+    if (value !== undefined) {
+      if (this.input instanceof HTMLInputElement || this.input instanceof HTMLTextAreaElement) this.input.value = value;
+      else {
+        const caret = this.caret(), focused = document.activeElement === this.input;
+        this.input.textContent = value;
+        if (value.startsWith('=')) this.input.replaceChildren(colorSpans(value));
+        if (focused) this.setOffset(caret);
+      }
+    }
     return this.input instanceof HTMLInputElement || this.input instanceof HTMLTextAreaElement ? this.input.value : this.input.textContent ?? '';
+  }
+  /** Re-render the formula text as syntax-coloured spans, restoring the caret when focused. */
+  private paint(caret?: number): void {
+    const input = this.input;
+    if (!input || input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) return;
+    const text = input.textContent ?? '';
+    if (text.startsWith('=')) input.replaceChildren(colorSpans(text));
+    else if (input.firstElementChild) input.textContent = text;
+    if (caret !== undefined && document.activeElement === input) this.setOffset(caret);
+  }
+  private setOffset(offset: number): void {
+    const input = this.input;
+    if (!input) return;
+    if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) { input.setSelectionRange(offset, offset); return; }
+    const walker = document.createTreeWalker(input, NodeFilter.SHOW_TEXT);
+    let remaining = offset, node: Node | null;
+    const selection = window.getSelection();
+    while ((node = walker.nextNode())) {
+      const length = node.textContent?.length ?? 0;
+      if (remaining <= length) { const range = document.createRange(); range.setStart(node, remaining); range.collapse(true); selection?.removeAllRanges(); selection?.addRange(range); return; }
+      remaining -= length;
+    }
+    const range = document.createRange(); range.selectNodeContents(input); range.collapse(false);
+    selection?.removeAllRanges(); selection?.addRange(range);
   }
   workbook(value?: Workbook): Workbook | undefined {
     if (value === undefined) return this.wb;
@@ -45,11 +78,11 @@ export class FormulaTextBox {
         const sheet = this.wb?.getActiveSheet(), input = this.input;
         if (sheet && input) {
           const value = this.text();
-          const selection = window.getSelection(); const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : undefined;
           const caret = this.caret();
           if (!sheet.isEditing()) sheet.startEdit(false, value);
           const editor = sheet._view()?.editor;
-          if (editor && sheet.isEditing()) { sheet._view()?.interaction.updateFromFormulaBar(value, input, caret); input.focus(); if (range && !(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) { selection?.removeAllRanges(); selection?.addRange(range); } }
+          if (editor && sheet.isEditing()) { sheet._view()?.interaction.updateFromFormulaBar(value, input, caret); input.focus(); }
+          this.paint(document.activeElement === input ? caret : undefined);
         }
         this.showSuggestions();
       }, { signal });

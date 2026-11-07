@@ -11,6 +11,7 @@ import { notImplemented } from './not-implemented.js';
 import { GeneralFormatter } from './formatter.js';
 import { FormulaHints } from './features/formula-hints.js';
 import { referenceAllowed, insertReference, closeFormulaParentheses } from './features/formula-point.js';
+import { colorFormula, parseReference } from './features/formula-color.js';
 import { FormulaParseError } from './calc/errors.js';
 import { columnLabel } from './rendering.js';
 
@@ -51,6 +52,7 @@ export class Interaction {
   private abort = new AbortController();
   private hints: FormulaHints;
   private formulaLayer?: HTMLElement;
+  private editorContainer?: HTMLElement;
   private referenceLayers: HTMLElement[] = [];
   private drag?: Drag;
   private anchor: Cell = { row: 0, col: 0 };
@@ -203,44 +205,56 @@ export class Interaction {
     this.view.editor.style.opacity = sheet === this.view.sheet ? '1' : '0';
     const rect = this.view.cellRect(row, col), style = sheet.getActualStyle(row, col), editor = this.view.editor;
     const ctx = this.view.context; ctx.save(); ctx.font = this.view.font(style);
-    const measured = Math.max(...editor.value.split('\n').map(line => ctx.measureText(line).width)); ctx.restore();
-    const width = style.wordWrap ? rect.width - 1 : Math.min(this.view.viewWidth - rect.x, Math.max(rect.width - 1, Math.ceil(measured) + 1));
-    Object.assign(editor.style, { left: `${rect.x - 2}px`, top: `${rect.y - 2}px`, width: `${width + 4}px`, height: `${Math.max(rect.height - 1, editor.value.split('\n').length * 19 * this.view.zoom) + 4}px`, font: this.view.font(style), color: String(style.foreColor ?? getComputedStyle(this.view.root.parentElement!.parentElement!).color), background: String(style.backColor ?? 'white'), textAlign: style.hAlign === 2 ? 'right' : style.hAlign === 1 ? 'center' : 'left', padding: '0px' });
+    const lines = editor.value.split('\n');
+    const measured = Math.max(...lines.map(line => ctx.measureText(line).width)); ctx.restore();
+    const width = style.wordWrap ? rect.width - 1 : Math.min(this.view.viewWidth - rect.x, Math.max(rect.width + 1, Math.ceil(measured) + 2));
+    const height = Math.max(rect.height - (style.wordWrap ? 1 : 0), lines.length * 19 * this.view.zoom) ;
+    if (!this.editorContainer) { this.editorContainer = document.createElement('div'); this.editorContainer.className = 'gc-cell-editor-container'; this.view.root.append(this.editorContainer); }
+    Object.assign(this.editorContainer.style, { display: editor.style.display, left: `${rect.x - 2}px`, top: `${rect.y - 2}px`, width: `${width + 4}px`, height: `${height + 4}px`, background: String(style.backColor ?? 'white') });
+    Object.assign(editor.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${width}px`, height: `${height}px`, font: this.view.font(style), color: String(style.foreColor ?? '#243148'), caretColor: String(style.foreColor ?? '#243148'), background: 'transparent', textAlign: style.hAlign === 2 ? 'right' : style.hAlign === 1 ? 'center' : 'left', padding: '0px' });
     editor.scrollLeft = 0;
     this.renderFormulaOverlay();
   }
   private renderFormulaOverlay(): void {
     this.formulaLayer?.remove(); this.formulaLayer = undefined;
     for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = [];
-    const editor = this.view.editor, sheet = this.editing?.sheet, text = editor.value;
-    if (!sheet || !text.startsWith('=')) return;
-    if (sheet !== this.view.sheet) {
+    const editor = this.view.editor, edit = this.editing, text = editor.value;
+    const foreColor = String(edit ? edit.sheet.getActualStyle(edit.row, edit.col).foreColor ?? '#243148' : '#243148');
+    if (!edit || !text.startsWith('=')) { editor.style.color = foreColor; return; }
+    if (edit.sheet !== this.view.sheet) {
+      editor.style.color = foreColor;
       const point = this.pointReference;
       if (point && point.anchor.row >= 0 && point.anchor.col >= 0 && point.last.row >= 0 && point.last.col >= 0) this.drawReference(point.anchor, point.last, '#0000ff');
       return;
     }
+    const sheet = edit.sheet, wb = this.view.workbook;
+    const { segments, references } = colorFormula(text);
     const layer = document.createElement('div'); layer.className = 'opensheets-formula-color';
-    Object.assign(layer.style, { position: 'absolute', zIndex: '4', boxSizing: 'border-box', overflow: 'hidden', whiteSpace: 'pre-wrap', pointerEvents: 'none', border: '2px solid transparent', left: editor.style.left, top: editor.style.top, width: editor.style.width, height: editor.style.height, font: editor.style.font, textAlign: editor.style.textAlign, background: editor.style.background, color: editor.style.color });
-    const colors = ['#0000ff', '#ff0000', '#008000', '#800080']; let referenceIndex = 0, last = 0;
-    const token = /\b([A-Za-z_][A-Za-z0-9_.]*)(?=\s*\()|\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?/g;
-    for (const match of text.matchAll(token)) {
-      const index = match.index; layer.append(document.createTextNode(text.slice(last, index))); const span = document.createElement('span'); span.textContent = match[0];
-      if (!match[1]) {
-        const color = colors[referenceIndex++ % colors.length]; span.style.color = color;
-        const col = (letters: string) => [...letters.toUpperCase()].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
-        const row1 = Number(match[3]) - 1, col1 = col(match[2]), row2 = match[5] ? Number(match[5]) - 1 : row1, col2 = match[4] ? col(match[4]) : col1;
-        if (row1 >= 0 && col1 >= 0 && row2 < sheet.getRowCount() && col2 < sheet.getColumnCount()) {
-          this.drawReference({ row: row1, col: col1 }, { row: row2, col: col2 }, color);
-        }
+    Object.assign(layer.style, { position: 'absolute', zIndex: '4', boxSizing: 'border-box', overflow: 'hidden', whiteSpace: 'pre-wrap', pointerEvents: 'none', left: editor.style.left, top: editor.style.top, width: editor.style.width, height: editor.style.height, font: editor.style.font, textAlign: editor.style.textAlign, background: 'transparent', color: foreColor });
+    for (const segment of segments) { const span = document.createElement('span'); span.textContent = segment.text; if (segment.color) span.style.color = segment.color; layer.append(span); }
+    this.view.root.append(layer); this.formulaLayer = layer;
+    editor.style.color = 'transparent';
+    const point = this.pointReference;
+    for (const reference of references) {
+      let bounds = reference.col1 >= 0 ? reference : undefined;
+      if (!bounds && /^[A-Za-z_][A-Za-z0-9_.]*$/.test(reference.text)) { // a defined name resolves through the model
+        const name = sheet.getCustomName(reference.text) ?? wb.getCustomName(reference.text);
+        const expression = name ? String((name as { getExpression?: () => unknown }).getExpression?.() ?? '') : '';
+        const parsed = parseReference(expression.replace(/^=/, ''));
+        if (parsed) bounds = { ...reference, ...parsed };
       }
-      layer.append(span); last = index + match[0].length;
+      if (!bounds || (bounds.sheetName && bounds.sheetName !== sheet.name())) continue;
+      if (bounds.row1 >= 0 && bounds.col1 >= 0 && bounds.row2 < sheet.getRowCount() && bounds.col2 < sheet.getColumnCount()) {
+        // A reference created by the latest point gesture stays dashed until the text changes again.
+        const dashed = !!point && point.start === reference.start && point.end === reference.start + reference.text.length;
+        this.drawReference({ row: bounds.row1, col: bounds.col1 }, { row: bounds.row2, col: bounds.col2 }, reference.color, !dashed);
+      }
     }
-    layer.append(document.createTextNode(text.slice(last))); this.view.root.append(layer); this.formulaLayer = layer;
-    editor.style.background = 'transparent'; editor.style.color = 'transparent'; editor.style.caretColor = '#222';
   }
-  private drawReference(first: Cell, last: Cell, color: string): void {
+  private drawReference(first: Cell, last: Cell, color: string, solid = false): void {
     const a = this.view.cellRect(Math.min(first.row, last.row), Math.min(first.col, last.col)), b = this.view.cellRect(Math.max(first.row, last.row), Math.max(first.col, last.col));
-    const border = document.createElement('div'); Object.assign(border.style, { position: 'absolute', pointerEvents: 'none', zIndex: '3', boxSizing: 'border-box', backgroundImage: `repeating-linear-gradient(to right, ${color} 0 6px, transparent 6px 12px), repeating-linear-gradient(to right, ${color} 0 6px, transparent 6px 12px), repeating-linear-gradient(to bottom, ${color} 0 6px, transparent 6px 12px), repeating-linear-gradient(to bottom, ${color} 0 6px, transparent 6px 12px), linear-gradient(${color}1a, ${color}1a)`, backgroundSize: '100% 2px, 100% 2px, 2px 100%, 2px 100%, calc(100% - 4px) calc(100% - 4px)', backgroundPosition: '1px 0, bottom left, left -1px, right -2px, 2px 2px', backgroundRepeat: 'no-repeat', left: `${a.x - 1}px`, top: `${a.y - 1}px`, width: `${b.x + b.width - a.x + 1}px`, height: `${b.y + b.height - a.y + 1}px` });
+    const line = (direction: 'right' | 'bottom') => solid ? `linear-gradient(${color}, ${color})` : `repeating-linear-gradient(to ${direction}, ${color} 0 6px, transparent 6px 12px)`;
+    const border = document.createElement('div'); Object.assign(border.style, { position: 'absolute', pointerEvents: 'none', zIndex: '3', boxSizing: 'border-box', backgroundImage: `${line('right')}, ${line('right')}, ${line('bottom')}, ${line('bottom')}, linear-gradient(${color}1a, ${color}1a)`, backgroundSize: '100% 2px, 100% 2px, 2px 100%, 2px 100%, calc(100% - 4px) calc(100% - 4px)', backgroundPosition: '1px 0, bottom left, left -1px, right -2px, 2px 2px', backgroundRepeat: 'no-repeat', left: `${a.x - 1}px`, top: `${a.y - 1}px`, width: `${b.x + b.width - a.x + 1}px`, height: `${b.y + b.height - a.y + 1}px` });
     for (const [horizontal, vertical] of [['left', 'top'], ['right', 'top'], ['left', 'bottom'], ['right', 'bottom']] as const) {
       const handle = document.createElement('div'); Object.assign(handle.style, { position: 'absolute', width: '5px', height: '5px', background: color, [horizontal]: '-1px', [vertical]: '-1px' }); border.append(handle);
     }
@@ -260,7 +274,7 @@ export class Interaction {
     }
     if (this.view.sheet !== sheet) this.view.workbook.setActiveSheet(sheet.name());
     this.view.editor.style.opacity = '1';
-    this.hints.close(); this.formulaLayer?.remove(); this.formulaLayer = undefined; for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = []; this.editing = undefined; this.pointReference = undefined; this.formulaBar = undefined; this.view.editor.style.display = 'none'; this.view.root.focus();
+    this.hints.close(); this.formulaLayer?.remove(); this.formulaLayer = undefined; for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = []; this.editing = undefined; this.pointReference = undefined; this.formulaBar = undefined; this.view.editor.style.display = 'none'; if (this.editorContainer) this.editorContainer.style.display = 'none'; this.view.root.focus();
     sheet._emit(Events.EditEnded, { ...info, newValue: sheet.getValue(row, col) });
     sheet._emit(Events.EditorStatusChanged, { sheet, sheetName: sheet.name(), oldStatus: 2, newStatus: 0 });
     this.view.schedule(); return true;
