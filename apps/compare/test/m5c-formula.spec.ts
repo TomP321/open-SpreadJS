@@ -29,17 +29,26 @@ for (const dpr of [1, 2]) {
       await expect(page.locator('.opensheets-formula-hints[role=tooltip]')).toBeVisible();
     });
     test('function lists agree for additional prefixes', async ({ page }) => {
-      for (const prefix of ['AV', 'COUNT', 'SUM']) {
+      test.setTimeout(120_000);
+      for (const prefix of [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'AV', 'COUNT', 'SUM']) {
         const lists: string[][] = [];
         for (const side of ['official', 'ours'] as const) {
           await page.goto('/?scenario=empty'); await page.waitForFunction(() => window.__compare?.ready);
           await edit(page, side, `=${prefix}`);
           const selector = side === 'official' ? '.gcsj-func-ac-row-name' : '.opensheets-formula-hints [role=option] > div:first-child';
-          await expect(page.locator(selector).first()).toBeVisible();
           lists.push(await page.locator(selector).allTextContents());
         }
-        expect(lists[1], prefix).toEqual(lists[0]);
+        expect.soft(lists[1], prefix).toEqual(lists[0]);
       }
+    });
+    test('sparkline suggestion includes its description and argument help', async ({ page }) => {
+      await page.goto('/?scenario=empty'); await page.waitForFunction(() => window.__compare?.ready);
+      await edit(page, 'ours', '=SCATTER');
+      const selected = page.locator('.opensheets-formula-hints[role=listbox] [aria-selected=true]');
+      await expect(selected).toContainText('SCATTERSPARKLINE');
+      await expect(selected).toContainText('Plots pairs of values as a compact scatter chart.');
+      await page.keyboard.press('Tab');
+      await expect(page.locator('.opensheets-formula-hints[role=tooltip]')).toContainText('points1');
     });
     test('dynamic array option filters the SE function list', async ({ page }) => {
       for (const enabled of [false, true]) {

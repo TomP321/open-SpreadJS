@@ -6,10 +6,17 @@ export function filterFormulaNames(names: string[], prefix: string): string[] {
   return [...new Set(names.map(name => name.toUpperCase()))].filter(name => name.startsWith(upper)).sort();
 }
 
+// Names observed in the v19 autocomplete UI that are not calculation-engine registrations.
+const additionalHintNames = `BOXPLOTSPARKLINE BULLETSPARKLINE CALCULATE CASCADESPARKLINE CHILDREN CUMEDIST DATEPART DBCS DENSERANK EURO FILTERJSON FIRSTVALUE FRAMEGROUPS FRAMERANGE FRAMEROWS GAUGEKPISPARKLINE HISTOGRAMSPARKLINE IMAGE LAG LASTVALUE LEAD LEVEL LEVELROWNUMBER LOLLIPOPVARISPARKLINE MONTHSPARKLINE NTHVALUE NTILE OBJECT ONLYCHILDREN ORDERASC ORDERBY ORDERDESC PARENT PARETOSPARKLINE PARTITIONBY PERCENTOF PHI PROGRESSSPARKLINE PROPERTY QUERY R.A R.CUMULATIVE R.CURRENTPAGE R.INDEX R.MOM R.PAGECOUNT R.PROPORTION R.R R.RANK R.V R.YOY RANGEBLOCKSPARKLINE REFRESH REGEXEXTRACT REGEXREPLACE REGEXTEST REMOVEFILTERS ROWNUMBER SCATTERSPARKLINE SJS.ENDWITH SJS.FISCALYEAR SJS.STARTWITH SJS.TABLE SJS.UUID SPREADSPARKLINE STACKEDSPARKLINE TRIMRANGE VARISPARKLINE WINDOW WINDOWDEF W_PERCENTRANK W_RANK YEARSPARKLINE`.split(' ');
+const hiddenBuiltinHintNames = new Set(['DATESTRING', 'FORECAST.LINEAR', 'INFO', 'JIS', 'PHONETIC']);
+export function builtinHintNames(): string[] {
+  return [...builtinNames().filter(name => !hiddenBuiltinHintNames.has(name)), ...additionalHintNames];
+}
+
 const dynamicNames = new Set(['BYCOL', 'BYROW', 'CHOOSECOLS', 'CHOOSEROWS', 'DROP', 'EXPAND', 'FILTER', 'GROUPBY', 'HSTACK', 'MAKEARRAY', 'MAP', 'PIVOTBY', 'RANDARRAY', 'REDUCE', 'SCAN', 'SEQUENCE', 'SORT', 'SORTBY', 'TAKE', 'TEXTSPLIT', 'TOCOL', 'TOROW', 'UNIQUE', 'VSTACK', 'WRAPCOLS', 'WRAPROWS']);
 
-const parameters: Record<string, string[]> = { SUM: ['number1', '[number2]'], SUBSTITUTE: ['text', 'old_text', 'new_text', '[instance_num]'], SUBTOTAL: ['function_num', 'ref1', '[ref2]'], SUMIF: ['range', 'criteria', '[sum_range]'], SUMIFS: ['sum_range', 'criteria_range1', 'criteria1'], AVERAGE: ['number1', '[number2]'], IF: ['logical_test', 'value_if_true', '[value_if_false]'], VLOOKUP: ['lookup_value', 'table_array', 'col_index_num', '[range_lookup]'], COUNTIF: ['range', 'criteria'] };
-const descriptions: Record<string, string> = { SUBSTITUTE: 'Replaces matching text with new text.', SUBTOTAL: 'Calculates a subtotal for a range.', SUM: 'Adds numbers together.', SUMIF: 'Adds values that meet a condition.', SUMIFS: 'Adds values that meet multiple conditions.' };
+const parameters: Record<string, string[]> = { SCATTERSPARKLINE: ['points1', '[points2]', '[minX]', '[maxX]', '[minY]', '[maxY]', '[hLine]', '[vLine]', '[xMinZone]', '[xMaxZone]', '[yMinZone]', '[yMaxZone]', '[tags]', '[drawSymbol]', '[drawLines]', '[color1]', '[color2]', '[dash]'], BOXPLOTSPARKLINE: ['points', 'boxPlotClass', '[showAverage]', '[scaleStart]', '[scaleEnd]', '[acceptableStart]', '[acceptableEnd]', '[colorScheme]', '[style]', '[vertical]'], SPREADSPARKLINE: ['points', '[showAverage]', '[scaleStart]', '[scaleEnd]', '[style]', '[colorScheme]', '[vertical]'], SUM: ['number1', '[number2]'], SUBSTITUTE: ['text', 'old_text', 'new_text', '[instance_num]'], SUBTOTAL: ['function_num', 'ref1', '[ref2]'], SUMIF: ['range', 'criteria', '[sum_range]'], SUMIFS: ['sum_range', 'criteria_range1', 'criteria1'], AVERAGE: ['number1', '[number2]'], IF: ['logical_test', 'value_if_true', '[value_if_false]'], VLOOKUP: ['lookup_value', 'table_array', 'col_index_num', '[range_lookup]'], COUNTIF: ['range', 'criteria'] };
+const descriptions: Record<string, string> = { SCATTERSPARKLINE: 'Plots pairs of values as a compact scatter chart.', BOXPLOTSPARKLINE: 'Shows the distribution of values as a compact box plot.', SPREADSPARKLINE: 'Displays the distribution of values in a compact chart.', SUBSTITUTE: 'Replaces matching text with new text.', SUBTOTAL: 'Calculates a subtotal for a range.', SUM: 'Adds numbers together.', SUMIF: 'Adds values that meet a condition.', SUMIFS: 'Adds values that meet multiple conditions.' };
 
 export interface HintDescription { name?: string; description?: string; parameters?: { name: string; optional?: boolean; repeatable?: boolean }[] }
 export class FormulaHints {
@@ -27,7 +34,7 @@ export class FormulaHints {
     const rect = this.anchor.getBoundingClientRect(); Object.assign(panel.style, { position: 'fixed', left: `${rect.left}px`, top: `${rect.bottom}px`, zIndex: '1000', background: 'white', color: '#333', border: '1px solid rgba(0,0,0,.2)', font: '12px/22px Arial, sans-serif', boxShadow: '0 2px 4px #0003' });
     if (partial && autocomplete && !/^\$?[A-Za-z]{1,3}\$?\d+$/.test(partial[1])) {
       const sheet = this.wb.getActiveSheet();
-      this.names = filterFormulaNames([...builtinNames().filter(name => this.wb.options.allowDynamicArray || !dynamicNames.has(name)), ...this.extra().flatMap(d => d.name ? [d.name] : []), ...this.wb._formulaFunctionNames(sheet), ...this.wb.getCustomNames().map(n => n.getName()), ...sheet.getCustomNames().map(n => n.getName())], partial[1]);
+      this.names = filterFormulaNames([...builtinHintNames().filter(name => this.wb.options.allowDynamicArray || !dynamicNames.has(name)), ...this.extra().flatMap(d => d.name ? [d.name] : []), ...this.wb._formulaFunctionNames(sheet), ...this.wb.getCustomNames().map(n => n.getName()), ...sheet.getCustomNames().map(n => n.getName())], partial[1]);
       if (!this.names.length) return;
       this.start = caret - partial[1].length; this.end = caret; this.selected = 0;
       panel.setAttribute('role', 'listbox'); Object.assign(panel.style, { width: '300px', maxHeight: '204px', overflowY: 'auto' });
