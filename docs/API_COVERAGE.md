@@ -23,7 +23,7 @@ The runtime inventory loads our optional `@opensheets/spread-sheets-io` side eff
 | GC.Spread.Pivot | 0/8 (0.0%) | 0/186 (0.0%) | 11/11 (100.0%) | 51/51 (100.0%) |
 | GC.Spread.Pivot.PivotTable | 0/1 (0.0%) | 0/6 (0.0%) | — | 1/1 (100.0%) |
 | GC.Spread.Report | 0/2 (0.0%) | 0/48 (0.0%) | — | 56/56 (100.0%) |
-| GC.Spread.Sheets | 9/20 (45.0%) | 264/383 (68.9%) | 70/70 (100.0%) | 324/324 (100.0%) |
+| GC.Spread.Sheets | 9/20 (45.0%) | 265/383 (69.2%) | 70/70 (100.0%) | 324/324 (100.0%) |
 | GC.Spread.Sheets.AI | — | — | — | 3/3 (100.0%) |
 | GC.Spread.Sheets.AutoMerge | — | — | 3/3 (100.0%) | 4/4 (100.0%) |
 | GC.Spread.Sheets.Barcode | 0/11 (0.0%) | — | — | 11/11 (100.0%) |
@@ -68,7 +68,7 @@ The runtime inventory loads our optional `@opensheets/spread-sheets-io` side eff
 | GC.Spread.Sheets.ThreadedComments | 0/3 (0.0%) | 0/19 (0.0%) | 1/1 (100.0%) | 9/9 (100.0%) |
 | GC.Spread.Sheets.Touch | 0/3 (0.0%) | 0/17 (0.0%) | — | 3/3 (100.0%) |
 | GC.Spread.Slicers | 0/1 (0.0%) | 0/26 (0.0%) | 2/2 (100.0%) | 9/9 (100.0%) |
-| **Total** | 74/207 (35.7%) | 794/1796 (44.2%) | 252/252 (100.0%) | 1369/1369 (100.0%) |
+| **Total** | 74/207 (35.7%) | 795/1796 (44.3%) | 252/252 (100.0%) | 1369/1369 (100.0%) |
 
 ## M1/M2 behavior and limits
 
@@ -450,7 +450,7 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Spread.Sheets.Touch.TouchToolStripItem` unsupported or add-on-only members: `font`, `foreColor`, `image`, `name`, `text`.
 - `GC.Spread.Sheets.Touch.TouchToolStripSeparator`: constructor throws `NotImplemented`.
 - `GC.Spread.Sheets.Touch.TouchToolStripSeparator` unsupported or add-on-only members: `name`.
-- `GC.Spread.Sheets.Workbook` unsupported or add-on-only members: `collaboration`, `customPivotTableThemes`, `customSlicerThemes`, `customTableThemes`, `customTimelineThemes`, `namedCellTemplates`, `scenarioManager`, `sheetTabStyles`, `touchToolStrip`, `addSheetTab`, `addSparklineEx`, `changeSheetPosition`, `clearCustomFunctions`, `clearSheetTabs`, `dataManager`, `defaultPivotTableTheme`, `defaultSlicerTheme`, `defaultTableTheme`, `defaultTimelineTheme`, `getActiveSheetTab`, `getActiveSheetTabIndex`, `getCircularReference`, `getExternalReferences`, `getSheetPosition`, `getSheetTab`, `getSheetTabCount`, `getSheetTabIndex`, `hitTest`, `injectAI`, `nextControl`, `pageInfo`, `previousControl`, `print`, `removeCustomFunction`, `removeSheetTab`, `removeSparklineEx`, `save`, `savePDF`, `search`, `setActiveSheetTab`, `updateExternalReference`, `waitForAllCalculations`.
+- `GC.Spread.Sheets.Workbook` unsupported or add-on-only members: `collaboration`, `customPivotTableThemes`, `customSlicerThemes`, `customTableThemes`, `customTimelineThemes`, `namedCellTemplates`, `scenarioManager`, `sheetTabStyles`, `touchToolStrip`, `addSheetTab`, `addSparklineEx`, `changeSheetPosition`, `clearCustomFunctions`, `clearSheetTabs`, `dataManager`, `defaultPivotTableTheme`, `defaultSlicerTheme`, `defaultTableTheme`, `defaultTimelineTheme`, `getActiveSheetTab`, `getActiveSheetTabIndex`, `getCircularReference`, `getExternalReferences`, `getSheetPosition`, `getSheetTab`, `getSheetTabCount`, `getSheetTabIndex`, `hitTest`, `injectAI`, `nextControl`, `pageInfo`, `previousControl`, `print`, `removeCustomFunction`, `removeSheetTab`, `removeSparklineEx`, `savePDF`, `search`, `setActiveSheetTab`, `updateExternalReference`, `waitForAllCalculations`.
 - `GC.Spread.Sheets.Worksheet` unsupported or add-on-only members: `cellStates`, `charts`, `dataCharts`, `dataRanges`, `outlineColumn`, `pivotTables`, `shapes`, `slicers`, `threadedComments`, `applyNamedCellTemplate`, `autoMerge`, `backgroundImage`, `clearCustomFunctions`, `currentTheme`, `editorStatus`, `fillAuto`, `getColumnPageBreak`, `getCsv`, `getDataColumnName`, `getDataItem`, `getDeletedRows`, `getDependents`, `getDirtyRows`, `getFormulaInformation`, `getId`, `getInsertRows`, `getPrecedents`, `getRowPageBreak`, `getSortState`, `getUsedRange`, `hasPassword`, `hitTest`, `isPrintLineVisible`, `isSelected`, `printInfo`, `protect`, `removeCustomFunction`, `reset`, `search`, `setColumnPageBreak`, `setCsv`, `setRowPageBreak`, `unprotect`.
 - `GC.Spread.Slicers.GeneralSlicerData`: constructor throws `NotImplemented`.
 - `GC.Spread.Slicers.GeneralSlicerData` unsupported or add-on-only members: `columnNames`, `data`, `aggregateData`, `attachListener`, `clearPreview`, `detachListener`, `doFilter`, `doUnfilter`, `getColumnIndex`, `getData`, `getExclusiveData`, `getExclusiveRowIndex`, `getFilteredIndexes`, `getFilteredOutIndexes`, `getFilteredOutRanges`, `getFilteredOutRowIndexes`, `getFilteredRanges`, `getFilteredRowIndexes`, `getRowIndexes`, `inPreview`, `onColumnNameChanged`, `onColumnsRemoved`, `onDataChanged`, `onFiltered`, `onRowsAdded`, `onRowsRemoved`, `resumeFilteredEvents`, `suspendFilteredEvents`.

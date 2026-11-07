@@ -1,9 +1,9 @@
 /** SJS is a ZIP of JSON workbook/sheet parts. The public save/open protocol
  * and black-box public API output establish this schema; no vendor code is used. */
-import { address, arr, obj, type IoOptions, type IoState, type RecordValue } from './common.js';
+import { address, arr, obj, relsPath, type IoOptions, type IoState, type RecordValue } from './common.js';
 import { child, children, declaration, escapeXml, parseXml, tag, textOf, type XmlNode } from './xml.js';
-import { MAIN, REL, readZip, writeZip, xmlFile, relationships, relsPath, relationshipXml } from './zip.js';
-import { readStyles, StyleWriter, themeXml, themeFromJSON } from './styles.js';
+import { MAIN, REL, readZip, writeZip, xmlFile, relationships, relationshipXml } from './zip.js';
+import { defaultTheme, readStyles, StyleWriter, themeXml } from './styles.js';
 import { readXlsx, writeXlsx, type XlsxResult } from './xlsx.js';
 export const sjsVersion={fileVer:'1.1',proName:'sjs',proVer:'19.2.5'};
 function toNode(n:XmlNode):RecordValue {return {n_:n.name,...n.attrs,...(n.children.length||n.text?{c_:[...(n.text?[n.text]:[]),...n.children.map(toNode)]}:{})};}
@@ -11,6 +11,7 @@ function fromNode(value:unknown):string {if(value===null||value===undefined)retu
 function nodeChildren(n:unknown,name:string):RecordValue[] {return arr(obj(n).c_).map(obj).filter(n=>n.n_===name);}
 function numbers(n:RecordValue):[string,RecordValue][] {return Object.entries(n).filter(([k,v])=>/^\d+$/.test(k)&&v&&typeof v==='object').map(([k,v])=>[k,obj(v)]);}
 const styleFields:Record<string,string>={h:'hAlign',v:'vAlign',l:'locked',d:'hidden',w:'wordWrap',i:'textIndent',x:'textOrientation',q:'shrinkToFit'};
+const fontLists:Record<string,string>={font:'htmlFonts',fontStyle:'fontStyles',fontWeight:'fontWeights',fontSize:'fontSizes',fontFamily:'fontFamilies'};
 function decodePairs(value:unknown):RecordValue {if(typeof value==='object')return obj(value);return Object.fromEntries(String(value??'').split(',').filter(Boolean).map(p=>{const i=p.indexOf(':');return [p.slice(0,i),+p.slice(i+1)];}));}
 /** Interned style components keep repeated cell formatting out of the cell data. */
 class SjsStyles {
@@ -20,7 +21,7 @@ class SjsStyles {
   encode(s:RecordValue):number {
     const out:RecordValue={};
     if(s.backColor)out.c=this.add('fills',this.add('sharedColors',s.backColor));
-    const font:RecordValue={};for(const [field,key]of Object.entries({f:'font',i:'fontStyle',b:'fontWeight',s:'fontSize',n:'fontFamily'})){if(s[key]!==undefined)font[field]=this.add(key==='font'?'htmlFonts':key+'s',s[key]);}
+    const font:RecordValue={};for(const [field,key]of Object.entries({f:'font',i:'fontStyle',b:'fontWeight',s:'fontSize',n:'fontFamily'})){if(s[key]!==undefined)font[field]=this.add(fontLists[key],s[key]);}
     if(s.foreColor)font.c=this.add('sharedColors',s.foreColor);if(s.textDecoration!==undefined)font.u=s.textDecoration;if(s.themeFont)font.t=s.themeFont==='Headings'?1:0;
     const pairs=(o:RecordValue)=>Object.entries(o).map(([k,v])=>k+':'+v).join(',');
     if(Object.keys(font).length)out.f=this.add('fonts',pairs(font));
@@ -33,7 +34,7 @@ class SjsStyles {
     const at=(key:string,i:unknown)=>arr(this.data[key])[Number(i)],fields=decodePairs(at(origin?'originCellXfs':'cellXfs',index)),out:RecordValue={};
     const json=(value:unknown)=>typeof value==='string'?obj(JSON.parse(value)):obj(value);
     if(fields.c!==undefined){const fill=at('fills',fields.c);if(typeof fill==='number')out.backColor=at('sharedColors',fill);}
-    if(fields.f!==undefined){const font=decodePairs(at('fonts',fields.f));for(const [k,name]of Object.entries({f:'font',i:'fontStyle',b:'fontWeight',s:'fontSize',n:'fontFamily'}))if(font[k]!==undefined)out[name]=at(name==='font'?'htmlFonts':name+'s',font[k]);if(font.c!==undefined)out.foreColor=at('sharedColors',font.c);if(font.u!==undefined)out.textDecoration=font.u;if(font.t!==undefined)out.themeFont=font.t?'Headings':'Body';}
+    if(fields.f!==undefined){const font=decodePairs(at('fonts',fields.f));for(const [k,name]of Object.entries({f:'font',i:'fontStyle',b:'fontWeight',s:'fontSize',n:'fontFamily'}))if(font[k]!==undefined)out[name]=at(fontLists[name],font[k]);if(font.c!==undefined)out.foreColor=at('sharedColors',font.c);if(font.u!==undefined)out.textDecoration=font.u;if(font.t!==undefined)out.themeFont=font.t?'Headings':'Body';}
     if(fields.b!==undefined){const borders=decodePairs(at('borders',fields.b));for(const [k,name]of Object.entries({l:'borderLeft',r:'borderRight',t:'borderTop',b:'borderBottom',d:'diagonalDown',u:'diagonalUp'}))if(borders[k]!==undefined){const b=json(at('borderItems',borders[k]));out[name]={style:b.s,color:at('sharedColors',b.c)};}}
     for(const [k,name]of Object.entries(styleFields))if(fields[k]!==undefined)out[name]=['locked','hidden','wordWrap','shrinkToFit'].includes(name)?!!fields[k]:fields[k];
     if(fields.j!==undefined){const fmt=decodePairs(at('numFmts',fields.j)),data=json(at('formatStrings',fmt.f));out.formatter=data.c;}
@@ -45,7 +46,7 @@ function xmlPath(path:string):string {if(path==='workbook.json')return 'xl/workb
 export function writeSjs(json:RecordValue,options:IoOptions={},state?:IoState):{bytes:Uint8Array;warnings:string[]} {
   const xlsx=writeXlsx(json,{...options,password:undefined,exportSharedFormula:false},state),xml=readZip(xlsx.bytes),files:Record<string,string|Uint8Array>={},styles=new SjsStyles();
   const sheets=Object.values(obj(json.sheets)).map(obj).sort((a,b)=>Number(a.index??0)-Number(b.index??0));
-  const palette=themeFromJSON(sheets[0]?.theme),styleMap=readStyles(xmlFile(xml,'xl/styles.xml'),palette.colors).styles.map(s=>styles.encode(s));
+  const styleMap=readStyles(xmlFile(xml,'xl/styles.xml'),defaultTheme).styles.map(s=>styles.encode(s));
   const strings=children(parseXml(xmlFile(xml,'xl/sharedStrings.xml')),'si').map(textOf);
   files['sharedStrings.json']=JSON.stringify(strings);files['styles.json']=JSON.stringify(styles.data);files['theme.json']=JSON.stringify(sheets[0]?.theme??'Office2007');files['docProps/docPropsCore.json']='{}';files['docProps/docPropsApp.json']='{}';
   for(const [path]of Object.entries(xml)){
@@ -76,9 +77,9 @@ export function isSjs(files:Record<string,Uint8Array>):boolean {return !!files['
 export function readSjs(bytes:Uint8Array,options:IoOptions={}):XlsxResult {
   const source=readZip(bytes),files:Record<string,string|Uint8Array>={},read=(p:string):unknown=>source[p]?JSON.parse(xmlFile(source,p)):undefined,book=obj(read('workbook.json'));
   if(book.n_!=='workbook')throw new Error('Invalid SJS workbook');
-  const styles=new SjsStyles(obj(read('styles.json'))),theme=read('theme.json')??'Office2007',themeInfo=themeFromJSON(theme),writer=new StyleWriter(themeInfo.colors),strings=arr(read('sharedStrings.json'));
+  const styles=new SjsStyles(obj(read('styles.json'))),theme=read('theme.json')??'Office2007',writer=new StyleWriter(defaultTheme),strings=arr(read('sharedStrings.json'));
   const styleMap=arr(styles.data.originCellXfs).map((_,i)=>writer.add(styles.decode(i))),cellMap=arr(styles.data.cellXfs).map((_,i)=>writer.add(styles.decode(i,false)));
-  files['xl/theme/theme1.xml']=themeXml(themeInfo.colors,themeInfo.name,themeInfo.headingFont,themeInfo.bodyFont);
+  files['xl/theme/theme1.xml']=themeXml(defaultTheme);
   files['xl/sharedStrings.xml']=declaration+tag('sst',{xmlns:MAIN,count:strings.length,uniqueCount:strings.length},strings.map(s=>tag('si',{},tag('t',{'xml:space':'preserve'},escapeXml(typeof s==='string'?s:obj(s).text??'')))).join(''));
   const sheetLossless:RecordValue[]=[];
   for(const path of Object.keys(source)){

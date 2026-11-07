@@ -8,3 +8,4 @@ playwright-report/
 .supervisor/
 .pnpm-store/
 .playwright-browsers/
+.claude/settings.local.json

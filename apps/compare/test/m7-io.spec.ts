@@ -34,6 +34,38 @@ const ioCases:Record<string,string>={
 };
 for(const [name,source]of Object.entries(ioCases))test(name,async({page})=>{await page.goto('/io-probe.html');await page.waitForFunction(()=>window.__ioProbe?.ready);const r=await page.evaluate(s=>window.__ioProbe.run(s),source);const dir=path.resolve('../../test-results/io');await fs.mkdir(dir,{recursive:true});await fs.writeFile(path.join(dir,name+'.json'),JSON.stringify(r,null,2));expect(r.ours).toEqual(r.official);});
 
+test('m7-sjs: both engines open each saved archive',async({page})=>{
+  await page.goto('/m7-io.html');await page.waitForFunction(()=>window.__m7?.ready);
+  const results=await page.evaluate(async()=>{
+    const books=window.__m7.books;
+    for(const book of books){const sheet=book.getActiveSheet();sheet.setValue(0,0,'SJS cross import');sheet.setValue(0,1,42);}
+    const save=(book:typeof books[number])=>new Promise<Blob>((resolve,reject)=>book.save(resolve,reject));
+    const open=(book:typeof books[number],blob:Blob)=>{book.getActiveSheet().setValue(0,0,'sentinel');book.getActiveSheet().setValue(0,1,-1);return Promise.race([new Promise<string>((resolve,reject)=>book.open(blob as File,()=>resolve(String(book.getActiveSheet().getValue(0,0))+'|'+String(book.getActiveSheet().getValue(0,1))),reject)),new Promise<string>((_,reject)=>setTimeout(()=>reject(new Error('open timed out')),10000))]).catch(e=>'ERROR: '+JSON.stringify(e));};
+    const files=await Promise.all(books.map(save)),results:string[][]=[];for(const file of files){const row:string[]=[];for(const book of books)row.push(await open(book,file));results.push(row);}return results;
+  });
+  expect(results).toEqual([['SJS cross import|42','SJS cross import|42'],['SJS cross import|42','SJS cross import|42']]);
+});
+
+test('m7-encryption: both engines import each password-protected export',async({page})=>{
+  await page.goto('/m7-io.html');await page.waitForFunction(()=>window.__m7?.ready);
+  const results=await page.evaluate(async()=>{
+    const books=window.__m7.books;for(const book of books)book.getActiveSheet().setValue(0,0,'encrypted data');
+    const files:Blob[]=[];for(const book of books)files.push(await window.__m7.exportBook(book,{fileType:0,password:'secret'}));
+    const results:string[][]=[];for(const file of files){const row:string[]=[];for(const book of books){try{book.getActiveSheet().setValue(0,0,'sentinel');await window.__m7.importBook(book,file,{fileType:0,password:'secret'});row.push(String(book.getActiveSheet().getValue(0,0)));}catch(e){row.push('ERROR: '+JSON.stringify(e));}}results.push(row);}return results;
+  });
+  expect(results).toEqual([['encrypted data','encrypted data'],['encrypted data','encrypted data']]);
+});
+
+test('m7-sjs: formulas and styles survive both engines',async({page})=>{
+  await page.goto('/m7-io.html');await page.waitForFunction(()=>window.__m7?.ready);
+  const results=await page.evaluate(async()=>{
+    const books=window.__m7.books;for(const book of books){const sheet=book.getActiveSheet();sheet.setValue(0,0,5);sheet.setFormula(0,1,'A1*2');sheet.getCell(0,0).backColor('#ff0000');}
+    const files:Blob[]=[];for(const book of books)files.push(await new Promise<Blob>((resolve,reject)=>book.save(resolve,reject)));
+    const results:unknown[][]=[];for(const file of files){const row:unknown[]=[];for(const book of books){try{const before=book.getActiveSheet();before.setValue(0,0,-1);before.setFormula(0,1,'1+1');before.getCell(0,0).backColor('#0000ff');await new Promise((resolve,reject)=>book.open(file as File,resolve,reject));const sheet=book.getActiveSheet();row.push({value:sheet.getValue(0,1),formula:sheet.getFormula(0,1),color:sheet.getActualStyle(0,0).backColor});}catch(e){row.push({error:JSON.stringify(e)});}}results.push(row);}return results;
+  });
+  expect(results).toEqual(Array.from({length:2},()=>Array.from({length:2},()=>({value:10,formula:'A1*2',color:'#ff0000'}))));
+});
+
 test('m7-core: IO methods remain absent without the plugin',async({page})=>{await page.goto('/probe.html');await page.waitForFunction(()=>window.__probe?.ready);const r=await page.evaluate(()=>window.__probe.run(`['import','export','open','save'].map(k=>typeof wb[k])`));expect(r.ours).toEqual(r.official);});
 
 test('m7-browser-distribution: global GC side effects preserve the host constructor',async({page})=>{

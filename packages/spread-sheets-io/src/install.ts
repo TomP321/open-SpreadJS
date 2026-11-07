@@ -4,6 +4,7 @@ import { csvSheet, writeCsv } from './csv.js';
 import { arr, obj, type IoOptions, type IoState, type RecordValue } from './common.js';
 import { readXlsx, writeXlsx } from './xlsx.js';
 import { defaultTheme, tintColor } from './styles.js';
+import { readSjs, writeSjs } from './sjs.js';
 export interface IoWorkbook {
   toJSON(options?:RecordValue):RecordValue;
   fromJSON(data:object,options?:RecordValue):void|Promise<void>;
@@ -77,12 +78,10 @@ export function install(GC:IoGC):void {
     if(kind===1||kind===2){try{validateOptions(o);const text=kind===1?JSON.stringify(this.toJSON(jsonOptions(o))):writeCsv(this,o);success?.(new Blob([text],{type:'text/plain;charset=utf-8'}));}catch(e){error?.(errorResult(e));}return;}
     void doExport(this,o).then(blob=>success?.(blob),e=>error?.(errorResult(e)));
   }});
-  // SJS uses the separate open/save protocol. Until that archive protocol is
-  // implemented, make it fail explicitly instead of writing disguised SSJSON.
   Object.defineProperty(proto,'open',{configurable:true,writable:true,value:function(this:IoWorkbook,file:Blob,success?:IoCallback,error?:IoCallback,options:IoOptions={}){
-    if(!file)return;const name=(file as File).name??'';if(/\.(?:xlsx|xltx|xlsm|xltm)$/i.test(name)){Reflect.get(this,'import').call(this,file,success,error,{...options,fileType:0});return;}queueMicrotask(()=>error?.({errorCode:0,errorMessage:'NotImplemented: SJS open'}));
+    if(!file)return;const name=(file as File).name??'';if(/\.(?:xlsx|xltx|xlsm|xltm)$/i.test(name)){Reflect.get(this,'import').call(this,file,success,error,{...options,fileType:0});return;}
+    void (async()=>{validateOptions(options);const result=readSjs(await bytesOf(file),options);await this.fromJSON(result.json,jsonOptions(options));applyImportedMetadata(this,result.json,result.state.theme??defaultTheme);state.set(this,result.state);report(result.state.warnings);if(options.fullRecalc)this.calculate();})().then(()=>success?.({}),e=>error?.(errorResult(e)));
   }});
-  Object.defineProperty(proto,'save',{configurable:true,writable:true,value:function(this:IoWorkbook,_success?:IoCallback,error?:IoCallback){queueMicrotask(()=>error?.({errorCode:0,errorMessage:'NotImplemented: SJS save'}));}});
-  Object.defineProperty(Reflect.get(proto,'save'),Symbol.for('@opensheets/NotImplemented'),{value:true});
+  Object.defineProperty(proto,'save',{configurable:true,writable:true,value:function(this:IoWorkbook,success?:IoCallback,error?:IoCallback,options:IoOptions={}){void Promise.resolve().then(()=>{validateOptions(options);const result=writeSjs(this.toJSON(jsonOptions(options)),options,state.get(this));report(result.warnings);return new Blob([result.bytes as Uint8Array<ArrayBuffer>],{type:'application/zip'});}).then(blob=>success?.(blob),e=>error?.(errorResult(e)));}});
 }
 void arr;void obj;
