@@ -1,3 +1,5 @@
+import { decryptXlsx, encryptXlsx } from './encryption.js';
+import { isCompound } from './compound.js';
 import { csvSheet, writeCsv } from './csv.js';
 import { arr, obj, type IoOptions, type IoState, type RecordValue } from './common.js';
 import { readXlsx, writeXlsx } from './xlsx.js';
@@ -37,9 +39,13 @@ async function bytesOf(file:Blob):Promise<Uint8Array> {
   return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(new Uint8Array(reader.result as ArrayBuffer));reader.onerror=()=>reject(reader.error);reader.readAsArrayBuffer(file);});
 }
 async function doImport(book:IoWorkbook,file:Blob,o:IoOptions):Promise<void> {
-  validateOptions(o);const bytes=await bytesOf(file),kind=o.fileType??0;
-  if(bytes[0]===0xd0&&bytes[1]===0xcf){if(!o.password)throw {errorCode:2,errorMessage:'The Excel file cannot be opened because the workbook is password protected.'};throw new Error('NotImplemented: encrypted XLSX import');}
-  if(kind===0){const result=readXlsx(bytes,o);await book.fromJSON(result.json,jsonOptions(o));applyImportedMetadata(book,result.json,result.state.theme??defaultTheme);state.set(book,result.state);report(result.state.warnings);}
+  validateOptions(o);let bytes=await bytesOf(file);const kind=o.fileType??0;
+  if(isCompound(bytes))bytes=decryptXlsx(bytes,o.password);
+  if(kind===0){const result=readXlsx(bytes,o);
+    // Core+IO has no print module: retain print parts privately for export.
+    result.state.printInfo=Object.values(obj(result.json.sheets)).map(s=>{const sheet=obj(s),print=obj(sheet.printInfo);delete sheet.printInfo;return print;});
+    for(const [sheetIndex,cells]of (result.state.inlineStrings??[]).entries())for(const entry of cells){const sheet=obj(Object.values(obj(result.json.sheets))[sheetIndex]);obj(obj(obj(obj(sheet.data).dataTable)[entry.row])[entry.col]).value=entry.value;}
+    await book.fromJSON(result.json,jsonOptions(o));applyImportedMetadata(book,result.json,result.state.theme??defaultTheme);state.set(book,result.state);report(result.state.warnings);}
   else if(kind===1){const parsed:unknown=JSON.parse(new TextDecoder().decode(bytes));if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error('Invalid workbook JSON');await book.fromJSON(parsed,jsonOptions(o));state.delete(book);}
   else if(kind===2){const text=new TextDecoder(String(o.encoding??'utf-8')).decode(bytes),s=book.getSheet(book.getActiveSheetIndex());s.fromJSON(csvSheet(text,o,s.name()));state.delete(book);}
   else throw new Error('Unknown file type');
@@ -51,8 +57,10 @@ async function doExport(book:IoWorkbook,o:IoOptions):Promise<Blob> {
   const json=book.toJSON(jsonOptions(o));
   if(kind===1)return new Blob([JSON.stringify(json)],{type:'text/plain;charset=utf-8'});
   if(kind!==0)throw new Error('Unknown file type');
-  const result=writeXlsx(json,o,o.losslessEditing===false?undefined:state.get(book));report(result.warnings);
-  return new Blob([result.bytes as Uint8Array<ArrayBuffer>],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const previous=state.get(book);if(previous?.printInfo)Object.values(obj(json.sheets)).forEach((s,i)=>{if(Object.keys(previous.printInfo?.[i]??{}).length)obj(s).printInfo=previous.printInfo![i];});
+  const result=writeXlsx(json,{...o,password:undefined},o.losslessEditing===false?undefined:previous);report(result.warnings);
+  const bytes=o.password?encryptXlsx(result.bytes,o.password):result.bytes;
+  return new Blob([bytes as Uint8Array<ArrayBuffer>],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 /** Install against the host constructor; no second core copy is bundled. */
 export function install(GC:IoGC):void {

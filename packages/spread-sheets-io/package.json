@@ -5,11 +5,38 @@
   "main": "./dist/gc.spread.sheets.io.cjs",
   "module": "./dist/gc.spread.sheets.io.esm.js",
   "types": "./dist/gc.spread.sheets.io.d.ts",
-  "exports": {".": {"import": {"types": "./dist/gc.spread.sheets.io.d.ts", "default": "./dist/gc.spread.sheets.io.esm.js"}, "require": {"types": "./dist/gc.spread.sheets.io.d.cts", "default": "./dist/gc.spread.sheets.io.cjs"}}, "./dist/*": "./dist/*"},
-  "files": ["dist"],
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.io.d.ts",
+        "default": "./dist/gc.spread.sheets.io.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.io.d.cts",
+        "default": "./dist/gc.spread.sheets.io.cjs"
+      }
+    },
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist"
+  ],
   "sideEffects": true,
-  "scripts": {"build": "tsup && tsx scripts/finalize.ts", "typecheck": "tsc -p tsconfig.json", "test": "vitest run", "bench": "tsx bench/large.ts"},
-  "dependencies": {"fflate": "0.8.2"},
-  "peerDependencies": {"@mescius/spread-sheets": "*"},
-  "devDependencies": {"@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"}
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "bench": "tsx bench/large.ts"
+  },
+  "dependencies": {
+    "@noble/ciphers": "1.3.0",
+    "@noble/hashes": "1.8.0",
+    "fflate": "0.8.2"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
 }

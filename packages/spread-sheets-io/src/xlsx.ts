@@ -22,7 +22,7 @@ export function readXlsx(bytes:Uint8Array,options:IoOptions={}):XlsxResult {
   const files=readZip(bytes);validatePackage(files);
   const bookPath=related(files,'','officeDocument'),book=parseXml(xmlFile(files,bookPath)),rels=relationships(files,bookPath),themePath=related(files,bookPath,'theme'),theme=readTheme(xmlFile(files,themePath)),styles=readStyles(xmlFile(files,related(files,bookPath,'styles')),theme);
   const sharedPath=related(files,bookPath,'sharedStrings'),strings=Array.from(elements(xmlFile(files,sharedPath),'si'),s=>parseSpreadsheetText(parseXml(s)));
-  const sheetPaths:string[]=[],warnings:string[]=[],sheets:RecordValue[]=[];
+  const sheetPaths:string[]=[],warnings:string[]=[],sheets:RecordValue[]=[],inlineStrings:{row:number;col:number;value:string}[][]=[];
   const date1904=bool(child(book,'workbookPr')?.attrs.date1904),view=child(child(book,'bookViews'),'workbookView');
   const json:RecordValue={version:'19.2.5',sheetCount:0,sheets:{},activeSheetIndex:+(view?.attrs.activeTab??0)};
   if(view?.attrs.showSheetTabs!==undefined)json.tabStripVisible=bool(view.attrs.showSheetTabs);if(view?.attrs.tabRatio)json.tabStripRatio=+view.attrs.tabRatio/1000;
@@ -31,7 +31,7 @@ export function readXlsx(bytes:Uint8Array,options:IoOptions={}):XlsxResult {
     const rel=rels.find(r=>r.id===sn.attrs['r:id']);if(!rel||rel.external)throw new Error('Invalid sheet relationship');
     const path=resolvePart(bookPath,rel.target),xml=xmlFile(files,path);if(!xml)throw new Error('Missing sheet');
     if(!rel.type.endsWith('/worksheet')){warnings.push(`${sn.attrs.name}: non-worksheet sheet is retained in archive but cannot be displayed`);continue;}
-    sheetPaths.push(path);const index=sheets.length,data:RecordValue={},rows:RecordValue={},columns:RecordValue={},rowStyles:RecordValue={},colStyles:RecordValue={},rowOutline:unknown[]=[],colOutline:unknown[]=[];
+    sheetPaths.push(path);inlineStrings.push([]);const index=sheets.length,data:RecordValue={},rows:RecordValue={},columns:RecordValue={},rowStyles:RecordValue={},colStyles:RecordValue={},rowOutline:unknown[]=[],colOutline:unknown[]=[];
     // Only the current row/cell has an XML tree. Metadata is parsed separately.
     const meta=parseXml(xml.replace(/<(?:\w+:)?sheetData\b[^>]*>[\s\S]*?<\/(?:\w+:)?sheetData>/,'<sheetData/>'));
     const sheetView=child(child(meta,'sheetViews'),'sheetView'),format=child(meta,'sheetFormatPr')?.attrs??{},dimension=child(meta,'dimension')?.attrs.ref;
@@ -49,7 +49,7 @@ export function readXlsx(bytes:Uint8Array,options:IoOptions={}):XlsxResult {
       let lastCol=-1;
       for(const cn of children(row,'c')){const [cr,cc]=cn.attrs.r?cellPosition(cn.attrs.r):[r,lastCol+1];lastCol=cc;const cell=putCell(data,cr,cc),v=child(cn,'v'),f=child(cn,'f'),type=cn.attrs.t,styleIndex=+(cn.attrs.s??0),raw=textOf(v);
         if(v){if(type==='s'){if(strings[+raw]===undefined)throw new Error('Invalid shared-string index');cell.value=strings[+raw];}else if(type==='b')cell.value=bool(raw);else if(type==='e')cell.value={error:raw};else if(type==='str')cell.value=raw;else if(type==='d'){const date=new Date(raw);if(!Number.isFinite(+date))throw new Error('Invalid date');cell.value=`/OADate(${(+date-Date.UTC(1899,11,30))/86400000})/`;}else if(raw!==''){const num=+raw;if(!Number.isFinite(num))throw new Error('Invalid number');cell.value=isDateFormat(styles.formats[styleIndex]??'General')?`/OADate(${num+(date1904?1462:0)})/`:num;}}
-        if(type==='inlineStr')cell.value=parseSpreadsheetText(child(cn,'is'));
+        if(type==='inlineStr'){const inline=child(cn,'is');cell.value=parseSpreadsheetText(inline);const runs=children(inline,'r');if(runs.length)inlineStrings[index].push({row:cr,col:cc,value:parseSpreadsheetText(runs[runs.length-1])});}
         if(options.includeStyles!==false&&cn.attrs.s!==undefined)cell.style=styles.styles[styleIndex]??{};
         if(f&&options.includeFormulas!==false){const formula=normalFormula(textOf(f));if(f.attrs.t==='shared'){if(formula){shared.set(f.attrs.si,{formula,row:cr,col:cc});cell.formula=formula;}else pending.push({cell,si:f.attrs.si,row:cr,col:cc});}else cell.formula=formula;
           if(f.attrs.t==='array'&&f.attrs.ref){const rect=range(f.attrs.ref);const dynamic=cn.attrs.cm!==undefined||descendants(f,'dynamicArrayProperties').length>0;cell.arrayInfo={...rect,...(dynamic?{isDynamicArray:true}:{})};if(!dynamic)cell.arrayFormula={rowCount:rect.rowCount,colCount:rect.colCount};else json.allowDynamicArray=true;}
@@ -80,7 +80,7 @@ export function readXlsx(bytes:Uint8Array,options:IoOptions={}):XlsxResult {
   namesRead(child(book,'definedNames'),sheets,json);json.sheetCount=sheets.length;
   const calc=child(book,'calcPr');if(calc){json.referenceStyle=calc.attrs.refMode==='R1C1'?1:0;if(calc.attrs.iterate!==undefined)json.iterativeCalculation=bool(calc.attrs.iterate);if(calc.attrs.iterateCount)json.iterativeCalculationMaximumIterations=+calc.attrs.iterateCount;if(calc.attrs.iterateDelta)json.iterativeCalculationMaximumChange=+calc.attrs.iterateDelta;}
   for(const k of ['dynamicReferences','calcOnDemand','incrementalCalculation'])if(options[k]!==undefined)json[k]=options[k];
-  return {json,state:{archive:files,sheetPaths,theme,warnings:[...new Set(warnings)]}};
+  return {json,state:{archive:files,sheetPaths,theme,inlineStrings,warnings:[...new Set(warnings)]}};
 }
 function ownStyle(value:unknown,names:Map<string,RecordValue>,seen=new Set<string>()):RecordValue {if(typeof value==='string'){if(seen.has(value))return {};seen.add(value);return ownStyle(names.get(value),names,seen);}const s=obj(value);return {...(s.parentName?ownStyle(s.parentName,names,seen):{}),...s};}
 function namesXml(json:RecordValue,sheets:RecordValue[]):string {

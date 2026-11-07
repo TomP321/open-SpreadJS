@@ -31,4 +31,4 @@ export function resolvePart(base: string, target: string): string {
 }
 export function relsPath(part: string): string { const i=part.lastIndexOf('/'); return `${part.slice(0,i+1)}_rels/${part.slice(i+1)}.rels`; }
 export interface IoOptions extends RecordValue { fileType?: number; includeStyles?: boolean; includeFormulas?: boolean; password?: string }
-export interface IoState { archive: Record<string,Uint8Array>; sheetPaths: string[]; theme?:string[]; warnings: string[] }
+export interface IoState { archive: Record<string,Uint8Array>; sheetPaths: string[]; theme?:string[]; warnings: string[]; printInfo?:RecordValue[]; inlineStrings?:{row:number;col:number;value:string}[][] }
