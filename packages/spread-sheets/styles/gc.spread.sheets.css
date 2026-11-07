@@ -119,3 +119,125 @@
 .opensheets-name-container { position: relative; display: flex; width: calc(100% + 2px); height: calc(100% + 2px); border: 1px solid #c6c6c6; box-sizing: border-box; background: white; }
 .opensheets-formula-input { font: inherit; color: inherit; padding: 0; min-height: 100%; }
 .opensheets-status-bar { font: 10.6667px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
+/* Popup metrics observed through the running 19.2.5 trial. */
+.opensheets-host .gc-ui-contextmenu-container { padding: 0; box-shadow: 2px 4px 5px #00000026; }
+.opensheets-host .gc-ui-contextmenu-menuitem { box-sizing: border-box; padding: 1px; }
+.opensheets-host .gc-ui-contextmenu-menuitem-content { min-height: 22px; height: 22px; padding: 3px; margin: 1px; border: 1px solid transparent; box-sizing: content-box; }
+.opensheets-host .gc-ui-contextmenu-menuitem-content { height: 16px; min-height: 16px; }
+.opensheets-host .gc-ui-contextmenu-icon { width: 16px; flex-basis: 16px; margin-right: 12px; }
+.opensheets-host .gc-ui-contextmenu-text { line-height: 16px; }
+.opensheets-host .gc-ui-contextmenu-menuitem-content:hover, .opensheets-host .gc-ui-contextmenu-menuitem-content:focus { background: #d3f0e0; }
+.opensheets-host .gc-ui-contextmenu-group-header { height: 16px; padding: 5px; font-weight: bold; }
+.opensheets-host .gc-ui-contextmenu-groupitems-container { height: 46px; box-sizing: border-box; margin-left: 28px; padding: 5px; align-items: center; }
+.opensheets-host .gc-ui-contextmenu-groupitem { flex: 0 0 34px; height: 34px; }
+.opensheets-host .gc-ui-contextmenu-groupitem .gc-ui-contextmenu-menuitem-content { height: 24px; min-height: 24px; padding: 3px; }
+.opensheets-host .gc-ui-contextmenu-groupitem .gc-ui-contextmenu-icon { width: 24px; flex-basis: 24px; margin: 0; }
+.opensheets-host .gc-ui-contextmenu-nonselective-menuitem { padding: 1px; }
+.opensheets-host .gc-ui-contextmenu-separator { background: #e3e3e3; margin: 0 5px 0 20px; }
+.opensheets-host .gc-ui-contextmenu-disabled { color: #a6a6a6; }
+.opensheets-host .opensheets-tab-menu { width: 190px; }
+.opensheets-host .opensheets-filter-menu { border-color: #a7abb0; background: #fcfdfd; box-shadow: 2px 4px 5px #00000026; resize: none; overflow: visible; }
+.opensheets-host .opensheets-filter-command:not(:disabled):hover, .opensheets-host .opensheets-filter-command:not(:disabled):focus { background: #d3f0e0; }
+.opensheets-host .opensheets-filter-command { transform: translateY(-.5px); }
+.opensheets-host .opensheets-filter-command:nth-of-type(4) { transform: none; }
+.opensheets-host .opensheets-filter-submenu { min-width: 0; width: max-content; border-color: #a7abb0; box-shadow: none; background: #fff; }
+.opensheets-host .opensheets-filter-submenu .opensheets-filter-command { height: 24px; padding: 0 24px 0 28px; transform: none; }
+.opensheets-host .opensheets-filter-values { border-color: #a7abb0; border-radius: 3px; }
+.opensheets-host .opensheets-filter-check-actions { top: 192.5px; }
+.opensheets-host .opensheets-filter-footer { right: 19px; }
+.opensheets-host .opensheets-filter-resize { position: absolute; right: 0; bottom: 0; width: 12px; height: 12px; cursor: nwse-resize; background: linear-gradient(135deg,transparent 56%,#888 56%,#888 61%,transparent 61%,transparent 70%,#888 70%,#888 75%,transparent 75%,transparent 84%,#888 84%,#888 89%,transparent 89%); clip-path: polygon(100% 0,100% 100%,0 100%); }
+.opensheets-host .opensheets-sheet-search { box-sizing: border-box; width: 202px; border: 1px solid #ccc; padding: 5px 0; background: white; box-shadow: 2px 4px 5px #00000026; color: #444; font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
+.opensheets-host .opensheets-sheet-search label { display: block; margin: 2px 15px; height: 14px; }
+.opensheets-host .opensheets-sheet-search input { display: block; box-sizing: border-box; margin: 5px 15px; padding: 1px 8px; width: 170px; height: 26px; border: 1px solid #ccc; font: inherit; }
+.opensheets-host .opensheets-sheet-list { position: static; width: 200px; padding: 0; border: 0; box-shadow: none; font-size: 12px; }
+.opensheets-host .opensheets-sheet-list .gc-ui-contextmenu-icon { margin-right: 0; }
+.opensheets-host .opensheets-sheet-list .opensheets-active-sheet { background: #ddd; }
+.opensheets-host .gc-ui-contextmenu-menuitem-content { border: 0; }
+.opensheets-host .gc-ui-contextmenu-group-header { border: 1px solid transparent; }
+.opensheets-host .opensheets-filter-submenu { left: calc(100% - 1px); background: #fcfdfd; }
+.opensheets-host .opensheets-filter-submenu .opensheets-filter-command { padding: 0 10px 0 24px; line-height: 24px; }
+.opensheets-host .opensheets-filter-command { transform: none; }
+.opensheets-host .opensheets-filter-menu > .opensheets-filter-command > span { position: relative; top: -.5px; }
+.opensheets-host .opensheets-filter-menu > .opensheets-filter-command:nth-of-type(4) > span { top: 0; }
+.opensheets-host .opensheets-filter-color-menu { width: 142px; }
+.opensheets-host .opensheets-filter-color-caption { height: 32px; line-height: 32px; text-indent: 8px; background: #ebebeb; color: #6a6a6a; margin-bottom: 7px; white-space: nowrap; }
+.opensheets-host .opensheets-filter-color-menu .opensheets-filter-color-row { height: 29px; line-height: 23px; padding: 2px 0 2px 27px; border: 1px solid transparent; box-sizing: border-box; }
+.opensheets-host .opensheets-filter-swatch { display: block; width: 75px; height: 22px; border: 1px solid #828282; box-sizing: border-box; }
+.opensheets-host .gc-ui-contextmenu-container { border-color: #c6c6c6; box-shadow: 1px 2px 5px #0006; }
+.opensheets-host .gc-ui-contextmenu-text { height: 16px; line-height: normal; }
+.opensheets-host .gc-ui-contextmenu-groupitems-container { padding-left: 6px; }
+.opensheets-host .opensheets-menu-arrow { color: #000; right: 5px; }
+.opensheets-host .opensheets-filter-submenu { position: fixed; left: 0; top: 0; }
+.opensheets-host .opensheets-filter-date-menu .opensheets-filter-command { padding-right: 30px; }
+.opensheets-host .opensheets-filter-has-nested::after { content: ''; position: absolute; right: 12px; top: 10px; border-left: 4px solid #999; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.opensheets-host .opensheets-filter-date-menu { min-width: 153.72px; }
+.opensheets-host .opensheets-filter-submenu { contain: layout paint; }
+.opensheets-host .opensheets-filter-color-menu { filter: opacity(1); }
+.opensheets-host .opensheets-filter-command:not(:disabled):hover, .opensheets-host .opensheets-filter-command:not(:disabled):focus { background: transparent; }
+.opensheets-host .opensheets-filter-menu > .opensheets-filter-command:not(:disabled):hover::before, .opensheets-host .opensheets-filter-menu > .opensheets-filter-command:not(:disabled):focus::before { content: ''; position: absolute; left: 24px; right: 18px; top: 0; bottom: 0; background: #d3f0e0; }
+.opensheets-host .opensheets-filter-menu > .opensheets-filter-command > span { position: relative; z-index: 1; }
+.opensheets-host .opensheets-filter-search { top: 167.5px; }
+.opensheets-host .opensheets-filter-footer button { background: #efefef; }
+.opensheets-host .opensheets-custom-filter { position: fixed; left: calc(50vw - 421px); top: calc(50vh - 131px); width: 842px; height: 262px; box-sizing: border-box; border: 1px solid #a7abb0; background: #f0f0f0; color: #242f48; font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
+.opensheets-custom-title { position: absolute; left: 1px; top: 1px; width: 840px; height: 34px; background: white; }
+.opensheets-custom-title-text { position: absolute; left: 12px; top: 0; line-height: 34px; }
+.opensheets-custom-close { position: absolute; right: 18px; top: 0; width: 36px; height: 34px; line-height: 34px; text-align: center; font-size: 18px; }
+.opensheets-custom-show { position: absolute; left: 13px; top: 35px; height: 24px; line-height: 24px; }
+.opensheets-custom-item { position: absolute; left: 28px; top: 59px; height: 24px; line-height: 24px; font-size: 10px; }
+.opensheets-custom-condition { position: absolute; left: 0; width: 840px; height: 37px; }
+.opensheets-custom-condition > select { position: absolute; left: 42.59px; top: 0; width: 233.84px; height: 25px; box-sizing: border-box; border: 1px solid #767676; background: white; font: 12px Arial; padding: 0 2px; }
+.opensheets-custom-value { position: absolute; left: 286.59px; top: 0; width: 529.19px; height: 25px; }
+.opensheets-custom-value select { width: 100%; height: 25px; box-sizing: border-box; border: 1px solid #767676; background: white; font: 13.3333px Arial; padding: 0 2px; }
+.opensheets-custom-value input { position: absolute; left: 2px; top: 2px; width: calc(100% - 26px); height: 21px; border: 0; background: transparent; font: 13.3333px Arial; padding: 0; }
+.opensheets-custom-conjunction { position: absolute; left: 40px; top: 120px; height: 30px; line-height: 30px; font: 13px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
+.opensheets-custom-conjunction label { margin-right: 25px; }
+.opensheets-custom-conjunction input { width: 13px; height: 13px; vertical-align: middle; }
+.opensheets-custom-hint { position: absolute; left: 1px; top: 187px; width: 840px; font-size: 10px; }
+.opensheets-custom-hint p { margin: 0; height: 11px; line-height: 11px; }
+.opensheets-custom-footer { position: absolute; left: 0; top: 209px; width: 840px; height: 45px; }
+.opensheets-custom-footer input { position: absolute; top: 10px; width: 75px; height: 23px; border: 1px solid #c2c2c2; background: #e1e1e1; font: 12px/21px Arial; }
+.opensheets-custom-footer input:first-child { left: 666px; }
+.opensheets-custom-footer input:last-child { left: 753px; }
+.opensheets-host .opensheets-custom-filter { border: 0; box-shadow: inset 0 0 0 1px #a7abb0; }
+.opensheets-host .opensheets-custom-condition > select, .opensheets-host .opensheets-custom-value select { margin: 0; }
+.opensheets-host .opensheets-custom-conjunction { position: absolute; left: 341px; top: 120px; width: 400px; height: 30px; }
+.opensheets-host .opensheets-custom-conjunction input { position: absolute; margin: 0; top: 3px; width: 13px; height: 13px; }
+.opensheets-host .opensheets-custom-conjunction input:nth-of-type(1) { left: 4px; }
+.opensheets-host .opensheets-custom-conjunction input:nth-of-type(2) { left: 58px; }
+.opensheets-host .opensheets-custom-conjunction label { position: absolute; top: 1px; margin: 0; font: 13px 'Segoe UI', Calibri, Thonuri, Arial, Verdana, sans-serif; }
+.opensheets-host .opensheets-custom-conjunction label:nth-of-type(1) { left: 20px; }
+.opensheets-host .opensheets-custom-conjunction label:nth-of-type(2) { left: 74px; }
+.opensheets-host .opensheets-custom-filter input, .opensheets-host .opensheets-custom-filter select { outline: none; }
+.opensheets-host .opensheets-custom-conjunction { left: 40px; }
+.opensheets-host .opensheets-custom-conjunction input:nth-of-type(1) { left: 6px; }
+.opensheets-host .opensheets-custom-conjunction input:nth-of-type(2) { left: 60px; }
+.opensheets-host .opensheets-custom-conjunction label:nth-of-type(1) { left: 22px; }
+.opensheets-host .opensheets-custom-conjunction label:nth-of-type(2) { left: 76px; }
+.opensheets-host .opensheets-custom-hint { left: 13px; }
+.opensheets-host .opensheets-custom-footer input:first-child { left: 667px; top: 9px; }
+.opensheets-host .opensheets-custom-footer input:last-child { left: 754px; top: 9px; }
+.opensheets-host .opensheets-custom-footer input:first-child { top: 10px; }
+.opensheets-host .opensheets-custom-footer input:last-child { top: 10px; }
+.opensheets-host .opensheets-custom-filter { border: 1px solid #a7abb0; box-shadow: none; }
+.opensheets-host .opensheets-custom-title { left: 0; top: 0; }
+.opensheets-host .opensheets-custom-title-text { left: 12px; }
+.opensheets-host .opensheets-custom-close { right: 19px; }
+.opensheets-host .opensheets-custom-show { left: 12px; top: 34px; }
+.opensheets-host .opensheets-custom-item { left: 27px; top: 58px; }
+.opensheets-host .opensheets-custom-condition { margin-top: -1px; }
+.opensheets-host .opensheets-custom-condition > select { left: 41.59px; }
+.opensheets-host .opensheets-custom-value { left: 285.59px; }
+.opensheets-host .opensheets-custom-conjunction { left: 39px; top: 119px; }
+.opensheets-host .opensheets-custom-hint { left: 12px; top: 186px; }
+.opensheets-host .opensheets-custom-footer { top: 208px; }
+.opensheets-host .opensheets-custom-footer input { top: 10px; }
+.opensheets-host .opensheets-custom-footer input:first-child { left: 666px; }
+.opensheets-host .opensheets-custom-footer input:last-child { left: 753px; }
+.opensheets-host .opensheets-custom-filter { contain: layout paint; }
+
+/* The trial paints colour-menu text on the grayscale path; the no-op filter
+   selects the same Chromium text rasterization without changing any pixels. */
+.opensheets-host .opensheets-filter-color-menu { filter: opacity(1); }
+/* Fixed popups can be culled by the host clip. Paint containment keeps their
+   text on the LCD path while leaving the declared content bounds unchanged. */
+.opensheets-host .opensheets-filter-submenu, .opensheets-host .opensheets-custom-filter { contain: layout paint; }

@@ -214,9 +214,9 @@ function drawCheckMark(ctx: CanvasRenderingContext2D, x: number, y: number, size
   ctx.stroke();
   ctx.restore();
 }
-function drawMixedMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string): void {
-  ctx.fillStyle = resolveColor(color);
-  ctx.fillRect(x + size * 0.25, y + size * 0.45, size * 0.5, Math.max(1.5, size / 9));
+function drawMixedMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, _color: string): void {
+  ctx.fillStyle = '#008000';
+  ctx.fillRect(x + size * 0.3, y + size * 0.3, size * 0.4, size * 0.4);
 }
 function drawCheckBox(
   ctx: CanvasRenderingContext2D,
@@ -303,14 +303,7 @@ export class CheckBox extends Base {
     const state = value === true ? true : value === false ? false : this.props.isThreeState ? null : false;
     const left = x + 5;
     const top = y + 5;
-    if (state === null) {
-      ctx.save();
-      ctx.fillStyle = '#008000';
-      ctx.fillRect(left, top, size, size);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(left + size * 0.3, top + size * 0.3, size * 0.4, size * 0.4);
-      ctx.restore();
-    } else drawCheckBox(ctx, left, top, size, state, '#ffffff', String(style.foreColor ?? '#000000'));
+    drawCheckBox(ctx, left, top, size, state, '#ffffff', String(style.foreColor ?? '#000000'));
     const caption = this.props.caption ? String(this.props.caption) : '';
     const stateText = state === true ? String(this.props.textTrue ?? '') : state === false ? String(this.props.textFalse ?? '') : String(this.props.textIndeterminate ?? '');
     const text = [caption, stateText].filter(Boolean).join(' ') || this.format(value, (style.formatter as string) ?? 'General');
@@ -675,7 +668,7 @@ export class RadioButtonList extends ItemListBase {
       const checked = selected.includes(String(text)) || selected.includes(String(index));
       const cx = px + size / 2, cy = top + size / 2;
       ctx.beginPath();
-      ctx.arc(cx, cy, size / 2 - 1.5, 0, Math.PI * 2);
+      ctx.arc(cx, cy, size / 2 - 0.5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
       ctx.strokeStyle = resolveColor(String(style.foreColor ?? '#000000'));

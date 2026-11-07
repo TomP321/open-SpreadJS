@@ -497,11 +497,16 @@ export class Interaction {
   private sheetList(hidden = false): void {
     this.closeMenu();
     const wb = this.view.workbook;
-    const items: MenuItemData[] = wb.sheets.flatMap((sheet, index) => (hidden ? !!sheet.visible() : !sheet.visible()) ? [] : [{ name: String(index), text: sheet.name(), iconClass: index === wb.getActiveSheetIndex() ? 'check' : undefined }]);
+    const items: MenuItemData[] = wb.sheets.flatMap((sheet, index) => (hidden ? !!sheet.visible() : !sheet.visible()) ? [] : [{ name: String(index), text: sheet.name(), itemClass: index === wb.getActiveSheetIndex() ? 'opensheets-active-sheet' : undefined }]);
     const menu = renderMenu(wb.contextMenu, items, item => { const index = Number(item.name); if (hidden) wb.getSheet(index).visible(true); wb.setActiveSheetIndex(index); wb.startSheetIndex(index); this.closeMenu(); });
     menu.classList.add('opensheets-sheet-list');
-    Object.assign(menu.style, { left: '81px', bottom: '22px', maxHeight: `${this.view.viewHeight - 20}px`, overflow: 'auto' });
-    this.view.root.append(menu); this.menu = menu;
+    const wrapper = document.createElement('div'); wrapper.className = 'opensheets-sheet-search';
+    Object.assign(wrapper.style, { position: 'absolute', zIndex: '10', left: '80px', bottom: '17px' });
+    const label = document.createElement('label'); label.textContent = hidden ? 'Unhide Sheet:' : 'Active Sheet:';
+    const search = document.createElement('input'); search.setAttribute('aria-label', label.textContent);
+    search.addEventListener('input', () => { for (const item of menu.children) { const element = item as HTMLElement; element.hidden = !element.textContent?.toLowerCase().includes(search.value.toLowerCase()); } });
+    menu.style.maxHeight = `${this.view.viewHeight - 80}px`; menu.style.overflow = 'auto';
+    wrapper.append(label, search, menu); this.view.root.append(wrapper); this.menu = wrapper;
   }
   private renameTab(event: MouseEvent): void {
     const hit = this.tabHit(event.clientX), wb = this.view.workbook;
@@ -673,9 +678,10 @@ export class Interaction {
       const options = menu.menuView.getCommandOptions(item, host, e);
       this.closeMenu(); this.menuCommand(item, options, event);
     });
+    if (tab) root.classList.add('opensheets-tab-menu');
     this.view.root.append(root); this.menu = root;
     root.style.left = `${Math.max(0, Math.min(x, this.view.width - root.offsetWidth))}px`;
-    root.style.top = `${Math.max(0, Math.min(y, this.view.height - root.offsetHeight))}px`;
+    root.style.top = `${Math.max(0, Math.min(y, (tab ? this.view.viewHeight + 12 : this.view.height) - root.offsetHeight))}px`;
     root.focus();
   }
   private menuCommand(item: MenuItemData, options: unknown, event: MouseEvent): void {

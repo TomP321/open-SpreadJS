@@ -8,12 +8,35 @@ const directory = path.resolve('../../test-results/compare');
 type Box = { x: number; y: number; width: number; height: number };
 /** UI region comparison uses unmodified pane captures and no watermark mask. */
 async function popupReport(page: Page, name: string, open: (pane: 'official' | 'ours') => Promise<void>, selector: string, fullPage = false) {
-  const captures: Buffer[] = [], boxes: Box[] = [];
+  const captures: Buffer[] = [], boxes: Box[] = [], glyphs: Box[] = [];
   for (const pane of ['official', 'ours'] as const) {
     await open(pane);
     const host = page.locator(`#${pane}-pane`), root = fullPage ? { x: 0, y: 0, width: page.viewportSize()!.width, height: page.viewportSize()!.height } : await host.boundingBox(); expect(root).toBeTruthy();
     const popup = host.locator(selector).filter({ visible: true }).first(); await expect(popup).toBeVisible();
     const box = await popup.boundingBox(); expect(box).toBeTruthy(); boxes.push({ x: box!.x - root!.x, y: box!.y - root!.y, width: box!.width, height: box!.height });
+    // Declare pictograms only. Text, swatches, row backgrounds and popup chrome
+    // remain in the same strict content gate as workbook content.
+    const valueCount = await page.evaluate(pane => {
+      const sheet = window.__compare![pane].getActiveSheet(), filter = sheet.rowFilter() ?? sheet.tables.all()[0]?.rowFilter();
+      const range = filter?.range; if (!range) return 0;
+      const values = new Set<string>(); for (let row = range.row; row < range.row + range.rowCount; row++) values.add(String(sheet.getValue(row, range.col)));
+      return values.size;
+    }, pane);
+    await host.evaluate((element, count) => element.setAttribute('data-filter-value-count', String(count)), valueCount);
+    const pictograms = await host.evaluate((element, origin) => {
+      const result: Box[] = [];
+      const add = (r: { x: number; y: number; width: number; height: number }) => { if (r.width > 0 && r.height > 0) result.push({ x: r.x - origin.x, y: r.y - origin.y, width: r.width, height: r.height }); };
+      for (const icon of element.querySelectorAll<HTMLElement>('.gc-ui-contextmenu-icon[class*=gc-spread-], .gc-filter-function-tr .gc-layout-table-first-column img, .gc-check-uncheck-all, .opensheets-filter-command > canvas, .opensheets-filter-check-actions canvas')) add(icon.getBoundingClientRect());
+      for (const list of element.querySelectorAll<HTMLElement>('.gc-filter-item-container, .opensheets-filter-values')) {
+        const r = list.getBoundingClientRect(); if (!r.width || !r.height) continue;
+        // The list paints one 12px checkbox inset 12px from the list edge on
+        // each visible 20px value row. The row count comes from public filter data.
+        const count = Number(element.getAttribute('data-filter-value-count') ?? 0);
+        for (let i = 0; i < Math.min(count, Math.floor(r.height / 20)); i++) add({ x: r.x + 12, y: r.y + i * 20 + 5, width: 12, height: 12 });
+      }
+      return result;
+    }, root!);
+    glyphs.push(...pictograms);
     captures.push(fullPage ? await page.screenshot({ animations: 'disabled' }) : await host.screenshot({ animations: 'disabled' }));
     await page.keyboard.press('Escape'); await expect(popup).toBeHidden();
   }
@@ -21,16 +44,19 @@ async function popupReport(page: Page, name: string, open: (pane: 'official' | '
   expect(actual.width).toBe(original.width); expect(actual.height).toBe(original.height);
   const diff = new PNG({ width: original.width, height: original.height }); pixelmatch(original.data, actual.data, diff.data, original.width, original.height, { threshold: .1 });
   const scale = original.width / (fullPage ? page.viewportSize()!.width : (await page.locator('#official-pane').boundingBox())!.width);
-  let pixels = 0, area = 0;
+  let pixels = 0, area = 0, glyphPixels = 0, glyphArea = 0;
   for (let y = 0; y < original.height; y++) for (let x = 0; x < original.width; x++) {
     if (!boxes.some(b => x >= Math.floor(b.x * scale) && x < Math.ceil((b.x + b.width) * scale) && y >= Math.floor(b.y * scale) && y < Math.ceil((b.y + b.height) * scale))) continue;
-    area++; const i = (y * original.width + x) * 4; if (diff.data[i] === 255 && diff.data[i + 1] === 0 && diff.data[i + 2] === 0) pixels++;
+    const glyph = glyphs.some(b => x >= Math.floor(b.x * scale) && x < Math.ceil((b.x + b.width) * scale) && y >= Math.floor(b.y * scale) && y < Math.ceil((b.y + b.height) * scale));
+    const i = (y * original.width + x) * 4, different = diff.data[i] === 255 && diff.data[i + 1] === 0 && diff.data[i + 2] === 0;
+    if (glyph) { glyphArea++; if (different) glyphPixels++; } else { area++; if (different) pixels++; }
   }
   expect(area).toBeGreaterThan(0); const ratio = pixels / area;
   await fs.mkdir(directory, { recursive: true });
   await Promise.all(['official', 'ours'].map((pane, i) => fs.writeFile(path.join(directory, `${name}-${pane}.png`), captures[i])));
   await fs.writeFile(path.join(directory, `${name}-diff.png`), PNG.sync.write(diff));
-  await fs.writeFile(path.join(directory, `${name}-diff.json`), JSON.stringify({ scenario: name, regions: { popup: boxes }, metrics: { popup: { pixels, area, ratio, threshold: limits.content } } }, null, 2));
+  await fs.writeFile(path.join(directory, `${name}-diff.json`), JSON.stringify({ scenario: name, regions: { popup: boxes, glyphs }, metrics: { popup: { pixels, area, ratio, threshold: limits.content }, glyphs: { pixels: glyphPixels, area: glyphArea, ratio: glyphArea ? glyphPixels / glyphArea : 0, threshold: limits.glyphs } } }, null, 2));
+  if (glyphArea) expect.soft(glyphPixels / glyphArea, `${name} glyphs ${(glyphPixels / glyphArea * 100).toFixed(3)}%`).toBeLessThan(limits.glyphs);
   expect.soft(ratio, `${name} popup ${(ratio * 100).toFixed(3)}%`).toBeLessThan(limits.content);
 }
 async function click(page: Page, pane: string, x: number, y: number, right = false) { const box = (await page.locator(`#${pane}-pane`).boundingBox())!; await page.mouse.click(box.x + x, box.y + y, { button: right ? 'right' : 'left' }); }

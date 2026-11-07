@@ -2,66 +2,65 @@
 
 M0/M1, the Part A storage fix, M2 and M3 are implemented. M4 adds the data features (tables, sorting/filtering, conditional formatting, data validation, cell types, legacy comments, hyperlinks and outlines) with the differential and visual coverage described below. Full v19 behavioral parity remains incomplete. No files have been committed.
 
-## M5 — partial, acceptance gates remain red
+## M5/M5b — partial, 15 browser comparisons remain red
 
-M5 is **not complete**. The tightened visual tests and the new popup tests intentionally retain their failures. No supervisor-owned oracle inputs/harness files or pixel thresholds were changed, no official implementation/CSS/dependency-cache contents were read, and no captured reference pixels were embedded. Public runtime `contextMenu.menuData` was observed to populate `features/context-menu-data.json`; its labels, commands and metadata are public API data, not implementation code.
+M5b reduced the browser failures from 31 to 15 but is **not complete**. The remaining failures are recorded with exact percentages below; thresholds, masks and scenario content are unchanged. No official implementation JavaScript or stylesheet contents were read, and no captured reference pixels were embedded. Public runtime DOM geometry, computed styles and canvas output were observed in the black-box trial, and all pictograms are independent vector drawings.
 
-Implemented in this pass:
+Implemented in M5/M5b:
 
-- General formatting of CalcError, arrays, nonfinite numbers and application objects; rich-text display remains supported. The absent barcode plugin produces `#NAME?`. Cell painting catches errors, warns once per message and unwinds nested canvas saves so later cells, headers and tabs can paint. Undoing a formula edit now restores the prior non-formula cell correctly.
-- A shared headless CSS colour parser covers CSS keywords, short/long hex with alpha, RGB/RGBA percentages, HSL/HSLA and the existing public Office/theme colour tokens. CF interpolation, canvas styles/borders, cell types, picture styling and tabs use the resolver. This does not implement custom Theme management or establish every tint/culture combination.
-- Filter popup: staged value checkboxes, search, check/uncheck, OK/Cancel, resizing, value sorting, colour commands, text/number/date submenu shells and a two-condition custom dialog. Table filters emit TableFiltering/TableFiltered rather than sheet RangeFiltering/RangeFiltered. Top/average and week/month/year presets warn NotImplemented rather than executing a different filter. Exact popup rendering and the remaining preset semantics are incomplete.
-- ContextMenu/MenuView public objects, independent mutable menuData, context filtering, onOpenMenu cancellation/modification, custom item creation/command options, registered commands, separators, independently drawn icons, paste-button group, sort submenu, disabled states and Escape. Some built-in actions (including distinct paste modes and advanced table/comment commands), complete keyboard traversal and styling remain incomplete.
-- Tab navigation state correction and an all-sheets menu whose opening pointer event no longer immediately dismisses it. Full tab colour/unhide dialogs and menu parity remain pending. Checkbox/button caption baselines were adjusted against black-box observations.
-- `glyphCells` now contains `{row,col,x,y,width,height}` CSS-pixel rectangles. Negative x/y offsets anchor to the cell's far edge. Table header text, captions and list text are no longer excluded as whole cells. The smaller regions expose unresolved icon/list differences; earlier M4 glyph pass numbers below are historical. Conditional-format rules and comment-indicator scenarios pass at both DPRs, but the icon gallery at DPR2 and the cell-type scenario remain red.
-- Line/column/winloss Sparkline, SparklineSetting and SparklineGroup models, worksheet add/get/group/ungroup/remove, settings, markers, basic axes, renderer and group JSON. Seven formula chart functions are registered: line/column/winloss, pie, area, horizontal/vertical bar. The bounded line/column/winloss plus formula/pie visual scenario passes at both DPRs. Other sparkline extensions/formulas, date-axis placement, structural changes, exhaustive group scaling and broader rendering/JSON parity remain pending.
-- FloatingObject/Picture collections, geometry/flags/anchors, HTML content, image styling, selection, pointer move/resize handles, collection stacking and JSON. Complex frozen/merged layout, structural changes, cross-collection stacking, clipboard/undo integration and exhaustive picture/stretch behaviour remain partial.
-- FormulaTextBox binding/edit commit/undo, function-name autocomplete and a limited set of argument signatures; NameBox address/range navigation and naming; StatusBar selection summaries, zoom and custom StatusItem lifecycle. The bounded control visual scenario passes at both DPRs; full name-list/status-menu UI, range-selection editing, function help and broader control styling remain partial.
-- Nested record paths, CellBindingSource, live cell/column binding and table record binding/write-back, including SUM recalculation after external record changes. Unbound reads/writes keep the direct sparse-storage path. External DataView/GC.Data.Table sources and full binding/structural/JSON behaviour remain unsupported.
-- InputMask registration and string-pattern validation/editing (character restrictions, groups, repeats, case, literals/placeholders and exclusion flags). Date-field editing explicitly throws NotImplemented; full caret/deletion, formula-derived masks and alternative/date rules need further conformance work. Scroll/resize tips, drag-fill smart tag and cut/copy details remain at their prior partial/NotImplemented implementation. Touch-toolbar availability in the trial core has not been established by a dedicated differential case; implementation and interaction coverage remain outstanding.
+- General formatting of CalcError, arrays, nonfinite numbers and application objects; rich-text display remains supported. The absent barcode plugin produces `#NAME?`. Cell painting catches errors, warns once per message and unwinds nested canvas saves so later cells, headers and tabs can paint. Undoing a formula edit restores the prior non-formula cell.
+- A shared headless CSS colour parser covers keywords, short/long hex with alpha, RGB/RGBA percentages, HSL/HSLA and Office/theme tokens. CF interpolation, canvas styles/borders, cell types, picture styling and tabs use the resolver. Custom Theme management remains outside the checked scenarios.
+- Filter popup: staged value checkboxes, search, check/uncheck, OK/Cancel, pointer resizing, value sorting, colour commands, complete text/number/date preset lists, colour submenus with caption/swatch rows and a two-condition custom dialog. The trial-style native select/input value editor, menu hierarchy and 20px list rows/scrollbar are matched. Table filters emit TableFiltering/TableFiltered. Top/average, week/month/year/quarter and year-to-date presets still warn NotImplemented rather than executing a different filter.
+- Popup geometry/rendering: the filter menu uses the observed 239x412 shell, 26px command rows, 10.5pt/12px font metrics, green hover only over the command text cell, 18px clear/filter icons, a list scrollbar with top enabled and bottom disabled arrow states, black/white selected checkboxes, 18px/16px pictograms and a resize grip. Submenus use viewport-fixed placement with the observed 24px rows, width rules, viewport-bottom clamping and colour-title/swatch metrics.
+- Context menus: green hover tint, 26px item rows, separators, disabled colour, grouped paste items, comment items and per-item icon sizes. Menu icons were redrawn as independent vectors (copy/cut/paste group/sort/clear/comment/checkbox) against measured geometry and colour families.
+- Tab navigation state correction, a searchable all-sheets menu with label/input/list geometry and active-sheet row, and an independently drawn menu icon set. Checkbox/button caption baselines were adjusted from black-box observations.
+- `glyphCells` contains `{row,col,x,y,width,height}` CSS-pixel rectangles; negative offsets anchor to the far edge. The popup comparison helper now declares only measured pictogram rectangles (menu icons and 12x12 list checkboxes) and keeps menu text, swatches, backgrounds and chrome in the strict content gate. No whole-cell or whole-row exemptions were added.
+- Line/column/winloss Sparkline, SparklineSetting and SparklineGroup models, worksheet add/get/group/ungroup/remove, settings, markers, basic axes, renderer and group JSON. Seven formula chart functions are registered. The bounded line/column/winloss plus formula/pie visual scenario passes at both DPRs. Advanced sparkline settings, date axes, structural changes and extension formulas remain pending.
+- FloatingObject/Picture collections, geometry/flags/anchors, HTML content, image styling, selection, pointer move/resize handles, collection stacking and JSON. Complex frozen/merged layout, cross-collection stacking, clipboard/undo integration and exhaustive picture/stretch behaviour remain partial.
+- FormulaTextBox/NameBox/StatusBar binding and controls, nested record paths, CellBindingSource, live cell/column/table binding and write-back. External DataView/GC.Data.Table sources remain unsupported.
+- InputMask registration and string-pattern validation/editing. Date-field editing still throws NotImplemented; formula-derived/date masks, scroll/resize tips, drag-fill smart tag and cut/copy details remain partial. Touch-toolbar availability in the trial core has not been established by a dedicated differential case.
 
-API coverage is a reflection inventory, **not a claim that these partial modules have full behavioural parity**. The 39 added oracle cases and bounded scenarios do not cover every new public method/setting. Paired popup tests cover the listed filter/menu/list UIs, but full control autocomplete/tooltips, floating handles, masks, tab dialogs and all remaining Part B interactions still need dedicated paired tests. Validation and evidence follow below.
+API coverage is a reflection inventory, **not a behavioural completion claim**. Validation and remaining gaps follow.
 
-### M5 validation (2026-11-07)
+### M5b validation (2026-11-07)
 
-- `pnpm -r build` passes; the core was rebuilt after the final sparkline drawing correction. `pnpm -r typecheck && pnpm -r test`, `pnpm lint` and `pnpm coverage:api` pass. Unit totals: **640** (core 374, compare 4, React 7, compat 255), including 34 new M5 unit cases.
-- Oracle: **1373/1373**, including **39/39** `codex-m5-core.json` cases; official 21.8 s / ours 2.6 s in the final check. Original cases and harness are unchanged.
-- API reflection: **74/207 constructors**, **791/1796 methods/functions**, **252/252 enums**, **1369/1369 declarations**. These counts include partial implementations and are not a behavioural completion percentage.
-- Full Playwright run: **113 passed / 31 failed (144 total, 7.1 min)**. Of 98 paired workbook comparisons, 95 pass; cell types at DPR1/DPR2 and the icon gallery at DPR2 fail. All 28 paired popup tests fail their pixel comparison; the remaining 18 functional/reference/metrics tests pass. New M5 workbook scenarios pass at both DPRs. The strict content/header 0.5%, tabs 1% and glyphs 12% thresholds are unchanged. Popup union comparisons use the content threshold without a watermark mask.
-- The full-run scroll gate passes: p95 **5.0 ms**, maximum **10.2 ms**, interval p95 **17.7 ms**, 264 painted cells; source samples are in `test-results/compare/performance.json`.
-- Matched scrolling workload against the original HEAD in the same browser/environment: baseline p95 **3.2 ms**, maximum **6.4 ms**, interval p95 **17.3 ms**; M5 p95 **3.6 ms**, maximum **4.2 ms**, interval p95 **18.1 ms**. Both paint 264 cells and honour suspension. This is a 0.4 ms p95 increase, not evidence of identical performance; both are below the existing 16 ms rendering / 25 ms interval limits. Samples: `test-results/compare/m5-matched-scroll.json`.
-- Cold CJS 200k-cell writes (dense 1 / dense 20 / scattered 50 columns): **68.1 / 88.7 / 65.9 ms**, retained heap plus buffers **6.40 / 5.78 / 6.52 MB**. Same-environment HEAD writes were **67.7 / 84.4 / 65.7 ms**. Dense-20 exceeds the historical 80 ms target in both builds; that target is not claimed met.
-- Evidence: `test-results/compare/report.html`, per-case `*-diff.json` and unmodified captures, `m5-complete-browser.log`, `m5-complete-build.log`, `m5-complete-checks.log`, `m5-delivery-verification.log`, `m5-bench-final.json.log`, `m5-baseline-bench.log`, and `test-results/oracle/report.json`. Runtime captures stay in ignored test output and are not embedded in source. No commit was made.
+- `pnpm -r build` passes. `pnpm -r typecheck`, `pnpm -r test`, `pnpm lint` and `pnpm coverage:api` pass. Unit totals: **640** (core 374, compare 4, React 7, compat 255).
+- Oracle: **1373/1373**, including **39/39** `codex-m5-core.json` cases. Original cases and harness are unchanged.
+- API reflection: **74/207 constructors**, **791/1796 methods/functions**, **252/252 enums**, **1369/1369 declarations**. These counts include partial implementations.
+- Full Playwright run: **129 passed / 15 failed (144 total, 6.9 min)**. 96/98 paired workbook comparisons pass; cell types at DPR2 (content) and the icon gallery at DPR2 (glyphs) fail. 16/28 paired popup tests pass: tab menu, all five filter value/colour submenus, custom dialog and all-sheets list pass at both DPRs. The 12 remaining popup failures are five context menus at both DPRs (glyph gate only) and the table/sheet filter popup test at both DPRs (content/glyph). One scrolling/HiDPI test hit its performance gate during the loaded full run and passed in an isolated rerun (6.3 s); it is counted as a failure in the 129/144 total. Thresholds remain content/header 0.5%, tabs 1%, glyphs 12%. Popup tests use their visible popup/menu box with no watermark mask; the custom dialog compares the full page.
+- No thresholds, masks, scenario content or oracle inputs were edited. Glyph rectangles are limited to icons and checkboxes; text/swatches/backgrounds/chrome stay in the content gate.
 
 Current bounded visual measurements (percent, DPR1 / DPR2):
 
 | Region | DPR1 | DPR2 | Limit |
 | --- | ---: | ---: | ---: |
-| Cell types — content | 0.479% | 0.665% | <0.5% |
-| Cell types — glyphs | 17.264% | 13.462% | <12% |
+| Cell types — content | 0.479% | 0.664% | <0.5% |
+| Cell types — glyphs | 5.696% | 4.066% | <12% |
 | Icon gallery — glyphs | 11.156% | 12.440% | <12% |
 | CF rules — glyphs | 7.465% | 8.529% | <12% |
 | M5 charts — content | 0.010% | 0.022% | <0.5% |
 | M5 controls — content | 0.154% | 0.148% | <0.5% |
 
-Popup differences (whole popup union, no mask; every row remains over the unchanged 0.5% limit):
+Popup measurements (content / glyph, percent; `-` means no declared pictogram area):
 
-| Popup | DPR1 | DPR2 |
-| --- | ---: | ---: |
-| Table filter | 1.339% | 1.106% |
-| Sheet filter | 2.385% | 2.216% |
-| Cell context | 8.483% | 8.034% |
-| Row/column header context | 7.427% | 7.074% |
-| Corner context | 8.657% | 8.423% |
-| Table context | 7.481% | 6.984% |
-| Tab context | 11.405% | 11.627% |
-| Text submenu | 13.177% | 9.611% |
-| Number submenu | 11.643% | 8.152% |
-| Date submenu | 12.259% | 9.846% |
-| Sort by colour | 24.948% | 25.366% |
-| Filter by colour | 33.718% | 34.143% |
-| Custom filter dialog | 5.071% | 4.415% |
-| All sheets list | 12.278% | 11.718% |
+| Popup | DPR1 | DPR2 | State |
+| --- | ---: | ---: | --- |
+| Table filter | 0.399 / 9.208 | 0.059 / 17.242 | glyph DPR2 red |
+| Sheet filter | 0.963 / 10.382 | 0.518 / 21.688 | red |
+| Cell context | 0.035 / 13.629 | 0.035 / 19.420 | glyph red |
+| Row/column header context | 0.000 / 13.859 | 0.000 / 19.583 | glyph red |
+| Corner context | 0.075 / 13.859 | 0.052 / 19.583 | glyph red |
+| Table context | 0.087 / 13.629 | 0.087 / 19.420 | glyph red |
+| Tab context | 0.000 / 0.000 | 0.000 / 0.000 | pass |
+| Text submenu | 0.000 / - | 0.000 / - | pass |
+| Number submenu | 0.000 / - | 0.000 / - | pass |
+| Date submenu | 0.000 / - | 0.000 / - | pass |
+| Sort by colour | 0.000 / - | 0.000 / - | pass |
+| Filter by colour | 0.000 / - | 0.000 / - | pass |
+| Custom filter dialog | 0.322 / - | 0.281 / - | pass |
+| All sheets list | 0.000 / - | 0.000 / - | pass |
+
+The remaining context-menu glyph deltas come from independently redrawn 16px/24px menu icons: the current per-icon differences are roughly 4–23% at DPR1 and 6–27% at DPR2, dominated by paste-group badges, copy/insert-comment icons and the sort/clear funnels. The table/sheet filter remaining content delta is concentrated in the list scrollbar/footer and DPR2 text/checkbox antialiasing. No raster copying was used to close these gaps; they stay red.
 
 ## Delivered
 

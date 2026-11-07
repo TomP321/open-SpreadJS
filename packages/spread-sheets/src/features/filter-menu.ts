@@ -19,20 +19,41 @@ export function filterMenu(sheet: Worksheet, filter: RowFilterBase, column: numb
   for (let row = range.row; row < range.row + range.rowCount; row++) { const value = sheet.getValue(row, range.col + column); values.set(value instanceof Date ? value.toISOString() : String(value ?? ''), value); }
   const sorted = [...values].sort((a, b) => typeof a[1] === 'number' && typeof b[1] === 'number' ? a[1] - b[1] : a[0].localeCompare(b[0]));
   const kind = sorted.some(([, v]) => v instanceof Date) ? 'Date' : sorted.some(([, v]) => typeof v === 'number') ? 'Number' : 'Text';
-  const selected = new Set(sorted.filter(([, value]) => !filter.isFiltered(column) || filter.getFilterItems(column).some(condition => condition.evaluate(sheet, range.row, range.col + column, value))).map(([key]) => key));
+  const selected = new Set(sorted.filter(([, value]) => !filter.isFiltered(column) || filter.getFilterItems(column).some(condition => {
+    const json = condition.toJSON?.() as { conType?: number; expected?: unknown } | undefined;
+    // The trial's list dialog treats an area condition with a comma-joined
+    // string as an empty selection (only an array marks values as selected).
+    if (json?.conType === CF.ConditionType.areaCondition && typeof json.expected === 'string') return false;
+    return condition.evaluate(sheet, range.row, range.col + column, value);
+  })).map(([key]) => key));
   const apply = (conditions: Condition[]) => { filter.removeFilterItems(column); filter.addFilterItem(column, conditions); filter.filter(column); close(); };
   const row = (label: string, icon?: string, action?: () => void, disabled = false) => {
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'opensheets-filter-command'; button.textContent = label; button.disabled = disabled; button.setAttribute('role', 'menuitem');
-    if (icon) button.prepend(menuIcon(icon));
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'opensheets-filter-command'; const caption = document.createElement('span'); caption.textContent = label; button.append(caption); button.disabled = disabled; button.setAttribute('role', 'menuitem');
+    if (icon) button.prepend(menuIcon(icon, /clear|filter/i.test(icon) ? 18 : 16));
     if (action) button.addEventListener('click', action); root.append(button); return button;
   };
-  const submenu = (button: HTMLButtonElement, items: { label: string; action: () => void; color?: string }[]) => {
+  const submenu = (button: HTMLButtonElement, items: { label: string; action: () => void; color?: string; heading?: string }[]) => {
     button.classList.add('opensheets-filter-has-submenu');
     const menu = document.createElement('div'); menu.className = 'opensheets-filter-submenu'; menu.setAttribute('role', 'menu'); menu.style.top = `${button.offsetTop}px`;
-    for (const item of items) { const b = document.createElement('button'); b.className = 'opensheets-filter-command'; b.textContent = item.label; b.setAttribute('role', 'menuitem'); b.addEventListener('click', item.action); if (item.color) { const swatch = document.createElement('span'); swatch.style.cssText = `display:inline-block;width:12px;height:12px;margin-right:6px;background:${resolveColor(item.color)}`; b.prepend(swatch); } menu.append(b); }
-    button.addEventListener('pointerenter', () => { root.querySelectorAll<HTMLElement>('.opensheets-filter-submenu').forEach(e => e.style.display = 'none'); if (!button.disabled) { menu.style.top = `${button.offsetTop}px`; menu.style.display = 'block'; } });
-    button.addEventListener('click', () => { if (!button.disabled) { menu.style.top = `${button.offsetTop}px`; menu.style.display = 'block'; } });
-    button.addEventListener('keydown', e => { if (e.key === 'ArrowRight' && !button.disabled) { e.preventDefault(); menu.style.display = 'block'; menu.querySelector('button')?.focus(); } });
+    let heading = '';
+    for (const item of items) {
+      if (item.heading && item.heading !== heading) {
+        heading = item.heading; menu.classList.add('opensheets-filter-color-menu');
+        const caption = document.createElement('div'); caption.className = 'opensheets-filter-color-caption'; caption.textContent = heading; menu.append(caption);
+      }
+      const b = document.createElement('div'); b.className = 'opensheets-filter-command'; b.tabIndex = 0; b.setAttribute('role', 'menuitem');
+      const caption = document.createElement('span'); caption.textContent = item.label; b.append(caption); b.addEventListener('click', item.action);
+      if (item.heading) b.classList.add('opensheets-filter-color-row');
+      if (item.color) { const swatch = document.createElement('span'); swatch.className = 'opensheets-filter-swatch'; swatch.style.background = resolveColor(item.color); b.prepend(swatch); }
+      menu.append(b);
+    }
+    // The trial renders its filter submenus in the viewport layer. Besides the
+    // exact geometry this keeps Chromium's LCD text rendering on the same layer
+    // as the reference (fixed layers are not composited with grayscale text).
+    const place = () => { const r = button.getBoundingClientRect(), left = root.getBoundingClientRect().left + root.clientWidth; menu.style.left = `${left}px`; menu.style.top = `${r.top}px`; menu.style.display = 'block'; const height = menu.offsetHeight; if (r.top + height > window.innerHeight - 5) menu.style.top = `${Math.max(5, window.innerHeight - height - 5)}px`; };
+    button.addEventListener('pointerenter', () => { root.querySelectorAll<HTMLElement>('.opensheets-filter-submenu').forEach(e => e.style.display = 'none'); if (!button.disabled) { place(); menu.style.display = 'block'; } });
+    button.addEventListener('click', () => { if (!button.disabled) { place(); menu.style.display = 'block'; } });
+    button.addEventListener('keydown', e => { if (e.key === 'ArrowRight' && !button.disabled) { e.preventDefault(); place(); menu.style.display = 'block'; menu.querySelector<HTMLElement>('[role=menuitem]')?.focus(); } });
     root.append(menu);
   };
   const visible = filter.filterDialogVisibleInfo() as Record<string, boolean>;
@@ -42,18 +63,33 @@ export function filterMenu(sheet: Worksheet, filter: RowFilterBase, column: numb
   }
   const colors = new Map<string, 'backColor' | 'foreColor'>();
   for (let r = range.row; r < range.row + range.rowCount; r++) { const style = sheet.getStyle(r, range.col + column); for (const key of ['backColor', 'foreColor'] as const) if (style && typeof style[key] === 'string') colors.set(String(style[key]), key); }
-  if (visible.sortByColor !== false) submenu(row('Sort By Color', undefined, undefined, !colors.size), [...colors].map(([color, key]) => ({ label: key === 'backColor' ? 'Cell Color' : 'Font Color', color, action: () => { sheet.sortRange(range.row, range.col, range.rowCount, range.colCount, true, [{ index: column, ascending: true, [key === 'backColor' ? 'backColor' : 'fontColor']: color }]); close(); } })));
+  const colorItems = (sort: boolean) => (['backColor', 'foreColor'] as const).flatMap(key => {
+    const entries = [...colors].filter(([, type]) => type === key); if (!entries.length) return [];
+    const heading = `${sort ? 'Sort' : 'Filter'} By ${key === 'backColor' ? 'Cell' : 'Font'} Color`;
+    const action = (color: string) => () => {
+      if (sort) { sheet.sortRange(range.row, range.col, range.rowCount, range.colCount, true, [{ index: column, ascending: true, [key === 'backColor' ? 'backColor' : 'fontColor']: color }]); close(); }
+      else apply([new Condition(CF.ConditionType.colorCondition, { expected: color, compareType: key === 'backColor' ? 0 : 1 })]);
+    };
+    return [...entries.map(([color]) => ({ label: '', color, heading, action: action(color) })), { label: key === 'backColor' ? 'No Fill' : 'Automatic', color: '', heading, action: action(key === 'backColor' ? '' : '#000000') }];
+  });
+  if (visible.sortByColor !== false) submenu(row('Sort By Color', undefined, undefined, !colors.size), colorItems(true));
   row(`Clear Filter From "${title}"`, 'clearFilter', () => { filter.unfilter(column); close(); }, !filter.isFiltered(column));
-  if (visible.filterByColor !== false) submenu(row('Filter By Color', undefined, undefined, !colors.size), [...colors].map(([color, key]) => ({ label: key === 'backColor' ? 'Cell Color' : 'Font Color', color, action: () => apply([new Condition(CF.ConditionType.colorCondition, { expected: color, compareType: key === 'backColor' ? 0 : 1 })]) })));
+  if (visible.filterByColor !== false) submenu(row('Filter By Color', undefined, undefined, !colors.size), colorItems(false));
   if (visible.filterByValue !== false) {
-    const choices = kind === 'Text' ? ['Equals...', 'Does Not Equal...', 'Begins With...', 'Ends With...', 'Contains...', 'Does Not Contain...', 'Custom Filter...'] : kind === 'Number' ? ['Equals...', 'Does Not Equal...', 'Greater Than...', 'Greater Than Or Equal To...', 'Less Than...', 'Less Than Or Equal To...', 'Between...', 'Top 10...', 'Above Average', 'Below Average', 'Custom Filter...'] : ['Equals...', 'Before...', 'After...', 'Between...', 'Today', 'Yesterday', 'Tomorrow', 'This Week', 'This Month', 'This Year', 'Custom Filter...'];
-    submenu(row(`${kind} Filters`), choices.map(label => ({ label, action: () => {
-      if (['Top 10...', 'Above Average', 'Below Average', 'This Week', 'This Month', 'This Year'].includes(label)) { console.warn(`NotImplemented: FilterMenu.${label}`); return; }
+    const choices = kind === 'Text' ? ['Equals...', 'Does Not Equal...', 'Begins With...', 'Ends With...', 'Contains...', 'Does Not Contain...', 'Custom Filter...'] : kind === 'Number' ? ['Equals...', 'Does Not Equal...', 'Greater Than...', 'Greater Than Or Equal To...', 'Less Than...', 'Less Than Or Equal To...', 'Between...', 'Top 10...', 'Above Average', 'Below Average', 'Custom Filter...'] : ['Equals...', 'Before...', 'After...', 'Between...', 'Tomorrow', 'Today', 'Yesterday', 'Next Week', 'This Week', 'Last Week', 'Next Month', 'This Month', 'Last Month', 'Next Quarter', 'This Quarter', 'Last Quarter', 'Next Year', 'This Year', 'Last Year', 'Year To Date', 'All Dates in Period', 'Custom Filter...'];
+    const filterButton = row(`${kind} Filters`);
+    submenu(filterButton, choices.map(label => ({ label, action: () => {
+      if (['Top 10...', 'Above Average', 'Below Average', 'Next Week', 'This Week', 'Last Week', 'Next Month', 'This Month', 'Last Month', 'Next Quarter', 'This Quarter', 'Last Quarter', 'Next Year', 'This Year', 'Last Year', 'Year To Date', 'All Dates in Period'].includes(label)) { console.warn(`NotImplemented: FilterMenu.${label}`); return; }
       const predefined: Record<string, number> = { 'Equals...': 0, 'Does Not Equal...': 1, 'Greater Than...': 2, 'After...': 2, 'Greater Than Or Equal To...': 3, 'Less Than...': 4, 'Before...': 4, 'Less Than Or Equal To...': 5, 'Begins With...': 6, 'Ends With...': 8, 'Contains...': 10, 'Does Not Contain...': 11 };
       if (['Today', 'Yesterday', 'Tomorrow'].includes(label)) { const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + (label === 'Yesterday' ? -1 : label === 'Tomorrow' ? 1 : 0)); apply([comparison(0, date.toISOString(), kind)]); return; }
       const dialog = customFilterDialog(title, kind, sorted.map(([k]) => k), predefined[label] ?? 0, label === 'Between...', apply, close);
       mount(dialog);
     } })));
+    if (kind === 'Date') {
+      filterButton.parentElement?.querySelectorAll('.opensheets-filter-submenu').forEach(menu => menu.classList.add('opensheets-filter-date-menu'));
+      const nested = [...root.querySelectorAll<HTMLElement>('.opensheets-filter-date-menu .opensheets-filter-command')].find(item => item.textContent === 'All Dates in Period');
+      nested?.classList.add('opensheets-filter-has-nested');
+    }
   }
   if (visible.listFilterArea !== false) {
     const search = document.createElement('input'); search.type = 'text'; search.placeholder = 'Search'; search.setAttribute('aria-label', 'Search'); search.className = 'opensheets-filter-search'; root.append(search);
@@ -62,15 +98,31 @@ export function filterMenu(sheet: Worksheet, filter: RowFilterBase, column: numb
     let offset = 0, focus = 0;
     const matches = () => sorted.filter(([key]) => key.toLowerCase().includes(search.value.toLowerCase()));
     const draw = () => {
-      const width = Math.max(100, root.clientWidth - 46), height = Math.max(80, root.clientHeight - 262), dpr = window.devicePixelRatio || 1;
+      const width = Math.max(100, root.clientWidth - 46), height = Math.max(80, root.clientHeight - 260), dpr = window.devicePixelRatio || 1;
       canvas.style.width = `${width}px`; canvas.style.height = `${height}px`; canvas.width = width * dpr; canvas.height = height * dpr;
       const ctx = canvas.getContext('2d'); if (!ctx) return; ctx.scale(dpr, dpr); ctx.fillStyle = 'white'; ctx.fillRect(0, 0, width, height); ctx.font = getComputedStyle(root).font; ctx.textBaseline = 'alphabetic';
-      const list = matches(); offset = Math.max(0, Math.min(offset, Math.max(0, list.length - Math.floor(height / 20))));
-      for (let i = offset; i < Math.min(list.length, offset + Math.ceil(height / 20)); i++) {
+      const list = matches(), rows = Math.floor((height - 2) / 20), scrollW = list.length > rows ? 22 : 0;
+      offset = Math.max(0, Math.min(offset, Math.max(0, list.length - rows)));
+      for (let i = offset; i < Math.min(list.length, offset + rows); i++) {
         const [key, value] = list[i], y = (i - offset) * 20;
-        ctx.fillStyle = selected.has(key) ? 'black' : 'white'; ctx.fillRect(11, y + 4, 12, 12); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(11.5, y + 4.5, 11, 11);
-        if (selected.has(key)) { ctx.strokeStyle = 'white'; ctx.beginPath(); ctx.moveTo(13, y + 10); ctx.lineTo(16, y + 13); ctx.lineTo(21, y + 7); ctx.stroke(); }
+        ctx.fillStyle = selected.has(key) ? '#000' : 'white'; ctx.fillRect(11, y + 4, 12, 12); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(11.5, y + 4.5, 11, 11); if (!selected.has(key)) { ctx.strokeStyle = '#b6b6b6'; ctx.strokeRect(12.5, y + 5.5, 9, 9); }
+        if (selected.has(key)) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(13, y + 10); ctx.lineTo(16, y + 13); ctx.lineTo(21, y + 7); ctx.stroke(); }
+        ctx.save(); ctx.beginPath(); ctx.rect(0, y, width - scrollW, 20); ctx.clip();
         ctx.fillStyle = 'black'; ctx.fillText(value == null || key === '' ? '(Blanks)' : value instanceof Date ? sheet.getText(range.row + [...values.keys()].indexOf(key), range.col + column) : key, 27, y + 13);
+        ctx.restore();
+      }
+      if (scrollW) {
+        const sx = width - 22;
+        ctx.fillStyle = '#f6f6f6'; ctx.fillRect(sx + 1, 0, 3, height); ctx.fillRect(sx + 19, 0, 3, height);
+        ctx.strokeStyle = '#ababab'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(sx + .5, 0); ctx.lineTo(sx + .5, height); ctx.moveTo(sx + 4.5, 0); ctx.lineTo(sx + 4.5, height); ctx.moveTo(sx + 18.5, 0); ctx.lineTo(sx + 18.5, height); ctx.stroke();
+        ctx.fillStyle = 'white'; ctx.fillRect(sx + 5, 0, 13, height);
+        ctx.fillStyle = 'white'; ctx.fillRect(sx + 5, 0, 13, 15);
+        ctx.strokeStyle = '#ababab'; ctx.beginPath(); ctx.moveTo(sx + 5, 15.5); ctx.lineTo(sx + 18, 15.5); ctx.stroke();
+        ctx.fillStyle = '#eaeaea'; ctx.fillRect(sx + 4, height - 16, 15, 16);
+        ctx.fillStyle = '#777';
+        ctx.beginPath(); ctx.moveTo(sx + 10, 10); ctx.lineTo(sx + 11.5, 5); ctx.lineTo(sx + 13, 10); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(sx + 10, height - 10); ctx.lineTo(sx + 11.5, height - 5); ctx.lineTo(sx + 13, height - 10); ctx.closePath(); ctx.fill();
       }
       ok.disabled = selected.size === 0;
     };
@@ -86,6 +138,14 @@ export function filterMenu(sheet: Worksheet, filter: RowFilterBase, column: numb
     requestAnimationFrame(draw);
     if (typeof ResizeObserver !== 'undefined') { const observer = new ResizeObserver(() => { if (root.isConnected) draw(); else observer.disconnect(); }); observer.observe(root); }
   }
+  const grip = document.createElement('div'); grip.className = 'opensheets-filter-resize'; grip.setAttribute('aria-label', 'Resize filter'); root.append(grip);
+  grip.addEventListener('pointerdown', event => {
+    event.preventDefault(); event.stopPropagation(); const x = event.clientX, y = event.clientY, width = root.offsetWidth, height = root.offsetHeight;
+    grip.setPointerCapture(event.pointerId);
+    const move = (e: PointerEvent) => { root.style.width = `${Math.max(239, width + e.clientX - x)}px`; root.style.height = `${Math.max(350, height + e.clientY - y)}px`; };
+    const end = () => { grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', end); grip.removeEventListener('pointercancel', end); };
+    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
+  });
   root.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
     else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { const buttons = [...root.querySelectorAll<HTMLButtonElement>(':scope > button:not(:disabled)')]; const index = buttons.indexOf(document.activeElement as HTMLButtonElement); e.preventDefault(); buttons[(index + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus(); }
@@ -94,24 +154,34 @@ export function filterMenu(sheet: Worksheet, filter: RowFilterBase, column: numb
 }
 function customFilterDialog(title: string, kind: string, values: string[], initial: number, between: boolean, apply: (conditions: Condition[]) => void, close: () => void): HTMLElement {
   const dialog = document.createElement('div'); dialog.className = 'opensheets-custom-filter'; dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-label', 'Custom AutoFilter');
-  const header = document.createElement('div'); header.className = 'opensheets-dialog-header'; header.textContent = 'Custom AutoFilter';
-  const cross = document.createElement('button'); cross.textContent = '×'; cross.setAttribute('aria-label', 'Close'); cross.addEventListener('click', close); header.append(cross); dialog.append(header);
-  const body = document.createElement('div'); body.className = 'opensheets-dialog-body'; body.textContent = 'Show rows where:'; dialog.append(body);
-  const legend = document.createElement('p'); legend.textContent = title; body.append(legend);
+  const titleBar = document.createElement('div'); titleBar.className = 'opensheets-custom-title';
+  const titleText = document.createElement('span'); titleText.className = 'opensheets-custom-title-text'; titleText.textContent = 'Custom AutoFilter'; titleBar.append(titleText);
+  const cross = document.createElement('span'); cross.className = 'opensheets-custom-close'; cross.textContent = '×'; cross.setAttribute('aria-label', 'Close'); cross.addEventListener('click', close); titleBar.append(cross); dialog.append(titleBar);
+  const show = document.createElement('div'); show.className = 'opensheets-custom-show'; show.textContent = 'Show rows where:'; dialog.append(show);
+  const item = document.createElement('div'); item.className = 'opensheets-custom-item'; item.textContent = title; dialog.append(item);
   const selects: HTMLSelectElement[] = [], inputs: HTMLInputElement[] = [];
-  const datalist = document.createElement('datalist'); datalist.id = `opensheets-filter-${Math.random().toString(36).slice(2)}`; for (const value of values) datalist.append(new Option(value)); body.append(datalist);
-  const conjunction = document.createElement('div'); conjunction.className = 'opensheets-filter-conjunction';
-  const and = document.createElement('input'); and.type = 'radio'; and.name = datalist.id; and.checked = true; and.value = 'and';
-  const or = document.createElement('input'); or.type = 'radio'; or.name = datalist.id; or.value = 'or';
-  const andLabel = document.createElement('label'); andLabel.append(and, 'And'); const orLabel = document.createElement('label'); orLabel.append(or, 'Or'); conjunction.append(andLabel, orLabel);
   for (let i = 0; i < 2; i++) {
-    const row = document.createElement('div'); row.className = 'opensheets-filter-condition';
+    const row = document.createElement('div'); row.className = 'opensheets-custom-condition'; row.style.top = `${83 + i * 67}px`;
     const select = document.createElement('select'); select.setAttribute('aria-label', `Condition ${i + 1}`); select.add(new Option('', '')); operators.forEach((name, index) => select.add(new Option(name, String(index)))); select.value = i === 0 ? String(between ? 3 : initial) : between ? '5' : '';
-    const input = document.createElement('input'); input.setAttribute('aria-label', `Value ${i + 1}`); input.setAttribute('list', datalist.id); row.append(select, input); body.append(row); selects.push(select); inputs.push(input); if (i === 0) body.append(conjunction);
+    const wrap = document.createElement('div'); wrap.className = 'opensheets-custom-value';
+    const list = document.createElement('select'); list.setAttribute('aria-label', `Value list ${i + 1}`); list.add(new Option('', '')); for (const value of values) list.add(new Option(value, value));
+    const input = document.createElement('input'); input.setAttribute('aria-label', `Value ${i + 1}`); input.value = '';
+    list.addEventListener('change', () => { input.value = list.value; });
+    input.addEventListener('input', () => { list.value = [...list.options].some(option => option.value === input.value) ? input.value : ''; });
+    wrap.append(list, input); row.append(select, wrap); dialog.append(row); selects.push(select); inputs.push(input);
+    if (i === 0) {
+      const conjunction = document.createElement('div'); conjunction.className = 'opensheets-custom-conjunction';
+      const and = document.createElement('input'); and.type = 'radio'; and.name = `opensheets-filter-${Math.random().toString(36).slice(2)}`; and.checked = true; and.value = 'and';
+      const or = document.createElement('input'); or.type = 'radio'; or.name = and.name; or.value = 'or';
+      const andLabel = document.createElement('label'); andLabel.append(and, 'And'); const orLabel = document.createElement('label'); orLabel.append(or, 'Or'); conjunction.append(andLabel, orLabel);
+      dialog.append(conjunction); (conjunction as HTMLElement & { and?: HTMLInputElement }).and = and; (conjunction as HTMLElement & { or?: HTMLInputElement }).or = or;
+    }
   }
-  const hint = document.createElement('p'); hint.className = 'opensheets-filter-hint'; hint.textContent = 'Use ? to represent any single character\nUse * to represent any series of characters'; body.append(hint);
-  const footer = document.createElement('div'); footer.className = 'opensheets-dialog-footer'; const ok = document.createElement('button'); ok.textContent = 'OK';
-  ok.addEventListener('click', () => { const conditions = selects.flatMap((s, i) => s.value === '' ? [] : [comparison(Number(s.value), inputs[i].value, kind)]); if (conditions.length === 2 && and.checked) apply([new Condition(CF.ConditionType.relationCondition, { item1: conditions[0], item2: conditions[1] })]); else apply(conditions); });
-  const cancel = document.createElement('button'); cancel.textContent = 'Cancel'; cancel.addEventListener('click', close); footer.append(ok, cancel); dialog.append(footer);
-  dialog.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } else if (e.key === 'Enter') ok.click(); }); requestAnimationFrame(() => inputs[0].focus()); return dialog;
+  const hint = document.createElement('div'); hint.className = 'opensheets-custom-hint'; hint.innerHTML = '<p>Use ? to represent any single character</p><p>Use * to represent any series of characters</p>'; dialog.append(hint);
+  const conjunction = dialog.querySelector<HTMLElement>('.opensheets-custom-conjunction') as HTMLElement & { and?: HTMLInputElement };
+  const footer = document.createElement('div'); footer.className = 'opensheets-custom-footer';
+  const ok = document.createElement('input'); ok.type = 'button'; ok.value = 'OK';
+  ok.addEventListener('click', () => { const conditions = selects.flatMap((s, i) => s.value === '' ? [] : [comparison(Number(s.value), inputs[i].value, kind)]); if (conditions.length === 2 && conjunction.and?.checked) apply([new Condition(CF.ConditionType.relationCondition, { item1: conditions[0], item2: conditions[1] })]); else apply(conditions); });
+  const cancel = document.createElement('input'); cancel.type = 'button'; cancel.value = 'Cancel'; cancel.addEventListener('click', close); footer.append(ok, cancel); dialog.append(footer);
+  dialog.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } else if (e.key === 'Enter') ok.click(); }); return dialog;
 }
