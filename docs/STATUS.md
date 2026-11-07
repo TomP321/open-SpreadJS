@@ -1,5 +1,11 @@
 # Status
 
+## M5c — in-cell formula editing (incomplete)
+
+The formula bar now receives the in-cell editor's current text on edit start and subsequent input, and refreshes after edit completion or cancellation. The status bar's public `cellMode` item reports `Enter` for edits started by typing, `Edit` for F2/double-click editing, and `Ready` after editing ends. Unit tests cover control event handling. This is a bounded change: formula-bar initiated editing and its buttons, in-cell autocomplete and argument help, syntax colouring and reference borders, and the requested padding audit are not complete. No popup pixel gate or DPR comparison has been established for M5c; this milestone is not accepted.
+
+Verification of this partial change: build, typecheck, 668 unit tests and lint pass; the oracle passes 1373/1373. Full Playwright reports 152 passed and the same 16 documented baseline failures. The M7 structure failures remain 0.514706% content at DPR 1 (limit <0.5%) and 1.012949% tabs at DPR 2 (limit <1%). The existing editing lifecycle test passes, but it does not verify the new formula-bar and status behavior against the trial.
+
 M0/M1, the Part A storage fix, M2 and M3 are implemented. M4 adds the data features (tables, sorting/filtering, conditional formatting, data validation, cell types, legacy comments, hyperlinks and outlines) with the differential and visual coverage described below. Full v19 behavioral parity remains incomplete. M7a resumes from commit `4926163` (`M7a (WIP)`); changes made during this continuation are uncommitted.
 
 ## M7a — IO plugin (partial)

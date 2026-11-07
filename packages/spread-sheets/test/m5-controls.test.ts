@@ -23,6 +23,24 @@ describe('M5 external controls', () => {
     expect(wb.getActiveSheet().getSelections()[0]).toMatchObject({ row: 2, col: 1, rowCount: 3, colCount: 2 });
     expect(box.getHost()).toBe(host); box.dispose(); expect(host.children.length).toBe(0);
   });
+  it('mirrors edit events and restores the committed value after cancellation', () => {
+    const host = document.createElement('div'), wb = new GC.Spread.Sheets.Workbook(), sheet = wb.getActiveSheet();
+    const box = new GC.Spread.Sheets.FormulaTextBox.FormulaTextBox(host); box.workbook(wb);
+    sheet.setValue(0, 0, 'original');
+    sheet._emit(GC.Spread.Sheets.Events.EditChange, { editingText: '=SU' });
+    expect(box.text()).toBe('=SU');
+    sheet._emit(GC.Spread.Sheets.Events.EditEnded, {});
+    expect(box.text()).toBe('original');
+    box.destroy();
+  });
+  it('exposes editing mode on the cellMode status item', () => {
+    const host = document.createElement('div'), wb = new GC.Spread.Sheets.Workbook(), sheet = wb.getActiveSheet();
+    const bar = new GC.Spread.Sheets.StatusBar.StatusBar(host); bar.bind(wb);
+    sheet._emit('EditStarted', { editMode: 'Enter' }); expect(bar.get('cellMode')?.value).toBe('Enter');
+    sheet._emit(GC.Spread.Sheets.Events.EditEnded, {}); expect(bar.get('cellMode')?.value).toBe('Ready');
+    sheet._emit('EditStarted', { editMode: 'Edit' }); expect(bar.get('cellMode')?.value).toBe('Edit');
+    bar.dispose();
+  });
   it('updates selection summaries, zoom and custom status item lifecycle', () => {
     const host = document.createElement('div'), wb = new GC.Spread.Sheets.Workbook(), s = wb.getActiveSheet();
     const bar = new GC.Spread.Sheets.StatusBar.StatusBar(host); bar.bind(wb);

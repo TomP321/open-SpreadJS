@@ -1,6 +1,6 @@
 import { GeneralFormatter } from '../formatter.js';
 import type { Workbook } from '../model.js';
-import { Events } from '../events.js';
+import { Events, type EventInfo, type ModelEvent } from '../events.js';
 import { sparklineRange } from './sparklines.js';
 import { columnLabel } from '../rendering.js';
 import { builtinNames } from '../calc/evaluate.js';
@@ -20,6 +20,7 @@ export class FormulaTextBox {
   private original: Node[];
   private host: HTMLElement;
   private bound = () => this.refresh();
+  private editChanged = (_event: ModelEvent, info: EventInfo) => { if (typeof info.editingText === 'string' && document.activeElement !== this.input) this.text(info.editingText); };
   constructor(host: HTMLElement, readonly options: { rangeSelectMode?: boolean; absoluteReference?: boolean; needSheetName?: boolean } = {}) {
     this.host = hostElement(host); this.original = [...this.host.childNodes]; controls.set(this.host, this);
   }
@@ -34,7 +35,7 @@ export class FormulaTextBox {
   }
   workbook(value?: Workbook): Workbook | undefined {
     if (value === undefined) return this.wb;
-    if (this.wb) for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditChange]) this.wb.unbind(event, this.bound);
+    if (this.wb) { for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditEnded]) this.wb.unbind(event, this.bound); this.wb.unbind(Events.EditChange, this.editChanged); }
     this.wb = value;
     if (!this.input) {
       this.input = this.host instanceof HTMLInputElement || this.host instanceof HTMLTextAreaElement ? this.host : document.createElement('div');
@@ -45,7 +46,8 @@ export class FormulaTextBox {
       this.input.addEventListener('keydown', e => this.key(e as KeyboardEvent), { signal });
       this.input.addEventListener('blur', () => { setTimeout(() => { if (!this.hints?.contains(document.activeElement)) this.hints?.remove(); }, 100); }, { signal });
     }
-    for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditChange]) this.wb.bind(event, this.bound);
+    for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditEnded]) this.wb.bind(event, this.bound);
+    this.wb.bind(Events.EditChange, this.editChanged);
     this.refresh(); return value;
   }
   refresh(ignoreEditing = false): void {
@@ -85,7 +87,7 @@ export class FormulaTextBox {
     } else return;
     document.body.append(panel); this.hints = panel;
   }
-  destroy(): void { if (this.wb) for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditChange]) this.wb.unbind(event, this.bound); this.abort.abort(); this.hints?.remove(); if (this.input !== this.host) this.host.replaceChildren(...this.original); controls.delete(this.host); this.wb = undefined; }
+  destroy(): void { if (this.wb) { for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.EditEnded]) this.wb.unbind(event, this.bound); this.wb.unbind(Events.EditChange, this.editChanged); } this.abort.abort(); this.hints?.remove(); if (this.input !== this.host) this.host.replaceChildren(...this.original); controls.delete(this.host); this.wb = undefined; }
 }
 export class NameBox {
   options: { dropDownMaxHeight?: number; enableAddCustomName?: boolean; enableNavigateToRange?: boolean; showCustomNameListIndicator?: boolean };
@@ -127,6 +129,9 @@ export class StatusBar {
   private view: HTMLElement;
   private original: Node[];
   private bound = () => this.update();
+  private mode: 'Ready' | 'Enter' | 'Edit' = 'Ready';
+  private editStarted = (_event: ModelEvent, info: EventInfo) => { this.mode = info.editMode === 'Enter' ? 'Enter' : 'Edit'; this.update(); };
+  private editEnded = () => { this.mode = 'Ready'; this.update(); };
   constructor(host: HTMLElement, options?: { items?: StatusItem[] }) {
     this.host = hostElement(host); this.original = [...host.childNodes]; controls.set(host, this); this.view = document.createElement('div'); this.view.className = 'opensheets-status-bar'; this.host.replaceChildren(this.view);
     const defaultNames: Record<string, string> = { cellMode: 'Cell Mode', progress: 'Progress', average: 'Average', count: 'Count', numericalCount: 'Numerical Count', min: 'Min', max: 'Max', sum: 'Sum', zoomSlider: 'Zoom Slider', zoomPanel: 'Zoom' };
@@ -137,15 +142,15 @@ export class StatusBar {
   get(name: string): StatusItem | undefined { return this.items.find(item => item.name === name); }
   add(item: StatusItem, position: number): boolean { if (this.get(item.name)) return false; this.items.splice(Math.max(0, position), 0, item); if (this.workbook) item.onBind(this.workbook); this.render(); return true; }
   remove(name: string): boolean { const item = this.get(name); if (!item) return false; item.onUnbind(); item.onDispose(); this.items = this.items.filter(i => i !== item); return true; }
-  bind(workbook: Workbook): void { this.unbind(); this.workbook = workbook; for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.ViewZoomed, Events.EditStarting, Events.EditEnded]) workbook.bind(event, this.bound); this.items.forEach(item => item.onBind(workbook)); this.update(); }
-  unbind(): void { if (this.workbook) for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.ViewZoomed, Events.EditStarting, Events.EditEnded]) this.workbook.unbind(event, this.bound); this.items.forEach(item => item.onUnbind()); this.workbook = undefined; }
+  bind(workbook: Workbook): void { this.unbind(); this.workbook = workbook; for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.ViewZoomed]) workbook.bind(event, this.bound); workbook.bind('EditStarted', this.editStarted); workbook.bind(Events.EditEnded, this.editEnded); this.items.forEach(item => item.onBind(workbook)); this.update(); }
+  unbind(): void { if (this.workbook) { for (const event of [Events.SelectionChanged, Events.ActiveSheetChanged, Events.ValueChanged, Events.ViewZoomed]) this.workbook.unbind(event, this.bound); this.workbook.unbind('EditStarted', this.editStarted); this.workbook.unbind(Events.EditEnded, this.editEnded); } this.mode = 'Ready'; this.items.forEach(item => item.onUnbind()); this.workbook = undefined; }
   update(): void {
     if (!this.workbook) return; const sheet = this.workbook.getActiveSheet(), selections = sheet.getSelections().map(r => r.normalized(sheet.getRowCount(), sheet.getColumnCount()));
     let count = 0; const values: number[] = [];
     for (const [row, col] of sheet._viewCellStore()?.entries() ?? []) if (selections.some(r => r.contains(row, col))) { const value = sheet.getValue(row, col); if (value != null && value !== '') count++; if (typeof value === 'number' && Number.isFinite(value)) values.push(value); }
     const sum = values.reduce((a, b) => a + b, 0), show = count > 1;
-    const computed: Record<string, unknown> = { cellMode: sheet.isEditing() ? 'Edit' : 'Ready', count: show ? `Count: ${count}` : '', numericalCount: show ? `Numerical Count: ${values.length}` : '', sum: show && values.length ? `Sum: ${sum}` : '', average: show && values.length ? `Average: ${sum / values.length}` : '', min: show && values.length ? `Min: ${Math.min(...values)}` : '', max: show && values.length ? `Max: ${Math.max(...values)}` : '', zoomPanel: `${Math.round(sheet.zoom() * 100)}%` };
-    for (const item of this.items) { if (item.name === 'zoomSlider') { const input = this.view.querySelector<HTMLInputElement>('.status-zoomSlider input'); if (input) input.value = String(Math.round(sheet.zoom() * 100)); } else if (item.name in computed) item.onUpdate(String(computed[item.name])); else { item.onUpdate(); if (['progress', 'calcProgress'].includes(item.name)) this.view.querySelector<HTMLElement>(`.status-${item.name}`)!.style.display = 'none'; } }
+    const computed: Record<string, unknown> = { cellMode: this.mode, count: show ? `Count: ${count}` : '', numericalCount: show ? `Numerical Count: ${values.length}` : '', sum: show && values.length ? `Sum: ${sum}` : '', average: show && values.length ? `Average: ${sum / values.length}` : '', min: show && values.length ? `Min: ${Math.min(...values)}` : '', max: show && values.length ? `Max: ${Math.max(...values)}` : '', zoomPanel: `${Math.round(sheet.zoom() * 100)}%` };
+    for (const item of this.items) { if (item.name === 'zoomSlider') { const input = this.view.querySelector<HTMLInputElement>('.status-zoomSlider input'); if (input) input.value = String(Math.round(sheet.zoom() * 100)); } else if (item.name in computed) { item.value = computed[item.name]; item.onUpdate(String(item.value)); } else { item.onUpdate(); if (['progress', 'calcProgress'].includes(item.name)) this.view.querySelector<HTMLElement>(`.status-${item.name}`)!.style.display = 'none'; } }
   }
   dispose(): void { this.unbind(); this.items.forEach(item => item.onDispose()); this.host.replaceChildren(...this.original); controls.delete(this.host); }
 }

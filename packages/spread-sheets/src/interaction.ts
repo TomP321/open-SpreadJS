@@ -168,7 +168,8 @@ export class Interaction {
     if (mask?.pattern) editor.value = applyMask(editor.value, mask, true);
     editor.style.display = 'block'; this.positionEditor(); editor.focus();
     if (selectAll) editor.select(); else editor.setSelectionRange(editor.value.length, editor.value.length);
-    s._emit('EditStarted', this.info({ row, col }));
+    s._emit('EditStarted', { ...this.info({ row, col }), editMode: defaultText === undefined ? 'Edit' : 'Enter' });
+    s._emit(Events.EditChange, { sheet: s, sheetName: s.name(), row, col, editingText: editor.value });
     s._emit(Events.EditorStatusChanged, { sheet: s, sheetName: s.name(), oldStatus: 0, newStatus: 2 });
   }
   positionEditor(): void {
