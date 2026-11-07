@@ -71,7 +71,6 @@ for (const dpr of [1, 2]) {
       await expect(page.locator('.opensheets-formula-hints[role=tooltip]')).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page.locator('.opensheets-formula-hints[role=tooltip]')).toHaveCount(0);
-      await page.keyboard.press('Escape');
       await expect(page.locator('.opensheets-formula-color')).toHaveCount(0);
     });
     test('formula bar and status bar mirror cell editing', async ({ page }) => {

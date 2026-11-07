@@ -10,7 +10,7 @@ import { Events } from './events.js';
 import { notImplemented } from './not-implemented.js';
 import { GeneralFormatter } from './formatter.js';
 import { FormulaHints } from './features/formula-hints.js';
-import { referenceAllowed, insertReference } from './features/formula-point.js';
+import { referenceAllowed, insertReference, closeFormulaParentheses } from './features/formula-point.js';
 import { FormulaParseError } from './calc/errors.js';
 import { columnLabel } from './rendering.js';
 
@@ -57,6 +57,7 @@ export class Interaction {
   private editing?: { sheet: Worksheet; row: number; col: number; oldValue: unknown; enter: boolean };
   private pointReference?: { start: number; end: number; anchor: Cell; last: Cell };
   private pointDragging = false;
+  private formulaBar?: HTMLElement;
   private cut = false;
   private clipboard?: { sheet: Worksheet; range: Range; values: unknown[][] };
   private menu?: HTMLElement;
@@ -99,8 +100,10 @@ export class Interaction {
       const edit = this.editing; if (edit) edit.sheet._emit(Events.EditChange, { sheet: edit.sheet, sheetName: edit.sheet.name(), row: edit.row, col: edit.col, editingText: editor.value });
     }, { signal });
     tabs.addEventListener('pointerdown', event => {
-      if (!this.endEdit()) return;
       const hit = this.tabHit(event.clientX); if (!hit) return;
+      const pointing = hit.index >= 0 && this.canPoint();
+      if (!pointing && !this.endEdit()) return;
+      if (pointing) event.preventDefault();
       const wb = view.workbook;
       if (hit.index === -4) { event.stopPropagation(); this.sheetList(); }
       else if (hit.index === -1) { wb.addSheet(wb.getSheetCount()); wb.setActiveSheetIndex(wb.getSheetCount() - 1); }
@@ -110,7 +113,8 @@ export class Interaction {
         wb._emit(Events.SheetTabClick, { sheet: wb.getSheet(hit.index), sheetName: wb.getSheet(hit.index).name(), sheetTabIndex: hit.index });
         wb.setActiveSheetIndex(hit.index); this.tabDrag = hit.index; this.tabPointerX = event.clientX; tabs.setPointerCapture(event.pointerId);
       }
-      if (this.menu) this.menu.focus(); else root.focus();
+      if (pointing) { this.pointReference = undefined; this.positionEditor(); (this.formulaBar ?? editor).focus(); }
+      else if (this.menu) this.menu.focus(); else root.focus();
     }, { signal });
     tabs.addEventListener('pointerup', event => {
       if (this.tabDrag !== undefined && Math.abs(event.clientX - this.tabPointerX) > 5 && view.workbook.options.allowSheetReorder) {
@@ -185,14 +189,16 @@ export class Interaction {
     s._emit(Events.EditChange, { sheet: s, sheetName: s.name(), row, col, editingText: editor.value });
     s._emit(Events.EditorStatusChanged, { sheet: s, sheetName: s.name(), oldStatus: 0, newStatus: 2 });
   }
-  updateFromFormulaBar(value: string): void {
+  updateFromFormulaBar(value: string, input: HTMLElement, caret: number): void {
     if (!this.editing) return;
-    this.view.editor.value = value; this.positionEditor(); this.hints.close();
+    this.formulaBar = input; this.view.editor.value = value; this.view.editor.setSelectionRange(caret, caret); this.positionEditor(); this.hints.close();
     const edit = this.editing; edit.sheet._emit(Events.EditChange, { sheet: edit.sheet, sheetName: edit.sheet.name(), row: edit.row, col: edit.col, editingText: value });
   }
   positionEditor(): void {
     if (!this.editing) return;
-    const { row, col, sheet } = this.editing, rect = this.view.cellRect(row, col), style = sheet.getActualStyle(row, col), editor = this.view.editor;
+    const { row, col, sheet } = this.editing;
+    this.view.editor.style.opacity = sheet === this.view.sheet ? '1' : '0';
+    const rect = this.view.cellRect(row, col), style = sheet.getActualStyle(row, col), editor = this.view.editor;
     const ctx = this.view.context; ctx.save(); ctx.font = this.view.font(style);
     const measured = Math.max(...editor.value.split('\n').map(line => ctx.measureText(line).width)); ctx.restore();
     const width = style.wordWrap ? rect.width - 1 : Math.min(this.view.viewWidth - rect.x, Math.max(rect.width - 1, Math.ceil(measured) + 1));
@@ -205,6 +211,11 @@ export class Interaction {
     for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = [];
     const editor = this.view.editor, sheet = this.editing?.sheet, text = editor.value;
     if (!sheet || !text.startsWith('=')) return;
+    if (sheet !== this.view.sheet) {
+      const point = this.pointReference;
+      if (point && point.anchor.row >= 0 && point.anchor.col >= 0 && point.last.row >= 0 && point.last.col >= 0) this.drawReference(point.anchor, point.last, '#0000ff');
+      return;
+    }
     const layer = document.createElement('div'); layer.className = 'opensheets-formula-color';
     Object.assign(layer.style, { position: 'absolute', zIndex: '4', boxSizing: 'border-box', overflow: 'hidden', whiteSpace: 'pre-wrap', pointerEvents: 'none', border: '2px solid transparent', left: editor.style.left, top: editor.style.top, width: editor.style.width, height: editor.style.height, font: editor.style.font, textAlign: editor.style.textAlign, background: editor.style.background, color: editor.style.color });
     const colors = ['#0000ff', '#ff0000', '#008000', '#800080']; let referenceIndex = 0, last = 0;
@@ -216,8 +227,7 @@ export class Interaction {
         const col = (letters: string) => [...letters.toUpperCase()].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
         const row1 = Number(match[3]) - 1, col1 = col(match[2]), row2 = match[5] ? Number(match[5]) - 1 : row1, col2 = match[4] ? col(match[4]) : col1;
         if (row1 >= 0 && col1 >= 0 && row2 < sheet.getRowCount() && col2 < sheet.getColumnCount()) {
-          const a = this.view.cellRect(Math.min(row1, row2), Math.min(col1, col2)), b = this.view.cellRect(Math.max(row1, row2), Math.max(col1, col2));
-          const border = document.createElement('div'); Object.assign(border.style, { position: 'absolute', pointerEvents: 'none', zIndex: '3', boxSizing: 'border-box', border: `2px dashed ${color}`, background: `${color}1a`, left: `${a.x}px`, top: `${a.y}px`, width: `${b.x + b.width - a.x}px`, height: `${b.y + b.height - a.y}px` }); this.view.root.append(border); this.referenceLayers.push(border);
+          this.drawReference({ row: row1, col: col1 }, { row: row2, col: col2 }, color);
         }
       }
       layer.append(span); last = index + match[0].length;
@@ -225,23 +235,34 @@ export class Interaction {
     layer.append(document.createTextNode(text.slice(last))); this.view.root.append(layer); this.formulaLayer = layer;
     editor.style.background = 'transparent'; editor.style.color = 'transparent'; editor.style.caretColor = '#222';
   }
+  private drawReference(first: Cell, last: Cell, color: string): void {
+    const a = this.view.cellRect(Math.min(first.row, last.row), Math.min(first.col, last.col)), b = this.view.cellRect(Math.max(first.row, last.row), Math.max(first.col, last.col));
+    const border = document.createElement('div'); Object.assign(border.style, { position: 'absolute', pointerEvents: 'none', zIndex: '3', boxSizing: 'border-box', backgroundImage: `repeating-linear-gradient(to right, ${color} 0 6px, transparent 6px 12px), repeating-linear-gradient(to right, ${color} 0 6px, transparent 6px 12px), repeating-linear-gradient(to bottom, ${color} 0 6px, transparent 6px 12px), repeating-linear-gradient(to bottom, ${color} 0 6px, transparent 6px 12px), linear-gradient(${color}1a, ${color}1a)`, backgroundSize: '100% 2px, 100% 2px, 2px 100%, 2px 100%, calc(100% - 4px) calc(100% - 4px)', backgroundPosition: '1px 0, bottom left, left -1px, right -2px, 2px 2px', backgroundRepeat: 'no-repeat', left: `${a.x - 1}px`, top: `${a.y - 1}px`, width: `${b.x + b.width - a.x + 1}px`, height: `${b.y + b.height - a.y + 1}px` });
+    for (const [horizontal, vertical] of [['left', 'top'], ['right', 'top'], ['left', 'bottom'], ['right', 'bottom']] as const) {
+      const handle = document.createElement('div'); Object.assign(handle.style, { position: 'absolute', width: '5px', height: '5px', background: color, [horizontal]: '-1px', [vertical]: '-1px' }); border.append(handle);
+    }
+    this.view.root.append(border); this.referenceLayers.push(border);
+  }
   endEdit(ignoreValueChange = false): boolean {
     const edit = this.editing; if (!edit) return true;
     const { sheet, row, col } = edit, text = this.view.editor.value;
     const info = { sheet, sheetName: sheet.name(), row, col, editor: this.view.editor, editingText: text, cancel: false, isCancel: ignoreValueChange };
     sheet._emit(Events.EditEnding, info); if (info.cancel && !ignoreValueChange) return false;
     if (!ignoreValueChange) {
-      const value = text.startsWith('=') ? text : this.parseText(text, row, col);
+      const value = text.startsWith('=') ? closeFormulaParentheses(text) : this.parseText(text, row, col);
       try {
         this.view.workbook.commandManager().execute({ cmd: 'editCell', sheetName: sheet.name(), row, col, newValue: value });
       } catch (error) { if (error instanceof FormulaParseError) return false; throw error; }
       if (text.startsWith('=')) sheet._emit(Events.UserFormulaEntered, { ...info, formula: text.slice(1) });
     }
-    this.hints.close(); this.formulaLayer?.remove(); this.formulaLayer = undefined; for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = []; this.editing = undefined; this.pointReference = undefined; this.view.editor.style.display = 'none'; this.view.root.focus();
+    if (this.view.sheet !== sheet) this.view.workbook.setActiveSheet(sheet.name());
+    this.view.editor.style.opacity = '1';
+    this.hints.close(); this.formulaLayer?.remove(); this.formulaLayer = undefined; for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = []; this.editing = undefined; this.pointReference = undefined; this.formulaBar = undefined; this.view.editor.style.display = 'none'; this.view.root.focus();
     sheet._emit(Events.EditEnded, { ...info, newValue: sheet.getValue(row, col) });
     sheet._emit(Events.EditorStatusChanged, { sheet, sheetName: sheet.name(), oldStatus: 2, newStatus: 0 });
     this.view.schedule(); return true;
   }
+  commitFromFormulaBar(): void { if (this.endEdit()) this.navigate(1, 0); }
   private parseText(text: string, row: number, col: number): unknown {
     const mask = this.view.sheet!.getActualStyle(row, col).mask as MaskOptions | undefined;
     if (mask?.pattern) return applyMask(text, mask);
@@ -253,6 +274,7 @@ export class Interaction {
   private keydown(event: KeyboardEvent): void {
     if (event.isComposing) return;
     if (this.editing) {
+      if (event.key === 'Escape') { event.preventDefault(); this.endEdit(true); return; }
       if (this.hints.key(event)) return;
       if (event.key === 'F2') { event.preventDefault(); this.editing.enter = !this.editing.enter; this.pointReference = undefined; return; }
       const direction = ({ ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] } as Record<string, number[]>)[event.key];
@@ -360,7 +382,10 @@ export class Interaction {
     let end = previous && !append ? previous.end : editor.selectionEnd;
     const address = (cell: Cell) => cell.row < 0 ? columnLabel(cell.col) : cell.col < 0 ? String(cell.row + 1) : `${columnLabel(cell.col)}${cell.row + 1}`;
     const first = address(anchor), second = address(last);
-    const reference = anchor.row < 0 || anchor.col < 0 || first !== second ? `${first}:${second}` : first;
+    const addressText = anchor.row < 0 || anchor.col < 0 || first !== second ? `${first}:${second}` : first;
+    const target = this.view.sheet!, source = this.editing!.sheet, name = target.name();
+    const sheetPrefix = target === source ? '' : `${/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : "'" + name.replaceAll("'", "''") + "'"}!`;
+    const reference = sheetPrefix + addressText;
     const prefix = append ? ',' : '';
     editor.value = insertReference(editor.value, start, end, prefix + reference);
     start += prefix.length; end = start + reference.length;
@@ -539,7 +564,7 @@ export class Interaction {
     }
   }
   private pointerUp(event: PointerEvent): void {
-    if (this.pointDragging) { this.pointDragging = false; this.view.editor.focus(); return; }
+    if (this.pointDragging) { this.pointDragging = false; (this.formulaBar ?? this.view.editor).focus(); return; }
     const drag = this.drag; this.drag = undefined; this.touch = undefined;
     if (!drag) return;
     if (drag.kind === 'resizeRow' || drag.kind === 'resizeCol') {

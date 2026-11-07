@@ -19,7 +19,7 @@ export class FormulaTextBox {
   private original: Node[];
   private host: HTMLElement;
   private bound = () => this.refresh();
-  private editChanged = (_event: ModelEvent, info: EventInfo) => { if (typeof info.editingText === 'string' && document.activeElement !== this.input) this.text(info.editingText); };
+  private editChanged = (_event: ModelEvent, info: EventInfo) => { if (typeof info.editingText === 'string' && this.text() !== info.editingText) { this.text(info.editingText); const input = this.input; if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) input.setSelectionRange(input.value.length, input.value.length); else if (input) { const range = document.createRange(); range.selectNodeContents(input); range.collapse(false); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); } } };
   constructor(host: HTMLElement, readonly options: { rangeSelectMode?: boolean; absoluteReference?: boolean; needSheetName?: boolean } = {}) {
     this.host = hostElement(host); this.original = [...this.host.childNodes]; controls.set(this.host, this);
   }
@@ -45,9 +45,11 @@ export class FormulaTextBox {
         const sheet = this.wb?.getActiveSheet(), input = this.input;
         if (sheet && input) {
           const value = this.text();
+          const selection = window.getSelection(); const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : undefined;
+          const caret = input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement ? input.selectionStart ?? value.length : range && input.contains(range.startContainer) ? range.startOffset : value.length;
           if (!sheet.isEditing()) sheet.startEdit(false, value);
           const editor = sheet._view()?.editor;
-          if (editor && sheet.isEditing()) { sheet._view()?.interaction.updateFromFormulaBar(value); input.focus(); }
+          if (editor && sheet.isEditing()) { sheet._view()?.interaction.updateFromFormulaBar(value, input, caret); input.focus(); if (range && !(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) { selection?.removeAllRanges(); selection?.addRange(range); } }
         }
         this.showSuggestions();
       }, { signal });
@@ -66,12 +68,12 @@ export class FormulaTextBox {
     this.text(s.getFormula(row, col) ? '=' + s.getFormula(row, col) : s.getText(row, col));
   }
   private key(event: KeyboardEvent): void {
+    if (event.key === 'Escape') { event.preventDefault(); this.wb?.getActiveSheet().endEdit(true); this.hints?.close(); this.refresh(true); this.wb?.focus(); return; }
     if (this.hints?.key(event)) return;
-    if (event.key === 'Escape') { event.preventDefault(); this.wb?.getActiveSheet().endEdit(true); this.refresh(true); this.wb?.focus(); return; }
     if (event.key === 'Enter' && !event.altKey) {
       event.preventDefault(); if (!this.wb) return;
       const sheet = this.wb.getActiveSheet(), row = sheet.getActiveRowIndex(), col = sheet.getActiveColumnIndex(), text = this.text();
-      if (sheet.isEditing()) sheet.endEdit();
+      if (sheet.isEditing()) sheet._view()?.interaction.commitFromFormulaBar();
       else this.wb.commandManager().execute({ cmd: 'editCell', row, col, sheetName: sheet.name(), newValue: text.startsWith('=') ? text : new GeneralFormatter().parse(text) });
       this.hints?.close(); this.wb.focus(); this.refresh(true);
     }
