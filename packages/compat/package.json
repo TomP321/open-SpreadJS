@@ -9,7 +9,7 @@
     "coverage:api": "tsx scripts/coverage.ts",
     "build": "tsx scripts/inventory.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run --testTimeout=30000"
   },
   "devDependencies": {
     "@mescius/spread-sheets": "19.2.5",

@@ -330,6 +330,240 @@ function paintBoxes(ctx: CanvasRenderingContext2D, x: number, y: number, size: n
   }
 }
 
+/** TASK 56 (probe `.probe/t56/icon-gallery-trial.txt` + `t56-cf-icon-sets` captures): the trial draws
+ * every icon-set arrow with ONE fletched arrow glyph in a 18x16 frame, rotated per direction:
+ * threeArrows = [down, right, up], fourArrows = [down, down-right, up-right, up],
+ * fiveArrows = [down, down-right, right, up-right, up]. Coordinates are frame-local CSS pixels
+ * (zoom 1), measured from the trial ink runs (shaft 13x5, head tip at the frame right edge,
+ * 45° feather bands 5px wide merging into the shaft edges). */
+const FLETCHED_ARROW: readonly [number, number][] = [
+  [1, 5], [8, 5], [5, 1], [10, 1], [13, 5], [16, 7.5], [13, 10], [10, 14], [5, 14], [8, 10], [1, 10],
+];
+
+function paintFletchedArrow(
+  ctx: CanvasRenderingContext2D,
+  fx: number,
+  fy: number,
+  z: number,
+  angle: number,
+  palette: Palette,
+): void {
+  ctx.save();
+  ctx.translate(fx + 8 * z, fy + 7 * z);
+  ctx.rotate((angle * Math.PI) / 180);
+  ctx.beginPath();
+  FLETCHED_ARROW.forEach(([x, y], i) => {
+    const px = (x - 8) * z, py = (y - 7) * z;
+    if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+  });
+  ctx.closePath();
+  ctx.fillStyle = palette.fill;
+  ctx.fill();
+  // The trial outlines the glyph with a solid 1px stroke exactly INSIDE the ink boundary.
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = palette.dark;
+  ctx.lineWidth = 2 * z;
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
+/** Trial `threeTrafficLightsUnrimmed` (probe `.probe/t61` masks on `t56-cf-icon-sets`/`m4-icon-sets-gallery`
+ * captures): the disc nearly fills the 18x16 frame — ellipse centered at frame-local (8.5, 7.5)
+ * with rx 8.4 ry 7.6; core `#d86344`, a single dark-red AA pixel ring, no hard border. */
+function paintTrialUnrimmedLight(ctx: CanvasRenderingContext2D, fx: number, fy: number, z: number, palette: Palette): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(fx + 8.5 * z, fy + 7.5 * z, 8.4 * z, 7.6 * z, 0, 0, Math.PI * 2);
+  ctx.fillStyle = palette.fill;
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = palette.dark;
+  ctx.lineWidth = 2 * z;
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
+/** Trial `threeFlags` (probe mask of the first frame): a 2px solid `#808080` pole at frame-local
+ * (5.2, 0) and a right-pointing pennant triangle (7,1) -> (16.8,4.5) -> (7,9) in flat palette.fill
+ * with a 1px dark rim. */
+function paintTrialFlag(ctx: CanvasRenderingContext2D, fx: number, fy: number, z: number, palette: Palette): void {
+  ctx.save();
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(fx + 5.2 * z, fy, 1.8 * z, 15 * z);
+  ctx.beginPath();
+  ctx.moveTo(fx + 7 * z, fy + 1 * z);
+  ctx.lineTo(fx + 16.8 * z, fy + 4.5 * z);
+  ctx.lineTo(fx + 7 * z, fy + 9 * z);
+  ctx.closePath();
+  ctx.fillStyle = palette.fill;
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = palette.dark;
+  ctx.lineWidth = 2 * z;
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
+/** Trial triangles (probe masks on `m4-icon-sets-gallery`): flat `palette.fill` bodies with a 1px
+ * dark rim inside the ink. `threeTriangles`: down-triangle top y2 x2..16 apex (10,12.8); flat bar
+ * y4..10.7; up-triangle base y12.5 apex (9.5,2). `threeSigns` up-triangle is taller: base y14.5. */
+function paintTrialTriangle(ctx: CanvasRenderingContext2D, fx: number, fy: number, z: number, shape: 'down' | 'bar' | 'up' | 'upTall', palette: Palette): void {
+  ctx.save();
+  ctx.beginPath();
+  if (shape === 'bar') ctx.rect(fx + 2 * z, fy + 4 * z, 14 * z, 6.7 * z);
+  else {
+    const tri: [number, number][] =
+      shape === 'down' ? [[2, 2], [16, 2], [10, 12.8]]
+        : shape === 'up' ? [[2, 12.5], [16, 12.5], [9.5, 2]]
+          : [[2, 14.5], [17.5, 14.5], [10.5, 2]];
+    tri.forEach(([x, y], i) => (i ? ctx.lineTo(fx + x * z, fy + y * z) : ctx.moveTo(fx + x * z, fy + y * z)));
+    ctx.closePath();
+  }
+  ctx.fillStyle = palette.fill;
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = palette.dark;
+  ctx.lineWidth = 2 * z;
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
+/** Trial `threeSymbolsCircled`: solid coloured disc (ellipse centre (8.3, 7.6), rx 8.3 ry 7.7)
+ * with a white symbol (stroke ≈ 2.5px) and a dark rim blended into the edge. */
+function paintTrialSymbolCircle(ctx: CanvasRenderingContext2D, fx: number, fy: number, z: number, kind: 'cross' | 'bang' | 'check', palette: Palette): void {
+  const cx = fx + 8.3 * z, cy = fy + 7.6 * z;
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 8.3 * z, 7.7 * z, 0, 0, Math.PI * 2);
+  ctx.fillStyle = palette.fill;
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = palette.dark;
+  ctx.lineWidth = 2 * z;
+  ctx.stroke();
+  ctx.restore();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2.5 * z;
+  symbolPath(ctx, kind, cx, cy, 16.5 * z);
+  ctx.stroke();
+  if (kind === 'bang') {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 16.5 * 0.21 * z, 1.3 * z, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Trial `fourRatings` (probe `t56-cf-icon-sets` col 5 raw dumps): a staircase of four 4-column bars
+ * at frame columns 4,7,10,13 with tops at rows 9,6,3,0 on a shared baseline row 15. Each bar has a
+ * 1px `#727272` left/right/top stroke and a 2px core; icon k fills k+1 bars from the left
+ * (`#4d82b8` filled, `#b3b3b3` unfilled). */
+function paintTrialRatingBars(ctx: CanvasRenderingContext2D, fx: number, fy: number, z: number, filled: number): void {
+  for (let i = 0; i < 4; i++) {
+    const x0 = fx + (4 + 3 * i) * z, top = fy + (9 - 3 * i) * z;
+    ctx.fillStyle = i < filled ? BLUE : '#b3b3b3';
+    ctx.fillRect(x0 + z, top + z, 2 * z, (5 + 3 * i) * z);
+    ctx.fillStyle = '#727272';
+    ctx.fillRect(x0, top, z, (7 + 3 * i) * z);
+    ctx.fillRect(x0 + 3 * z, top, z, (7 + 3 * i) * z);
+    ctx.fillRect(x0, top, 4 * z, z);
+  }
+  ctx.fillRect(fx + 4 * z, fy + 15 * z, 13 * z, z);
+}
+
+/** Trial `fiveBoxes` (probe `t56-cf-icon-sets` col 7 raw dumps): a 15x15 grid (frame columns 1..15,
+ * rows 0..14) with `#727272` borders and a mid cross at column 8/row 7; four 6x6 quadrants are
+ * `#b3b3b3` when empty and `#4d82b8` when filled, in the order bottom-left, bottom-right, top-left,
+ * top-right; icon k fills k quadrants. */
+function paintTrialQuarterBoxes(ctx: CanvasRenderingContext2D, fx: number, fy: number, z: number, filled: number): void {
+  const quads: readonly [number, number][] = [[2, 8], [9, 8], [2, 1], [9, 1]];
+  quads.forEach(([x, y], i) => {
+    ctx.fillStyle = i < filled ? BLUE : '#b3b3b3';
+    ctx.fillRect(fx + x * z, fy + y * z, 6 * z, 6 * z);
+  });
+  ctx.fillStyle = '#727272';
+  ctx.fillRect(fx + z, fy, 15 * z, z);
+  ctx.fillRect(fx + z, fy + 7 * z, 15 * z, z);
+  ctx.fillRect(fx + z, fy + 14 * z, 15 * z, z);
+  ctx.fillRect(fx + z, fy, z, 15 * z);
+  ctx.fillRect(fx + 8 * z, fy, z, 15 * z);
+  ctx.fillRect(fx + 15 * z, fy, z, 15 * z);
+}
+
+/** Legacy sets are painted by the existing size-based painters; these offsets map the 18x16 frame
+ * onto their previous anchors, reproducing the old (gallery-verified) positions in 20px rows. */
+const LEGACY_ICON_OFFSETS: Record<number, [number, number, number]> = {
+  2: [-1, -2, 18], 3: [0, -1, 18], 4: [1, -2, 18], 6: [0, -1, 18], 7: [0, -1, 16],
+  8: [-1, -2, 18], 9: [-1, -2, 18], 12: [-1, -2, 18], 14: [-1, -2, 18], 17: [2, -1, 18], 18: [-1, -2, 18],
+};
+
+/** Paints one icon-set glyph into the 18x16 frame whose top-left is (fx, fy) at zoom z.
+ * The trial anchors the frame at cell + (1, 2) CSS pixels, independent of the row height
+ * (measured in 20px and 26px rows, `m4-icon-sets-gallery` and `t56-cf-icon-sets`). */
+export function drawIconGlyph(
+  ctx: CanvasRenderingContext2D,
+  iconSet: number,
+  index: number,
+  fx: number,
+  fy: number,
+  z: number,
+): void {
+  const count = iconSet <= 9 ? 3 : iconSet <= 14 ? 4 : 5;
+  const position = Math.max(0, Math.min(count - 1, index));
+  if (iconSet === 0 || iconSet === 1 || iconSet === 10 || iconSet === 11 || iconSet === 15 || iconSet === 16) {
+    const angles = count === 3 ? [90, 0, -90] : count === 4 ? [90, 45, -45, -90] : [90, 45, 0, -45, -90];
+    const colored = iconSet === 0 || iconSet === 10 || iconSet === 15;
+    const palette = colored ? (position === 0 ? RED : position === count - 1 ? GREEN : YELLOW) : GRAY;
+    paintFletchedArrow(ctx, fx, fy, z, angles[position], palette);
+    return;
+  }
+  if (iconSet === 5) {
+    paintTrialUnrimmedLight(ctx, fx, fy, z, position === 0 ? RED : position === 1 ? YELLOW : GREEN);
+    return;
+  }
+  const trialPalette = position === 0 ? RED : position === count - 1 ? GREEN : YELLOW;
+  if (iconSet === 4) {
+    paintTrialFlag(ctx, fx, fy, z, trialPalette);
+    return;
+  }
+  if (iconSet === 2) {
+    paintTrialTriangle(ctx, fx, fy, z, position === 0 ? 'down' : position === 1 ? 'bar' : 'up', trialPalette);
+    return;
+  }
+  if (iconSet === 7) {
+    if (position === 0) paintDiamond(ctx, fx + 9 * z, fy + 8 * z, 17 * z, RED);
+    else if (position === 1) paintTrialTriangle(ctx, fx, fy, z, 'upTall', YELLOW);
+    else paintTrialUnrimmedLight(ctx, fx, fy, z, GREEN);
+    return;
+  }
+  if (iconSet === 8) {
+    paintTrialSymbolCircle(ctx, fx, fy, z, position === 0 ? 'cross' : position === 1 ? 'bang' : 'check', trialPalette);
+    return;
+  }
+  if (iconSet === 13) {
+    paintTrialRatingBars(ctx, fx, fy, z, position + 1);
+    return;
+  }
+  if (iconSet === 19) {
+    paintTrialQuarterBoxes(ctx, fx, fy, z, position);
+    return;
+  }
+  const [dx, dy, size] = LEGACY_ICON_OFFSETS[iconSet] ?? [0, 0, 18];
+  drawIconSet(ctx, iconSet, index, fx + dx * z, fy + dy * z, size * z);
+}
+
 /** Draws one conditional-formatting icon-set glyph in an 18 CSS-pixel box. */
 export function drawIconSet(ctx: CanvasRenderingContext2D, iconSet: number, index: number, x: number, y: number, size: number): void {
   const count = iconSet <= 9 ? 3 : iconSet <= 14 ? 4 : 5;

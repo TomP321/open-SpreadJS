@@ -1,6 +1,6 @@
 import { functionCatalog } from '../calc/function-catalog.js';
 import { builtinNames } from '../calc/evaluate.js';
-import type { Workbook } from '../model.js';
+import type { Workbook } from '../workbook.js';
 
 export function filterFormulaNames(names: string[], prefix: string): string[] {
   const upper = prefix.toUpperCase();

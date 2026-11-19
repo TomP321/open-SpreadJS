@@ -10,17 +10,23 @@ describe('M5 value formatting', () => {
       [GC.Spread.CalcEngine.CalcError.parse('#NAME?'), '#NAME?'],
       [[1, 2], '1,2'], [[[1, 2], [3, 4]], '1,2,3,4'], [{ text: 'hello' }, '[object Object]'],
       [{ richText: [{ text: 'Hello' }, { text: ' world' }] }, 'Hello world'], [{ a: 1 }, '[object Object]'],
-      [new Date('2020-01-02Z'), '1/2/2020'], [NaN, 'NaN'], [Infinity, 'Infinity'], [-Infinity, '-Infinity'],
+      // Trial probe `dates:general`: JS Dates display with browser-local time
+      // getters (Date('2020-01-02Z') shows '1/2/2020 1:00:00' in a CET browser).
+      // Local-midnight / local-time dates are the timezone-stable equivalents
+      // of the original UTC cases and carry the same trial values.
+      [new Date(2020, 0, 2), '1/2/2020'], [new Date(2020, 0, 2, 13, 45), '1/2/2020 13:45:00'], [NaN, 'NaN'], [Infinity, 'Infinity'], [-Infinity, '-Infinity'],
     ];
     for (const [value, text] of values) {
       sheet.setValue(0, 0, value);
       expect(sheet.getText(0, 0), String(value)).toBe(text);
     }
   });
-  it('renders an absent barcode plugin as a calculation error', () => {
+  it('renders barcode formulas as paintable values (M6 insert tab)', () => {
     const sheet = new GC.Spread.Sheets.Workbook().getActiveSheet();
     sheet.setFormula(0, 0, 'BC_QRCODE("hello")');
-    expect(sheet.getText(0, 0)).toBe('#NAME?');
+    expect(sheet.getText(0, 0)).toBe('');
+    // TASK 46: the trial stores `BC_*` results as a SparklineExValue record (probe bc46p).
+    expect((sheet.getValue(0, 0) as { typeName?: string }).typeName).toBe('SparklineExValue');
     sheet.setFormula(1, 0, 'LINESPARKLINE(A1:A4,0)');
     expect(() => sheet.getText(1, 0)).not.toThrow();
   });
@@ -83,7 +89,11 @@ describe('M5 floating model', () => {
     const a = new F.FloatingObject('A', 12, 20, 100, 80); s.floatingObjects.add(a);
     expect([a.startRow(), a.startColumn(), a.endColumn(), a.endColumnOffset()]).toEqual([1, 0, 1, 50]);
     a.dynamicMove(false); expect(a.dynamicSize()).toBe(false);
-    a.dynamicSize(true); expect(a.dynamicMove()).toBe(true);
+    // Trial values (probe f40sh5-float): size-following cannot be switched on while
+    // move-following is off, and switching move back on does not restore size-following.
+    a.dynamicSize(true); expect(a.dynamicMove()).toBe(false); expect(a.dynamicSize()).toBe(false);
+    a.dynamicMove(true); expect(a.dynamicSize()).toBe(false);
+    a.dynamicSize(true); expect(a.dynamicSize()).toBe(true);
     const b = new F.FloatingObject('B', 0, 0, 20, 20); s.floatingObjects.add(b);
     expect(() => s.floatingObjects.add(new F.FloatingObject('B', 0, 0, 20, 20))).toThrow();
     s.floatingObjects.zIndex('A', 1); expect(s.floatingObjects.all().map(o => o.name())).toEqual(['B', 'A']);
@@ -122,7 +132,7 @@ it('binds tables to nested record collections and writes through column fields',
 
 it('restores cached formula-chart values and calculation errors as displayable values', () => {
   const s = new GC.Spread.Sheets.Workbook().getActiveSheet(); s.setArray(0, 0, [[1], [3], [2]]);
-  s.setFormula(0, 2, 'COLUMNSPARKLINE(A1:A3,0)'); s.setFormula(1, 2, 'BC_QRCODE("hello")');
+  s.setFormula(0, 2, 'COLUMNSPARKLINE(A1:A3,0)'); s.setFormula(1, 2, 'NOT_A_FUNCTION("hello")');
   const json = JSON.parse(JSON.stringify(s.toJSON())); const restored = new GC.Spread.Sheets.Worksheet(); restored.fromJSON(json);
   expect(restored.getText(0, 2)).toBe(''); expect(restored.getText(1, 2)).toBe('#NAME?');
   expect((restored.getValue(0, 2) as { value: { values: number[][] } }).value.values).toEqual([[1], [3], [2]]);

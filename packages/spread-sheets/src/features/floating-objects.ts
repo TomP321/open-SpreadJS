@@ -1,4 +1,4 @@
-import type { Worksheet } from '../model.js';
+import type { Worksheet } from '../worksheet.js';
 import type { WorkbookRenderer } from '../rendering.js';
 import { resolveColor } from '../colors.js';
 import type { JsonRecord } from '../serialization.js';
@@ -8,12 +8,12 @@ export class FloatingObject {
   typeName = '0';
   protected props: JsonRecord;
   _sheet?: Worksheet;
-  private element?: HTMLElement;
-  private contentElement?: HTMLElement;
+  protected element?: HTMLElement;
+  private contentElement?: HTMLElement | SVGElement;
   private origin?: { row: number; col: number; dx: number; dy: number; endRow: number; endCol: number; endDx: number; endDy: number };
-  constructor(name: string, x = 0, y = 0, width = 100, height = 100) {
-    if (!name) throw new Error('Floating object must have name');
-    this.props = { ...defaults, name, x, y, width, height };
+  constructor(name?: string, x = 0, y = 0, width = 100, height = 100) {
+    if (name !== undefined && !name) throw new Error('Empty name.');
+    this.props = { ...defaults, ...(name === undefined ? {} : { name }), x, y, width, height };
   }
   protected property(key: string, value?: unknown): unknown {
     if (value === undefined) return this.props[key];
@@ -22,24 +22,50 @@ export class FloatingObject {
     if (['x', 'y', 'width', 'height'].includes(key)) this.origin = undefined;
     this._sheet?._view()?.schedule(); return this;
   }
-  name(value?: string): unknown { if (value !== undefined && !value) throw new Error('Floating object must have name'); return this.property('name', value); }
+  name(value?: string): unknown { if (value !== undefined && !value) throw new Error('Empty name.'); return this.property('name', value); }
   x(value?: number): unknown { return this.property('x', value); }
   y(value?: number): unknown { return this.property('y', value); }
   width(value?: number): unknown { return this.property('width', value); }
   height(value?: number): unknown { return this.property('height', value); }
   allowMove(value?: boolean): unknown { return this.property('allowMove', value); }
   allowResize(value?: boolean): unknown { return this.property('allowResize', value); }
-  alt(value?: string): unknown { return this.property('alt', value); }
-  dynamicMove(value?: boolean): unknown { if (value === false) this.props.dynamicSize = false; return this.property('dynamicMove', value); }
-  dynamicSize(value?: boolean): unknown { if (value === true) this.props.dynamicMove = true; return this.property('dynamicSize', value); }
+  /** Alternative text; unset answers the empty string, exactly like the trial. */
+  alt(value?: string): unknown {
+    if (value === undefined) return this.props.alt === undefined ? '' : this.props.alt;
+    return this.property('alt', value);
+  }
+  dynamicMove(value?: boolean): unknown {
+    if (value === undefined) return this.props.dynamicMove;
+    // Disabling move also disables size-following (trial rule); enabling move does not re-enable it.
+    if (value === false) this.props.dynamicSize = false;
+    return this.property('dynamicMove', value);
+  }
+  dynamicSize(value?: boolean): unknown {
+    if (value === undefined) return this.props.dynamicSize;
+    // A shape cannot stretch with the cells while it does not move with them (trial rule).
+    if (value === true && this.props.dynamicMove !== true) return this;
+    return this.property('dynamicSize', value);
+  }
   fixedPosition(value?: boolean): unknown { return this.property('fixedPosition', value); }
   isLocked(value?: boolean): unknown { return this.property('isLocked', value); }
-  isSelected(value?: boolean): unknown { return this.property('isSelected', value); }
+  isSelected(value?: boolean): unknown {
+    if (value === undefined) return this.props.isSelected;
+    const previous = this.props.isSelected;
+    this.property('isSelected', value);
+    if (previous !== value) this._sheet?._emit(Events.FloatingObjectSelectionChanged, { sheet: this._sheet, floatingObject: this, selectionType: value ? 1 : 0 });
+    return this;
+  }
   isVisible(value?: boolean): unknown { return this.property('isVisible', value); }
-  content(value?: HTMLElement): HTMLElement | undefined | this { if (value === undefined) return this.contentElement; this.contentElement = value; this.refreshContent(); return this; }
+  /** The stored artwork: an HTML node or (for charts) an SVG node, mirroring the reference component. */
+  content(value?: HTMLElement | SVGElement): HTMLElement | SVGElement | undefined | this { if (value === undefined) return this.contentElement; this.contentElement = value; this.refreshContent(); return this; }
   cloneContent(): HTMLElement { return this.contentElement?.cloneNode(true) as HTMLElement ?? document.createElement('div'); }
   getHost(): HTMLElement[] { return this.element ? [this.element] : []; }
   refreshContent(): void { if (this.element) { this.element.querySelector('.opensheets-floating-content')?.replaceChildren(...(this.contentElement ? [this.contentElement] : [])); } this._sheet?._view()?.schedule(); }
+  /** Captures the row/column anchors against the current layout (called when the object is added to a sheet so later row/column resizes move/resize it like the trial). */
+  _captureAnchors(): void { if (this._sheet) this.anchors(); }
+  /** Internal anchor snapshot (used by the slicer serialisation). */
+  _anchors(): NonNullable<FloatingObject['origin']> { return this.anchors(); }
+  _setAnchors(value: NonNullable<FloatingObject['origin']>): void { this.origin = value; }
   private anchors() {
     const rows = this._sheet?._rowLayout(), cols = this._sheet?._columnLayout();
     if (!this.origin) {
@@ -65,9 +91,19 @@ export class FloatingObject {
       if (this.contentElement) content.append(this.contentElement);
       for (const dir of ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se']) { const handle = document.createElement('div'); handle.className = `opensheets-floating-handle handle-${dir}`; handle.dataset.direction = dir; this.element.append(handle); }
       this.element.addEventListener('pointerdown', event => {
-        if (event.button !== 0 || this._sheet?.options.isProtected && this.isLocked()) return;
+        if (event.button === 2) {
+          // Right-click selects the object like the trial so the context menu applies to it.
+          if (!event.ctrlKey) for (const item of [...view.sheet!.floatingObjects.all(), ...view.sheet!.pictures.all(), ...(view.sheet!.shapes?.all() ?? []), ...view.sheet!.charts.all(), ...(view.sheet!.dataCharts?.all() ?? [])]) if (item !== this) item.isSelected(false);
+          if (!event.ctrlKey) for (const slicer of view.sheet!.slicers?.all() ?? []) slicer.isSelected(false);
+          this.isSelected(true);
+          return;
+        }
+        const protection = this._sheet?.options.protectionOptions as { allowEditObjects?: boolean } | undefined;
+        const objectEditBlocked = !!this._sheet?.options.isProtected && (protection?.allowEditObjects !== true || this.isLocked());
+        if (event.button !== 0 || objectEditBlocked) return;
         event.stopPropagation(); const element = this.element!; element.focus(); element.setPointerCapture(event.pointerId);
-        if (!event.ctrlKey) for (const item of [...view.sheet!.floatingObjects.all(), ...view.sheet!.pictures.all()]) item.isSelected(false);
+        if (!event.ctrlKey) for (const item of [...view.sheet!.floatingObjects.all(), ...view.sheet!.pictures.all(), ...(view.sheet!.shapes?.all() ?? []), ...view.sheet!.charts.all(), ...(view.sheet!.dataCharts?.all() ?? [])]) if (item !== this) item.isSelected(false);
+        if (!event.ctrlKey) for (const slicer of view.sheet!.slicers?.all() ?? []) slicer.isSelected(false);
         this.isSelected(true);
         const dir = (event.target as HTMLElement).dataset.direction;
         const start = { x: event.clientX, y: event.clientY, left: Number(this.x()), top: Number(this.y()), width: Number(this.width()), height: Number(this.height()) };
@@ -78,12 +114,16 @@ export class FloatingObject {
         const up = () => { element.removeEventListener('pointermove', move); element.removeEventListener('pointerup', up); this._sheet?._emit(dir ? Events.FloatingObjectChanged : Events.FloatingObjectChanged, { sheet: this._sheet, floatingObject: this, propertyName: dir ? 'size' : 'position' }); };
         element.addEventListener('pointermove', move); element.addEventListener('pointerup', up);
       });
-      this.element.addEventListener('keydown', e => { if (e.key === 'Escape') { this.isSelected(false); view.root.focus(); } if (e.key === 'Delete') { this._sheet?.floatingObjects.remove(String(this.name())); this._sheet?.pictures.remove(String(this.name())); } });
+      this.element.addEventListener('keydown', e => { if (e.key === 'Escape') { this.isSelected(false); view.root.focus(); } if (e.key === 'Delete') { this._sheet?.floatingObjects.remove(String(this.name())); this._sheet?.pictures.remove(String(this.name())); this._sheet?.shapes?.remove(String(this.name())); this._sheet?.charts.remove(String(this.name())); this._sheet?.dataCharts?.remove(String(this.name())); } });
     }
     if (this.element.parentElement !== layer) layer.append(this.element);
     const a = this.anchors(), rows = this._sheet!._rowLayout(), cols = this._sheet!._columnLayout();
     const left = this.dynamicMove() ? cols.prefixSum(a.col) + a.dx : Number(this.x()), top = this.dynamicMove() ? rows.prefixSum(a.row) + a.dy : Number(this.y());
-    const width = this.dynamicSize() ? cols.prefixSum(a.endCol) + a.endDx - left : Number(this.width()), height = this.dynamicSize() ? rows.prefixSum(a.endRow) + a.endDy - top : Number(this.height());
+    const width = this.dynamicSize() ? Math.max(0, cols.prefixSum(a.endCol) + a.endDx - left) : Number(this.width());
+    const height = this.dynamicSize() ? Math.max(0, rows.prefixSum(a.endRow) + a.endDy - top) : Number(this.height());
+    // Report the anchored geometry through the public accessors too (the trial does:
+    // after setRowHeight the shape's height() reads back the resized height).
+    this.props.x = left; this.props.y = top; this.props.width = width; this.props.height = height;
     Object.assign(this.element.style, { display: this.isVisible() ? '' : 'none', left: `${view.headerWidth + (left - (this.fixedPosition() ? 0 : view.scrollX)) * view.zoom}px`, top: `${view.headerHeight + (top - (this.fixedPosition() ? 0 : view.scrollY)) * view.zoom}px`, width: `${Math.max(1, width) * view.zoom}px`, height: `${Math.max(1, height) * view.zoom}px`, zIndex: String(zIndex) });
     this.element.classList.toggle('selected', !!this.isSelected()); this.element.classList.toggle('resizable', !!this.allowResize()); this.element.setAttribute('aria-label', String(this.alt() ?? this.name()));
     if (this instanceof Picture) this._paintImage(this.element.querySelector<HTMLElement>('.opensheets-floating-content')!);
@@ -96,7 +136,7 @@ export class FloatingObject {
     for (const [key, value] of Object.entries(this.props)) if (key in defaults && value !== defaults[key]) result[key] = value;
     return result;
   }
-  fromJSON(json: JsonRecord): void { for (const key of Object.keys(this.props)) if (json[key] !== undefined) this.props[key] = json[key]; this.origin = undefined; if (json.content && typeof document !== 'undefined') { const template = document.createElement('template'); template.innerHTML = String(json.content); this.contentElement = template.content.firstElementChild as HTMLElement; } }
+  fromJSON(json: JsonRecord): void { for (const key of Object.keys(this.props)) if (json[key] !== undefined) this.props[key] = json[key]; this.origin = json.startRow !== undefined && json.endRow !== undefined && json.startColumn !== undefined && json.endColumn !== undefined ? { row: Number(json.startRow), col: Number(json.startColumn), dx: Number(json.startColumnOffset ?? 0), dy: Number(json.startRowOffset ?? 0), endRow: Number(json.endRow), endCol: Number(json.endColumn), endDx: Number(json.endColumnOffset ?? 0), endDy: Number(json.endRowOffset ?? 0) } : undefined; if (json.content && typeof document !== 'undefined') { const template = document.createElement('template'); template.innerHTML = String(json.content); this.contentElement = template.content.firstElementChild as HTMLElement; } }
 }
 export class Picture extends FloatingObject {
   override typeName = '1';
@@ -126,7 +166,7 @@ export class FloatingObjectCollection {
   add(objectOrName: FloatingObject | string, src?: string, x?: number, y?: number, width?: number, height?: number): FloatingObject {
     const item = typeof objectOrName === 'string' ? new Picture(objectOrName, src ?? '', x, y, width, height) : objectOrName;
     if (this.get(String(item.name()))) throw new Error('Floating object name already exists');
-    item._sheet = this.sheet; this.items.push(item); this.sheet?._view()?.schedule(); return item;
+    item._sheet = this.sheet; item._captureAnchors(); this.items.push(item); this.sheet?._view()?.schedule(); return item;
   }
   all(): FloatingObject[] { return [...this.items]; }
   get(name: string): FloatingObject | undefined { return this.items.find(item => item.name() === name); }

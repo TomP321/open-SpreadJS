@@ -1,0 +1,16 @@
+{
+  "name": "dropin-c-vite-designer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "build": "vite build" },
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{TARBALLS}}/opensheets-spread-sheets-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-designer": "file:{{TARBALLS}}/opensheets-spread-sheets-designer-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-designer-resources-en": "file:{{TARBALLS}}/opensheets-spread-sheets-designer-resources-en-{{VERSION}}.tgz"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1",
+    "@types/node": "^22.0.0"
+  }
+}

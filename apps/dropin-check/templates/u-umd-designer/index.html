@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Designer through script tags / window.GC</title>
+    <link rel="stylesheet" href="./node_modules/@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css" />
+    <link rel="stylesheet" href="./node_modules/@mescius/spread-sheets-designer/styles/gc.spread.sheets.designer.min.css" />
+  </head>
+  <body>
+    <div id="designer-host" style="width: 1200px; height: 720px"></div>
+    <script src="./node_modules/@mescius/spread-sheets/dist/gc.spread.sheets.all.min.js"></script>
+    {{EXTRA_SCRIPT}}
+    <script src="./node_modules/@mescius/spread-sheets-designer/dist/gc.spread.sheets.designer.all.min.js"></script>
+    <script src="./node_modules/@mescius/spread-sheets-designer-resources-en/dist/gc.spread.sheets.designer.resource.en.min.js"></script>
+    <script>
+      (function () {
+        var host = document.getElementById('designer-host');
+        var designer = new GC.Spread.Sheets.Designer.Designer(host);
+        var sheet = designer.getWorkbook().getActiveSheet();
+        sheet.suspendPaint();
+        sheet.name('Design');
+        sheet.setColumnWidth(0, 150);
+        sheet.setColumnWidth(1, 110);
+        sheet.setValue(0, 0, 'Region');
+        sheet.setValue(0, 1, 'Units');
+        sheet.setValue(1, 0, 'North');
+        sheet.setValue(1, 1, 1200);
+        sheet.setValue(2, 0, 'South');
+        sheet.setValue(2, 1, 900);
+        sheet.setValue(3, 0, 'Total');
+        sheet.setFormula(3, 1, '=SUM(B2:B3)');
+        sheet.charts.add('UnitsChart', GC.Spread.Sheets.Charts.ChartType.columnClustered, 420, 60, 420, 260, 'A1:B3');
+        sheet.resumePaint();
+        window.__RESULT__ = {
+          designerInstalled: typeof GC.Spread.Sheets.Designer === 'object' && typeof GC.Spread.Sheets.Designer.Designer === 'function',
+          commandCount: Object.keys(GC.Spread.Sheets.Designer.getCommand() || {}).length,
+          sheetName: sheet.name(),
+          formulaValue: sheet.getValue(3, 1),
+          chartCount: sheet.charts.all().length,
+          resourceBoldLabel: (GC.Spread.Sheets.Designer.getResources && GC.Spread.Sheets.Designer.getResources().ribbon.home.bold) || (GC.Spread.Sheets.DesignerResources && GC.Spread.Sheets.DesignerResources.ribbon.home.bold) || null
+        };
+        window.__READY__ = true;
+      })();
+    </script>
+  </body>
+</html>

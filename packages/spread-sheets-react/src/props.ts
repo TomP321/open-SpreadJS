@@ -1,6 +1,6 @@
 // Generated public prop signatures, without vendor comments.
 import type * as React from "react";
-import type GC from "@opensheets/spread-sheets";
+import type GC from "@mescius/spread-sheets";
 export interface IEventTypeObj {
     type: string;
 }

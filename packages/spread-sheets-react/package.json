@@ -1,10 +1,25 @@
 {
   "name": "@opensheets/spread-sheets-react",
   "version": "0.1.0",
+  "description": "React wrapper components for the OpenSheets spreadsheet, drop-in for the SpreadJS React wrapper.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "sideEffects": false,
+  "keywords": [
+    "spread-sheets-react",
+    "react",
+    "sheets",
+    "spread",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
   "exports": {
     ".": {
       "import": {
@@ -15,24 +30,29 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
-    }
+    },
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE.md",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@opensheets/spread-sheets": "workspace:*"
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
   },
   "peerDependencies": {
+    "@mescius/spread-sheets": "*",
     "react": ">=16.8",
     "react-dom": ">=16.8"
   },
   "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "react": "^18.3.1",

@@ -1,14 +1,15 @@
 import { Range, clone } from '../primitives.js';
-import type { Worksheet } from '../model.js';
+import type { Worksheet } from '../worksheet.js';
 import { resolveColor } from '../colors.js';
 import type { JsonRecord } from '../serialization.js';
+import { drawSparklineRecord } from './sparkline-draw.js';
 export type SparklineOptions = Record<string, string | number | boolean>;
+/** The trial's visible `SparklineSetting.options` (no group-extent fields: those are internal). */
 export const sparklineDefaults: SparklineOptions = {
   axisColor: 'black', firstMarkerColor: '#95b3d7', highMarkerColor: 'Blue', lastMarkerColor: '#95b3d7', lowMarkerColor: 'Blue',
   markersColor: '#244062', negativeColor: 'Brown', seriesColor: '#244062', displayEmptyCellsAs: 0, rightToLeft: false,
   displayHidden: false, displayXAxis: false, showFirst: false, showHigh: false, showLast: false, showLow: false,
-  showNegative: false, showMarkers: false, manualMax: 0, manualMin: 0, maxAxisType: 0, minAxisType: 0,
-  groupMaxValue: -Number.MAX_VALUE, groupMinValue: Number.MAX_VALUE, lineWeight: 1,
+  showNegative: false, showMarkers: false, manualMax: 0, manualMin: 0, maxAxisType: 0, minAxisType: 0, lineWeight: 1,
 };
 export class SparklineSetting {
   options: SparklineOptions;
@@ -113,28 +114,91 @@ export function paintSparkline(ctx: CanvasRenderingContext2D, data: (number | nu
   ctx.restore();
 }
 /** Paints the small-chart values returned by the formula engine. */
-export function paintFormulaSparkline(ctx: CanvasRenderingContext2D, spark: { name: string; value: Record<string, unknown> }, x: number, y: number, w: number, h: number): void {
+export function paintFormulaSparkline(
+  ctx: CanvasRenderingContext2D,
+  spark: { name: string; value: Record<string, unknown> },
+  x: number, y: number, w: number, h: number,
+  sheet?: unknown,
+): void {
   const value = spark.value;
+  // The advanced chart sparklines have their own painters (sparkline-draw.ts).
+  if (drawSparklineRecord(ctx, spark.name, value, x, y, w, h, sheet)) return;
   if (/^(LINE|COLUMN|WINLOSS)/.test(spark.name)) {
-    const matrix = value.values as unknown[][], orientation = Number(value.dataOrientation);
-    const data = (orientation === 0 ? matrix.map(row => row[0]) : matrix[0] ?? []).map(n => typeof n === 'number' ? n : null);
-    paintSparkline(ctx, data, Number(value.sparklineType), (value.setting as { options: SparklineOptions }).options, x, y, w, h); return;
+    const matrix = (value.values as unknown[]).map((row) => (Array.isArray(row) ? row : [row]));
+    const orientation = Number(value.dataOrientation);
+    const data = (orientation === 0 ? matrix.map((row) => row[0]) : matrix[0] ?? []).map((n) => (typeof n === 'number' ? n : null));
+    const options = { ...sparklineDefaults, ...(value.setting as { options?: SparklineOptions })?.options };
+    paintSparkline(ctx, data, Number(value.sparklineType), options, x, y, w, h); return;
   }
-  const values = (value.values as unknown[]).map(Number).filter(Number.isFinite), colors = value.colors as string[];
-  if (!values.length) return;
   ctx.save(); ctx.beginPath(); ctx.rect(x, y, w - 1, h - 1); ctx.clip();
   if (spark.name === 'PIESPARKLINE') {
+    const values = (value.values as unknown[]).map(Number).filter(Number.isFinite), colors = (value.colors ?? []) as string[];
+    if (!values.length) { ctx.restore(); return; }
     const total = values.reduce((sum, n) => sum + Math.abs(n), 0), radius = Math.max(0, (Math.min(w, h) - 9) / 2);
     let angle = -Math.PI / 2;
     const palette = ['#a9a9a9', '#878787', '#515151', '#202020', '#060606'];
     values.forEach((n, i) => { const end = angle + Math.abs(n) / (total || 1) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(x + (w - 1) / 2, y + (h - 1) / 2); ctx.arc(x + (w - 1) / 2, y + (h - 1) / 2, radius, angle, end); ctx.closePath(); ctx.fillStyle = resolveColor(colors[i] || palette[i % palette.length]); ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 1; ctx.stroke(); angle = end; });
-  } else if (spark.name === 'HBARSPARKLINE' || spark.name === 'VBARSPARKLINE') {
-    const fraction = Math.max(-1, Math.min(1, values[0])); ctx.fillStyle = resolveColor(colors[0] || 'gray');
-    if (spark.name === 'HBARSPARKLINE') ctx.fillRect(x + 2, y + 2, (w - 4) * Math.abs(fraction), h - 4);
-    else ctx.fillRect(x + 2, y + h - 2 - (h - 4) * Math.abs(fraction), w - 4, (h - 4) * Math.abs(fraction));
-  } else if (spark.name === 'AREASPARKLINE') {
-    const min = Math.min(0, ...values), max = Math.max(0, ...values), py = (v: number) => y + h - 2 - (v - min) / (max - min || 1) * (h - 4);
-    ctx.beginPath(); ctx.moveTo(x + 2, py(0)); values.forEach((v, i) => ctx.lineTo(x + 2 + i / Math.max(1, values.length - 1) * (w - 4), py(v))); ctx.lineTo(x + w - 2, py(0)); ctx.closePath(); ctx.fillStyle = resolveColor(colors[0] || '#787878'); ctx.fill();
+    ctx.restore(); return;
+  }
+  if (spark.name === 'HBARSPARKLINE' || spark.name === 'VBARSPARKLINE') {
+    const fraction = Math.max(-1, Math.min(1, Number(value.value) || 0)), color = String(value.colorScheme ?? '') || 'gray';
+    const scheme = color.includes('-') ? color.split('-') : [color];
+    ctx.fillStyle = resolveColor(scheme[0] || 'gray');
+    const thick = Number(value.barHeight ?? value.barWidth);
+    if (spark.name === 'HBARSPARKLINE') {
+      const height = Number.isFinite(thick) && thick > 0 ? Math.min(h - 2, thick) : h - 4;
+      ctx.fillRect(x + 2, y + (h - height) / 2, (w - 4) * Math.abs(fraction), height);
+    } else {
+      const width = Number.isFinite(thick) && thick > 0 ? Math.min(w - 2, thick) : w - 4;
+      ctx.fillRect(x + (w - width) / 2, y + h - 2 - (h - 4) * Math.abs(fraction), width, (h - 4) * Math.abs(fraction));
+    }
+    if (value.axisVisible) {
+      ctx.strokeStyle = resolveColor(scheme[1] ?? '#595959'); ctx.lineWidth = 1; ctx.beginPath();
+      if (spark.name === 'HBARSPARKLINE') { ctx.moveTo(x + 1, Math.round(y + h / 2) + .5); ctx.lineTo(x + w - 1, Math.round(y + h / 2) + .5); }
+      else { ctx.moveTo(Math.round(x + w / 2) + .5, y + 1); ctx.lineTo(Math.round(x + w / 2) + .5, y + h - 1); }
+      ctx.stroke();
+    }
+    ctx.restore(); return;
+  }
+  if (spark.name === 'AREASPARKLINE') {
+    const values = (value.points as unknown[]) ?? [], numeric = values.map(Number);
+    const min = Number.isFinite(Number(value.mini)) ? Number(value.mini) : Math.min(0, ...numeric.filter(Number.isFinite));
+    const max = Number.isFinite(Number(value.maxi)) ? Number(value.maxi) : Math.max(0, ...numeric.filter(Number.isFinite));
+    const positive = String(value.colorPositive ?? '') || '#787878', negative = String(value.colorNegative ?? '') || '#c00000';
+    const py = (v: number) => y + h - 2 - (v - min) / (max === min ? 1 : max - min) * (h - 4);
+    const px = (i: number) => x + 2 + i / Math.max(1, numeric.length - 1) * (w - 4);
+    const zero = py(0);
+    ctx.beginPath(); ctx.moveTo(px(0), zero);
+    numeric.forEach((v, i) => ctx.lineTo(px(i), py(v)));
+    ctx.lineTo(px(numeric.length - 1), zero); ctx.closePath();
+    ctx.fillStyle = resolveColor(positive); ctx.fill();
+    numeric.forEach((v, i) => {
+      if (!Number.isFinite(v) || v >= 0 || i + 1 >= numeric.length || !Number.isFinite(numeric[i + 1]!)) return;
+      ctx.beginPath(); ctx.moveTo(px(i), zero); ctx.lineTo(px(i), py(v)); ctx.lineTo(px(i + 1), py(Math.max(0, numeric[i + 1]!))); ctx.lineTo(px(i + 1), zero); ctx.closePath();
+      ctx.fillStyle = resolveColor(negative); ctx.fill();
+    });
+    for (const line of [value.line1, value.line2]) {
+      const level = Number(line);
+      if (!Number.isFinite(level)) continue;
+      ctx.strokeStyle = resolveColor(positive); ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(x + 2, py(level) + .5); ctx.lineTo(x + w - 2, py(level) + .5); ctx.stroke();
+    }
+    ctx.restore(); return;
   }
   ctx.restore();
 }
+
+/* ---- Worksheet-scoped sparkline storage (moved out of `worksheet.ts`
+   unchanged; `this` renamed to the `sheet` parameter). ---- */
+
+export function getSparkline(sheet: Worksheet, row: number, col: number): Sparkline | null { return sheet.sparklineCells.get(`${row}:${col}`) ?? null; }
+export function setSparkline(sheet: Worksheet, row: number, col: number, dataRange: Range | string, orientation: number, type: number, setting = new SparklineSetting(), dateRange?: Range | string, dateOrientation?: number): Sparkline {
+    sheet.removeSparkline(row, col);
+    const spark = new Sparkline(row, col, undefined, orientation, type, setting); spark._reference(dataRange); spark._sheet = sheet;
+    if (dateRange && typeof dateRange !== "string") spark.dateAxisData(dateRange);
+    if (dateOrientation !== undefined) spark.dateAxisOrientation(dateOrientation);
+    sheet.sparklineCells.set(`${row}:${col}`, spark); sheet.batch.invalidate(); return spark;
+}
+export function removeSparkline(sheet: Worksheet, row: number, col: number): void { const spark = getSparkline(sheet, row, col); if (spark) (spark.group() as SparklineGroup).remove(spark); sheet.sparklineCells.delete(`${row}:${col}`); sheet.batch.invalidate(); }
+export function groupSparkline(sheet: Worksheet, sparklines: Sparkline[]): SparklineGroup { const first = sparklines[0]; if (!first) throw new Error("No sparklines to group"); const group = new SparklineGroup(first.sparklineType() as number, (first.setting() as SparklineSetting).clone()); sparklines.forEach(s => group.add(s)); sheet.batch.invalidate(); return group; }
+export function ungroupSparkline(sheet: Worksheet, group: SparklineGroup): void { for (const spark of [...group._members]) { const single = new SparklineGroup(group.sparklineType, group.setting.clone()); single.add(spark); } sheet.batch.invalidate(); }

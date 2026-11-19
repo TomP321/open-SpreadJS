@@ -63,3 +63,14 @@ Apps switch to us without code changes via npm aliases:
 - Keep `docs/STATUS.md` updated: what's done, what's partial, known gaps.
 - Do not stub silently: unimplemented API members must exist (for type compatibility)
   and throw/warn `NotImplemented` in dev, recorded in the coverage report.
+
+## Designer-specific clean-room rules
+- Contract: the public d.ts of `@mescius/spread-sheets-designer@19.2.5` and `-designer-react` (devDependencies of apps/designer-compare)
+  plus the public docs (https://developer.mescius.com/spreadjs/docs/spreadjs-designer-component/ and the API reference).
+- Reading runtime STRUCTURE through the public API is allowed and required for compatibility: config/ribbon ids, nesting, command names,
+  template names (users customise the designer through these). Do NOT serialise official dialog templates or the default config wholesale
+  into our source: write our own templates/config that reproduce the same structure, ids and visible result.
+- Icons: never copy official icon images/SVG/CSS sprites (no screenshots crops either). Use an open-source MIT icon set (e.g. @fluentui/svg-icons)
+  or draw our own SVGs, matching size and meaning.
+- UI strings: `@mescius/spread-sheets-designer-resources-*` are minified files you must NOT read. Transcribe visible labels from the running UI.
+- Runtime DOM of the official designer may be inspected (class names, geometry, computed styles) as black-box observation.

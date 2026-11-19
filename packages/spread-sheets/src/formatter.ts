@@ -1,5 +1,6 @@
 import * as SSF from 'ssf';
 import { CultureInfo, CultureManager } from './culture.js';
+import { instanceProperties } from './not-implemented.js';
 
 const DAY = 86400000;
 /** Excel's 1900 epoch, preserving the fictitious leap day in numeric values. */
@@ -82,20 +83,147 @@ export interface FormattedData {
   content?: { type: string; value: string }[];
   [key: string]: unknown;
 }
-export class GeneralFormatter {
-  private pattern: string;
+/**
+ * Formats a cell value with the cell's formatter: a general formatter, an
+ * application formatter built on `FormatterBase`, or the format string stored on
+ * the style. A `FormatterBase` subclass answers whatever its `format` override
+ * answers, exactly like the trial: assigning a custom formatter to a cell makes
+ * `getText` and the rendered text go through that object.
+ */
+export function applyFormatter(formatter: unknown, value: unknown, data?: FormattedData): string {
+  if (formatter instanceof GeneralFormatter) return formatter.format(value, data);
+  if (formatter instanceof FormatterBase) return String(formatter.format(value, data ?? {}) ?? '');
+  return new GeneralFormatter(typeof formatter === 'string' ? formatter : 'General').format(value, data);
+}
+/** Reads edited text back with the cell's formatter. */
+export function parseWithFormatter(formatter: unknown, text: string): unknown {
+  if (formatter instanceof GeneralFormatter) return formatter.parse(text);
+  if (formatter instanceof FormatterBase) return formatter.parse(text);
+  return new GeneralFormatter(typeof formatter === 'string' ? formatter : 'General').parse(text);
+}
+/** Instance surface of `GC.Spread.Formatter.FormatterBase`. */
+export interface FormatterBase {
+  /** Format string this formatter was built with. */
+  formatCached: string | undefined;
+  /** Culture name this formatter localises numbers and dates with. */
+  cultureName: string | undefined;
+  /** Type name used when the formatter is serialised; the base answers `''`. */
+  typeName: string;
+  /** Reads the stored pattern. The reference ignores a value passed here. */
+  formatString(): string;
+  formatString(value: string): string;
+  /** Hook for subclasses: the reference base formats nothing and answers `null`. */
+  format(obj: unknown, options?: Record<string, unknown>): string | null;
+  /** Hook for subclasses: the reference base parses nothing and answers `null`. */
+  parse(text: string): unknown;
+  /** Serialises the formatter's own data fields. */
+  toJSON(): Record<string, unknown>;
+  /** Copies the fields of a serialised formatter onto this instance. */
+  fromJSON(settings: Record<string, unknown> | undefined): void;
+}
+/**
+ * `FormatterBase` is callable as well as constructible, because the documented
+ * subclass pattern is `function MyFormatter(format, culture) { FormatterBase.apply(this, arguments); … }`
+ * with `MyFormatter.prototype = new FormatterBase()`. An ES class could not be
+ * used that way, so this is a plain constructor function with its members on the
+ * prototype, which behaves identically for `new FormatterBase(…)` and `instanceof`.
+ */
+export interface FormatterBaseConstructor {
+  new (format?: string, cultureName?: string): FormatterBase;
+  (format?: string, cultureName?: string): void;
+  prototype: FormatterBase;
+}
+
+function FormatterBaseImpl(this: FormatterBase, format?: string, cultureName?: string): void {
+  this.formatCached = format;
+  this.cultureName = cultureName;
+  this.typeName = '';
+}
+
+export const FormatterBase = FormatterBaseImpl as unknown as FormatterBaseConstructor;
+
+Object.defineProperties(FormatterBase.prototype, {
+  formatString: {
+    configurable: true,
+    writable: true,
+    value: function (this: FormatterBase, value?: string): string {
+      void value;
+      return this.formatCached ?? '';
+    },
+  },
+  format: {
+    configurable: true,
+    writable: true,
+    value: function (this: FormatterBase, _obj: unknown, _options?: Record<string, unknown>): string | null {
+      return null;
+    },
+  },
+  parse: {
+    configurable: true,
+    writable: true,
+    value: function (this: FormatterBase, _text: string): unknown {
+      return null;
+    },
+  },
+  /**
+   * Serialises the own data fields in the order they were created:
+   * `{ formatCached, cultureName, typeName }`, plus whatever a subclass or a
+   * `fromJSON` call added afterwards. Fields without a value are left out, so
+   * `new FormatterBase().toJSON()` answers `{ typeName: '' }`.
+   */
+  toJSON: {
+    configurable: true,
+    writable: true,
+    value: function (this: FormatterBase): Record<string, unknown> {
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(this)) {
+        if (typeof value === 'function' || value === undefined) continue;
+        result[key] = value;
+      }
+      return result;
+    },
+  },
+  fromJSON: {
+    configurable: true,
+    writable: true,
+    value: function (this: FormatterBase & Record<string, unknown>, settings: Record<string, unknown> | undefined): void {
+      if (!settings) return;
+      for (const [key, value] of Object.entries(settings)) this[key] = value;
+    },
+  },
+});
+// `typeName` is a declared data property: the coverage report and the fallback
+// test read its descriptor on the prototype, the value lives on each instance.
+instanceProperties(FormatterBase, 'typeName');
+
+export class GeneralFormatter extends FormatterBase {
   constructor(
-    format = 'General',
-    private cultureName?: string,
+    format?: string,
+    cultureName?: string,
   ) {
-    this.pattern = format || 'General';
+    super(format, cultureName);
+  }
+  /** The stored pattern; a general formatter without one behaves as `General`. */
+  private get pattern(): string {
+    return this.formatCached || 'General';
   }
   formatString(): string;
   formatString(value: string): this;
   formatString(value?: string): string | this {
     if (value === undefined) return this.pattern;
-    this.pattern = value || 'General';
+    this.formatCached = value || 'General';
     return this;
+  }
+  /**
+   * The general formatter serialises as the pattern plus the culture it localises
+   * with — under the key `customerCultureName`, unlike the base class — and carries
+   * no `typeName`.
+   */
+  toJSON(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    if (this.formatCached !== undefined) result.formatCached = this.formatCached;
+    if (this.cultureName !== undefined) result.customerCultureName = this.cultureName;
+    return result;
   }
   format(value: unknown, data?: FormattedData): string {
     if (value == null) return '';
@@ -162,7 +290,7 @@ export class GeneralFormatter {
     const locale = this.pattern.match(/\[\$[^\]]*-([0-9a-f]+)\]/i)?.[1];
     return (
       (locale ? CultureManager.getCultureInfo(parseInt(locale, 16)) : undefined) ??
-      CultureManager.getCultureInfo(this.cultureName) ??
+      CultureManager.getCultureInfo(this.cultureName ?? CultureManager.culture()) ??
       CultureManager.getCultureInfo('en-us')
     );
   }

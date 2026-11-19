@@ -1,0 +1,44 @@
+{
+  "name": "@opensheets/designer-compare",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5175",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "test:visual": "playwright test"
+  },
+  "dependencies": {
+    "@mescius/spread-sheets": "19.2.5",
+    "@mescius/spread-sheets-barcode": "19.2.5",
+    "@mescius/spread-sheets-charts": "19.2.5",
+    "@mescius/spread-sheets-designer": "19.2.5",
+    "@mescius/spread-sheets-designer-react": "19.2.5",
+    "@mescius/spread-sheets-designer-resources-en": "19.2.5",
+    "@mescius/spread-sheets-io": "19.2.5",
+    "@mescius/spread-sheets-languagepackages": "19.2.5",
+    "@mescius/spread-sheets-pdf": "19.2.5",
+    "@mescius/spread-sheets-print": "19.2.5",
+    "@mescius/spread-sheets-shapes": "19.2.5",
+    "@opensheets/spread-sheets": "workspace:*",
+    "@opensheets/spread-sheets-designer": "workspace:*",
+    "@opensheets/spread-sheets-designer-react": "workspace:*",
+    "@opensheets/spread-sheets-designer-resources-en": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets-pivot-addon": "19.2.5",
+    "@playwright/test": "^1.56.0",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "pixelmatch": "^8.0.0",
+    "pngjs": "^7.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^6.4.1",
+    "vitest": "^3.2.4"
+  }
+}

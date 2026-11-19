@@ -1,0 +1,9 @@
+{
+  "name": "dropin-e-umd-script",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{TARBALLS}}/opensheets-spread-sheets-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-io": "file:{{TARBALLS}}/opensheets-spread-sheets-io-{{VERSION}}.tgz"
+  }
+}

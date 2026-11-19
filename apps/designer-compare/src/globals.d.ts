@@ -1,0 +1,10 @@
+declare module '@mescius/spread-sheets-barcode';
+declare module '@mescius/spread-sheets-shapes';
+declare module '@mescius/spread-sheets-charts';
+declare module '@mescius/spread-sheets-print';
+declare module '@mescius/spread-sheets-pdf';
+declare module '@mescius/spread-sheets-io';
+declare module '@mescius/spread-sheets-designer-resources-en';
+declare module '@mescius/spread-sheets-pivot-addon';
+declare module '@mescius/spread-sheets-designer';
+declare module '@mescius/spread-sheets-designer-react';

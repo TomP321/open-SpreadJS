@@ -1,6 +1,6 @@
 /** Additional text and locale functions. */
-import {} from '../evaluate.js';
-import { ErrorCode, error, normalizeNumber } from '../values.js';
+import { type Args, type EvalContext } from '../evaluate.js';
+import { CalcError, ErrorCode, error, isReference, normalizeNumber, type Value } from '../values.js';
 import { type DefinedFunction, define } from './common.js';
 import { textArg} from './text.js';
 
@@ -139,13 +139,54 @@ const EURO_RATES: Record<string, number> = {
   TRL: 1906032.5,
 };
 
+/** Duck-typed view of the pivot objects GETPIVOTDATA reads (see src/pivot). */
+interface PivotDataLike {
+  _getDataFieldValue(
+    dataName: string, pairs: readonly (readonly [string, string | number])[], refRow?: number, refCol?: number,
+  ): number | null | undefined;
+}
+interface PivotManagerLike {
+  findPivotTable(row: number, col: number): PivotDataLike | null | undefined;
+}
+
+/** GETPIVOTDATA(data_name, pivot_table, [field1, item1], ...) — TASK 42 item 3. */
+function getPivotData(args: Args, ctx: EvalContext): Value {
+  const first = args.scalar(0);
+  if (first instanceof CalcError) return first;
+  const dataName = first === null ? '' : typeof first === 'string' ? first : String(first);
+  const ref = args.value(1);
+  if (ref instanceof CalcError) return ref;
+  if (!isReference(ref)) return error(ErrorCode.ref);
+  const area = ref.areas[0]!;
+  if (ref.areas.length !== 1 || area.r1 !== area.r2 || area.c1 !== area.c2) return error(ErrorCode.value);
+  const manager = (area.sheet as unknown as { pivotTables?: PivotManagerLike }).pivotTables;
+  const pivot = manager?.findPivotTable(area.r1, area.c1);
+  if (!pivot) return error(ErrorCode.ref);
+  const rest = args.count - 2;
+  if (rest % 2 !== 0) return error(ErrorCode.value);
+  const pairs: (readonly [string, string | number])[] = [];
+  for (let i = 0; i < rest; i += 2) {
+    const field = args.scalar(2 + i);
+    if (field instanceof CalcError) return field;
+    if (field === null || field === '') return error(ErrorCode.ref);
+    const item = args.scalar(3 + i);
+    if (item instanceof CalcError) return item;
+    const itemValue: string | number = typeof item === 'number' ? item : item === null ? '' : String(item);
+    pairs.push([typeof field === 'string' ? field : String(field), itemValue]);
+  }
+  void ctx;
+  const value = pivot._getDataFieldValue(dataName, pairs, area.r1, area.c1);
+  if (value === undefined) return error(ErrorCode.ref);
+  return value === null ? 0 : value;
+}
+
 export const TEXT_EXTRA_FUNCTIONS: DefinedFunction[] = [
   define('ASC', 1, 1, (args) => toHalfWidth(textArg(args, 0))),
   define('BAHTTEXT', 1, 1, (args) => bahtText(args.number(0))),
   define('ENCODEURL', 1, 1, (args) => encodeURIComponent(textArg(args, 0)).replace(/'/g, '%27')),
   define('WEBSERVICE', 1, 1, () => ''),
   define('FILTERXML', 2, 2, () => error(ErrorCode.value)),
-  define('GETPIVOTDATA', 2, 255, () => error(ErrorCode.ref)),
+  define('GETPIVOTDATA', 2, 255, getPivotData),
   define('EUROCONVERT', 3, 5, (args) => {
     const value = args.number(0);
     const source = args.text(1).toUpperCase();

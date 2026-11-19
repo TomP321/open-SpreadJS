@@ -6,14 +6,12 @@
 import { Range } from '../primitives.js';
 import { GC } from '../generated/enums.js';
 import { Events } from '../events.js';
-import type { Worksheet } from '../model.js';
+import type { Worksheet } from '../worksheet.js';
 import { Condition } from './conditions.js';
 import { serializeValue, deserializeValue, type JsonRecord } from '../serialization.js';
 
-const { SortState, Filter } = GC.Spread.Sheets as unknown as {
-  SortState: { none: number; ascending: number; descending: number };
-  Filter: { FilterActionType: { filter: number; unfilter: number } };
-};
+const SortState = GC.Spread.Sheets.SortState;
+const Filter = GC.Spread.Sheets.Filter;
 
 export const SortStateEnum = SortState;
 
@@ -89,31 +87,46 @@ export function sortRange(
   // sortInfo.index; byRows=false reorders columns using the rows.
   const count = byRows ? range.rowCount : range.colCount;
   const order = Array.from({ length: count }, (_, index) => index);
-  const valueFor = (position: number, item: SortRangeOptions['sortInfo'][number]): unknown =>
+  /**
+   * The trial accepts both condition shapes: the flat `{ index, ascending }`
+   * entry and the `{ sortBy: [{ index, ascending }], rowTop }` wrapper (the
+   * Designer writes the second one). Only the sort keys are read; `rowTop` has
+   * no effect on the trial either (verified by the probe).
+   */
+  const keysOf = (item: SortRangeOptions['sortInfo'][number]): { index: number; ascending?: boolean }[] => {
+    const nested = (item as { sortBy?: { index: number; ascending?: boolean }[] }).sortBy;
+    return nested?.length ? nested : [{ index: item.index, ascending: item.ascending }];
+  };
+  const valueFor = (position: number, item: { index: number }): unknown =>
     byRows
       ? sheet.getValue(range.row + position, range.col + item.index)
       : sheet.getValue(range.row + item.index, range.col + position);
-  const colorFor = (position: number, kind: 'backColor' | 'foreColor', item: SortRangeOptions['sortInfo'][number]): string | undefined => {
+  const colorFor = (position: number, kind: 'backColor' | 'foreColor', item: { index: number }): string | undefined => {
+    // Rows carry their color in the sorted column, columns in the sorted row.
     const style = byRows
-      ? sheet.getStyle(range.col + item.index, 0) && sheet.getStyle(range.row + position, range.col + item.index)
+      ? sheet.getStyle(range.row + position, range.col + item.index)
       : sheet.getStyle(range.row + item.index, range.col + position);
     const value = style ? style[kind] : undefined;
     return typeof value === 'string' ? value : undefined;
   };
   const compare = (a: number, b: number): number => {
     for (const item of sortInfo) {
-      let result: number;
-      const fn = item.compare ?? item.compareFunction;
-      if (fn) result = fn(valueFor(a, item), valueFor(b, item));
-      else if (item.backColor !== undefined || item.fontColor !== undefined) {
-        const kind: 'backColor' | 'foreColor' = item.backColor !== undefined ? 'backColor' : 'foreColor';
-        const wanted = item.backColor ?? item.fontColor;
-        const colorA = colorFor(a, kind, item);
-        const colorB = colorFor(b, kind, item);
-        result = colorA === wanted ? (colorB === wanted ? 0 : -1) : colorB === wanted ? 1 : 0;
-        if (item.order === 'bottom') result = -result;
-      } else result = compareValues(valueFor(a, item), valueFor(b, item));
-      if (result) return item.ascending === false ? -result : result;
+      for (const key of keysOf(item)) {
+        let result: number;
+        const fn = item.compare ?? item.compareFunction;
+        if (fn) result = fn(valueFor(a, key), valueFor(b, key));
+        else if (item.backColor !== undefined || item.fontColor !== undefined) {
+          const kind: 'backColor' | 'foreColor' = item.backColor !== undefined ? 'backColor' : 'foreColor';
+          const wanted = item.backColor ?? item.fontColor;
+          const colorA = colorFor(a, kind, key);
+          const colorB = colorFor(b, kind, key);
+          // An empty wanted color selects cells with no explicit fill/font color.
+          const matches = (color: string | undefined): boolean => color === wanted || (color === undefined && (wanted === '' || wanted === undefined));
+          result = matches(colorA) ? (matches(colorB) ? 0 : -1) : matches(colorB) ? 1 : 0;
+          if (item.order === 'bottom') result = -result;
+        } else result = compareValues(valueFor(a, key), valueFor(b, key));
+        if (result) return (key.ascending ?? item.ascending) === false ? -result : result;
+      }
     }
     return 0;
   };
@@ -362,6 +375,7 @@ export class RowFilterBase {
     if (this.buttons.size) result.filterButtonVisibleInfo = Object.fromEntries(this.buttons);
     result.showFilterButton = this.showFilterButton;
     result.filteredOutRows = this.suppressFilteredOut ? [] : [...this.filtered];
+    if (this.tableName) result.tableName = this.tableName;
     return result;
   }
   fromJSON(settings: object): void {

@@ -62,6 +62,7 @@
   "customList": [],
   "scrollbarAppearance": 0,
   "numbersFitMode": 0,
+  "pasteIgnoreSingleBlankCharCell": false,
   "pasteSkipInvisibleRange": false,
   "allowAutoExtendFilterRange": false,
   "allowInvalidFormula": false,

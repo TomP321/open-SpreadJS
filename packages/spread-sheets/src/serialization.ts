@@ -1,4 +1,4 @@
-import { CalcError, SparklineExValue, isErrorString } from './calc/values.js';
+import { CalcError, BarcodeExValue, ImageExValue, SparklineExValue, isErrorString } from './calc/values.js';
 import { GeneralFormatter, dateToSerial, serialToDate } from './formatter.js';
 import { LineBorder, Style, styleProperties } from './primitives.js';
 export type JsonRecord = Record<string, unknown>;
@@ -28,7 +28,15 @@ export function deserializeValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(deserializeValue);
   if (value && typeof value === 'object') {
     const record = value as JsonRecord;
-    if (record.typeName === 'SparklineExValue' && typeof record.name === 'string') return new SparklineExValue(record.name, object(deserializeValue(record.value)));
+    if (record.typeName === 'SparklineExValue' && typeof record.name === 'string') {
+      const payload = object(deserializeValue(record.value));
+      // TASK 46: the trial stores barcode results as `SparklineExValue` records flagged
+      // `isBarcode`; a stored `BarcodeExValue` type name is still accepted (older files).
+      if (payload.isBarcode === true) return new BarcodeExValue(record.name, payload);
+      return new SparklineExValue(record.name, payload);
+    }
+    if (record.typeName === 'BarcodeExValue' && typeof record.name === 'string') return new BarcodeExValue(record.name, object(deserializeValue(record.value)));
+    if (record.typeName === 'ImageExValue') return new ImageExValue(object(deserializeValue(record.value)));
     if (typeof record.error === 'string' && isErrorString(record.error)) return new CalcError(record.error);
   }
   if (value && typeof value === 'object')

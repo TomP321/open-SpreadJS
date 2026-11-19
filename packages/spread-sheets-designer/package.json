@@ -1,0 +1,65 @@
+{
+  "name": "@opensheets/spread-sheets-designer",
+  "version": "0.1.0",
+  "description": "OpenSheets Designer component: a spreadsheet UI control that embeds a ribbon, property panels and a workbook host.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.designer.cjs",
+  "module": "./dist/gc.spread.sheets.designer.esm.js",
+  "types": "./dist/gc.spread.sheets.designer.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets",
+    "javascript spreadsheet",
+    "javascript excel",
+    "sheets",
+    "sheet",
+    "designer",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.designer.d.ts",
+        "default": "./dist/gc.spread.sheets.designer.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.designer.d.cts",
+        "default": "./dist/gc.spread.sheets.designer.cjs"
+      }
+    },
+    "./styles/*": "./styles/*",
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "styles",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsx scripts/clean.ts && tsup --replaceNodeEnv && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1"
+  }
+}

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import GC from '@opensheets/spread-sheets';
+import GC from '@mescius/spread-sheets';
 import type { SpreadSheetsProp, WorksheetProp, ColumnProp } from './props.js';
 export type { SpreadSheetsProp, WorksheetProp, ColumnProp, IEventTypeObj } from './props.js';
 
@@ -138,7 +138,11 @@ export class SpreadSheets extends React.Component<SpreadSheetsProp> {
   componentWillUnmount(): void { this.workbook?.destroy(); this.workbook = undefined; this.bindings.clear(); }
   render(): React.ReactNode {
     const className = ['opensheets-host', this.props.hostClass, this.props.className].filter(Boolean).join(' ') || undefined;
-    return <div ref={this.host} className={className} style={this.props.hostStyle as React.CSSProperties} />;
+    // The official wrapper hosts the spreadsheet in a block that fills its parent (measured on the
+    // trial: `<div class="container gc-no-user-select" style="width:100%; height:100%; …">`), so a
+    // plain <SpreadSheets/> inside a sized container paints; `hostStyle` overrides any of these.
+    const style = { width: '100%', height: '100%', overflow: 'visible', ...(this.props.hostStyle as React.CSSProperties | undefined) };
+    return <div ref={this.host} className={className} style={style} />;
   }
 }
 export class Worksheet extends React.Component<WorksheetProp> { render(): React.ReactNode { return null; } }

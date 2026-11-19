@@ -11,7 +11,9 @@
     "test:visual": "playwright test",
     "oracle": "node scripts/oracle.mjs",
     "probe": "node scripts/probe.mjs",
-    "io-probe": "node scripts/io-probe.mjs"
+    "io-probe": "node scripts/io-probe.mjs",
+    "pdf:oracle": "node scripts/pdf-oracle.mjs",
+    "tablesheet:compare": "node scripts/tablesheet-comparison.mjs"
   },
   "dependencies": {
     "@mescius/spread-sheets": "19.2.5",
@@ -20,6 +22,14 @@
     "@opensheets/spread-sheets-io": "workspace:*"
   },
   "devDependencies": {
+    "@mescius/spread-sheets-charts": "19.2.5",
+    "@mescius/spread-sheets-datacharts-addon": "19.2.5",
+    "@mescius/spread-sheets-ganttsheet": "19.2.5",
+    "@mescius/spread-sheets-pivot-addon": "19.2.5",
+    "@mescius/spread-sheets-print": "19.2.5",
+    "@mescius/spread-sheets-reportsheet-addon": "19.2.5",
+    "@mescius/spread-sheets-slicers": "19.2.5",
+    "@mescius/spread-sheets-tablesheet": "19.2.5",
     "@types/pngjs": "^6.0.5",
     "pixelmatch": "^8.0.0",
     "pngjs": "^7.0.0",

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Slicer comparison</title></head><body>
+<div id="hosts"></div>
+<script type="module">
+import * as OfficialNs from '@mescius/spread-sheets';
+import Official from '@mescius/spread-sheets';
+import '@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css';
+import OpenSheets from '@opensheets/spread-sheets';
+import '@opensheets/spread-sheets/styles/gc.spread.sheets.css';
+window.GC = Official?.Spread ? Official : OfficialNs;
+// The core package alone does not ship the GC.Spread.Slicers data runtime; the official
+// designer bundle registers it (same way the designer app gets it). NOTE: the local trial
+// packages do NOT contain the in-sheet Sheets.Slicers UI runtime (that ships in the
+// separate @mescius/spread-sheets-slicers npm package), so the UI part of the comparison
+// is recorded from our build only and cross-checked against the trial's TABLE FILTER API.
+let officialLoaded = null;
+async function loadOfficialSlicers() {
+  if (!officialLoaded) {
+    await import('@mescius/spread-sheets-designer-resources-en');
+    await import('@mescius/spread-sheets-designer');
+    officialLoaded = window.GC?.Spread?.Slicers ? window.GC : Official;
+  }
+  return officialLoaded;
+}
+const sessions = {};
+function plain(value) {
+  return JSON.parse(JSON.stringify(value, (key, item) => (typeof item === 'function' ? '[function]' : item)));
+}
+// Shared fixture: same input for both libraries.
+const NAMES = ['Name', 'City', 'Salary'];
+const MATRIX = [
+  [{ value: 'Bob', text: 'Bob' }, { value: 'NewYork', text: 'NewYork' }, { value: 80, text: '80' }],
+  [{ value: 'Betty', text: 'Betty' }, { value: 'NewYork', text: 'NewYork' }, { value: 90, text: '90' }],
+  [{ value: 'Alice', text: 'Alice' }, { value: 'Washington', text: 'Washington' }, { value: 70, text: '70' }],
+  [{ value: 'Carl', text: 'Carl' }, { value: 'London', text: 'London' }, { value: 100, text: '100' }],
+];
+async function runLib(kind) {
+  const GC = kind === 'official' ? await loadOfficialSlicers() : OpenSheets;
+  const CF = GC.Spread.Sheets.ConditionalFormatting;
+  const out = { kind, steps: {} };
+  const record = (label, fn) => {
+    try { out.steps[label] = fn(); } catch (error) { out.steps[label] = { thrown: String(error.message) }; }
+  };
+  // ---- 1) GeneralSlicerData method matrix (identical public API on both sides).
+  const g = new GC.Spread.Slicers.GeneralSlicerData(MATRIX.map(row => row.slice()), NAMES.slice());
+  const Agg = GC.Spread.Slicers.SlicerAggregateType;
+  const Fod = GC.Spread.Slicers.FilteredOutDataType;
+  record('gsd.columns', () => g.columnNames);
+  record('gsd.getColumnIndex', () => [g.getColumnIndex('City'), g.getColumnIndex('Nope')]);
+  record('gsd.getData', () => g.getData('City'));
+  record('gsd.getExclusiveData', () => g.getExclusiveData('City'));
+  record('gsd.getRowIndexes', () => g.getRowIndexes('City', 0));
+  record('gsd.getExclusiveRowIndex', () => [g.getExclusiveRowIndex('City', 1), g.getExclusiveRowIndex('City', 2)]);
+  record('gsd.aggregate', () => ['sum', 'count', 'counta', 'average', 'max', 'min', 'product', 'stdev', 'stdevp', 'vars', 'varp']
+    .map(name => Number(g.aggregateData('Salary', Agg[name]).toFixed(6))));
+  record('gsd.aggregateRange', () => Number(g.aggregateData('Salary', Agg.sum, { min: 80, max: 100 }).toFixed(6)));
+  record('gsd.getDataRange', () => g.getData('City', { min: 85, max: 100 }));
+  let filteredEvents = 0;
+  let lastEvent = null;
+  const listener = {
+    onFiltered: data => { filteredEvents++; lastEvent = { isPreview: data.isPreview, count: data.rowIndexes.length }; },
+    onDataChanged: () => { filteredEvents++; },
+    onRowsChanged: () => { filteredEvents++; },
+    onColumnNameChanged: () => { filteredEvents++; },
+    onColumnRemoved: () => { filteredEvents++; },
+  };
+  g.attachListener(listener);
+  g.doFilter('City', { exclusiveRowIndexes: [0, 1] });
+  record('gsd.filtered', () => ({
+    rows: g.getFilteredRowIndexes(),
+    outRows: g.getFilteredOutRowIndexes(),
+    indexes: g.getFilteredIndexes('City'),
+    outAll: g.getFilteredOutIndexes('City', Fod.all),
+    outSelf: g.getFilteredOutIndexes('City', Fod.byCurrentColumn),
+    outOther: g.getFilteredOutIndexes('City', Fod.byOtherColumns),
+    salaryIndexes: g.getFilteredIndexes('Salary'),
+    salaryOut: g.getFilteredOutIndexes('Salary', Fod.all),
+    events: filteredEvents,
+    last: lastEvent,
+  }));
+  g.doFilter('Salary', { ranges: [{ min: 75, max: 95 }] }, true);
+  record('gsd.preview', () => ({
+    inPreview: g.inPreview(),
+    rows: g.getFilteredRowIndexes(),
+    ranges: g.getFilteredRanges('Salary'),
+    outRanges: g.getFilteredOutRanges('Salary'),
+    events: filteredEvents,
+  }));
+  g.clearPreview();
+  g.doUnfilter('City');
+  record('gsd.afterClear', () => ({
+    inPreview: g.inPreview(),
+    rows: g.getFilteredRowIndexes(),
+    outAll: g.getFilteredOutIndexes('City', Fod.all),
+    events: filteredEvents,
+  }));
+  const beforeSuspend = filteredEvents;
+  g.suspendFilteredEvents();
+  g.doFilter('City', { exclusiveRowIndexes: [2] });
+  g.doUnfilter('City');
+  const duringSuspend = filteredEvents - beforeSuspend;
+  record('gsd.resume', () => { g.resumeFilteredEvents(); return true; });
+  record('gsd.suspendResume', () => ({ during: duringSuspend, afterResume: filteredEvents - beforeSuspend }));
+  record('gsd.rename', () => { g.onColumnNameChanged('City', 'Town'); return true; });
+  record('gsd.renamed', () => ({
+    columns: g.columnNames,
+    exclusive: g.getExclusiveData('Town'),
+    events: filteredEvents,
+  }));
+  record('gsd.removeColumn', () => { g.onColumnsRemoved(1, 1); return true; });
+  record('gsd.columnRemoved', () => ({ columns: g.columnNames, row0: g.data[0].length, events: filteredEvents }));
+  record('gsd.addRows', () => { g.onRowsAdded(0, 1); return true; });
+  record('gsd.removeRows', () => { g.onRowsRemoved(0, 1); return true; });
+  record('gsd.rows', () => ({ rows: g.data.length, events: filteredEvents }));
+  record('gsd.setCell', () => {
+    g.onDataChanged({ columnName: 'Name', row: 0, rowIndex: 0, data: { value: 'Bobby', text: 'Bobby' } });
+    return true;
+  });
+  record('gsd.dataChanged', () => ({ first: g.getData('Name')[0], events: filteredEvents }));
+  record('gsd.onFilteredRaw', () => { g.onFiltered(); return true; });
+  record('gsd.onFiltered', () => ({ events: filteredEvents }));
+  // ---- 2) table row filtering parity: the trial's filter menu API vs our slicer-driven path.
+  const host = document.createElement('div');
+  host.id = 'host-' + kind;
+  host.style.cssText = 'width:900px;height:620px';
+  document.getElementById('hosts').append(host);
+  const wb = new GC.Spread.Sheets.Workbook(host, { sheetCount: 1 });
+  const sheet = wb.getActiveSheet();
+  sheet.options.rowHeaderVisible = false;
+  sheet.options.columnHeaderVisible = false;
+  const tableSheet = [
+    ['Name', 'City', 'Salary'],
+    ['Bob', 'NewYork', 80],
+    ['Betty', 'NewYork', 90],
+    ['Alice', 'Washington', 70],
+    ['Carl', 'London', 100],
+  ];
+  for (let r = 0; r < tableSheet.length; r++) for (let c = 0; c < 3; c++) sheet.setValue(r, c, tableSheet[r][c]);
+  const table = sheet.tables.add('TableCities', 0, 0, 5, 3);
+  record('table.slicerData', () => {
+    const data = table.getSlicerData();
+    return { created: !!data, same: data === table.getSlicerData(), exclusive: data.getExclusiveData('City') };
+  });
+  const condition = new CF.Condition(CF.ConditionType.textCondition, {
+    compareType: CF.TextCompareType.equalsTo, expected: 'NewYork', useWildCards: false, ignoreCase: true,
+  });
+  if (kind === 'official') {
+    table.rowFilter().addFilterItem(1, condition);
+    table.rowFilter().filter();
+  } else {
+    const slicer = sheet.slicers.add('slicer1', 'TableCities', 'City');
+    sessions.ours = { wb, sheet, slicer, table };
+    slicer.slicerData.doFilter('City', { exclusiveRowIndexes: [0] });
+  }
+  record('table.filtered', () => ({
+    visible: [0, 1, 2, 3, 4].map(r => sheet.getRowVisible(r)),
+  }));
+  record('table.filterJson', () => {
+    const json = table.rowFilter().toJSON();
+    return { typeName: json.typeName, filteredOutRows: (json.filteredOutRows || []).slice().sort((a, b) => a - b), filterItemMap: plain(json.filterItemMap || {}) };
+  });
+  if (kind === 'official') {
+    table.rowFilter().removeFilterItems(1);
+    table.rowFilter().filter();
+  } else {
+    sessions.ours.slicer.slicerData.doUnfilter('City');
+  }
+  record('table.unfiltered', () => ({ visible: [0, 1, 2, 3, 4].map(r => sheet.getRowVisible(r)) }));
+  // ---- 3) in-sheet slicer object record (ours only; the local trial lacks the UI runtime).
+  record('slicer.object', () => {
+    if (!sessions.ours) return { skipped: 'official Sheets.Slicers runtime not part of the local trial packages' };
+    const { sheet: sh, slicer } = sessions.ours;
+    const events = [];
+    sh.bind(GC.Spread.Sheets.Events.SlicerChanged, (sender, args) => events.push(args.propertyName));
+    slicer.captionName('Towns');
+    slicer.columnCount(2);
+    slicer.itemHeight(28);
+    slicer.showHeader(false);
+    slicer.sortState(GC.Spread.Sheets.SortState.descending);
+    slicer.multiSelect(true);
+    slicer.position(new GC.Spread.Sheets.Point(40, 40));
+    slicer.disableResizingAndMoving(true);
+    const json = plain(slicer.toJSON());
+    delete json.toImageSrc;
+    return { events: events.slice(), json, items: null };
+  });
+  sessions[kind] = Object.assign(sessions[kind] || {}, { wb, host, sheet, table });
+  return out;
+}
+window.slicerDiagnostics = async () => {
+  const GC = await loadOfficialSlicers();
+  return {
+    topSlicers: GC.Spread.Slicers ? Object.keys(GC.Spread.Slicers).filter(k => !/^[a-z]{3}$/.test(k)) : null,
+    sheetsSlicers: !!GC.Spread.Sheets.Slicers,
+    sheetSlicers: typeof (new GC.Spread.Sheets.Workbook()).getActiveSheet().slicers,
+  };
+};
+window.slicerScenario = {
+  async run(kind) { return runLib(kind); },
+  // Clean visual state for our slicer screenshots (the trial has no UI runtime to shoot).
+  async reset(kind) {
+    const { sheet, slicer } = sessions[kind];
+    const GC = OpenSheets;
+    slicer.showHeader(true);
+    slicer.columnCount(1);
+    slicer.itemHeight(21);
+    slicer.sortState(GC.Spread.Sheets.SortState.ascending);
+    slicer.multiSelect(false);
+    slicer.disableResizingAndMoving(false);
+    slicer.captionName('City');
+    slicer.style('SlicerStyleLight1');
+    slicer.slicerData.doUnfilter('City');
+    slicer.position(new GC.Spread.Sheets.Point(60, 60));
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const panel = sessions[kind].host.querySelector('.opensheets-slicer');
+    const rect = panel.getBoundingClientRect();
+    return { clip: { x: rect.left, y: rect.top, width: rect.width, height: rect.height } };
+  },
+  async clickPoints(kind) {
+    const { slicer } = sessions[kind];
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const panel = sessions[kind].host.querySelector('.opensheets-slicer');
+    const rect = panel.getBoundingClientRect();
+    const itemHeight = Number(slicer.itemHeight());
+    const centre = index => ({
+      left: rect.left + 9 + (Number(slicer.width()) - 23) / 2,
+      top: rect.top + 29 + index * (itemHeight + 6) + (itemHeight + 3) / 2,
+    });
+    window.__hits2 = [];
+    panel.addEventListener('pointerdown', e => window.__hits2.push({ x: Math.round(e.clientX - rect.left), y: Math.round(e.clientY - rect.top), ctrl: e.ctrlKey || e.metaKey }), true);
+    return { item0: centre(0), item1: centre(1), item2: centre(2), bbox: { x: rect.left, y: rect.top, width: rect.width, height: rect.height } };
+  },
+  async readState(kind) {
+    const { sheet, slicer, table } = sessions[kind];
+    const json = plain(slicer.toJSON());
+    delete json.toImageSrc;
+    return {
+      visibleRows: [0, 1, 2, 3, 4].map(r => sheet.getRowVisible(r)),
+      slicerJson: json,
+      filterJson: plain(table.rowFilter().toJSON()),
+    };
+  },
+  async dispose(kind) {
+    const session = sessions[kind];
+    if (!session) return;
+    try { session.wb.destroy(); } catch { /* ignore */ }
+    session.host.remove();
+    delete sessions[kind];
+  },
+};
+</script></body></html>

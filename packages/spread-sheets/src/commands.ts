@@ -1,11 +1,12 @@
-import { clone } from './primitives.js';
 export interface CommandOptions {
   cmd: string;
   [key: string]: unknown;
 }
 export interface Command {
   canUndo?: boolean;
-  execute(context: unknown, options: CommandOptions, isUndo: boolean): boolean | void;
+  // The trial's built-ins pass raw values through (some return objects, e.g.
+  // `{ ignoreCancelDefault: true }`); TASK 44 widened the return type.
+  execute(context: unknown, options: CommandOptions, isUndo: boolean): unknown;
 }
 interface HistoryEntry {
   options: CommandOptions;
@@ -93,15 +94,21 @@ export class CommandManager {
   }
   execute(options: CommandOptions): boolean {
     const command = this.commands.get(options.cmd);
-    if (!command) return false;
-    if (command.execute(this.context, options, false) === false) return false;
+    if (!command) return undefined as unknown as boolean; // trial: unknown commands return null (probed via `collapseRowOutline`, `DefineColumn`, ...)
+    // The trial passes the built-in command's raw return through: some
+    // commands return `undefined` (JSON `null`), one returns an options
+    // object; only an explicit `false` marks failure (TASK 44 probes).
+    const result = command.execute(this.context, options, false);
+    if (result === false) return false;
     if (command.canUndo && this.context.options?.allowUndo !== false)
       this.history.add({
-        options: clone(options),
+        // Shallow copy only: options may legitimately carry live objects
+        // (sheet instances, Range arrays), which a deep clone would recurse into.
+        options: { ...options },
         undo: () => command.execute(this.context, options, true) !== false,
         redo: () => command.execute(this.context, options, false) !== false,
       });
-    return true;
+    return result as boolean;
   }
   setShortcutKey(
     name: string | undefined,

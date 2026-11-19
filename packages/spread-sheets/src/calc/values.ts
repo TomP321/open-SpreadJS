@@ -6,7 +6,7 @@
  * first-class value is what allows functions such as ROW, OFFSET and INDEX to
  * observe the address of their argument instead of only its contents.
  */
-import type { Worksheet } from '../model.js';
+import type { Worksheet } from '../worksheet.js';
 
 /** Error values used by the engine. */
 export const ErrorCode = {
@@ -23,6 +23,24 @@ export const ErrorCode = {
 } as const;
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
 
+/**
+ * Numeric error identities, copied from what the official 19.2.5 trial answers
+ * for `JSON.stringify(…getValue())` (its error object serialises as
+ * `{ _calcError, _code }` through a `toJSON` method on the prototype).
+ */
+export const ErrorCodeValueMap: Record<string, number> = {
+  '#NULL!': 0,
+  '#DIV/0!': 7,
+  '#VALUE!': 15,
+  '#REF!': 23,
+  '#NAME?': 29,
+  '#NUM!': 36,
+  '#N/A': 42,
+  '#GETTING_DATA': 101,
+  '#SPILL!': 99,
+  '#CALC!': 100,
+};
+
 /** A calculation error, matching the public `GC.Spread.CalcEngine.CalcError`. */
 export class CalcError {
   error: string;
@@ -34,6 +52,14 @@ export class CalcError {
   }
   toString(): string {
     return this.error;
+  }
+  /** A copy of this error, like the trial's `clone`. */
+  clone(): CalcError {
+    return new CalcError(this.error);
+  }
+  /** The identity the trial serialises an error with. */
+  toJSON(): { _calcError: string; _code: number } {
+    return { _calcError: this.error, _code: ErrorCodeValueMap[this.error] ?? 0 };
   }
 }
 
@@ -131,7 +157,22 @@ export class SparklineExValue {
   constructor(public name: string, public value: Record<string, unknown>) {}
   toString(): string { return ''; }
 }
-export type ScalarValue = number | string | boolean | Date | CalcError | SparklineExValue | null;
+export class BarcodeExValue {
+  /**
+   * TASK 46: the trial reports `BC_*` results as a `SparklineExValue`-shaped record whose
+   * payload carries `isBarcode: true` (probe bc46p); our own class stays distinct so the
+   * renderer can branch on it.
+   */
+  readonly typeName = 'SparklineExValue';
+  constructor(public name: string, public value: Record<string, unknown>) {}
+  toString(): string { return ''; }
+}
+export class ImageExValue {
+  readonly typeName = 'ImageExValue';
+  constructor(public value: Record<string, unknown>) {}
+  toString(): string { return ''; }
+}
+export type ScalarValue = number | string | boolean | Date | CalcError | SparklineExValue | BarcodeExValue | ImageExValue | null;
 export type Value = ScalarValue | ReferenceValue | CalcArray | LambdaValue | MissingValue;
 
 export function isLambda(value: unknown): value is LambdaValue {

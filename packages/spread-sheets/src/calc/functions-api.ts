@@ -29,6 +29,16 @@ export interface CalcFunction {
 
 const globalFunctions = new Map<string, Function>();
 
+/**
+ * The trial's `addCustomFunction` rejects anything that is not a registered
+ * function object - `wb.addCustomFunction('NAME', fn, 1, 1)` (the pre-15 legacy
+ * form) throws `invalid custom function`.
+ */
+export function assertCustomFunction(fn: unknown): void {
+  if (!fn || typeof fn !== 'object' || typeof (fn as { evaluate?: unknown }).evaluate !== 'function')
+    throw new Error('invalid custom function');
+}
+
 /** Represents a user defined (or built-in style) spreadsheet function. */
 export class Function {
   name: string;
@@ -36,8 +46,8 @@ export class Function {
   maxArgs: number;
   typeName = 'Function';
   private readonly functionDescription?: IFunctionDescription;
-  constructor(name: string, minArgs = 0, maxArgs = 0, description?: IFunctionDescription) {
-    this.name = name;
+  constructor(name = '', minArgs = 0, maxArgs = 0, description?: IFunctionDescription) {
+    this.name = name ?? '';
     this.minArgs = minArgs;
     this.maxArgs = maxArgs;
     this.functionDescription = description;

@@ -187,3 +187,12 @@ export class EventHub {
       }
   }
 }
+
+/**
+ * `GC.Spread.Common.Events` (TASK 44). Trial reflection: constructible class
+ * with no instance members; holds the static user-event name
+ * `CurrentUserChanged` (trial: `typeof === 'string'`, length 18).
+ */
+export class CommonEvents {
+  static CurrentUserChanged = 'CurrentUserChanged';
+}

@@ -1,0 +1,19 @@
+{
+  "name": "dropin-b-vite-react",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "build": "vite build" },
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{TARBALLS}}/opensheets-spread-sheets-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-react": "file:{{TARBALLS}}/opensheets-spread-sheets-react-{{VERSION}}.tgz",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/node": "^22.0.0"
+  }
+}

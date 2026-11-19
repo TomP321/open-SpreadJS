@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>TableSheet panel comparison</title></head><body>
+<script type="module">
+// Side-isolated page: ?side=official loads only the official library + its CSS,
+// ?side=ours loads only our library + our CSS, so each panel is styled by its own code.
+const side = new URLSearchParams(location.search).get('side') ?? 'official';
+const libs = side === 'ours'
+  ? { load: async () => { await import('@opensheets/spread-sheets/styles/gc.spread.sheets.css'); return (await import('@opensheets/spread-sheets')).default; } }
+  : { load: async () => { await import('@mescius/spread-sheets/styles/gc.spread.sheets.css'); await import('@mescius/spread-sheets-tablesheet'); return (await import('@mescius/spread-sheets')).default; } };
+const GC = await libs.load();
+window.panelLibraries = { official: null, ours: null };
+window.panelLibraries[side] = GC;
+
+// Shared scenario builder: creates a TableSheet + TableSheetPanel for the named scenario.
+// Scenarios: default | groups | grouped-view | toggled | drag-group | narrow
+window.panelScenario = async (name) => {
+  const narrow = name === 'narrow';
+  document.body.innerHTML = '<div id="wrap" style="position:relative;width:820px;height:500px;margin:8px">'
+    + '<div id="host" style="position:absolute;left:0;top:0;width:' + (narrow ? 630 : 580) + 'px;height:500px"></div>'
+    + '<div id="panel" style="position:absolute;right:0;top:0;width:' + (narrow ? 180 : 230) + 'px;height:500px"></div></div>';
+  const data = Array.from({ length: 12 }, (_, i) => ({
+    id: i, name: 'Name ' + i, city: i % 2 ? 'Paris' : 'Rome', score: i * 2, active: i % 2 === 0,
+  }));
+  const spread = new GC.Spread.Sheets.Workbook(document.getElementById('host'), { sheetCount: 0 });
+  window.probeSpread = spread;
+  const table = spread.dataManager().addTable('t', { data });
+  const view = table.addView('v', [
+    { value: 'id', caption: 'ID', width: 80 },
+    { value: 'name', caption: 'Name', width: 130 },
+    { value: 'city', caption: 'City', width: 100 },
+    { value: 'score', caption: 'Score', width: 90 },
+    { value: 'active', caption: 'Active', width: 90 },
+    { value: '=SUM([@score])', caption: 'Total', width: 90 },
+  ]);
+  await view.fetch();
+  const sheet = spread.addSheetTab(0, 'Data', GC.Spread.Sheets.SheetType.tableSheet);
+  sheet.setDataView(view);
+  window.probeSheet = sheet;
+  window.probeView = view;
+  const host = document.getElementById('panel');
+  window.probeHost = host;
+  const panel = new GC.Spread.Sheets.TableSheet.TableSheetPanel('fields', sheet, host);
+  window.probePanel = panel;
+  if (name === 'groups' || name === 'narrow') {
+    sheet.groupBy([{ field: 'city', caption: 'City', summaryFields: [{ formula: '=SUM([score])', relateTo: 'score' }] },
+      { field: 'active', caption: 'Active' }]);
+  }
+  if (name === 'grouped-view') {
+    sheet.groupBy([{ field: 'city', caption: 'City', summaryFields: [{ formula: '=SUM([score])', relateTo: 'score' }] }]);
+  }
+  // Interactions after the panel had time to build its (canvas) field list.
+  await new Promise(r => setTimeout(r, 700));
+  if (name === 'toggled') {
+    // Toggle the visibility of the "Name" field through the panel UI only.
+    if (!window.panelToggleField(2)) sheet.setColumnVisible?.(2 + (sheet._groupColumnCount?.() ?? 0), false);
+  }
+  if (name === 'drag-group') {
+    // Drag the "Name" field row (mini-sheet row index 2) onto the group list.
+    if (!window.panelDragField(2)) {
+      const labels = host.querySelectorAll('label');
+      const list = host.querySelector('div,ul');
+      labels[1]?.dispatchEvent(new Event('dragstart'));
+      list?.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }));
+    }
+  }
+  await new Promise(r => setTimeout(r, 400));
+  return side;
+};
+
+// Locate the mini-workbook canvas (the trial and our rewritten panel render the field
+// list into an embedded Spread canvas; the old DOM panel returns null).
+window.panelMini = () => {
+  const fp = document.querySelector('.gc-table-sheet-field-panel');
+  if (!fp || !window.probeSpread) return null;
+  const GC = window.panelLibraries.official ?? window.panelLibraries.ours;
+  let wb;
+  const panel = GC.Spread.Sheets.TableSheet.TableSheetPanel.findControl(document.getElementById('panel'));
+  if (panel && typeof panel._miniWorkbook === 'function') wb = panel._miniWorkbook(); // ours
+  if (!wb) { try { wb = GC.Spread.Sheets.findControl(fp); } catch { wb = undefined; } } // trial
+  if (!wb) return null;
+  const canvas = fp.querySelector('canvas');
+  return { wb, sheet: wb.getActiveSheet(), canvas };
+};
+window.panelToggleField = (row) => {
+  const m = window.panelMini();
+  if (!m) return false;
+  const r = m.canvas.getBoundingClientRect();
+  const x = r.x + 14, y = r.y + row * 20 + 10; // checkbox column center, given row
+  const t = document.elementFromPoint(x, y);
+  for (const ty of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
+    t.dispatchEvent(new MouseEvent(ty, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+  return true;
+};
+window.panelDragField = (row, targetSel = '.gc-table-sheet-group-list') => {
+  const m = window.panelMini();
+  const list = document.querySelector(targetSel);
+  if (!m || !list) return false;
+  // Real input fires pointer events alongside mouse events on whatever element is
+  // under the cursor; dispatch the way a browser would (hit-tested target).
+  const fire = (type, x, y, buttons) => {
+    const init = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons, pointerId: 1 };
+    const target = document.elementFromPoint(x, y) ?? document;
+    (type.startsWith('pointer') ? target.dispatchEvent(new PointerEvent(type, init))
+      : target.dispatchEvent(new MouseEvent(type, init)));
+  };
+  const r = m.canvas.getBoundingClientRect();
+  const lr = list.getBoundingClientRect();
+  const sx = r.x + 40, sy = r.y + row * 20 + 10;
+  fire('pointerdown', sx, sy, 1);
+  fire('mousedown', sx, sy, 1);
+  const steps = 8;
+  for (let i = 1; i <= steps; i++) {
+    const x = sx + (lr.x + 120 - sx) * i / steps, y = sy + (lr.y + 40 - sy) * i / steps;
+    fire('pointermove', x, y, 1);
+    fire('mousemove', x, y, 1);
+  }
+  fire('pointerup', lr.x + 120, lr.y + 40, 0);
+  fire('mouseup', lr.x + 120, lr.y + 40, 0);
+  return true;
+};
+
+// Public-API state of the embedded mini-workbook (trial keeps its field list there).
+window.panelFieldSheet = () => {
+  const m = window.panelMini();
+  if (!m) return null;
+  const s = m.sheet;
+  const rc = s.getRowCount(), cc = s.getColumnCount();
+  const clean = v => (v && typeof v === 'object' && 'richText' in v) ? { richText: v.richText, text: v.text }
+    : (v && typeof v === 'object' && '_calcError' in v) ? { _calcError: v._calcError } : v;
+  return { rc, cc,
+    values: Array.from({ length: rc }, (_, r) => Array.from({ length: cc }, (_, c) => clean(s.getValue(r, c)))),
+    texts: Array.from({ length: rc }, (_, r) => Array.from({ length: cc }, (_, c) => { try { return s.getText(r, c); } catch { return null; } })),
+    colWidths: Array.from({ length: cc }, (_, c) => s.getColumnWidth(c)),
+    rowHeights: Array.from({ length: rc }, (_, r) => s.getRowHeight(r)) };
+};
+
+// Compact structure dump: tag/classes/geometry/text/attributes, no styles.
+window.panelStructure = (selector = '#panel') => {
+  const root = document.querySelector(selector);
+  if (!root) return 'MISSING ' + selector;
+  const box = root.getBoundingClientRect();
+  const fmt = (el, depth) => {
+    const r = el.getBoundingClientRect();
+    const own = [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim());
+    let line = '  '.repeat(depth) + el.tagName.toLowerCase()
+      + (el.id ? '#' + el.id : '')
+      + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).sort().join('.') : '')
+      + ' ' + Math.round(r.x - box.x) + ',' + Math.round(r.y - box.y) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+    if (own.length) line += ' text=' + JSON.stringify(own.join('|').slice(0, 60));
+    for (const name of ['role', 'aria-label', 'title', 'tabindex', 'draggable', 'type', 'checked']) {
+      if (el[name] !== undefined && el[name] !== false && el[name] !== '') line += ' ' + name + '=' + JSON.stringify(name === 'checked' || name === 'type' ? el[name] : el.getAttribute(name));
+    }
+    if (el.tagName === 'INPUT') line += ' value=' + JSON.stringify(el.value);
+    if (getComputedStyle(el).display === 'none') line += ' display=none';
+    const out = [line];
+    for (const child of el.children) out.push(...fmt(child, depth + 1));
+    return out;
+  };
+  return fmt(root, 0).join('\n');
+};
+
+// Full dump with computed styles (kept for debugging diffs manually).
+window.panelDump = (selector) => {
+  const root = document.querySelector(selector);
+  if (!root) return 'MISSING ' + selector;
+  const box = root.getBoundingClientRect();
+  const fmt = (el, depth) => {
+    const cs = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    const own = [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim());
+    let line = '  '.repeat(depth) + el.tagName.toLowerCase()
+      + (el.id ? '#' + el.id : '')
+      + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).join('.') : '')
+      + ' ' + Math.round(r.x - box.x) + ',' + Math.round(r.y - box.y) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)
+      + (own.length ? ' text=' + JSON.stringify(own.join('|')) : '');
+    if (el.tagName === 'INPUT') line += ' type=' + el.type + ' checked=' + el.checked;
+    if (el.draggable) line += ' draggable=' + el.draggable;
+    line += ' {' + ['fontSize', 'fontFamily', 'color', 'backgroundColor', 'borderTop', 'borderBottom', 'borderLeft', 'borderRight',
+      'padding', 'margin', 'overflow', 'position', 'display', 'lineHeight', 'textIndent', 'cursor']
+      .map(k => k + ':' + cs[k]).join(';') + '}';
+    const out = [line];
+    for (const child of el.children) out.push(...fmt(child, depth + 1));
+    return out;
+  };
+  return fmt(root, 0).join('\n');
+};
+
+// Observable state through the public APIs of the sheet/view.
+window.panelState = () => {
+  const sheet = window.probeSheet, view = window.probeView, host = document.getElementById('panel');
+  if (!sheet || !view) return null;
+  const GC = window.panelLibraries.official ?? window.panelLibraries.ours;
+  return {
+    groups: (() => { try { return JSON.parse(JSON.stringify(sheet.groupBy() ?? [])); } catch (e) { return 'err:' + e; } })(),
+    viewColumns: (() => { try { return (view.getColumn() ?? []).map(c => ({ value: String(c.value ?? c.name ?? ''), visible: c.visible })); } catch (e) { return 'err:' + e; } })(),
+    panelFound: !!GC.Spread.Sheets.TableSheet.TableSheetPanel.findControl(host),
+  };
+};
+window.panelReady = true;
+</script></body></html>

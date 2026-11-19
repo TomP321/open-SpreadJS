@@ -1,4 +1,4 @@
-import type { Worksheet } from '../model.js';
+import type { Worksheet } from '../worksheet.js';
 import type { RowFilterBase } from './filters.js';
 import { Condition } from './conditions.js';
 import { GC } from '../generated/enums.js';
@@ -29,7 +29,7 @@ export function filterMenu(sheet: Worksheet, filter: RowFilterBase, column: numb
   const apply = (conditions: Condition[]) => { filter.removeFilterItems(column); filter.addFilterItem(column, conditions); filter.filter(column); close(); };
   const row = (label: string, icon?: string, action?: () => void, disabled = false) => {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'opensheets-filter-command'; const caption = document.createElement('span'); caption.textContent = label; button.append(caption); button.disabled = disabled; button.setAttribute('role', 'menuitem');
-    if (icon) button.prepend(menuIcon(icon, /clear|filter/i.test(icon) ? 18 : 16));
+    if (icon) { const canvas = menuIcon(icon, /clear|filter|listCheck/i.test(icon) ? 18 : 16, disabled); if (canvas.width / (window.devicePixelRatio || 1) === 18) canvas.classList.add('opensheets-filter-icon-18'); button.prepend(canvas); }
     if (action) button.addEventListener('click', action); root.append(button); return button;
   };
   const submenu = (button: HTMLButtonElement, items: { label: string; action: () => void; color?: string; heading?: string }[]) => {
@@ -77,7 +77,8 @@ export function filterMenu(sheet: Worksheet, filter: RowFilterBase, column: numb
   if (visible.filterByColor !== false) submenu(row('Filter By Color', undefined, undefined, !colors.size), colorItems(false));
   if (visible.filterByValue !== false) {
     const choices = kind === 'Text' ? ['Equals...', 'Does Not Equal...', 'Begins With...', 'Ends With...', 'Contains...', 'Does Not Contain...', 'Custom Filter...'] : kind === 'Number' ? ['Equals...', 'Does Not Equal...', 'Greater Than...', 'Greater Than Or Equal To...', 'Less Than...', 'Less Than Or Equal To...', 'Between...', 'Top 10...', 'Above Average', 'Below Average', 'Custom Filter...'] : ['Equals...', 'Before...', 'After...', 'Between...', 'Tomorrow', 'Today', 'Yesterday', 'Next Week', 'This Week', 'Last Week', 'Next Month', 'This Month', 'Last Month', 'Next Quarter', 'This Quarter', 'Last Quarter', 'Next Year', 'This Year', 'Last Year', 'Year To Date', 'All Dates in Period', 'Custom Filter...'];
-    const filterButton = row(`${kind} Filters`);
+    // The trial marks the value-filter row with a check tile only while the column is filtered.
+    const filterButton = row(`${kind} Filters`, filter.isFiltered(column) ? 'listCheck' : undefined);
     submenu(filterButton, choices.map(label => ({ label, action: () => {
       if (['Top 10...', 'Above Average', 'Below Average', 'Next Week', 'This Week', 'Last Week', 'Next Month', 'This Month', 'Last Month', 'Next Quarter', 'This Quarter', 'Last Quarter', 'Next Year', 'This Year', 'Last Year', 'Year To Date', 'All Dates in Period'].includes(label)) { console.warn(`NotImplemented: FilterMenu.${label}`); return; }
       const predefined: Record<string, number> = { 'Equals...': 0, 'Does Not Equal...': 1, 'Greater Than...': 2, 'After...': 2, 'Greater Than Or Equal To...': 3, 'Less Than...': 4, 'Before...': 4, 'Less Than Or Equal To...': 5, 'Begins With...': 6, 'Ends With...': 8, 'Contains...': 10, 'Does Not Contain...': 11 };
@@ -103,38 +104,50 @@ export function filterMenu(sheet: Worksheet, filter: RowFilterBase, column: numb
       const ctx = canvas.getContext('2d'); if (!ctx) return; ctx.scale(dpr, dpr); ctx.fillStyle = 'white'; ctx.fillRect(0, 0, width, height); ctx.font = getComputedStyle(root).font; ctx.textBaseline = 'alphabetic';
       const list = matches(), rows = Math.floor((height - 2) / 20), scrollW = list.length > rows ? 22 : 0;
       offset = Math.max(0, Math.min(offset, Math.max(0, list.length - rows)));
-      for (let i = offset; i < Math.min(list.length, offset + rows); i++) {
+      // The trial also paints the partially visible row under the last full one (clipped by
+      // the canvas box), so the value list fills right down to its bottom border.
+      const drawCount = Math.min(list.length, offset + Math.ceil((height - 2) / 20));
+      for (let i = offset; i < drawCount; i++) {
         const [key, value] = list[i], y = (i - offset) * 20;
-        ctx.fillStyle = selected.has(key) ? '#000' : 'white'; ctx.fillRect(11, y + 4, 12, 12); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(11.5, y + 4.5, 11, 11); if (!selected.has(key)) { ctx.strokeStyle = '#b6b6b6'; ctx.strokeRect(12.5, y + 5.5, 9, 9); }
+        ctx.fillStyle = selected.has(key) ? '#000' : 'white'; ctx.fillRect(11, y + 4, 12, 12); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(11.5, y + 4.5, 11, 11);
+        if (!selected.has(key)) { ctx.strokeStyle = '#6d6d6d'; ctx.lineWidth = .5; ctx.strokeRect(12.25, y + 5.25, 9.5, 9.5); ctx.lineWidth = 1; }
         if (selected.has(key)) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(13, y + 10); ctx.lineTo(16, y + 13); ctx.lineTo(21, y + 7); ctx.stroke(); }
         ctx.save(); ctx.beginPath(); ctx.rect(0, y, width - scrollW, 20); ctx.clip();
         ctx.fillStyle = 'black'; ctx.fillText(value == null || key === '' ? '(Blanks)' : value instanceof Date ? sheet.getText(range.row + [...values.keys()].indexOf(key), range.col + column) : key, 27, y + 13);
         ctx.restore();
       }
       if (scrollW) {
-        const sx = width - 22;
-        ctx.fillStyle = '#f6f6f6'; ctx.fillRect(sx + 1, 0, 3, height); ctx.fillRect(sx + 19, 0, 3, height);
-        ctx.strokeStyle = '#ababab'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(sx + .5, 0); ctx.lineTo(sx + .5, height); ctx.moveTo(sx + 4.5, 0); ctx.lineTo(sx + 4.5, height); ctx.moveTo(sx + 18.5, 0); ctx.lineTo(sx + 18.5, height); ctx.stroke();
-        ctx.fillStyle = 'white'; ctx.fillRect(sx + 5, 0, 13, height);
-        ctx.fillStyle = 'white'; ctx.fillRect(sx + 5, 0, 13, 15);
-        ctx.strokeStyle = '#ababab'; ctx.beginPath(); ctx.moveTo(sx + 5, 15.5); ctx.lineTo(sx + 18, 15.5); ctx.stroke();
-        ctx.fillStyle = '#eaeaea'; ctx.fillRect(sx + 4, height - 16, 15, 16);
-        ctx.fillStyle = '#777';
-        ctx.beginPath(); ctx.moveTo(sx + 10, 10); ctx.lineTo(sx + 11.5, 5); ctx.lineTo(sx + 13, 10); ctx.closePath(); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(sx + 10, height - 10); ctx.lineTo(sx + 11.5, height - 5); ctx.lineTo(sx + 13, height - 10); ctx.closePath(); ctx.fill();
+        // Trial: a #f6f6f6 22px gutter at the list's right edge holding a 15px white
+        // scrollbar box (#ababab 1px frame): arrow button rows at both ends with a
+        // solid #777 triangle, a framed thumb, and #eaeaea track between thumb and buttons.
+        const sx = width - 22, cx = sx + 11.5, buttonH = 15, trackH = height - buttonH * 2;
+        const thumbH = Math.max(16, Math.round(trackH * rows / list.length));
+        const thumbY = buttonH + Math.round((trackH - thumbH) * offset / Math.max(1, list.length - rows));
+        ctx.fillStyle = '#f6f6f6'; ctx.fillRect(sx, 0, 22, height);
+        ctx.fillStyle = '#ababab'; ctx.fillRect(sx, 0, 1, height);
+        ctx.fillStyle = '#eaeaea'; ctx.fillRect(sx + 4, buttonH, 18, trackH);
+        const frame = (top: number, bottom: number, thumbTopEdge: number) => {
+          ctx.fillStyle = 'white'; ctx.fillRect(sx + 5, top + 1, 13, bottom - top - 1);
+          ctx.fillStyle = '#ababab';
+          ctx.fillRect(sx + 4, top, 15, thumbTopEdge); ctx.fillRect(sx + 4, bottom - 1, 15, 1);
+          ctx.fillRect(sx + 4, top, 1, bottom - top); ctx.fillRect(sx + 18, top, 1, bottom - top);
+        };
+        frame(0, buttonH, 1); frame(height - buttonH, height, 1); frame(thumbY, thumbY + thumbH, 1);
+        ctx.fillStyle = '#777777';
+        ctx.beginPath(); ctx.moveTo(cx, 4.5); ctx.lineTo(cx + 4.75, 8.6); ctx.lineTo(cx - 4.75, 8.6); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(cx, height - 5.4); ctx.lineTo(cx + 4.75, height - 9.5); ctx.lineTo(cx - 4.75, height - 9.5); ctx.closePath(); ctx.fill();
       }
       ok.disabled = selected.size === 0;
     };
     const toggle = (key: string) => { if (selected.has(key)) selected.delete(key); else selected.add(key); draw(); };
-    for (const all of [true, false]) { const b = document.createElement('button'); b.textContent = all ? 'Check all' : 'Uncheck all'; b.prepend(menuIcon(all ? 'check' : 'uncheck')); b.addEventListener('click', () => { for (const [key] of matches()) { if (all) selected.add(key); else selected.delete(key); } draw(); }); actions.append(b); }
+    for (const all of [true, false]) { const b = document.createElement('button'); const lbl = document.createElement('span'); lbl.textContent = all ? 'Check all' : 'Uncheck all'; b.append(lbl); b.prepend(menuIcon(all ? 'check' : 'uncheck')); b.addEventListener('click', () => { for (const [key] of matches()) { if (all) selected.add(key); else selected.delete(key); } draw(); }); actions.append(b); }
     search.addEventListener('input', () => { offset = 0; focus = 0; draw(); });
     canvas.addEventListener('click', e => { const index = offset + Math.floor((e.clientY - canvas.getBoundingClientRect().top) / 20); const entry = matches()[index]; if (entry) { focus = index; toggle(entry[0]); } });
     canvas.addEventListener('wheel', e => { e.preventDefault(); offset += Math.sign(e.deltaY); draw(); }, { passive: false });
     canvas.addEventListener('keydown', e => { if (e.key === ' ' && matches()[focus]) { e.preventDefault(); toggle(matches()[focus][0]); } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); focus = Math.max(0, Math.min(matches().length - 1, focus + (e.key === 'ArrowDown' ? 1 : -1))); if (focus < offset || focus >= offset + canvas.clientHeight / 20) offset = focus; draw(); } });
     const footer = document.createElement('div'); footer.className = 'opensheets-filter-footer'; root.append(footer);
-    const ok = document.createElement('button'); ok.textContent = 'OK'; ok.addEventListener('click', () => { if (selected.size === sorted.length) { filter.unfilter(column); close(); } else apply([new Condition(CF.ConditionType.areaCondition, { expected: sorted.filter(([k]) => selected.has(k)).map(([, v]) => v) })]); });
-    const cancel = document.createElement('button'); cancel.textContent = 'Cancel'; cancel.addEventListener('click', close); footer.append(ok, cancel);
+    const ok = document.createElement('button'); ok.type = 'button'; ok.textContent = 'OK'; ok.addEventListener('click', () => { if (selected.size === sorted.length) { filter.unfilter(column); close(); } else apply([new Condition(CF.ConditionType.areaCondition, { expected: sorted.filter(([k]) => selected.has(k)).map(([, v]) => v) })]); });
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.addEventListener('click', close); footer.append(ok, cancel);
     requestAnimationFrame(draw);
     if (typeof ResizeObserver !== 'undefined') { const observer = new ResizeObserver(() => { if (root.isConnected) draw(); else observer.disconnect(); }); observer.observe(root); }
   }

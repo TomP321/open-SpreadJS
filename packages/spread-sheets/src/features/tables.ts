@@ -4,310 +4,33 @@ import { CellBindingSource, getPath, setPath } from './binding.js';
  * support and JSON round-trip. Styles are resolved lazily so table edits are
  * reflected by getActualStyle and the renderer without copying cell styles.
  */
-import { Style, LineBorder, Range, clone } from '../primitives.js';
+import { Style, Range } from '../primitives.js';
 import { Events } from '../events.js';
-import type { Worksheet } from '../model.js';
-import { HideRowFilter, filterFromJSON, filterToJSON } from './filters.js';
-import { deserializeValue, serializeValue, styleToJSON, type JsonRecord } from '../serialization.js';
-import { TABLE_THEME_JSON, THEME_COLORS, THEME_COLORS_2013, type ThemeJSON, type ThemeStyleJSON } from './table-theme-data.js';
+import type { Worksheet } from '../worksheet.js';
+import { HideRowFilter } from './filters.js';
+import { type JsonRecord } from '../serialization.js';
+import { type ThemeJSON } from './table-theme-data.js';
+import { TableColumn, TableTheme, TableThemes, themeByName } from './table-style.js';
+import { CustomThemeManagerBase } from './workbook-managers.js';
+import { TableSlicerData } from './slicers/table-data.js';
 
-let themedDocument: boolean | undefined;
-/** The bundled theme stylesheet switches the palette to the Excel 2013 one. */
-export function usingThemedDocument(): boolean {
-  if (themedDocument !== undefined) return themedDocument;
-  if (typeof document === 'undefined') return (themedDocument = false);
-  themedDocument = !!document.querySelector(
-    'link[href*="gc.spread.sheets"], style[data-vite-dev-id*="gc.spread.sheets"]',
-  );
-  return themedDocument;
-}
-export function resolveColor(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
-  const palette = usingThemedDocument() ? THEME_COLORS_2013 : THEME_COLORS;
-  if (Object.hasOwn(palette, value)) return palette[value];
-  if (Object.hasOwn(THEME_COLORS, value)) return THEME_COLORS[value];
-  return value;
-}
-
-function styleFromTheme(style?: ThemeStyleJSON): Style | undefined {
-  if (!style) return undefined;
-  const result = new Style();
-  for (const [key, raw] of Object.entries(style)) {
-    if (raw === undefined || raw === null) continue;
-    if (key.startsWith('border') && typeof raw === 'object') {
-      const border = raw as { color?: string; style?: number };
-      result[key] = new LineBorder(String(border.color ?? 'black'), Number(border.style ?? 0));
-    } else result[key] = clone(raw);
-  }
-  return result;
-}
-/** Resolves theme colour tokens against the active document palette. */
-function resolveThemeStyle(style: Style | undefined, palette?: Record<string, string>): Style | undefined {
-  if (!style) return undefined;
-  const result = Object.assign(new Style(), style);
-  const color = (value: unknown) => {
-    if (typeof value !== 'string' || !palette?.[value]) return resolveColor(value);
-    const base = value.replace(/ -?\d+(?:\.\d+)?$/, '');
-    // Public built-in palette facts include the reference's quantized tints.
-    for (const known of [THEME_COLORS, THEME_COLORS_2013])
-      if (known[value] && known[base] && palette[base] && known[base].toLowerCase() === palette[base].toLowerCase()) return known[value];
-    return palette[value];
-  };
-  for (const key of ['backColor', 'foreColor']) if (typeof result[key] === 'string') result[key] = color(result[key]);
-  for (const key of ['borderLeft', 'borderRight', 'borderTop', 'borderBottom', 'borderHorizontal', 'borderVertical']) {
-    const border = result[key] as LineBorder | undefined;
-    if (!border) continue;
-    const resolved = new LineBorder(String(color(border.color)), border.style);
-    (resolved as unknown as JsonRecord).level = 20;
-    result[key] = resolved;
-  }
-  return result;
-}
-function mergeStyle(target: Style, source?: Style): void {
-  if (source) Object.assign(target, source);
-}
-
-export class TableStyle {
-  [key: string]: unknown;
-  constructor(
-    backColor?: unknown,
-    foreColor?: string,
-    font?: string,
-    public borderLeft?: LineBorder,
-    public borderTop?: LineBorder,
-    public borderRight?: LineBorder,
-    public borderBottom?: LineBorder,
-    public borderHorizontal?: LineBorder,
-    public borderVertical?: LineBorder,
-    textDecoration?: number,
-    fontStyle?: string,
-    fontWeight?: string,
-    fontSize?: string,
-    fontFamily?: string,
-  ) {
-    if (backColor !== undefined) this.backColor = backColor;
-    if (foreColor !== undefined) this.foreColor = foreColor;
-    if (font !== undefined) this.font = font;
-    if (textDecoration !== undefined) this.textDecoration = textDecoration;
-    if (fontStyle !== undefined) this.fontStyle = fontStyle;
-    if (fontWeight !== undefined) this.fontWeight = fontWeight;
-    if (fontSize !== undefined) this.fontSize = fontSize;
-    if (fontFamily !== undefined) this.fontFamily = fontFamily;
-  }
-  toJSON(): JsonRecord {
-    return serializeValue({
-      ...Object.fromEntries(Object.entries(this).filter(([, value]) => value !== undefined)),
-    }) as JsonRecord;
-  }
-  fromJSON(data: object): void {
-    Object.assign(this, deserializeValue(data));
-  }
-}
-for (const key of ['backColor', 'foreColor', 'font', 'borderLeft', 'borderTop', 'borderRight', 'borderBottom', 'borderHorizontal', 'borderVertical', 'textDecoration', 'fontStyle', 'fontWeight', 'fontSize', 'fontFamily'])
-  Object.defineProperty(TableStyle.prototype, key, { value: undefined, writable: true, configurable: true });
-
-const THEME_KEYS = [
-  'headerRowStyle',
-  'footerRowStyle',
-  'wholeTableStyle',
-  'firstRowStripStyle',
-  'secondRowStripStyle',
-  'firstColumnStripStyle',
-  'secondColumnStripStyle',
-  'firstHeaderCellStyle',
-  'lastHeaderCellStyle',
-  'firstFooterCellStyle',
-  'lastFooterCellStyle',
-  'highlightFirstColumnStyle',
-  'highlightLastColumnStyle',
-] as const;
-const THEME_SIZES = ['firstRowStripSize', 'secondRowStripSize', 'firstColumnStripSize', 'secondColumnStripSize'] as const;
-
-export class TableTheme {
-  private styles = new Map<string, Style>();
-  sizes = new Map<string, number>();
-  private themeName = '';
-  private raw: ThemeJSON = {};
-  constructor();
-  constructor(data: ThemeJSON);
-  constructor(data?: ThemeJSON) {
-    if (data) this.load(data);
-  }
-  private load(data: ThemeJSON): void {
-    this.styles.clear();
-    this.resolved.clear();
-    this.sizes.clear();
-    this.raw = JSON.parse(JSON.stringify(data)) as ThemeJSON;
-    this.themeName = data.name ?? '';
-    for (const key of THEME_KEYS) {
-      const style = styleFromTheme(data[key]);
-      if (style) this.styles.set(key, style);
-    }
-    for (const key of THEME_SIZES) if (data[key] !== undefined) this.sizes.set(key, Number(data[key]));
-  }
-  private resolved = new Map<string, Style>();
-  private paletteStyles = new WeakMap<object, Map<string, Style>>();
-  _style(key: string, palette?: Record<string, string>): Style | undefined {
-    let cache = this.resolved;
-    if (palette) {
-      let stored = this.paletteStyles.get(palette);
-      if (!stored) this.paletteStyles.set(palette, stored = new Map());
-      cache = stored;
-    }
-    let style = cache.get(key);
-    if (!style) {
-      const resolved = resolveThemeStyle(this.styles.get(key), palette);
-      if (!resolved) return undefined;
-      cache.set(key, (style = resolved));
-    }
-    return style;
-  }
-  _size(key: string): number | undefined {
-    return this.sizes.get(key);
-  }
-  getter(key: string): unknown {
-    if (key === 'name') return this.themeName;
-    return this.styles.get(key);
-  }
-  setter(key: string, value: unknown): this {
-    if (key === 'name') {
-      this.themeName = String(value ?? '');
-      this.raw.name = this.themeName;
-    } else if (value === undefined) {
-      this.styles.delete(key);
-      delete (this.raw as Record<string, unknown>)[key];
-    } else {
-      const style = value instanceof Style ? value : styleFromProps(value);
-      this.styles.set(key, style);
-      this.resolved.clear();
-      this.paletteStyles = new WeakMap();
-      (this.raw as Record<string, unknown>)[key] = styleToJSON(style);
-    }
-    return this;
-  }
-  name(value?: string): string | this {
-    return value === undefined ? (this.themeName as string) : this.setter('name', value);
-  }
-  toJSON(): JsonRecord {
-    return JSON.parse(JSON.stringify(this.raw)) as JsonRecord;
-  }
-  fromJSON(data: object): void {
-    this.load(data as ThemeJSON);
-  }
-}
-for (const key of [...THEME_KEYS, ...THEME_SIZES]) {
-  Object.defineProperty(TableTheme.prototype, key, {
-    configurable: true,
-    enumerable: false,
-    get(this: TableTheme) {
-      return this.getter(key);
-    },
-    set(this: TableTheme, value: unknown) {
-      if (key.endsWith('Size')) this.sizes.set(key, Number(value));
-      else this.setter(key, value);
-    },
-  });
-}
-function styleFromProps(value: unknown): Style {
-  if (value instanceof Style) return value;
-  const style = new Style();
-  for (const [key, raw] of Object.entries(value as JsonRecord)) {
-    if (raw && typeof raw === 'object' && key.startsWith('border')) {
-      const border = raw as JsonRecord;
-      style[key] = new LineBorder(String(border.color ?? 'black'), Number(border.style ?? 0));
-    } else style[key] = raw;
-  }
-  return style;
-}
-
-const THEME_NAMES = [
-  ...Array.from({ length: 21 }, (_, i) => `light${i + 1}`),
-  ...Array.from({ length: 28 }, (_, i) => `medium${i + 1}`),
-  ...Array.from({ length: 11 }, (_, i) => `dark${i + 1}`),
-];
-export class TableThemes {
-  static [key: string]: unknown;
-  constructor() {}
-}
-for (const name of THEME_NAMES) {
-  const data = TABLE_THEME_JSON[name];
-  if (!data) continue;
-  const theme = new TableTheme(data);
-  Object.defineProperty(TableThemes, name, { enumerable: true, value: theme, writable: true });
-}
-// The declared professional themes are absent from the reference runtime.
-for (let i = 1; i <= 24; i++)
-  Object.defineProperty(TableThemes, `professional${i}`, { enumerable: false, value: undefined, writable: true });
-
-export function themeByName(name: string): TableTheme | undefined {
-  const lower = name.toLowerCase();
-  return (TableThemes[lower] as TableTheme | undefined) ?? undefined;
-}
-
-export class TableColumn {
-  private _id: number;
-  private fields: JsonRecord = {};
-  constructor(
-    id: number,
-    dataField?: string,
-    name?: string,
-    formatter?: string,
-    cellType?: unknown,
-    value?: (...args: unknown[]) => unknown,
-    headerStyle?: string | Style,
-    dataStyle?: string | Style,
-    footerStyle?: string | Style,
-  ) {
-    this._id = id;
-    if (dataField !== undefined) this.fields.dataField = dataField;
-    if (name !== undefined) this.fields.name = name;
-    if (formatter !== undefined) this.fields.formatter = formatter;
-    if (cellType !== undefined) this.fields.cellType = cellType;
-    if (value !== undefined) this.fields.value = value;
-    if (headerStyle !== undefined) this.fields.headerStyle = headerStyle;
-    if (dataStyle !== undefined) this.fields.dataStyle = dataStyle;
-    if (footerStyle !== undefined) this.fields.footerStyle = footerStyle;
-  }
-  private prop(key: string, value?: unknown): unknown {
-    if (value === undefined) return this.fields[key];
-    this.fields[key] = value;
-    return this;
-  }
-  id(value?: number): unknown {
-    if (value === undefined) return this._id;
-    this._id = value;
-    return this;
-  }
-  dataField(value?: string): unknown { return this.prop('dataField', value); }
-  name(value?: string): unknown { return this.prop('name', value); }
-  formatter(value?: string): unknown { return this.prop('formatter', value); }
-  cellType(value?: unknown): unknown { return this.prop('cellType', value); }
-  value(value?: (...args: unknown[]) => unknown): unknown { return this.prop('value', value); }
-  headerStyle(value?: string | Style): unknown { return this.prop('headerStyle', value); }
-  dataStyle(value?: string | Style): unknown { return this.prop('dataStyle', value); }
-  footerStyle(value?: string | Style): unknown { return this.prop('footerStyle', value); }
-  toJSON(): JsonRecord {
-    const result: JsonRecord = { id: this._id };
-    for (const key of ['dataField', 'name', 'value', 'formatter', 'cellType', 'headerStyle', 'dataStyle', 'footerStyle', 'dataAreaFormula', 'footerFormula']) {
-      const value = this.fields[key];
-      if (value === undefined) continue;
-      if (typeof value === 'function') continue;
-      const jsonKey = key === 'value' ? 'footerValue' : key;
-      if (key === 'cellType' && value && typeof value === 'object' && 'toJSON' in value)
-        result[jsonKey] = (value as { toJSON(): unknown }).toJSON();
-      else result[jsonKey] = serializeValue(value);
-    }
-    return result;
-  }
-  fromJSON(data: object): void {
-    const json = deserializeValue(data) as JsonRecord;
-    if (json.id !== undefined) this._id = Number(json.id);
-    for (const key of ['dataField', 'name', 'formatter', 'cellType', 'headerStyle', 'dataStyle', 'footerStyle', 'dataAreaFormula', 'footerFormula'])
-      if (json[key] !== undefined) this.fields[key] = json[key];
-    if (json.footerValue !== undefined) this.fields.value = json.footerValue;
-    if (json.value !== undefined && this.fields.value === undefined) this.fields.value = json.value;
-  }
-}
+// Public classes and style helpers live in the `table-style.ts` leaf module
+// (moved out unchanged); re-exported here so existing import paths and the
+// `GC.Spread.Sheets.Tables` namespace wiring keep working.
+export {
+  TableColumn,
+  TableStyle,
+  TableTheme,
+  TableThemes,
+  cloneBorder,
+  mergeStyle,
+  objectRecord,
+  resolveColor,
+  resolveThemeStyle,
+  styleFromProps,
+  themeByName,
+  usingThemedDocument,
+} from './table-style.js';
 
 export interface TableOptions {
   showHeader?: boolean;
@@ -317,13 +40,13 @@ export interface TableOptions {
 }
 
 export class Table {
-  private sheet!: Worksheet;
-  private tableName = 'Table1';
-  private row = 0;
-  private col = 0;
-  private rowCount = 1;
-  private colCount = 1;
-  private options: Required<TableOptions> & { bandRows: boolean; bandColumns: boolean; highlightFirstColumn: boolean; highlightLastColumn: boolean; allowAutoExpand: boolean; autoGenerateColumns: boolean; bindingPath: string; expandBoundRows: boolean } = {
+  sheet!: Worksheet;
+  tableName = 'Table1';
+  row = 0;
+  col = 0;
+  rowCount = 1;
+  colCount = 1;
+  options: Required<TableOptions> & { bandRows: boolean; bandColumns: boolean; highlightFirstColumn: boolean; highlightLastColumn: boolean; allowAutoExpand: boolean; autoGenerateColumns: boolean; bindingPath: string; expandBoundRows: boolean } = {
     showHeader: true,
     showFooter: false,
     useFooterDropDownList: false,
@@ -337,13 +60,15 @@ export class Table {
     bindingPath: '',
     expandBoundRows: false,
   };
-  private tableStyle!: TableTheme;
-  private columns: TableColumn[] = [];
-  private filter: HideRowFilter;
-  private layoutStyles = new Map<number, JsonRecord>();
-  private dataSource: unknown = null;
-  private parsedFromJSON = false;
-  private reservedElement: unknown = undefined;
+  tableStyle!: TableTheme;
+  columns: TableColumn[] = [];
+  filter: HideRowFilter;
+  layoutStyles = new Map<number, JsonRecord>();
+  dataSource: unknown = null;
+  parsedFromJSON = false;
+  reservedElement: unknown = undefined;
+  /** Column indices the trial auto-named (`Column…`/derived names) on expansion. */
+  _blankColumns = new Set<number>();
 
   constructor(
     name?: string,
@@ -373,40 +98,18 @@ export class Table {
     this.resetColumns();
   }
   _attach(sheet: Worksheet): void {
-    this.sheet = sheet;
-    const data = this.dataRange();
-    this.filter.range = new Range(data.row, data.col, data.rowCount, data.colCount);
-    this.filter.extendedRange = new Range(data.row, data.col, data.rowCount, data.colCount);
-    this.filter._attach(sheet);
-    for (let c = 0; c < this.colCount; c++) this.filter.filterButtonVisible(c, true);
-    if (this.options.showHeader) {
-      // Existing header text becomes the column names and must not be overwritten.
-      for (let c = 0; c < this.colCount; c++) {
-        const existing = sheet.getValue(this.headerIndex(), this.col + c);
-        if (existing != null && String(existing) !== '') this.columns[c]?.name(String(existing));
-      }
-      this.writeHeaderValues();
-    }
-    if (this.options.showFooter) {
-      const footerValueRow = this.footerIndex() - (this.options.showHeader ? 1 : 0);
-      for (let c = 0; c < this.colCount; c++) {
-        const column = this.columns[c] as unknown as { fields: JsonRecord };
-        if (typeof column?.fields.footerFormula === 'string') continue;
-        const value = sheet.getValue(footerValueRow, this.col + c);
-        if (value != null) column.fields.value = value;
-      }
-    }
+    _attach(this, sheet);
   }
   _isAttached(): boolean {
     return !!this.sheet;
   }
-  private writeHeaderValues(): void {
+  writeHeaderValues(): void {
     const header = this.headerIndex();
     if (header < 0) return;
     for (let c = 0; c < this.colCount; c++)
       this.sheet.setValue(header, this.col + c, this.getColumnName(c));
   }
-  private resetColumns(): void {
+  resetColumns(): void {
     this.columns = Array.from({ length: this.colCount }, (_, index) => {
       const existing = this.sheet && this.options.showHeader ? this.sheet.getValue(this.headerIndex(), this.col + index) : undefined;
       const name = existing != null && String(existing) !== '' ? String(existing) : `Column${index + 1}`;
@@ -439,6 +142,39 @@ export class Table {
   }
   footerIndex(): number {
     return this.options.showFooter ? this.row + this.rowCount : -1;
+  }
+  /**
+   * Internal (Designer table row commands): grow/shrink the table's own row span without touching
+   * sheet row metadata. The caller has already shifted the cells inside the table's columns
+   * (`Worksheet._shiftRowsInColumns`), matching the trial's Insert/Delete Table Rows behaviour.
+   */
+  _growRowCount(delta: number): void {
+    this.rowCount = Math.max(0, this.rowCount + delta);
+    const data = this.dataRange();
+    this.filter.range = new Range(data.row, data.col, data.rowCount, data.colCount);
+    this.filter.extendedRange = this.filter.range;
+    this.sheet._tablesChanged();
+  }
+  /** Internal mirror of `_growRowCount` for the table's columns. */
+  _growColCount(delta: number): void {
+    const old = this.colCount;
+    this.colCount = Math.max(1, this.colCount + delta);
+    if (this.colCount > old)
+      for (let c = old; c < this.colCount; c++) {
+        const existing = this.sheet && this.options.showHeader ? this.sheet.getValue(this.headerIndex(), this.col + c) : undefined;
+        const name = existing != null && String(existing) !== '' ? String(existing) : `Column${c + 1}`;
+        if (existing == null || String(existing) === '') this._blankColumns.add(c);
+        this.columns.push(new TableColumn(c + 1, undefined, name));
+      }
+    else {
+      this.columns.length = this.colCount;
+      for (const index of [...this._blankColumns]) if (index >= this.colCount) this._blankColumns.delete(index);
+    }
+    const data = this.dataRange();
+    this.filter.range = new Range(data.row, data.col, data.rowCount, data.colCount);
+    this.filter.extendedRange = this.filter.range;
+    for (let c = 0; c < this.colCount; c++) this.filter.filterButtonVisible(c, true);
+    this.sheet._tablesChanged();
   }
   showHeader(value?: boolean): unknown {
     if (value === undefined) return this.options.showHeader;
@@ -521,6 +257,8 @@ export class Table {
   }
   style(value?: string | TableTheme): unknown {
     if (value === undefined) {
+      // A cleared style (`style(null)`, the gallery's Clear) reads back as null.
+      if (!this.tableStyle) return null;
       const copy = new TableTheme(this.tableStyle.toJSON() as ThemeJSON);
       return copy;
     }
@@ -571,11 +309,11 @@ export class Table {
     return this;
   }
   getColumnFormula(tableColumnIndex: number): string {
-    const fields = (this.columns[tableColumnIndex] as unknown as { fields: JsonRecord }).fields;
+    const fields = this.columns[tableColumnIndex].fields;
     return String(fields.formula ?? fields.footerFormula ?? '');
   }
   setColumnFormula(tableColumnIndex: number, formula: string): this {
-    const column = this.columns[tableColumnIndex] as unknown as { fields: JsonRecord };
+    const column = this.columns[tableColumnIndex];
     if (column) {
       const canonical = formula.replace(/(^|[^A-Za-z0-9_])\[([^\]]+)\]/g, (_m, prefix: string, inner: string) =>
         /^#|^@/.test(inner) ? `${prefix}[${inner}]` : `${prefix}${this.tableName}[${inner}]`,
@@ -590,29 +328,29 @@ export class Table {
     return this;
   }
   setColumnDataFormula(tableColumnIndex: number, formula: string | null): this {
-    const column = this.columns[tableColumnIndex] as unknown as { fields: JsonRecord };
+    const column = this.columns[tableColumnIndex];
     if (column) {
       if (formula == null) delete column.fields.dataAreaFormula;
       else column.fields.dataAreaFormula = formula;
     }
     return this;
   }
-  private writeDataFormulas(): void {
+  writeDataFormulas(): void {
     if (!this.sheet) return;
     const data = this.dataRange();
     for (let c = 0; c < this.colCount; c++) {
-      const formula = (this.columns[c] as unknown as { fields: JsonRecord })?.fields.dataAreaFormula;
+      const formula = this.columns[c]?.fields.dataAreaFormula;
       if (typeof formula !== 'string') continue;
       for (let r = data.row; r < data.row + data.rowCount; r++)
         this.sheet.setFormula(r, this.col + c, formula);
     }
   }
   getColumnValue(tableColumnIndex: number): unknown {
-    const column = this.columns[tableColumnIndex] as unknown as { fields: JsonRecord };
+    const column = this.columns[tableColumnIndex];
     return column?.fields.value ?? null;
   }
   setColumnValue(tableColumnIndex: number, value: object): this {
-    const column = this.columns[tableColumnIndex] as unknown as { fields: JsonRecord };
+    const column = this.columns[tableColumnIndex];
     if (column) column.fields.value = value;
     return this;
   }
@@ -626,11 +364,11 @@ export class Table {
     for (const [index, style] of Object.entries(value)) this.layoutStyles.set(Number(index), style as JsonRecord);
     return this;
   }
-  private writeFooterValues(): void {
+  writeFooterValues(): void {
     if (!this.sheet || !this.options.showFooter) return;
     const footer = this.footerIndex();
     for (let c = 0; c < this.colCount; c++) {
-      const raw = (this.columns[c] as unknown as { fields: JsonRecord })?.fields.footerFormula;
+      const raw = this.columns[c]?.fields.footerFormula;
       if (typeof raw === 'string') this.sheet.setFormula(footer, this.col + c, raw);
     }
   }
@@ -644,11 +382,14 @@ export class Table {
   isTableLayoutDirty(): boolean {
     return false;
   }
+  /** The shared slicer-data model for this table (created on first use). */
+  _slicerData?: TableSlicerData;
   getSlicerData(): unknown {
-    return null;
+    if (!this._slicerData) this._slicerData = new TableSlicerData(this);
+    return this._slicerData;
   }
   adjustTableRangeForBind(): void { this._refreshBinding(); }
-  private boundRecords(): Record<string, unknown>[] | null {
+  boundRecords(): Record<string, unknown>[] | null {
     const source = this.dataSource ?? this.sheet?.getDataSource();
     const records = source instanceof CellBindingSource ? source.getValue(this.options.bindingPath) : this.options.bindingPath ? getPath(source, this.options.bindingPath) : source;
     return Array.isArray(records) ? records : null;
@@ -678,12 +419,304 @@ export class Table {
     if (this.sheet) this.writeHeaderValues();
   }
 
+  /* ---- table-scoped structural changes (trial-observed, probes f40c..f40e) ---- */
+
+  /**
+   * Integer coercion of a structural-change argument (probes f40c..f40af): a
+   * non-numeric string reads as 0, `undefined`/`null` read as 0, but a real
+   * negative number is rejected with the axis' range error.
+   */
+  private _paramIndex(value: unknown, name: 'col' | 'row'): number {
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        if (parsed < 0) throw this._rangeError(name);
+        return Math.trunc(parsed);
+      }
+      return 0;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value < 0) throw this._rangeError(name);
+      return Math.trunc(value);
+    }
+    if (value === undefined || value === null) return 0;
+    throw this._rangeError(name);
+  }
+
+  private _rangeError(name: 'col' | 'row'): Error {
+    return new Error(name === 'col' ? 'The param col out of data range of table.' : 'The param row out of data range of table.');
+  }
+
+  /**
+   * Trial rule (probes f40h-name-decide2 t1, f40c-delete-semantics): the cells a
+   * table mutation shifts may only move inside the acting table's own band — an
+   * occupied source cell whose destination lands in another table's band is
+   * refused.
+   */
+  private _checkMoveConflict(axis: 'row' | 'col', sourceStart: number, sourceEnd: number, delta: number, crossStart: number, crossEnd: number): void {
+    if (sourceEnd < sourceStart || crossEnd < crossStart) return;
+    for (const other of this.sheet.tables.all()) {
+      if (other === this) continue;
+      const otherRange = other.range();
+      const crossFrom = Math.max(axis === 'row' ? other.col : otherRange.row, crossStart);
+      const crossTo = Math.min(axis === 'row' ? other.col + other.colCount - 1 : otherRange.row + otherRange.rowCount - 1, crossEnd);
+      if (crossTo < crossFrom) continue;
+      const alongStart = axis === 'row' ? otherRange.row : other.col;
+      const alongEnd = axis === 'row' ? otherRange.row + otherRange.rowCount - 1 : other.col + other.colCount - 1;
+      for (let source = sourceStart; source <= sourceEnd; source++) {
+        const destination = source + delta;
+        if (destination < alongStart || destination > alongEnd) continue;
+        for (let cross = crossFrom; cross <= crossTo; cross++) {
+          const occupied = axis === 'row' ? this.sheet.getValue(cross, source) : this.sheet.getValue(source, cross);
+          if (occupied !== null && occupied !== undefined && occupied !== '')
+            throw new Error("This won't work because it would move cells in a table on your worksheet.");
+        }
+      }
+    }
+  }
+
+  private _nextColumnId(): number {
+    return this.columns.reduce((max, column) => Math.max(max, column.id() as number), 0) + 1;
+  }
+
+  /**
+   * Column name the trial gives to an inserted column whose header cell is blank.
+   * Trial model (probes f40ba-name-a1, f40c, f40e, f40h, f40x-seq-A/B):
+   * - base: the name of the column left of the insertion point. When that left
+   *   neighbour is itself a blank the trial created, its LAST character is cut
+   *   (with leading zeros dropped): `02` -> ``, `12` -> `1`, `Column12` -> `Column1`.
+   * - appended number: the 1-based position the first shifted column lands on;
+   *   for a tail insertion the left neighbour's trailing number + 1.
+   * - when the result collides with an existing name, the trial shortens the base
+   *   to the left name minus its last character and appends that last digit + 1
+   *   (`10,102,103` insert at 1 -> `11`).
+   * - with no usable numeric context the trial counts `Column1, Column2, …`
+   *   (continuing the table's existing `Column<n>` counter).
+   */
+  private _blankColumnName(
+    insertAt: number,
+    offsetInBlock: number,
+    originalColCount: number,
+    originalHeaders: string[],
+    originalBlankIndices: Set<number>,
+    leftNeighborName: string | undefined,
+    leftIsBlank: boolean,
+    usedNames: Set<string>,
+  ): string {
+    const trailingRun = (name: string): string => (name.match(/(\d+)$/) ?? ['', ''])[1];
+    const lastDigit = (name: string): string => (name.match(/(\d)$/) ?? ['', ''])[1];
+    const isColumnNamed = (name: string): boolean => /^Column\d+$/i.test(name);
+    const shortenBase = (name: string): string => {
+      const cut = name.slice(0, -1);
+      return /^\d+$/.test(cut) ? (cut === '0' ? '' : cut.replace(/^0+(?=\d)/, '')) : cut;
+    };
+    // `Column<n>` fallback: the trial fills the LOWEST unused counter number
+    // (probe f40w-blank-mixed: a table already holding `Column2` names its next
+    // blank `Column1`; blanks inserted in the same operation walk it forward).
+    const columnFallback = (): string => {
+      const taken = new Set<number>();
+      for (const name of usedNames) if (isColumnNamed(name)) taken.add(Number(trailingRun(name)));
+      let n = 1;
+      while (taken.has(n)) n++;
+      return `Column${n + offsetInBlock}`;
+    };
+    const left = leftNeighborName ?? '';
+    if (left === '') return columnFallback();
+    if (trailingRun(left) === '') {
+      // Text left neighbour (`A`, `X`): the trial counts Column names (probe
+      // f40w-blank-mixed a/c: `A | insert | 2` -> `Column1`).
+      void originalHeaders;
+      return columnFallback();
+    }
+    let base: string;
+    let appended: string;
+    const anchorAtPoint =
+      insertAt < originalColCount && originalBlankIndices.has(insertAt) && !isColumnNamed(originalHeaders[insertAt])
+        ? originalHeaders[insertAt]
+        : undefined;
+    if (insertAt >= originalColCount) {
+      // Tail append behind the last column: the trial repeats the left name's
+      // number (probe f40c-insert-columns: `… 1, 2 | insert |` -> `22`).
+      base = left;
+      appended = trailingRun(left);
+    } else if (leftIsBlank) {
+      // Chain from the blank directly left: `02 -> 3`, `12 -> 13`, `Column12 -> Column13`.
+      base = shortenBase(left);
+      appended = String(Number(lastDigit(left) || '0') + 1);
+    } else if (anchorAtPoint !== undefined) {
+      // A numeric blank sits at the insertion point: continue its number.
+      base = left;
+      appended = String(Number(lastDigit(anchorAtPoint) || '0') + 1);
+    } else if (originalBlankIndices.size > 0) {
+      base = left;
+      appended = String(Number(lastDigit(left) || '0') + 1);
+    } else if (isColumnNamed(left) && insertAt >= originalColCount - 1) {
+      // Insert directly before the last `Column<n>` column: the trial repeats the
+      // left number (probe f40ba-name-a1 C: `Column1, Column2 | insert | Column3`
+      // -> `Column22`).
+      base = left;
+      appended = trailingRun(left);
+    } else {
+      base = left;
+      appended = String(insertAt + 1 + offsetInBlock);
+    }
+    let name = `${base}${appended}`;
+    if (usedNames.has(name)) {
+      // Trial collision rule (probe f40ba-name-a1 D/E: `10,102,103` insert at 1
+      // -> `11`): shorten the base to the left name minus its last character and
+      // continue with that last digit + 1.
+      base = shortenBase(left);
+      const last = Number(lastDigit(left) || '0');
+      appended = String(last + 1 + offsetInBlock);
+      name = `${base}${appended}`;
+      while (usedNames.has(name)) name = `${base}${Number(trailingRun(name) || '0') + 1}`;
+    }
+    return name;
+  }
+
+  /**
+   * Re-read header cell values into the table's column names (the trial syncs a
+   * table's names with its header row lazily; probe f40ba-name-a1: header values
+   * written *after* `tables.add` become the column names, duplicates get the
+   * 1-based column index appended: `10, 102, 103`). Bound (data-source) tables
+   * keep their binding-derived names.
+   */
+  _syncNamesFromHeader(): void {
+    if (this.dataSource || !this.sheet) return;
+    const header = this.headerIndex();
+    if (header < 0) return;
+    const used = new Set<string>();
+    for (let c = 0; c < this.columns.length; c++) {
+      const value = this.sheet.getValue(header, this.col + c);
+      const name = value !== null && value !== undefined && String(value) !== '' ? String(value) : undefined;
+      if (name === undefined) continue;
+      const final = used.has(name) ? `${name}${c + 1}` : name;
+      used.add(final);
+      if (String(this.columns[c].name() ?? '') !== final) {
+        this.columns[c].name(final);
+        this._blankColumns.delete(c);
+      }
+    }
+  }
+
+  insertColumns(col: number, count: number, isInsertAfter?: boolean): void {
+    const sheet = this.sheet;
+    const start = this._paramIndex(col, 'col');
+    const amount = Math.max(0, this._paramIndex(count, 'col'));
+    // The trial validates the *argument* against the table width (probes
+    // f40c-insert-edge vs f40e-insert-bounds): `col` must name an existing
+    // column; `isInsertAfter` then moves the insertion point one further.
+    if (start >= this.colCount && !(start === 0 && this.colCount === 0))
+      throw this._rangeError('col');
+    const pos = isInsertAfter === true ? start + 1 : start;
+    if (pos > this.colCount || pos + amount > sheet.getColumnCount() - this.col)
+      throw this._rangeError('col');
+    const header = this.headerIndex();
+    const rowStart = header >= 0 ? header : this.row;
+    const rowEnd = rowStart + this.rowCount + (header >= 0 ? 1 : 0) - 1;
+    this._checkMoveConflict('col', this.col + pos, this.col + this.colCount - 1, amount, rowStart, rowEnd);
+    const originalColCount = this.colCount;
+    this._syncNamesFromHeader();
+    const originalHeaders = this.columns.map((column) => String(column.name() ?? ''));
+    const originalBlankIndices = new Set(this._blankColumns);
+    sheet._shiftColumnsInRows(this.col + pos, amount, rowStart, rowEnd, false);
+    this.colCount += amount;
+    let nextId = this._nextColumnId();
+    const usedNames = new Set(originalHeaders);
+    for (let offset = 0; offset < amount; offset++) {
+      const at = pos + offset;
+      const headerValue = header >= 0 ? sheet.getValue(header, this.col + at) : undefined;
+      const leftName = at > 0 ? String(this.columns[at - 1].name() ?? '') : undefined;
+      const name = headerValue !== null && headerValue !== undefined && String(headerValue) !== ''
+        ? String(headerValue)
+        : this._blankColumnName(at, offset, originalColCount, originalHeaders, originalBlankIndices, leftName, at > 0 && this._blankColumns.has(at - 1), usedNames);
+      usedNames.add(name);
+      const column = new TableColumn(nextId++, undefined, name);
+      this.columns.splice(at, 0, column);
+      const remapped = new Set<number>();
+      for (const index of this._blankColumns) remapped.add(index >= at ? index + 1 : index);
+      remapped.add(at);
+      this._blankColumns.clear();
+      for (const index of remapped) this._blankColumns.add(index);
+    }
+    if (this.columns.length > this.colCount) this.columns.length = this.colCount;
+    if (header >= 0) this.writeHeaderValues();
+    for (let c = 0; c < this.colCount; c++) this.filter.filterButtonVisible(c, true);
+    const data = this.dataRange();
+    this.filter.range = new Range(data.row, data.col, data.rowCount, data.colCount);
+    this.filter.extendedRange = this.filter.range;
+    sheet._tablesChanged();
+  }
+
+  deleteColumns(col: number, count: number): void {
+    const sheet = this.sheet;
+    const start = this._paramIndex(col, 'col');
+    const requested = Math.max(0, this._paramIndex(count, 'col'));
+    if (start >= this.colCount) throw this._rangeError('col');
+    // Trial (probes f40af, f40w-del-cols): deleting the full width from index 0 is refused,
+    // an overshooting count is clamped to the remaining data columns.
+    if (start === 0 && requested >= this.colCount) throw new Error('The param count to delete will cause empty table.');
+    const amount = Math.min(requested, this.colCount - start);
+    const header = this.headerIndex();
+    const rowStart = header >= 0 ? header : this.row;
+    const rowEnd = rowStart + this.rowCount + (header >= 0 ? 1 : 0) - 1;
+    this._checkMoveConflict('col', this.col + start + amount, this.col + this.colCount - 1, -amount, rowStart, rowEnd);
+    sheet._shiftColumnsInRows(this.col + start, amount, rowStart, rowEnd, true);
+    this.columns.splice(start, amount);
+    {
+      const remapped = new Set<number>();
+      for (const index of this._blankColumns) {
+        if (index >= start + amount) remapped.add(index - amount);
+        else if (index < start) remapped.add(index);
+      }
+      this._blankColumns.clear();
+      for (const index of remapped) this._blankColumns.add(index);
+    }
+    this._growColCount(-amount);
+    const data = this.dataRange();
+    this.filter.range = new Range(data.row, data.col, data.rowCount, data.colCount);
+    this.filter.extendedRange = this.filter.range;
+    if (header >= 0) this.writeHeaderValues();
+    sheet._tablesChanged();
+  }
+
+  insertRows(row: number, count: number, isInsertAfter?: boolean): void {
+    const sheet = this.sheet;
+    const start = this._paramIndex(row, 'row');
+    const amount = Math.max(0, this._paramIndex(count, 'row'));
+    // Trial: `row` must address an existing data row (probes f40c/f40e bounds).
+    if (start >= this.rowCount) throw this._rangeError('row');
+    const pos = isInsertAfter === true ? start + 1 : start;
+    if (pos + amount > this.rowCount && pos + amount > sheet.getRowCount() - this.row)
+      throw this._rangeError('row');
+    this._checkMoveConflict('row', this.row + pos, this.row + this.rowCount - 1, amount, this.col, this.col + this.colCount - 1);
+    sheet._shiftRowsInColumns(this.row + pos, amount, this.col, this.col + this.colCount - 1, false);
+    this._growRowCount(amount);
+    if (this.options.showFooter && this.dataSource) this.writeFooterValues();
+    sheet._tablesChanged();
+  }
+
+  deleteRows(row: number, count: number): void {
+    const sheet = this.sheet;
+    const start = this._paramIndex(row, 'row');
+    const requested = Math.max(0, this._paramIndex(count, 'row'));
+    if (start >= this.rowCount) throw this._rangeError('row');
+    // Trial (probes f40af, f40z-del-rows-*): an overshooting count is clamped to the
+    // remaining data rows — the table keeps its header row, no "empty table" error.
+    const amount = Math.min(requested, this.rowCount - start);
+    this._checkMoveConflict('row', this.row + start + amount, this.row + this.rowCount - 1, -amount, this.col, this.col + this.colCount - 1);
+    sheet._shiftRowsInColumns(this.row + start, amount, this.col, this.col + this.colCount - 1, true);
+    this._growRowCount(-amount);
+    sheet._tablesChanged();
+  }
+
   /** Internal: auto-expands by rows/columns. */
   _grow(rows: number, cols: number): void {
     this.rowCount += rows;
     this.colCount += cols;
     if (cols > 0)
       while (this.columns.length < this.colCount) {
+        this._blankColumns.add(this.columns.length);
         const column = new TableColumn(this.columns.length + 1, undefined, `Column${this.columns.length + 1}`);
         this.columns.push(column);
       }
@@ -693,37 +726,7 @@ export class Table {
 
   /** Internal: applies a new range (TableManager.resize). */
   _resize(range: Range): void {
-    const previousCol = this.col;
-    const delta = range.col - previousCol;
-    this.col = range.col;
-    this.colCount = range.colCount;
-    this.row = range.row + (this.options.showHeader ? 1 : 0);
-    this.rowCount = Math.max(
-      0,
-      range.rowCount - (this.options.showHeader ? 1 : 0) - (this.options.showFooter ? 1 : 0),
-    );
-    if (delta > 0) {
-      const dropped = this.columns.splice(0, delta);
-      this.columns.push(...dropped);
-      while (this.columns.length < this.colCount) {
-        const column = new TableColumn(this.columns.length + 1, undefined, `Column${this.columns.length + 1}`);
-        this.columns.push(column);
-      }
-    } else if (delta < 0) {
-      for (let i = 0; i < -delta; i++) {
-        const column = new TableColumn(i + 1, undefined, `Column${i + 1}`);
-        this.columns.unshift(column);
-      }
-      if (this.columns.length > this.colCount) this.columns.length = this.colCount;
-    }
-    while (this.columns.length < this.colCount) {
-      const column = new TableColumn(this.columns.length + 1, undefined, `Column${this.columns.length + 1}`);
-      this.columns.push(column);
-    }
-    if (this.columns.length > this.colCount) this.columns.length = this.colCount;
-    if (this.filter._hasButtons())
-      for (let c = 0; c < this.colCount; c++) if (this.filter.filterButtonVisible(c) === undefined) this.filter.filterButtonVisible(c, true);
-    if (this.sheet) this.writeHeaderValues();
+    _resize(this, range);
   }
   /** Internal: repositions the table without reordering its columns. */
   _move(row: number, col: number): void {
@@ -733,242 +736,107 @@ export class Table {
   }
   /** Internal: shifts table bounds after a row/column structural change. */
   _shift(axis: 'row' | 'col', index: number, amount: number, remove: boolean): void {
-    const range = this.range();
-    const start = axis === 'row' ? range.row : this.col;
-    const count = axis === 'row' ? range.rowCount : this.colCount;
-    const end = start + count;
-    const pos = axis === 'row' ? this.row : this.col;
-    const dataEnd = pos + (axis === 'row' ? this.rowCount : this.colCount);
-    if (remove) {
-      const removed = Math.max(0, Math.min(end, index + amount) - Math.max(start, index));
-      if (axis === 'row')
-        this.rowCount = Math.max(
-          0,
-          this.rowCount - Math.max(0, Math.min(dataEnd, index + amount) - Math.max(pos, index)),
-        );
-      else this.colCount = Math.max(1, this.colCount - removed);
-      if (start >= index + amount) {
-        if (axis === 'row') this.row -= amount;
-        else this.col -= amount;
-      }
-    } else if (index <= start) {
-      if (axis === 'row') this.row += amount;
-      else this.col += amount;
-    } else if (index < end) {
-      if (axis === 'row') this.rowCount += amount;
-      else this.colCount += amount;
-    }
+    _shift(this, axis, index, amount, remove);
   }
 
   /** Resolved role style for a sheet cell; null when the cell is outside this table. */
   _styleFor(row: number, col: number): Style | null {
-    const header = this.headerIndex(),
-      footer = this.footerIndex();
-    const data = this.dataRange();
-    if (col < this.col || col >= this.col + this.colCount) return null;
-    if (row !== header && row !== footer && !(row >= data.row && row < data.row + data.rowCount)) return null;
-    const result = new Style();
-    const palette = this.sheet?._ioThemeColors;
-    const role = (key: keyof ThemeJSON) => this.tableStyle._style(key, palette);
-    const c = col - this.col;
-    if (row === header) {
-      mergeStyle(result, role('headerRowStyle'));
-      if (c === 0) mergeStyle(result, role('firstHeaderCellStyle'));
-      if (c === this.colCount - 1) mergeStyle(result, role('lastHeaderCellStyle'));
-      if (this.options.highlightFirstColumn && c === 0) mergeStyle(result, role('highlightFirstColumnStyle'));
-      if (this.options.highlightLastColumn && c === this.colCount - 1) mergeStyle(result, role('highlightLastColumnStyle'));
-      const whole = this.tableStyle._style('wholeTableStyle', palette);
-      const borders = result as JsonRecord;
-      if (!borders.borderTop && whole?.borderTop) borders.borderTop = cloneBorder(whole.borderTop);
-      if (!borders.borderBottom && whole?.borderBottom) borders.borderBottom = cloneBorder(whole.borderBottom);
-      if (c === 0 && !borders.borderLeft && whole?.borderLeft) borders.borderLeft = cloneBorder(whole.borderLeft);
-      if (c === this.colCount - 1 && !borders.borderRight && whole?.borderRight) borders.borderRight = cloneBorder(whole.borderRight);
-    } else if (row === footer) {
-      mergeStyle(result, role('footerRowStyle'));
-      if (c === 0) mergeStyle(result, role('firstFooterCellStyle'));
-      if (c === this.colCount - 1) mergeStyle(result, role('lastFooterCellStyle'));
-      const whole = this.tableStyle._style('wholeTableStyle', palette);
-      const borders = result as JsonRecord;
-      if (!borders.borderTop && whole?.borderTop) borders.borderTop = cloneBorder(whole.borderTop);
-      if (!borders.borderBottom && whole?.borderBottom) borders.borderBottom = cloneBorder(whole.borderBottom);
-      if (c === 0 && !borders.borderLeft && whole?.borderLeft) borders.borderLeft = cloneBorder(whole.borderLeft);
-      if (c === this.colCount - 1 && !borders.borderRight && whole?.borderRight) borders.borderRight = cloneBorder(whole.borderRight);
-    } else {
-      const whole = this.tableStyle._style('wholeTableStyle', palette);
-      if (whole) {
-        const backgrounds = Object.assign(new Style(), whole);
-        delete backgrounds.borderLeft;
-        delete backgrounds.borderTop;
-        delete backgrounds.borderRight;
-        delete backgrounds.borderBottom;
-        delete backgrounds.borderHorizontal;
-        delete backgrounds.borderVertical;
-        mergeStyle(result, backgrounds);
-      }
-      const r = row - data.row;
-      const isFirstRow = r === 0, isLastRow = r === data.rowCount - 1;
-      if (this.options.bandRows)
-        mergeStyle(result, role(r % 2 === 0 ? 'firstRowStripStyle' : 'secondRowStripStyle'));
-      if (this.options.bandColumns)
-        mergeStyle(result, role(c % 2 === 0 ? 'firstColumnStripStyle' : 'secondColumnStripStyle'));
-      if (this.options.highlightFirstColumn && c === 0) mergeStyle(result, role('highlightFirstColumnStyle'));
-      if (this.options.highlightLastColumn && c === this.colCount - 1) mergeStyle(result, role('highlightLastColumnStyle'));
-      const borders = result as JsonRecord;
-      const horizontal = whole?.borderHorizontal;
-      if (horizontal) {
-        borders.borderTop = cloneBorder(horizontal);
-        borders.borderBottom = cloneBorder(horizontal);
-      }
-      if (isFirstRow && whole?.borderTop) borders.borderTop = cloneBorder(whole.borderTop);
-      if (isLastRow && whole?.borderBottom) borders.borderBottom = cloneBorder(whole.borderBottom);
-      if (c === 0 && whole?.borderLeft) borders.borderLeft = cloneBorder(whole.borderLeft);
-      if (c === this.colCount - 1 && whole?.borderRight) borders.borderRight = cloneBorder(whole.borderRight);
-    }
-    const tableColumn = this.columns[c];
-    const layout = this.layoutStyles.get(c);
-    if (layout) {
-      const kind = row === header ? 'header' : row === footer ? 'footer' : 'data';
-      const style = layout[kind];
-      if (style) mergeStyle(result, typeof style === 'string' ? undefined : styleFromProps(style));
-    } else if (tableColumn) {
-      const kind = row === header ? 'headerStyle' : row === footer ? 'footerStyle' : 'dataStyle';
-      const style = (tableColumn as unknown as { fields: JsonRecord }).fields[kind];
-      if (style instanceof Style) mergeStyle(result, style);
-      else if (typeof style === 'object' && style) mergeStyle(result, styleFromProps(style));
-    }
-    const borders = result as JsonRecord;
-    delete borders.borderHorizontal;
-    delete borders.borderVertical;
-    if (c !== 0) delete borders.borderLeft;
-    if (c !== this.colCount - 1) delete borders.borderRight;
-    if (!Object.keys(result).length) return null;
-    return result;
+    return _styleFor(this, row, col);
   }
   toJSON(): JsonRecord {
-    const range = this.range();
-    const result: JsonRecord = {
-      name: this.tableName,
-      row: range.row,
-      col: range.col,
-      rowCount: range.rowCount,
-      colCount: range.colCount,
-    };
-    if (!this.options.showHeader) result.showHeader = false;
-    if (this.options.showFooter) result.showFooter = true;
-    if (this.options.useFooterDropDownList) result.useFooterDropDownList = true;
-    if (!this.options.bandRows) result.bandRows = false;
-    if (this.options.bandColumns) result.bandColumns = true;
-    if (this.options.highlightFirstColumn) result.highlightFirstColumn = true;
-    if (this.options.highlightLastColumn) result.highlightLastColumn = true;
-    if (this.options.showResizeHandle) result.showResizeHandle = true;
-    if (!this.options.allowAutoExpand) result.allowAutoExpand = false;
-    if (!this.options.autoGenerateColumns) result.autoGenerateColumns = false;
-    if (this.options.bindingPath) result.bindingPath = this.options.bindingPath;
-    if (this.options.expandBoundRows) result.expandBoundRows = true;
-    if (Object.keys(this.layoutStyles).length)
-      result.layoutStyle = Object.fromEntries(
-        [...this.layoutStyles].map(([index, style]) => [
-          index,
-          Object.fromEntries(Object.entries(style).map(([kind, value]) => [kind, styleToJSON(value as Style)])),
-        ]),
-      );
-    result.reservedElement = this.reservedElement;
-    const styleName = this.getStyleName();
-    result.style = styleName;
-    const dataRange = this.dataRange();
-    this.filter.range = new Range(dataRange.row, dataRange.col, dataRange.rowCount, dataRange.colCount);
-    const filterJSON = filterToJSON(this.filter, this.tableName);
-    if (this.filter._hasButtons()) {
-      const visible: Record<string, boolean> = {};
-      for (let c = 0; c < this.colCount; c++) visible[c] = this.filter.filterButtonVisible(c) !== false;
-      filterJSON.filterButtonVisibleInfo = visible;
-    } else delete filterJSON.filterButtonVisibleInfo;
-    result.rowFilter = filterJSON;
-    result.columns = this.columns.map((column) => column.toJSON());
-    return result;
+    return toJSON(this);
   }
   fromJSON(settings: object): void {
-    const json = objectRecord(settings);
-    this.parsedFromJSON = true;
-    this.reservedElement = json.reservedElement;
-    this.tableName = String(json.name ?? this.tableName);
-    this.col = Number(json.col ?? 0);
-    this.colCount = Number(json.colCount ?? 1);
-    this.options.showHeader = json.showHeader !== false;
-    this.options.showFooter = json.showFooter === true;
-    const totalRows = Number(json.rowCount ?? 1);
-    this.row = Number(json.row ?? 0) + (this.options.showHeader ? 1 : 0);
-    this.rowCount = Math.max(
-      0,
-      totalRows - (this.options.showHeader ? 1 : 0) - (this.options.showFooter ? 1 : 0),
-    );
-    this.options.useFooterDropDownList = json.useFooterDropDownList === true;
-    this.options.bandRows = json.bandRows !== false;
-    this.options.bandColumns = json.bandColumns === true;
-    this.options.highlightFirstColumn = json.highlightFirstColumn === true;
-    this.options.highlightLastColumn = json.highlightLastColumn === true;
-    this.options.showResizeHandle = json.showResizeHandle === true;
-    this.options.allowAutoExpand = json.allowAutoExpand !== false;
-    this.options.autoGenerateColumns = json.autoGenerateColumns !== false;
-    this.options.bindingPath = String(json.bindingPath ?? '');
-    this.options.expandBoundRows = json.expandBoundRows === true;
-    this.tableStyle = themeByName(String(json.style ?? 'medium2')) ?? (TableThemes.medium2 as TableTheme);
-    this.filter = filterFromJSON(json.rowFilter ?? {}, true);
-    this.columns = [];
-    for (const raw of Array.isArray(json.columns) ? json.columns : []) {
-      const column = new TableColumn(Number(objectRecord(raw).id ?? this.columns.length + 1));
-      column.fromJSON(raw as object);
-      this.columns.push(column);
-    }
-    if (!this.columns.length) this.resetColumns();
-    const layout = json.layoutStyle as JsonRecord | undefined;
-    this.layoutStyles.clear();
-    if (layout)
-      for (const [index, style] of Object.entries(layout))
-        this.layoutStyles.set(Number(index), style as JsonRecord);
+    fromJSON(this, settings);
   }
 }
-function cloneBorder(value: unknown): LineBorder {
-  const border = value as LineBorder;
-  const copy = new LineBorder(border.color, border.style);
-  (copy as unknown as JsonRecord).level = 20;
-  return copy;
-}
-function objectRecord(value: unknown): JsonRecord {
-  return value && typeof value === 'object' ? (value as JsonRecord) : {};
-}
+import {
+  _attach,
+  _resize,
+  _shift,
+  _styleFor,
+  fromJSON,
+  toJSON,
+} from './table-ops.js';
+
 export function isValidTableName(name: string): boolean {
   if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name)) return false;
   if (/^(TRUE|FALSE)$/i.test(name)) return false;
-  // Names that parse as a cell reference are rejected by the trial.
+  // Trial-observed reserved families (probes f40zb-*, fresh-sheet single adds):
+  // `T1`-style (the auto-naming family), `Tb1`-style, and `Table11`-style
+  // (`Table` + two or more digits; `Table1` itself is the trial's own default
+  // name and stays valid). Names that parse as a 1-3 letter cell reference
+  // (`A11`, `CA1`, `ZZ999`, `abc123`) are rejected too.
+  if (/^T\d+$/i.test(name)) return false;
+  if (/^TB\d+$/i.test(name)) return false;
+  if (/^TABLE\d{2,}$/i.test(name)) return false;
   if (/^[A-Za-z]{1,3}\d+$/.test(name)) return false;
   if (/^R\d+C\d+$/i.test(name)) return false;
   return true;
 }
 
-export class CustomTableThemeManager {
-  private themes = new Map<string, TableTheme>();
-  constructor(private workbook?: unknown) {}
+/**
+ * `GC.Spread.Sheets.Tables.CustomTableThemeManager` (`wb.customTableThemes`), the
+ * concrete manager behind `CustomThemeManagerBase`. Trial behaviour: `add(name)`
+ * stores a new *empty* theme carrying exactly that name (a built-in theme is never
+ * copied, so `add('light1')` serialises as `{ name: 'light1' }`); adding a name
+ * that already exists answers `undefined` and leaves the stored theme untouched;
+ * `get` is case-insensitive; `update(old, newTheme)` drops the old name and keeps
+ * the theme under its own name; `remove` of an unknown name does nothing. The
+ * themes serialise as the workbook key `tableStyles`.
+ */
+export class CustomTableThemeManager extends CustomThemeManagerBase {
   add(theme: string | TableTheme): TableTheme | undefined {
-    const name = typeof theme === 'string' ? theme : String(theme.name?.() ?? '');
-    if (!name || this.themes.has(name.toLowerCase())) return undefined;
-    const instance = typeof theme === 'string' ? (themeByName(theme) ?? new TableTheme()) : theme;
-    if (typeof theme === 'string') (instance as TableTheme).name(theme);
-    this.themes.set(name.toLowerCase(), instance);
-    return instance;
+    if (typeof theme === 'string') {
+      if (!theme || this.get(theme)) return undefined;
+      const created = new TableTheme();
+      created.name(theme);
+      return super.add(created);
+    }
+    return super.add(theme);
   }
-  all(): TableTheme[] { return [...this.themes.values()]; }
-  get(name: string): TableTheme | undefined { return this.themes.get(name.toLowerCase()); }
-  remove(name: string): void { this.themes.delete(name.toLowerCase()); }
-  update(oldThemeName: string, newTheme: TableTheme): void {
-    this.themes.set(oldThemeName.toLowerCase(), newTheme);
+  remove(name: string): void {
+    super.remove(name);
+  }
+  /** @internal The workbook `tableStyles` JSON, `undefined` while there are none. */
+  _toJSON(): JsonRecord[] | undefined {
+    const themes = this.all();
+    return themes.length ? themes.map((theme) => theme.toJSON()) : undefined;
+  }
+  /** @internal Reads imported `tableStyles` records back into the store. */
+  _fromJSON(records: unknown): void {
+    const store = this._themes();
+    store.clear();
+    for (const raw of (records as JsonRecord[] | undefined) ?? []) {
+      const settings = raw as JsonRecord;
+      const name = String(settings.name ?? '');
+      if (!name) continue;
+      store.set(name.toLowerCase(), new TableTheme(settings as ThemeJSON));
+    }
   }
 }
 
 export class TableManager {
-  private tables: Table[] = [];
+  tables: Table[] = [];
   constructor(private sheet: Worksheet) {}
   _hasAny(): boolean { return this.tables.length > 0; }
+  /**
+   * The theme a table gets when no style is passed: the trial builds it from
+   * `Workbook.defaultTableTheme()`, falling back to the medium2 built-in.
+   */
+  _workbookTheme(): TableTheme | undefined {
+    const parent = this.sheet.parent as { defaultTableTheme?: () => TableTheme | null | undefined } | undefined;
+    return parent?.defaultTableTheme?.() ?? undefined;
+  }
+  /**
+   * Resolves a table style name: the trial answers built-in `TableThemes` names
+   * first and the workbook's `customTableThemes` second, and builds a new table
+   * from `Workbook.defaultTableTheme()` when no style is given.
+   */
+  _themeName(name: string): TableTheme | undefined {
+    const parent = this.sheet.parent as { customTableThemes?: CustomTableThemeManager } | undefined;
+    return themeByName(name) ?? parent?.customTableThemes?.get(name);
+  }
   add(
     name?: string,
     row?: number,
@@ -983,11 +851,17 @@ export class TableManager {
     const r = row ?? 0, c = column ?? 0, rc = rowCount ?? 1, cc = columnCount ?? 1;
     const range = new Range(r, c, rc, cc);
     if (range.row + range.rowCount > this.sheet.getRowCount() || range.col + range.colCount > this.sheet.getColumnCount())
-      throw new RangeError('Table range is outside the worksheet');
+      throw new RangeError('Invalid column index or column count.');
     for (const existing of this.tables)
       if (existing.range().intersect(r, c, rc, cc)) throw new Error('The tables cannot be intersected.');
     if (this.findByName(tableName)) throw new Error('The current worksheet already exists in a table with the same name.');
-    const table = new Table(tableName, r, c, rc, cc, style, options);
+    const theme =
+      style === undefined
+        ? this._workbookTheme()
+        : typeof style === 'string'
+          ? this._themeName(style)
+          : style;
+    const table = new Table(tableName, r, c, rc, cc, theme, options);
     table._attach(this.sheet);
     this.tables.push(table);
     this.sheet._tablesChanged();
@@ -1015,7 +889,7 @@ export class TableManager {
     });
     return table;
   }
-  private nextName(): string {
+  nextName(): string {
     let index = this.tables.length + 1;
     while (this.findByName(`Table${index}`)) index++;
     return `Table${index}`;

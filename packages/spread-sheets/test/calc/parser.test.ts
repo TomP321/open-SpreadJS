@@ -52,6 +52,16 @@ describe('formula parser', () => {
     if (union.kind === 'function') expect(union.args[0]?.kind).toBe('paren');
   });
 
+  it('distinguishes A1 references from names at reference boundaries', () => {
+    for (const formula of ['$A$1', 'XFD1048576', 'A1:B2', 'SUM($AA1:A$2)']) {
+      expect(collectRefs(parseFormula(formula)).length).toBeGreaterThan(0);
+    }
+    for (const name of ['XFE1', 'A1048577', 'A1_name', 'A1name']) {
+      expect(parseFormula(name).kind).toBe('name');
+    }
+    expect(parseFormula('A1(2)').kind).toBe('function');
+  });
+
   it('parses R1C1 references relative to the base cell', () => {
     const ast = parseFormula('SUM(R1C1:R2C1)', { r1c1: true });
     expect(astToText(ast, { r1c1: true })).toBe('SUM(R1C1:R2C1)');

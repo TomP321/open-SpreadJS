@@ -1,9 +1,9 @@
-import { SparklineExValue } from './values.js';
+import { BarcodeExValue, ImageExValue, SparklineExValue } from './values.js';
 /**
  * Formula evaluator: turns an AST into a value, applying SpreadJS coercion
  * rules (numeric text conversion, implicit intersection, array semantics).
  */
-import type { Worksheet } from '../model.js';
+import type { Worksheet } from '../worksheet.js';
 import {
   AstNode,
   BinaryNode,
@@ -54,6 +54,14 @@ export interface EvalHost {
   ): { ast: AstNode; baseRow: number; baseCol: number } | undefined;
   /** Custom or built-in function lookup. */
   getCustomFunction(name: string, sheet: Worksheet): CustomFunctionLike | undefined;
+  /** SparklineEx formula functions registered through `Workbook.addSparklineEx`. */
+  getSparklineFunction?(name: string): CustomFunctionLike | undefined;
+  /**
+   * The user-registered function the formula cell bound when its formula was
+   * parsed. The trial keeps such a formula working after the registration was
+   * removed; only a re-parsed formula answers `#NAME?`.
+   */
+  boundFunction?(name: string, sheet: Worksheet, row: number, col: number): CustomFunctionLike | undefined;
   sheetFromName(name: string): Worksheet | undefined;
   isR1C1(): boolean;
   allowDynamicArray(): boolean;
@@ -63,6 +71,8 @@ export interface EvalHost {
   resolveTableName?(name: string, sheet: Worksheet): Value | undefined;
   workbookIndex(sheet: Worksheet): number;
   sheetCount(): number;
+  /** Loaded values of one sheet of a referenced workbook (`[Book1.xlsx]Sheet1!A1`). */
+  externalValues?(name: string, sheetName: string): Map<number, Map<number, unknown>> | undefined;
 }
 
 /** Minimal structural type of the public custom Function class. */
@@ -101,6 +111,14 @@ export function cellKey(sheet: Worksheet, row: number, col: number): string {
 // Coercion
 // ---------------------------------------------------------------------------
 
+/** A loaded external-workbook range (`[Book1.xlsx]Sheet1!A1:B2`); its bounds
+ * drive implicit intersection in scalar position, like internal references. */
+export class ExternalRangeArray extends CalcArray {
+  constructor(readonly bounds: { r1: number; c1: number; r2: number; c2: number }, array: Value[][]) {
+    super(array);
+  }
+}
+
 /** Resolves a reference in scalar position using implicit intersection. */
 export function implicitIntersect(ctx: EvalContext, value: Value): ScalarValue {
   if (!isReference(value)) return value as ScalarValue;
@@ -137,6 +155,14 @@ function intersectArea(ctx: EvalContext, area: AreaRef): ScalarValue {
 export function scalar(ctx: EvalContext, value: Value | Missing): ScalarValue {
   if (value instanceof MissingValue) return null;
   if (value instanceof ReferenceValue) return implicitIntersect(ctx, value);
+  // External multi-cell ranges intersect like internal references (trial probe
+  // `io2:update-after`: a 2x2 external range in scalar position answers #VALUE!).
+  if (value instanceof ExternalRangeArray) {
+    const b = value.bounds;
+    if (b.r1 === b.r2 && b.c1 <= ctx.col && ctx.col <= b.c2) return scalar(ctx, value.array[0]![ctx.col - b.c1] as Value);
+    if (b.c1 === b.c2 && b.r1 <= ctx.row && ctx.row <= b.r2) return scalar(ctx, value.array[ctx.row - b.r1]![0] as Value);
+    return error(ErrorCode.value);
+  }
   if (value instanceof CalcArray) return value.at(0, 0);
   if (isLambda(value)) return error(ErrorCode.value);
   return value as ScalarValue;
@@ -450,7 +476,37 @@ export class Evaluator {
     return this.evaluate(ast, ctx);
   }
 
+  /**
+   * Values of a range in another workbook (`=[Book1.xlsx]Sheet1!A1:B2`).
+   * A sheet whose values were never loaded answers `#REF!` like the trial;
+   * inside a loaded sheet a cell the payload did not mention reads as 0.
+   */
+  private resolveExternalRef(node: RefNode): Value {
+    const external = node.external!;
+    const values = this.host.externalValues?.(external.name, external.sheet);
+    if (!values) return error(ErrorCode.ref);
+    let r1 = node.wholeCol || node.colOnly ? 0 : node.r1;
+    let r2 = node.wholeCol || node.colOnly ? 0 : node.r2;
+    let c1 = node.wholeRow || node.rowOnly ? 0 : node.c1;
+    let c2 = node.wholeRow || node.rowOnly ? 0 : node.c2;
+    if (node.wholeCol || node.colOnly) for (const row of values.keys()) { r1 = Math.min(r1, row); r2 = Math.max(r2, row); }
+    if (node.wholeRow || node.rowOnly)
+      for (const cells of values.values()) for (const col of cells.keys()) { c1 = Math.min(c1, col); c2 = Math.max(c2, col); }
+    const rows: ScalarValue[][] = [];
+    for (let row = r1; row <= r2; row++) {
+      const line: ScalarValue[] = [];
+      for (let col = c1; col <= c2; col++) {
+        const value = values.get(row)?.get(col);
+        line.push(value === undefined ? 0 : (value as ScalarValue));
+      }
+      rows.push(line);
+    }
+    if (rows.length === 1 && rows[0]!.length === 1) return rows[0]![0]!;
+    return new ExternalRangeArray({ r1, c1, r2, c2 }, rows);
+  }
+
   resolveRef(node: RefNode, ctx: EvalContext): Value {
+    if (node.external) return this.resolveExternalRef(node);
     let sheet = ctx.sheet;
     if (node.sheet) {
       const found = this.host.sheetFromName(node.sheet);
@@ -629,12 +685,17 @@ export class Evaluator {
       if (ref instanceof ReferenceValue) return sumReferenceValues(ctx, ref) as Value;
     }
     const cachedArgs = node._args as Args | undefined;
-    const args = cachedArgs ? cachedArgs.reset(ctx) : new Args(node.args, ctx, this);
+    const args = cachedArgs ? cachedArgs.reset(ctx, this) : new Args(node.args, ctx, this);
     if (!cachedArgs) node._args = args;
-    const custom = this.host.getCustomFunction(name, ctx.sheet);
+    const bound = this.host.boundFunction?.(name, ctx.sheet, ctx.row, ctx.col);
+    const custom = bound ?? this.host.getCustomFunction(name, ctx.sheet);
     if (custom) return this.callCustomFunction(custom, node, ctx);
     const builtin = getBuiltin(name);
-    if (!builtin) return error(ErrorCode.name);
+    if (!builtin) {
+      const sparkline = this.host.getSparklineFunction?.(name);
+      if (sparkline) return this.callCustomFunction(sparkline, node, ctx);
+      return error(ErrorCode.name);
+    }
     try {
       return builtin.evaluate(args, ctx);
     } catch (thrown) {
@@ -685,6 +746,7 @@ export class Evaluator {
 
   fromCustomResult(result: unknown): Value {
     if (result === undefined || result === null) return null;
+    if (result instanceof SparklineExValue) return result;
     if (result instanceof CalcError) return result;
     if (result instanceof CalcArray || result instanceof ReferenceValue) return result;
     if (Array.isArray(result)) {
@@ -737,13 +799,14 @@ export class Args {
   constructor(
     readonly nodes: AstNode[],
     private ctx: EvalContext,
-    private readonly evaluator: Evaluator,
+    private evaluator: Evaluator,
   ) {
     this.cache = new Array<Value | Missing | undefined>(nodes.length).fill(undefined);
   }
   /** Reuses a cached argument list for the same function node. */
-  reset(ctx: EvalContext): this {
+  reset(ctx: EvalContext, evaluator: Evaluator): this {
     this.ctx = ctx;
+    this.evaluator = evaluator;
     this.cache.fill(undefined);
     return this;
   }
@@ -900,7 +963,7 @@ function textOf(value: ScalarValue): string {
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
   if (typeof value === 'number') return numberToText(value);
   if (value instanceof Date) return numberToText(dateToSerial(value));
-  if (value instanceof SparklineExValue) return '';
+  if (value instanceof SparklineExValue || value instanceof BarcodeExValue || value instanceof ImageExValue) return '';
   if (isError(value)) raiseError(value);
   raise(ErrorCode.value);
 }

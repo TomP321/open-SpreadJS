@@ -1,13 +1,52 @@
 import { GeneralFormatter } from '../formatter.js';
-import type { Workbook } from '../model.js';
+import type { Workbook } from '../workbook.js';
 import { Events, type EventInfo, type ModelEvent } from '../events.js';
 import { sparklineRange } from './sparklines.js';
 import { columnLabel } from '../rendering.js';
 import { FormulaHints } from './formula-hints.js';
 import { colorSpans } from './formula-color.js';
+/**
+ * Two registries mirror the trial (probes core46p..core46r): `GC.Spread.Sheets.findControl`
+ * resolves workbook hosts only (a FormulaTextBox placed on a child of a workbook host stays
+ * invisible to it: trial `onControlHost: "undefined:null"`), while each control namespace
+ * (`FormulaTextBox.findControl`, `FormulaPanel.findControl`, ...) keeps its own control map.
+ */
+const workbooks = new WeakMap<HTMLElement, object | null>();
 const controls = new WeakMap<HTMLElement, object>();
 function hostElement(host: HTMLElement | string): HTMLElement { const element = typeof host === 'string' ? document.getElementById(host) : host; if (!element) throw new Error('Control host not found'); return element; }
 export function findControl<T>(host: HTMLElement | string): T | undefined { return controls.get(hostElement(host)) as T | undefined; }
+/**
+ * `GC.Spread.Sheets.findControl(host)` (TASK 46, probes core46p/core46q): exact-host
+ * lookup of workbook registrations only — canvas/child elements, inner wrappers and
+ * workbook objects answer `undefined`; host elements and their id strings map to the
+ * workbook; an unknown id answers `undefined`; a destroyed workbook's host answers `null`
+ * (trial: `afterDestroy: null`, `unknownId: undefined`, `twoWb: "first"`).
+ */
+export function findSheetControl(host: HTMLElement | string): object | null | undefined {
+  if (typeof host === 'string') {
+    const element = typeof document === 'undefined' ? null : document.getElementById(host);
+    if (!element) return undefined;
+    host = element;
+  }
+  if (typeof host !== 'object' || host === null || !(host instanceof HTMLElement)) return undefined;
+  return workbooks.has(host) ? (workbooks.get(host) ?? null) : undefined;
+}
+/** Registers a control instance for its host element (used by the namespace findControl lookups). */
+export function registerControl(host: HTMLElement, control: object): void { controls.set(host, control); }
+/** Registers a workbook for its host; the first registration wins (trial `twoWb: "first"`). */
+export function registerWorkbookHost(host: HTMLElement, workbook: object): void {
+  if (!workbooks.has(host)) workbooks.set(host, workbook);
+}
+/** Clears the workbook registration; the host then answers `null` (trial after-destroy value). */
+export function unregisterWorkbookHost(host: HTMLElement): void { if (workbooks.has(host)) workbooks.set(host, null); }
+/**
+ * Removes a workbook-host registration entirely; the host answers `undefined` again
+ * (unlike `unregisterWorkbookHost`'s after-destroy `null`). Used by add-on hosts that
+ * register a wrapper element only while a workbook lives in it (TableSheetPanel field panel).
+ */
+export function clearWorkbookHost(host: HTMLElement): void { workbooks.delete(host); }
+/** Removes the control registration (destroy()). */
+export function unregisterControl(host: HTMLElement): void { controls.delete(host); }
 interface FunctionDescription { name?: string; description?: string; parameters?: { name: string; optional?: boolean; repeatable?: boolean }[] }
 export class FormulaTextBox {
   private wb?: Workbook;

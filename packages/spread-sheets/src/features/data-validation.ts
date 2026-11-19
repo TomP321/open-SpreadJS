@@ -8,15 +8,8 @@ import { Condition } from './conditions.js';
 import { columnLabel } from '../calc/parser.js';
 import { deserializeValue, serializeValue, type JsonRecord } from '../serialization.js';
 
-const DV = GC.Spread.Sheets.DataValidation as unknown as {
-  CriteriaType: Record<string, number>;
-  ErrorStyle: Record<string, number>;
-  HighlightType: Record<string, number>;
-};
-const Criteria = DV.CriteriaType;
-const Comparison = (GC.Spread.Sheets.ConditionalFormatting as unknown as {
-  ComparisonOperators: Record<string, number>;
-}).ComparisonOperators;
+const Criteria = GC.Spread.Sheets.DataValidation.CriteriaType;
+const Comparison = GC.Spread.Sheets.ConditionalFormatting.ComparisonOperators;
 
 export function rangeToAddress(range: Range): string {
   const start = range.row < 0 ? '' : `${columnLabel(range.col)}${range.row + 1}`;
@@ -72,22 +65,26 @@ export class DefaultDataValidator {
     this.conditionValue = value;
     return this;
   }
+  /** Numeric `compareType` of a condition (the getter also returns `this` on set calls). */
+  private static cmpOf(condition: Condition): number {
+    const value: unknown = condition.compareType();
+    return typeof value === 'number' ? value : 0;
+  }
   comparisonOperator(value?: number): number | this {
     if (value === undefined) {
       if (this.comparisonOperatorValue !== undefined) return this.comparisonOperatorValue;
-      const condition = this.conditionValue as unknown as { cmp?: number; one?: Condition; two?: Condition } | undefined;
+      const condition = this.conditionValue;
       if (!condition) return 0;
-      const ops = (GC.Spread.Sheets.ConditionalFormatting as unknown as { ComparisonOperators: Record<string, number> }).ComparisonOperators;
-      if (condition.one && condition.two) {
-        const first = condition.one as unknown as { cmp?: number };
-        const second = condition.two as unknown as { cmp?: number };
-        return first.cmp === 3 || second.cmp === 3 ? ops.between! : ops.notBetween!;
-      }
+      const ops = GC.Spread.Sheets.ConditionalFormatting.ComparisonOperators;
+      const first = condition.item1();
+      const second = condition.item2();
+      if (first && second)
+        return DefaultDataValidator.cmpOf(first) === 3 || DefaultDataValidator.cmpOf(second) === 3 ? ops.between : ops.notBetween;
       if (this.typeValue === Criteria.date || this.typeValue === Criteria.time) {
         const map: Record<number, number> = { 0: 0, 1: 1, 2: 4, 3: 5, 4: 2, 5: 3 };
-        return map[condition.cmp ?? 0] ?? 0;
+        return map[DefaultDataValidator.cmpOf(condition)] ?? 0;
       }
-      return condition.cmp ?? 0;
+      return DefaultDataValidator.cmpOf(condition);
     }
     this.comparisonOperatorValue = value;
     return this;
@@ -159,9 +156,9 @@ export class DefaultDataValidator {
     const condition = this.conditionValue;
     if (!condition) return null;
     if (condition.item1()) return condition.item1()!.getExpected(null, baseRow ?? 0, baseColumn ?? 0);
-    const args = (condition as unknown as { args?: JsonRecord }).args ?? {};
-    if ((this.typeValue === Criteria.custom || this.typeValue === Criteria.list) && args.formula)
-      return '=' + String(args.formula);
+    const formula = condition.formula();
+    if ((this.typeValue === Criteria.custom || this.typeValue === Criteria.list) && formula)
+      return '=' + String(formula);
     return condition.getExpected(null, baseRow ?? 0, baseColumn ?? 0);
   }
   value2(baseRow?: number, baseColumn?: number): unknown {
@@ -201,8 +198,7 @@ export class DefaultDataValidator {
   toJSON(): JsonRecord {
     const result: JsonRecord = {};
     const relation =
-      this.conditionValue &&
-      (this.conditionValue as unknown as { item1(): unknown }).item1() !== undefined;
+      this.conditionValue && this.conditionValue.item1() !== undefined;
     const operator = this.comparisonOperator();
     if (
       (!relation || operator === 7) &&

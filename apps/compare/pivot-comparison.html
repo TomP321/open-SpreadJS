@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Pivot comparison (official vs ours)</title></head><body>
+<div style="display:flex;flex-direction:column;gap:8px">
+  <div id="official" style="width:1240px;height:660px"></div>
+  <div id="ours" style="width:1240px;height:660px"></div>
+</div>
+<script type="module">
+import Official from '@mescius/spread-sheets';
+import '@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css';
+import OpenSheets from '@opensheets/spread-sheets';
+import '@opensheets/spread-sheets/styles/gc.spread.sheets.css';
+import shapesUrl from '../../node_modules/.pnpm/@mescius+spread-sheets-slicers@19.2.5/node_modules/@mescius/spread-sheets-shapes/dist/gc.spread.sheets.shapes.min.js?url';
+import slicersUrl from '../../node_modules/.pnpm/@mescius+spread-sheets-slicers@19.2.5/node_modules/@mescius/spread-sheets-slicers/dist/gc.spread.sheets.slicers.min.js?url';
+import pivotUrl from '@mescius/spread-sheets-pivot-addon/dist/gc.spread.pivot.pivottables.min.js?url';
+
+const fixFs = src => typeof src === 'string' ? src.replace(/^\/@fs(?=\/@fs\/)/, '') : src;
+const loadScript = src => new Promise((resolve, reject) => {
+  const el = document.createElement('script');
+  el.src = src;
+  el.onload = resolve;
+  el.onerror = () => reject(new Error('failed to load ' + src));
+  document.head.append(el);
+});
+window.GC = Official; // the pivot UMD plugin attaches to the global GC
+await loadScript(fixFs(shapesUrl));
+await loadScript(fixFs(slicersUrl));
+await loadScript(fixFs(pivotUrl));
+
+const LIBS = { official: window.GC, ours: OpenSheets };
+const sessions = {};
+
+/* ---------- shared fixture ---------- */
+/* Buyer/Type/Amount/Date/Region sample shaped like the trial docs. */
+const SALES = [
+  ['Date', 'Buyer', 'Type', 'Amount', 'Region'],
+  ['01-Jan', 'Mom', 'Fuel', 74, 'East'],
+  ['15-Jan', 'Mom', 'Food', 235, 'East'],
+  ['17-Jan', 'Dad', 'Sports', 20, 'West'],
+  ['21-Jan', 'Kelly', 'Books', 125, 'West'],
+  ['25-Jan', 'Dad', 'Food', 58, 'East'],
+  ['30-Jan', 'Mom', 'Sports', 42, 'West'],
+  ['04-Feb', 'Kelly', 'Fuel', 96, 'East'],
+  ['08-Feb', 'Dad', 'Books', 310, 'West'],
+  ['12-Feb', 'Mom', 'Food', 88, 'East'],
+];
+
+/* Real Date values (TASK 42 date grouping). */
+const SALES_DATE = [
+  ['Date', 'Buyer', 'Amount'],
+  [new Date(2022, 0, 5), 'Mom', 100],
+  [new Date(2022, 3, 15), 'Dad', 150],
+  [new Date(2022, 10, 20), 'Kelly', 200],
+  [new Date(2023, 1, 3), 'Mom', 120],
+  [new Date(2023, 5, 18), 'Dad', 180],
+  [new Date(2023, 11, 30), 'Kelly', 220],
+];
+
+function build(kind) {
+  const GC = LIBS[kind];
+  const host = document.getElementById(kind);
+  host.innerHTML = '';
+  const wb = new GC.Spread.Sheets.Workbook(host, { sheetCount: 2 });
+  const src = wb.getSheet(0);
+  src.name('Data');
+  src.setArray(0, 0, SALES);
+  src.tables.add('sourceData', 0, 0, SALES.length, 5);
+  src.setArray(20, 0, SALES_DATE);
+  src.tables.add('salesDate', 20, 0, SALES_DATE.length, 3);
+  const sheet = wb.getSheet(1);
+  sheet.name('Pivot');
+  return { GC, wb, src, sheet, host };
+}
+
+function pivotOf(kind, name) {
+  return sessions[kind].sheet.pivotTables.get(name);
+}
+
+/* ---------- probe helpers (black-box, public API only) ---------- */
+function serializeRange(r) {
+  return r ? { row: r.row, col: r.col, rowCount: r.rowCount, colCount: r.colCount } : null;
+}
+
+/** Read the displayed value grid the way the trial exposes pivot cells. */
+function nodeGrid(kind, name) {
+  const pt = pivotOf(kind, name);
+  const range = pt.getRange();
+  const content = range.content;
+  const out = [];
+  for (let r = 0; r < content.rowCount; r++) {
+    const row = [];
+    for (let c = 0; c < content.colCount; c++) {
+      const row_ = content.row + r, col_ = content.col + c;
+      let cell = {};
+      try {
+        const info = pt.getNodeInfo(row_, col_);
+        cell.node = info ? { fields: (info.fieldInfos || []).map(f => [f.fieldName, f.fieldItem]), value: info.valueInfo || null } : null;
+        cell.value = info ? pt.getNodeValue(info) : null;
+      } catch (e) { cell.error = String(e.message).slice(0, 80); }
+      row.push(cell);
+    }
+    out.push(row);
+  }
+  return { content: serializeRange(content), page: serializeRange(range.page), grid: out };
+}
+
+/** Padded content rectangle: `pad` extra rows above / columns left (page area). */
+function pivotRect(kind, name, pad) {
+  const pt = pivotOf(kind, name);
+  const content = pt.getRange().content;
+  const top = Math.max(0, content.row - (pad || 0));
+  const left = Math.max(0, content.col - (pad || 0));
+  return {
+    row: top, col: left,
+    rowCount: content.row + content.rowCount - top,
+    colCount: content.col + content.colCount - left,
+    pad: pad || 0,
+  };
+}
+
+function gridAt(kind, rect, read) {
+  const sheet = sessions[kind].sheet;
+  const out = [];
+  for (let r = 0; r < rect.rowCount; r++) {
+    const row = [];
+    for (let c = 0; c < rect.colCount; c++) row.push(read(sheet, rect.row + r, rect.col + c));
+    out.push(row);
+  }
+  return out;
+}
+
+/** Values as visible on sheet cells (padded with the page area when asked). */
+function cellGrid(kind, name, pad) {
+  return gridAt(kind, pivotRect(kind, name, pad), (sheet, r, c) => sheet.getValue(r, c));
+}
+
+/** Effective cell style + number format, as the trial exposes them publicly. */
+function cellStyleGrid(kind, name, pad) {
+  const GC = LIBS[kind];
+  const area = GC.Spread.Sheets.SheetArea.viewport;
+  return gridAt(kind, pivotRect(kind, name, pad), (sheet, r, c) => {
+    const style = sheet.getStyle(r, c, area) || {};
+    const pick = {};
+    for (const key of ['backColor', 'foreColor', 'font', 'fontWeight', 'hAlign', 'vAlign', 'indent', 'borderTop', 'borderBottom', 'borderLeft', 'borderRight', 'cellPadding'])
+      if (style[key] !== undefined && style[key] !== null && style[key] !== '') pick[key] = style[key];
+    let formatter = null;
+    try { formatter = sheet.getFormatter ? sheet.getFormatter(r, c, area) : null; } catch (e) { formatter = 'n/a'; }
+    return { s: pick, f: formatter || null };
+  });
+}
+
+const pc = {
+  reset(kind) { sessions[kind] = build(kind); return true; },
+  /** Dismiss popups/overlays a previous pass may have left open. */
+  cleanup(kind) {
+    document.querySelectorAll('[class*="gc-overlay-gc-dialog"]').forEach(el => {
+      for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click'])
+        el.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+    });
+    const host = document.getElementById(kind);
+    host?.querySelectorAll('.gc-pivot-filter-panel, .gc-pivot-sort-dialog').forEach(el => el.remove());
+    return true;
+  },
+  pivot(kind, name) { return pivotOf(kind, name); },
+  active(kind, index) { sessions[kind].wb.setActiveSheetIndex(index); return true; },
+  appendData(kind, rows) {
+    const s = sessions[kind];
+    const start = SALES.length;
+    s.src.setArray(start, 0, rows);
+    s.src.tables.resize('sourceData', new s.GC.Spread.Sheets.Range(0, 0, start + rows.length, 5));
+    return true;
+  },
+  GC(kind) { return LIBS[kind]; },
+
+  /** Create a pivot through the manager and return quick facts. */
+  add(kind, opts) {
+    const s = sessions[kind];
+    const L = s.GC.Spread.Pivot;
+    const pt = s.sheet.pivotTables.add(opts.name, opts.source, opts.row, opts.col,
+      opts.layout, opts.theme, opts.options);
+    return { ctor: pt && pt.constructor && pt.constructor.name, isPivot: !!pt };
+  },
+  setSetupOpts(kind, opts) { sessions[kind].setupOpts = opts; return true; },
+  manager(kind) {
+    const s = sessions[kind];
+    const m = s.sheet.pivotTables;
+    return {
+      allCount: m.all().length,
+      getFound: !!m.get('pivot1'),
+      customListDefault: (() => { try { return m.customList(); } catch (e) { return { thrown: String(e.message).slice(0, 60) }; } })(),
+    };
+  },
+  api(kind, name, ops) {
+    // Generic call runner: [methodOrGetter, args[]] on the pivot table.
+    const pt = pivotOf(kind, name);
+    const results = [];
+    for (const [path, args] of ops) {
+      let target = pt;
+      const parts = path.split('.');
+      const member = parts.pop();
+      for (const p of parts) target = target[p];
+      try {
+        const fn = target[member];
+        const value = typeof fn === 'function' ? fn.apply(target, args || []) : fn;
+        results.push(JSON.parse(JSON.stringify(value === undefined ? '<undefined>' : value)));
+      } catch (e) { results.push({ thrown: String(e.message).slice(0, 120) }); }
+    }
+    return results;
+  },
+  serialize(kind, name) { return pivotOf(kind, name).serialize(); },
+  /** View-manager ops; `add` uses the pivot's current serialize() as config. */
+  viewsApi(kind, name, ops) {
+    const pt = pivotOf(kind, name);
+    const results = [];
+    for (const [method, args] of ops) {
+      try {
+        let value;
+        if (method === 'add') value = pt.views.add({ name: args[0], config: pt.serialize() });
+        else if (method === 'sortDesc') { pt.sort('Buyer', { sortType: 1 }); value = undefined; }
+        else if (method === 'all') value = pt.views.all().map(v => ({ name: v.name, layoutType: v.config?.layoutType, fields: (v.config?.fieldsInfo ?? []).map(a => a.length) }));
+        else if (method === 'get') { const v = pt.views.get(args[0]); value = v ? { name: v.name, layoutType: v.config?.layoutType } : String(v); }
+        else value = pt.views[method](...(args ?? []));
+        results.push(JSON.parse(JSON.stringify(value === undefined ? '<undefined>' : value)));
+      } catch (e) { results.push({ thrown: String(e.message).slice(0, 120) }); }
+    }
+    return results;
+  },
+  /** Set a formula on a far cell of the pivot sheet and read the result. */
+  formula(kind, r, c, f) {
+    const sheet = sessions[kind].sheet;
+    sheet.setFormula(r, c, f);
+    const value = sheet.getValue(r, c);
+    if (value instanceof Error) return String(value);
+    // Error values are plain objects in both runtimes; their toString() gives
+    // the error code, so the exact code (not just "some error") is compared.
+    if (value && typeof value === 'object' && !Array.isArray(value)) return String(value);
+    return value;
+  },
+  wbJson(kind) { return JSON.stringify(sessions[kind].wb.toJSON()); },
+  /* ---- PivotPanel black-box probe (TASK 42 item 5) ---- */
+  panelHost(kind) {
+    let host = document.getElementById(kind + '-panel');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = kind + '-panel';
+      // To the right of both canvases (never overlaps the clip regions).
+      host.style.cssText = `position:absolute;left:1248px;top:${kind === 'official' ? 4 : 672}px;width:300px;height:560px;border:1px solid #999;background:#fff`;
+      document.body.append(host);
+    }
+    return host;
+  },
+  panelOpen(kind) {
+    const s = sessions[kind];
+    const host = pc.panelHost(kind);
+    host.innerHTML = '';
+    const P = s.GC.Spread.Pivot.PivotPanel;
+    const pt = s.sheet.pivotTables.get('pivot1');
+    try { sessions[kind].panel = new P('panel1', pt, host); return !!sessions[kind].panel; }
+    catch (e) { sessions[kind].panel = null; return 'ERR ' + String(e.message).slice(0, 80); }
+  },
+  panelDump(kind) {
+    const host = document.getElementById(kind + '-panel');
+    if (!host) return null;
+    host.__innerTextDump = host.innerText;
+    host.__itemDump = [...host.querySelectorAll('.gc-panel-all-field-item, .gc-panel-area-item-title, .gc-panel-area-item-content > *')]
+      .map(el => ({ cls: String(el.className), text: el.innerText || el.title || '',
+        kids: [...el.childNodes].map(n => n.nodeType === 3 ? JSON.stringify(n.textContent) : n.tagName + (n.className ? '.' + String(n.className).split(' ')[0] : '')),
+        attrs: [...el.attributes].map(a => a.name).filter(n => /data|title|aria/.test(n)) }));
+    const walk = (el, depth) => {
+      if (/^(STYLE|SCRIPT|LINK)$/.test(el.tagName)) return {}; // clean-room: never read injected CSS
+      const texts = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent.trim()).filter(Boolean);
+      const out = {};
+      if (texts.length) out.t = texts.join('|');
+      const cls = String(el.className || '').split(/\s+/).filter(c => c && /panel|pivot|field|drag|search|area|filter|row|col|value|list|check|title|caption/i.test(c));
+      if (cls.length) out.c = cls.join(' ');
+      if (el.tagName === 'INPUT') out.i = { type: el.type, value: el.value, placeholder: el.placeholder };
+      const kids = depth < 9 ? [...el.children].map(c => walk(c, depth + 1)).filter(k => Object.keys(k).length) : [];
+      if (kids.length) out.k = kids;
+      return out;
+    };
+    return walk(host, 0);
+  },
+  panelAction(kind, what) {
+    const host = document.getElementById(kind + '-panel');
+    const [cmd, arg] = String(what).split(':');
+    try {
+      if (cmd === 'field') {
+        const item = [...host.querySelectorAll('.gc-panel-all-field-item')].find(i => i.dataset.sourcename === arg);
+        const inp = item && item.querySelector('input[type="checkbox"]');
+        if (!inp) return 'no-item ' + arg;
+        inp.click();
+        return arg + '=' + inp.checked;
+      }
+      if (cmd === 'defer') { host.querySelector('.gc-panel-defer-layout-input').click(); return 'defer'; }
+      if (cmd === 'update') { host.querySelector('.gc-panel-defer-layout-right-button').click(); return 'update'; }
+      if (cmd === 'search') { const i = host.querySelector('.gc-panel-search-input'); i.value = arg; i.dispatchEvent(new Event('input')); return 'search'; }
+    } catch (e) { return 'ERR ' + String(e.message).slice(0, 60); }
+    return '?';
+  },
+  panelApi(kind, ops) {
+    const panel = sessions[kind].panel;
+    const out = [];
+    for (const [op, ...args] of ops) {
+      try {
+        const v = panel[op](...args);
+        out.push(v === undefined ? '<void>' : (typeof v === 'object' ? JSON.stringify(v) : String(v)));
+      } catch (e) { out.push('ERR ' + String(e.message).slice(0, 70)); }
+    }
+    return out;
+  },
+  panelGeom(kind) {
+    const host = document.getElementById(kind + '-panel');
+    if (!host) return null;
+    const r = host.getBoundingClientRect();
+    return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+  },
+  /* Enum members + sample values (public API structure probe, TASK 42). */
+  enumProbe(kind, ns, names, sample) {
+    const s = sessions[kind];
+    let target = s.GC;
+    if (ns.startsWith('Spread.')) target = s.GC.Spread ? { Spread: s.GC.Spread } : s.GC;
+    for (const part of ns.split('.')) target = target?.[part];
+    const out = {};
+    for (const name of names) out[name] = target?.[name] === undefined ? '<missing>' : String(target[name]);
+    if (sample) { try { const v = target?.[sample]?.(); out['$' + sample] = typeof v === 'object' && v !== null ? JSON.stringify(v).slice(0, 200) : String(v); } catch (e) { out['$' + sample] = 'ERR ' + e.message.slice(0, 60); } }
+    return out;
+  },
+  /* ---- pivot slicers / timeline (TASK 42 item 4) ---- */
+  slicerSnapshot(s, sl) {
+    if (!sl) return null;
+    const GC = s.GC;
+    const call = (name, ...args) => {
+      try {
+        const fn = sl[name];
+        if (typeof fn !== 'function') return '<missing>';
+        const v = fn.call(sl, ...args);
+        if (v === sl) return '<self>';
+        if (v === undefined) return '<undefined>';
+        if (v && typeof v.getTime === 'function') return v.toISOString();
+        if (Array.isArray(v)) return v.map(x => x && x.name ? x.name() : x);
+        return v;
+      } catch (e) { return 'ERR ' + String(e.message).slice(0, 60); }
+    };
+    const pt = s.sheet.pivotTables.get('pivot1');
+    return {
+      ctor: (() => {
+        const P = s.GC.Spread.Pivot;
+        return {
+          item: P.PivotTableItemSlicer ? sl instanceof P.PivotTableItemSlicer : '<missing>',
+          timeline: P.PivotTableTimelineSlicer ? sl instanceof P.PivotTableTimelineSlicer : '<missing>',
+        };
+      })(),
+      name: call('name'), caption: call('captionName'), source: call('sourceName'),
+      nameInFormula: call('nameInFormula'), cache: call('slicerCacheName'),
+      connected: call('getConnectedPivotTableNameList'),
+      isConnPivot: call('isConnectedPivotTable', 'pivot1'),
+      pivotIsConn: pt && typeof pt.isConnectedSlicer === 'function' ? pt.isConnectedSlicer(String(sl.name())) : '<missing>',
+      allSlicers: pt && typeof pt.getAllSlicers === 'function' ? pt.getAllSlicers().map(x => x.name()) : '<missing>',
+      x: call('x'), y: call('y'), width: call('width'), height: call('height'),
+      visible: call('isVisible'), multiSelect: call('multiSelect'), showHeader: call('showHeader'),
+      styleName: call('getStyleName'), itemHeight: call('itemHeight'), columnCount: call('columnCount'),
+      level: typeof sl.level === 'function' ? call('level') : '<missing>',
+      showTimeLevel: typeof sl.showTimeLevel === 'function' ? call('showTimeLevel') : '<missing>',
+      showSelectionLabel: typeof sl.showSelectionLabel === 'function' ? call('showSelectionLabel') : '<missing>',
+      scrollPosition: typeof sl.scrollPosition === 'function' ? call('scrollPosition') : '<missing>',
+      allPivots: call('getAllPivotTables'),
+      sheetName: (() => { try { const sh = sl.sheet(); return sh ? sh.name() : String(sh); } catch { return 'ERR'; } })(),
+    };
+  },
+  slicerOps(kind, ops) {
+    const s = sessions[kind];
+    const ST = s.GC.Spread.Sheets.Slicers ? s.GC.Spread.Sheets.Slicers.SlicerType : {};
+    const out = [];
+    for (const [op, ...args] of ops) {
+      try {
+        if (op === 'add') {
+          const type = args[3] === 'timeline' ? ST.pivotTimeline : ST.pivotTable;
+          const sl = s.sheet.slicers.add(args[0], args[1], args[2], undefined, type);
+          out.push(pc.slicerSnapshot(s, sl));
+        } else if (op === 'get') out.push(pc.slicerSnapshot(s, s.sheet.slicers.get(args[0])));
+        else if (op === 'remove') { s.sheet.slicers.remove(args[0]); out.push(true); }
+        else if (op === 'set') {
+          const sl = s.sheet.slicers.get(args[0]);
+          const v = sl[args[1]](...args.slice(2));
+          out.push(v === sl ? '<self>' : (v === undefined ? undefined : v));
+        }
+        else if (op === 'all') out.push(s.sheet.slicers.all().map(sl => sl.name()));
+        else if (op === 'byPivot') out.push(s.sheet.slicers.all(args[0]).map(sl => sl.name()));
+        else out.push('unknown op ' + op);
+      } catch (e) { out.push('ERR ' + String(e.message).slice(0, 80)); }
+    }
+    return out;
+  },
+  slicerItemPoint(kind, name, index) {
+    const s = sessions[kind];
+    const sl = s.sheet.slicers.get(name);
+    if (!sl) return { error: 'no slicer ' + name };
+    const host = document.getElementById(kind);
+    const cv = [...host.querySelectorAll('canvas')].sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+    const cr = cv.getBoundingClientRect();
+    const itemHeight = Number(sl.itemHeight ? sl.itemHeight() : 21);
+    return {
+      x: Math.round(cr.x + 40 + Number(sl.x()) + 60),
+      y: Math.round(cr.y + 20 + Number(sl.y()) + 29 + index * (itemHeight + 7) + itemHeight / 2),
+    };
+  },
+  fromJson(kind, json) {
+    const wb = sessions[kind].wb;
+    wb.fromJSON(JSON.parse(json));
+    const sheet = wb.getSheetFromName ? wb.getSheetFromName('Pivot') : null;
+    const all = sheet && sheet.pivotTables ? sheet.pivotTables.all() : [];
+    return all.map(t => ({ name: t.name(), range: JSON.stringify(t.getRange()), fields: t.getFieldsByArea().length, theme: t.getThemeName() }));
+  },
+  activeName(kind) { const s = sessions[kind]; return s.wb.getActiveSheet() ? s.wb.getActiveSheet().name() : null; },
+  sheetJson(kind) { return JSON.stringify(sessions[kind].wb.toJSON()).length; },
+  sheetJsonText(kind) { return JSON.stringify(sessions[kind].wb.toJSON()); },
+  nodeGrid, cellGrid, cellStyleGrid,
+  /** One-shot comparison probe: per-cell value + style signature per scenario. */
+  probeStyles(kind, scenarios) {
+    const out = {};
+    for (const entry of scenarios) {
+      const name = entry[0], layout = entry[1], fields = entry[2], ops = entry[3] || [], pad = entry[4] || 0;
+      try {
+        this.reset(kind);
+        this.add(kind, { name: 'p1', source: 'sourceData', row: 1, col: 1, layout, theme: 'Medium2' });
+        this.api(kind, 'p1', fields);
+        if (ops.length) this.api(kind, 'p1', ops);
+        this.active(kind, 1);
+        const sg = cellStyleGrid(kind, 'p1', pad);
+        const cg = cellGrid(kind, 'p1', pad);
+        const lines = [];
+        for (let r = 0; r < sg.length; r++) {
+          const cells = [];
+          for (let c = 0; c < sg[r].length; c++) {
+            const s = sg[r][c].s || {};
+            const v = cg[r][c];
+            const parts = [
+              s.backColor || '-',
+              s.foreColor || '-',
+              (s.font || '').replace(/\s+/g, ' '),
+              'i' + (s.indent === undefined ? 0 : s.indent),
+              s.hAlign || '-',
+              sg[r][c].f || '-',
+            ];
+            cells.push(String(v === null || v === undefined ? '' : v).slice(0, 14) + '<<' + parts.join(',') + '>>');
+          }
+          lines.push(cells.join(' | '));
+        }
+        out[name] = lines;
+      } catch (error) { out[name] = ['ERROR ' + String(error && error.message).slice(0, 120)]; }
+    }
+    return out;
+  },
+  sheetRef(kind) { return sessions[kind].sheet; },
+  /** Page-absolute pixel position of a named pivot interaction target. */
+  pivotClickPoint(kind, name, what) {
+    const s = sessions[kind];
+    const pivot = s.sheet.pivotTables.get(name);
+    if (!pivot) return { error: 'no pivot ' + name + ' on ' + kind + ' all=' + s.sheet.pivotTables.all().map(t => t.name()).join(',') };
+    const c = pivot.getRange().content;
+    let target = null;
+    for (let r = c.row; r < c.row + c.rowCount; r++) {
+      for (let col = c.col; col < c.col + c.colCount; col++) {
+        const v = s.sheet.getValue(r, col);
+        if (what.type === 'label' && col === c.col && v === what.text) target = { r, c: col };
+        if (what.type === 'corner' && v === what.text) target = { r, c: col };
+      }
+      if (target) break;
+    }
+    if (!target) return { error: 'no label ' + JSON.stringify(what) + ' on ' + kind };
+    let px = 40;
+    for (let i = 0; i < target.c; i++) px += s.sheet.getColumnWidth(i);
+    let py = 20;
+    for (let i = 0; i < target.r; i++) py += s.sheet.getRowHeight(i);
+    const w = s.sheet.getColumnWidth(target.c);
+    const h = s.sheet.getRowHeight(target.r);
+    const host = document.getElementById(kind);
+    const cv = [...host.querySelectorAll('canvas')].sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+    const cr = cv.getBoundingClientRect();
+    const x = cr.x + px;
+    const y = cr.y + py;
+    if (what.type === 'label')
+      return { x: x + 15, y: y + h / 2, cell: target };
+    const label = String(what.text);
+    const bx = x + Math.min(label.length * 7 + 7, w - 17);
+    return { x: bx + 7, y: y + h / 2, cell: target };
+  },
+  styles(kind, name) {
+    // Probe theme style resolution for representative pivot areas.
+    const pt = pivotOf(kind, name);
+    const areas = [
+      ['all', { type: 0 }],
+      ['corner', { type: 5 }],
+      ['topRight', { type: 7 }],
+    ];
+    const out = {};
+    for (const [label, area] of areas) {
+      try { out[label] = pt.getStyle(area); } catch (e) { out[label] = { thrown: String(e.message).slice(0, 100) }; }
+    }
+    return out;
+  },
+  themeDump(kind) {
+    const L = LIBS[kind].Spread.Pivot;
+    const keys = Object.keys(L.PivotTableThemes).filter(k => k !== 'prototype' && k !== 'length' && k !== 'name');
+    const data = {};
+    for (const key of keys) data[key] = { name: L.PivotTableThemes[key].name(), json: L.PivotTableThemes[key].toJSON() };
+    return { keys, data };
+  },
+  geom(kind) {
+    const canvas = [...sessions[kind].host.querySelectorAll('canvas')].sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+    const rect = canvas.getBoundingClientRect();
+    return { clip: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) } };
+  },
+};
+window.pc = pc;
+for (const kind of ['official', 'ours']) pc.reset(kind);
+window.__pcReady = true;
+</script>
+</body></html>

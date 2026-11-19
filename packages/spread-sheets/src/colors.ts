@@ -73,3 +73,10 @@ export function mixColor(from: string, to: string, ratio: number, round = Math.r
 export function canvasColor(input: string): string {
   return /^(?:accent|background|text|followed hyperlink|hyperlink)(?:\s|$)/i.test(input) ? resolveColor(input) : input;
 }
+/** Same colour with a replacement alpha, for translucent highlight overlays. */
+export function withAlpha(input: string, alpha: number): string {
+  const value = parseColor(input) ?? parseColor(resolveColor(input), {});
+  if (!value) return input;
+  const a = clamp(value[3] * clamp(alpha, 1));
+  return `rgba(${value[0]},${value[1]},${value[2]},${Number(a.toFixed(4))})`;
+}

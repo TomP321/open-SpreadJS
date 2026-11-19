@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>DataCharts comparison (official vs ours)</title></head><body>
+<div id="hosts" style="position:relative;width:1100px"></div>
+<script type="module">
+import Official from '@mescius/spread-sheets';
+import '@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css';
+import OpenSheets from '@opensheets/spread-sheets';
+import '@opensheets/spread-sheets/styles/gc.spread.sheets.css';
+import shapesUrl from '../../node_modules/.pnpm/@mescius+spread-sheets-shapes@19.2.5/node_modules/@mescius/spread-sheets-shapes/dist/gc.spread.sheets.shapes.min.js?url';
+import datachartsUrl from '../../node_modules/.pnpm/@mescius+spread-sheets-datacharts-addon@19.2.5/node_modules/@mescius/spread-sheets-datacharts-addon/dist/gc.spread.sheets.datacharts.min.js?url';
+window.GC = Official;
+const fixFs = src => typeof src === 'string' ? src.replace(/^\/@fs(?=\/@fs\/)/, '') : src;
+const loadScript = src => new Promise((resolve, reject) => {
+  const el = document.createElement('script');
+  el.src = src;
+  el.onload = resolve;
+  el.onerror = () => reject(new Error('failed to load ' + src));
+  document.head.append(el);
+});
+// The official datacharts runtime is a UMD plugin on top of the core + shapes.
+await loadScript(fixFs(shapesUrl));
+await loadScript(fixFs(datachartsUrl));
+
+const LIBS = { official: Official, ours: OpenSheets };
+window.__LIBS__ = LIBS;
+const sessions = {};
+
+/* Shared fixture table fields (one row per product/region combination). */
+const RECORDS = [
+  { Year: 2021, Region: 'East',  Category: 'Drinks',  Child: 'A', Product: 'Juice', X: 2,  Y: 5,  Size: 20, Open: 4, High: 8,  Low: 3,  Close: 6,  Sales: 140, Qty: 9,  Date: '2021-01-05' },
+  { Year: 2021, Region: 'East',  Category: 'Drinks',  Child: 'B', Product: 'Milk',  X: 5,  Y: 9,  Size: 35, Open: 6, High: 9,  Low: 5,  Close: 7,  Sales: 431, Qty: 38, Date: '2021-02-06' },
+  { Year: 2021, Region: 'North', Category: 'Drinks',  Child: 'A', Product: 'Juice', X: 8,  Y: 3,  Size: 12, Open: 7, High: 10, Low: 6,  Close: 8,  Sales: 250, Qty: 23, Date: '2021-03-07' },
+  { Year: 2021, Region: 'North', Category: 'Drinks',  Child: 'B', Product: 'Milk',  X: 11, Y: 12, Size: 48, Open: 8, High: 11, Low: 7,  Close: 9,  Sales: 666, Qty: 39, Date: '2021-04-08' },
+  { Year: 2022, Region: 'East',  Category: 'Food',    Child: 'A', Product: 'Cake',  X: 3,  Y: 7,  Size: 30, Open: 9, High: 12, Low: 8,  Close: 10, Sales: 333, Qty: 32, Date: '2022-01-09' },
+  { Year: 2022, Region: 'East',  Category: 'Food',    Child: 'C', Product: 'Bread', X: 6,  Y: 2,  Size: 18, Open: 10, High: 13, Low: 9, Close: 12, Sales: 156, Qty: 14, Date: '2022-02-10' },
+  { Year: 2022, Region: 'North', Category: 'Food',    Child: 'B', Product: 'Cake',  X: 9,  Y: 6,  Size: 26, Open: 11, High: 14, Low: 10, Close: 13, Sales: 218, Qty: 17, Date: '2022-03-11' },
+  { Year: 2022, Region: 'North', Category: 'Food',    Child: 'C', Product: 'Bread', X: 12, Y: 10, Size: 40, Open: 12, High: 15, Low: 11, Close: 14, Sales: 345, Qty: 21, Date: '2022-04-12' },
+];
+
+function strip(value) {
+  const walk = any => {
+    if (Array.isArray(any)) return any.map(walk);
+    if (any && typeof any === 'object') {
+      const out = {};
+      for (const key of Object.keys(any)) {
+        const item = any[key];
+        if (typeof item === 'function') continue;
+        if (typeof item === 'string' && /^data:image/.test(item)) { out[key] = '<png:' + item.length + '>'; continue; }
+        if (any[key] instanceof Date) { out[key] = '<date:' + any[key].toISOString() + '>'; continue; }
+        out[key] = walk(item);
+      }
+      return out;
+    }
+    if (any instanceof Date) return '<date:' + any.toISOString() + '>';
+    return any;
+  };
+  try { return walk(JSON.parse(JSON.stringify(value))); } catch { return '<unserialisable>'; }
+}
+
+/** Resolve {__e:'DataChartType.pie'} markers (at any depth) against the session's GC. */
+function resolveArgs(GC, value) {
+  if (Array.isArray(value)) return value.map(v => resolveArgs(GC, v));
+  if (value && typeof value === 'object' && (value.constructor === Object || value.constructor === undefined)) {
+    if (typeof value.__e === 'string') {
+      return value.__e.split('.').reduce((o, k) => (o == null ? undefined : o[k]), GC.Spread.Sheets.DataCharts);
+    }
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = resolveArgs(GC, v);
+    return out;
+  }
+  return value;
+}
+
+function resolveTarget(s, path) {
+  const dot = path.lastIndexOf('.');
+  const targetName = dot < 0 ? path : path.slice(0, dot);
+  const member = dot < 0 ? null : path.slice(dot + 1);
+  const named = {
+    dc: () => s.dc,
+    dcs: () => s.sheet.dataCharts,
+    sheet: () => s.sheet,
+    wb: () => s.wb,
+    dm: () => s.dm,
+    table: () => s.table,
+    panel: () => s.panel,
+  };
+  let target = (named[targetName] ?? (() => undefined))();
+  if (target === undefined && targetName === 'panel') {
+    // The panel is created on demand through an op like `panel.<member>`.
+    target = s.panel;
+  }
+  if (!target) throw new Error('unknown op target ' + path);
+  return { target, member };
+}
+
+/** Generic operation runner: ops are [target.member, argsArray] pairs. */
+async function apply(kind, ops) {
+  const s = sessions[kind];
+  const log = [];
+  for (const [path, rawArgs] of ops) {
+    const args = resolveArgs(s.GC, (rawArgs ?? []).map(a => a === '@wb' ? s.wb : a));
+    let target, member;
+    try { ({ target, member } = resolveTarget(s, path)); }
+    catch (error) { log.push(path + ':throws:' + String(error.message).slice(0, 120)); continue; }
+    if (!member || typeof target[member] !== 'function') { log.push(path + ':missing'); continue; }
+    try {
+      const ret = await target[member](...args);
+      const shown = ret === undefined ? 'undefined' : ret === target || ret === s.dc ? '<dc>' : JSON.stringify(strip(ret));
+      log.push(path + ':' + String(shown).slice(0, 400));
+    }
+    catch (error) { log.push(path + ':throws:' + String(error && error.message || error).slice(0, 200)); }
+  }
+  return log;
+}
+
+function dcState(s) {
+  const out = { hasChart: !!s.dc };
+  if (!s.dc) return out;
+  const call = (label, fn) => { try { const r = fn(); out[label] = r === s.dc ? '<dc>' : strip(r); } catch (error) { out[label] = { throws: String(error && error.message || error).slice(0, 160) }; } };
+  call('name', () => s.dc.name());
+  call('geometry', () => [s.dc.x(), s.dc.y(), s.dc.width(), s.dc.height()]);
+  call('anchor', () => [s.dc.startRow(), s.dc.startColumn(), s.dc.startRowOffset(), s.dc.startColumnOffset(), s.dc.endRow(), s.dc.endColumn(), s.dc.endRowOffset(), s.dc.endColumnOffset()]);
+  call('flags', () => ({
+    allowMove: s.dc.allowMove(), allowResize: s.dc.allowResize(), alt: s.dc.alt(), canPrint: s.dc.canPrint(),
+    dynamicMove: s.dc.dynamicMove(), dynamicSize: s.dc.dynamicSize(), isLocked: s.dc.isLocked(),
+    isSelected: s.dc.isSelected(), isVisible: s.dc.isVisible(),
+  }));
+  call('config', () => s.dc.getChartConfig());
+  return out;
+}
+
+function managerState(s) {
+  const out = {};
+  const call = (label, fn) => { try { out[label] = strip(fn()); } catch (error) { out[label] = { throws: String(error && error.message || error).slice(0, 160) }; } };
+  call('names', () => (s.sheet.dataCharts.all() ?? []).map(d => String(d.name())));
+  call('getMissing', () => { const r = s.sheet.dataCharts.get('NoSuchChart'); return r === undefined ? 'undefined' : r === null ? 'null' : '<obj>'; });
+  call('zIndexMissing', () => s.sheet.dataCharts.zIndex('NoSuchChart'));
+  call('zIndexGet', () => s.dc ? s.sheet.dataCharts.zIndex(String(s.dc.name())) : null);
+  return out;
+}
+
+/** DOM tag tree of the chart host (STYLE/LINK skipped entirely). */
+function tagTree(el, depth = 4) {
+  if (!el) return null;
+  if (el.tagName === 'STYLE' || el.tagName === 'LINK') return null;
+  const kids = depth > 0
+    ? Array.from(el.children).filter(k => k.tagName !== 'STYLE' && k.tagName !== 'LINK').slice(0, 12).map(k => tagTree(k, depth - 1))
+    : [];
+  return {
+    tag: el.tagName,
+    cls: (el.getAttribute && el.getAttribute('class') || '').toString().split(' ').slice(0, 4).join('.'),
+    w: el.clientWidth || undefined, h: el.clientHeight || undefined,
+    kids: kids.length ? kids : undefined,
+  };
+}
+
+window.dc = {
+  ready: () => Object.keys(LIBS),
+  namespace(kind) {
+    const GC = LIBS[kind];
+    const ns = (GC.Spread.Sheets.DataCharts ?? {});
+    const protoMembers = cls => cls && cls.prototype
+      ? [...new Set([...Object.getOwnPropertyNames(cls.prototype), ...Object.getOwnPropertyNames(cls)])].sort()
+      : null;
+    return {
+      keys: Object.keys(ns).sort(),
+      dataChartMembers: protoMembers(ns.DataChart),
+      managerMembers: protoMembers(ns.DataChartManager),
+      panelMembers: protoMembers(ns.DataChartConfigPanel),
+      typeValues: ns.DataChartType ? Object.entries(ns.DataChartType).map(([k, v]) => k + '=' + v).sort() : null,
+    };
+  },
+  async setup(kind, opts0 = {}) {
+    // {__e:'DataChartType.column'} markers may appear anywhere in the options.
+    const opts = resolveArgs(LIBS[kind], opts0);
+    if (sessions[kind]) {
+      // Trial quirk: destroying a workbook that still hosts data charts breaks
+      // `sheet.dataCharts` in later workbooks of the page. Clear first.
+      try { sessions[kind].dcs?.clear?.(); } catch { /* ignore */ }
+      try { sessions[kind].wb.destroy(); } catch { /* ignore */ }
+      sessions[kind].host.remove();
+      delete sessions[kind];
+    }
+    const GC = LIBS[kind];
+    const host = document.createElement('div');
+    host.id = 'dc-host-' + kind;
+    host.style.cssText = 'width:800px;height:560px;position:absolute;top:20px;left:' + (kind === 'official' ? 10 : 830) + 'px';
+    document.getElementById('hosts').append(host);
+    const wb = new GC.Spread.Sheets.Workbook(host, { sheetCount: 1 });
+    const sheet = wb.getActiveSheet();
+    // A cell fixture as well, to see whether data charts ever touch the grid.
+    sheet.setValue(0, 0, 'Grid');
+    const dm = wb.dataManager();
+    let table = null;
+    let setupError = null;
+    if (opts.withTable !== false) {
+      try {
+        table = dm.addTable(opts.tableName ?? 'Sales', { data: (opts.records ?? RECORDS).map(r => ({ ...r })) });
+        await table.fetch();
+      } catch (error) { setupError = 'table:' + String(error && error.message || error); }
+    }
+    const name = opts.name ?? 'DataChart1';
+    const type = typeof opts.type === 'string'
+      ? (GC.Spread.Sheets.DataCharts.DataChartType[opts.type] ?? opts.type)
+      : opts.type;
+    let dcs = null;
+    try { dcs = sheet.dataCharts; } catch (error) { setupError = (setupError ? setupError + ' | ' : '') + 'dataCharts:' + String(error && error.message || error); }
+    let dc = null;
+    if (dcs && type !== undefined && type !== null) {
+      try {
+        dc = dcs.add(name, opts.x ?? 120, opts.y ?? 40, opts.width ?? 460, opts.height ?? 300, type);
+      } catch (error) { setupError = (setupError ? setupError + ' | ' : '') + 'add:' + String(error && error.message || error); }
+    }
+    if (dc && opts.config) {
+      try {
+        const config = resolveArgs(GC, opts.config);
+        if (opts.infer !== undefined) dc.setChartConfig(config, opts.infer);
+        else dc.setChartConfig(config);
+      } catch (error) { setupError = (setupError ? setupError + ' | ' : '') + 'setConfig:' + String(error && error.message || error); }
+    }
+    if (dc && opts.focus !== false) { try { dc.isSelected(true); } catch { /* ignore */ } }
+    let panelHost = null;
+    if (opts.panel) {
+      panelHost = document.createElement('div');
+      panelHost.id = 'dc-panel-' + kind;
+      panelHost.style.cssText = 'width:260px;height:400px;position:absolute;top:400px;left:' + (kind === 'official' ? 10 : 830) + 'px';
+      document.getElementById('hosts').append(panelHost);
+      try {
+        const Panel = GC.Spread.Sheets.DataCharts.DataChartConfigPanel;
+        sessions[kind] = { GC, wb, sheet, dm, table, dcs, dc, name, host, panelHost };
+        sessions[kind].panel = new Panel(panelHost, wb);
+      } catch (error) { setupError = (setupError ? setupError + ' | ' : '') + 'panel:' + String(error && error.message || error); }
+    }
+    sessions[kind] = { GC, wb, sheet, dm, table, dcs, dc, name, host, panelHost, panel: sessions[kind]?.panel ?? null, setupError };
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise(r => setTimeout(r, 600));
+    return { ok: !setupError, setupError };
+  },
+  apply,
+  get: kind => sessions[kind]?.dc ?? null,
+  panelHostRef: kind => sessions[kind]?.panelHost ?? null,
+  wbRef: kind => sessions[kind]?.wb ?? null,
+  sheetRef: kind => sessions[kind]?.sheet ?? null,
+  async roundTrip(kind) {
+    const s = sessions[kind];
+    const json = strip(s.wb.toJSON());
+    const old = s.wb;
+    try { old.getActiveSheet().dataCharts?.clear?.(); } catch { /* ignore */ }
+    try { old.destroy(); } catch { /* ignore */ }
+    s.wb = new s.GC.Spread.Sheets.Workbook(s.host);
+    await s.wb.fromJSON(json);
+    await new Promise(r => setTimeout(r, 60));
+    s.sheet = s.wb.getActiveSheet();
+    s.dcs = s.sheet.dataCharts;
+    s.dc = s.dcs ? s.dcs.get(s.name) : null;
+    return { count: s.dcs ? s.dcs.all().length : -1 };
+  },
+  tableOp(kind, args) {
+    // [method, ...args] against the bound GC.Data table (live refresh check).
+    const s = sessions[kind];
+    try { return strip({ ret: s.table[args[0]](...args.slice(1)) }); }
+    catch (error) { return { throws: String(error && error.message || error) }; }
+  },
+  hasChart(kind) { return !!(sessions[kind] && sessions[kind].dc); },
+  tooltipProbe(kind) {
+    // Small floating text boxes currently visible inside the session host =
+    // the runtime's hover tooltip. Positions are rounded to 16 px so pure
+    // sub-pixel placement noise does not create diffs.
+    const s = sessions[kind];
+    if (!s) return null;
+    const hostRect = s.host.getBoundingClientRect();
+    const out = [];
+    for (const el of document.querySelectorAll('div,span,table')) {
+      if (el.tagName === 'CANVAS' || el === s.host || s.host === document.body) continue;
+      const st = getComputedStyle(el);
+      if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) continue;
+      if (st.position !== 'absolute' && st.position !== 'fixed') continue;
+      const r = el.getBoundingClientRect();
+      // Must sit (almost) inside the session host box.
+      if (r.left < hostRect.left - 2 || r.top < hostRect.top - 2 || r.right > hostRect.right + 2 || r.bottom > hostRect.bottom + 2) continue;
+      if (r.width < 8 || r.height < 8 || r.width > 320 || r.height > 240) continue;
+      if (el.querySelector('canvas')) continue;
+      const text = (el.textContent || '').trim().replace(/\s+/g, ' ');
+      if (!text || text.length > 120) continue;
+      out.push({ x: Math.round((r.left - hostRect.left) / 16) * 16, y: Math.round((r.top - hostRect.top) / 16) * 16, text });
+    }
+    out.sort((a, b) => a.y - b.y || a.x - b.x);
+    // Keep only the innermost texts (drop ancestors repeating the same text).
+    const seen = new Set();
+    return out.filter(o => { const k = o.text; if (seen.has(k)) return false; seen.add(k); return true; });
+  },
+  dom(kind) {
+    const s = sessions[kind];
+    return {
+      host: tagTree(s.host, 5),
+      panel: s.panelHost ? tagTree(s.panelHost, 5) : null,
+    };
+  },
+  canvases(kind) {
+    const s = sessions[kind];
+    return Array.from(s.host.querySelectorAll('canvas')).map(c => {
+      const r = c.getBoundingClientRect();
+      return { w: c.width, h: c.height, left: Math.round(r.left), top: Math.round(r.top), rw: Math.round(r.width), rh: Math.round(r.height) };
+    });
+  },
+  geom(kind) {
+    const s = sessions[kind];
+    const hostRect = s.host.getBoundingClientRect();
+    // Data charts float on the sheet data area: canvas surface origin +
+    // header band (40x20) + (x, y) * zoom.
+    let origin = hostRect;
+    let best = Infinity;
+    for (const c of s.host.querySelectorAll('canvas')) {
+      const r = c.getBoundingClientRect();
+      const d = Math.abs(r.left - hostRect.left) + Math.abs(r.top - hostRect.top);
+      if (r.width > 200 && d < best) { best = d; origin = r; }
+    }
+    const zoom = (s.wb.options && s.wb.options.zoom) || 1;
+    const x = Number(s.dc.x()), y = Number(s.dc.y());
+    const w = Number(s.dc.width()), h = Number(s.dc.height());
+    const M = 4;
+    const left = origin.left + 40 * zoom + x * zoom, top = origin.top + 20 * zoom + y * zoom;
+    return { left, top, width: w * zoom, height: h * zoom, zoom,
+      clip: { x: left - M, y: top - M, width: w * zoom + 2 * M, height: h * zoom + 2 * M } };
+  },
+  state(kind) {
+    const s = sessions[kind];
+    const sheetJson = strip(s.sheet.toJSON());
+    const wbJson = strip(s.wb.toJSON());
+    return Object.assign({
+      setupError: s.setupError ?? null,
+      sheetTopKeys: Object.keys(sheetJson).sort().join(','),
+      wbTopKeys: Object.keys(wbJson).sort().join(','),
+      sheetDataCharts: sheetJson.dataCharts ?? null,
+      sheetShapes: sheetJson.shapes ?? null,
+      sheetFloatingObjects: sheetJson.floatingObjects ?? null,
+      dataManagerPresent: !!wbJson.dataManager,
+      wbDataManager: wbJson.dataManager ?? null,
+    }, managerState(s), dcState(s));
+  },
+  sheetJson(kind) { return strip(sessions[kind].wb.toJSON()); },
+  dispose(kind) {
+    if (!sessions[kind]) return;
+    try { sessions[kind].wb.destroy(); } catch { /* ignore */ }
+    sessions[kind].host.remove();
+    if (sessions[kind].panelHost) sessions[kind].panelHost.remove();
+    delete sessions[kind];
+  },
+};
+window.__dcReady = true;
+</script></body></html>

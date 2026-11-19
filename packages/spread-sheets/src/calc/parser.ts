@@ -7,668 +7,70 @@
  */
 import { isErrorString } from './values.js';
 
-export type AstNode =
-  | NumberNode
-  | StringNode
-  | BooleanNode
-  | ErrorNode
-  | MissingNode
-  | NameNode
-  | RefNode
-  | RangeNode
-  | UnionNode
-  | IntersectNode
-  | BinaryNode
-  | UnaryNode
-  | PercentNode
-  | ParenNode
-  | FunctionNode
-  | ArrayNode
-  | SpillNode
-  | StructuredNode
-  | CallNode;
 
-export interface NumberNode {
-  kind: 'number';
-  value: number;
-  raw: string;
-}
-export interface StringNode {
-  kind: 'string';
-  value: string;
-}
-export interface BooleanNode {
-  kind: 'boolean';
-  value: boolean;
-}
-export interface ErrorNode {
-  kind: 'error';
-  value: string;
-}
-export interface MissingNode {
-  kind: 'missing';
-}
-export interface NameNode {
-  kind: 'name';
-  name: string;
-  sheet?: string;
-}
-export interface RefNode {
-  kind: 'ref';
-  sheet?: string;
-  r1: number;
-  c1: number;
-  r2: number;
-  c2: number;
-  /** Relative flags for R1C1 references (and name base translation). */
-  r1Rel: boolean;
-  c1Rel: boolean;
-  r2Rel: boolean;
-  c2Rel: boolean;
-  /** `$` markers for rendering. */
-  r1Abs: boolean;
-  c1Abs: boolean;
-  r2Abs: boolean;
-  c2Abs: boolean;
-  wholeRow?: boolean;
-  wholeCol?: boolean;
-  /** True when written with an explicit colon (`A1:A1`). */
-  range?: boolean;
-  /** R1C1 row-only / column-only reference (`R1`, `C1`). */
-  rowOnly?: boolean;
-  colOnly?: boolean;
-  /** R1C1 mode was used to write this reference. */
-  r1c1?: boolean;
-  /** Resolved reference cache (engine internal). */
-  _cache?: { sheet: unknown; rows: number; cols: number; value: unknown };
-}
-export interface RangeNode {
-  kind: 'range';
-  start: AstNode;
-  end: AstNode;
-}
-export interface UnionNode {
-  kind: 'union';
-  parts: AstNode[];
-}
-export interface IntersectNode {
-  kind: 'intersect';
-  left: AstNode;
-  right: AstNode;
-}
-export interface BinaryNode {
-  kind: 'binary';
-  op: string;
-  left: AstNode;
-  right: AstNode;
-}
-export interface UnaryNode {
-  kind: 'unary';
-  op: '-' | '+' | '@';
-  operand: AstNode;
-}
-export interface PercentNode {
-  kind: 'percent';
-  operand: AstNode;
-}
-export interface ParenNode {
-  kind: 'paren';
-  inner: AstNode;
-}
-export interface FunctionNode {
-  kind: 'function';
-  name: string;
-  args: AstNode[];
-  /** Reusable argument list cache (engine internal). */
-  _args?: unknown;
-}
-export interface ArrayNode {
-  kind: 'array';
-  rows: AstNode[][];
-}
-export interface SpillNode {
-  kind: 'spill';
-  ref: AstNode;
-}
-export interface StructuredNode {
-  kind: 'structured';
-  table: string;
-  spec: string;
-}
-export interface CallNode {
-  kind: 'call';
-  callee: AstNode;
-  args: AstNode[];
-  _args?: unknown;
-}
-
-/** FormulaParseError is re-exported for callers that want position details. */
+import {
+  Lexer,
+  columnIndex,
+  columnLabel,
+  formatSheetName,
+  type LexOptions,
+  type Token,
+  type TokenType,
+} from './lexer.js';
 import { FormulaParseError } from './errors.js';
-export { FormulaParseError };
-
-// ---------------------------------------------------------------------------
-// Tokenizer
-// ---------------------------------------------------------------------------
-
-type TokenType =
-  | 'number'
-  | 'string'
-  | 'error'
-  | 'ident'
-  | 'ref'
-  | 'colrange'
-  | 'rowrange'
-  | 'sheet'
-  | 'lparen'
-  | 'rparen'
-  | 'comma'
-  | 'semicolon'
-  | 'lbrace'
-  | 'rbrace'
-  | 'colon'
-  | 'op'
-  | 'percent'
-  | 'spill'
-  | 'at'
-  | 'structured'
-  | 'end';
-
-interface Token {
-  type: TokenType;
-  text: string;
-  start: number;
-  end: number;
-  wsBefore: boolean;
-  value?: unknown;
-}
-
-const MAX_COL = 16384;
-const MAX_ROW = 1048576;
-
-function columnIndex(letters: string): number {
-  let col = 0;
-  for (const ch of letters.toUpperCase()) {
-    col = col * 26 + ch.charCodeAt(0) - 64;
-    if (col > MAX_COL) return -1;
-  }
-  return col - 1;
-}
-export function columnLabel(col: number): string {
-  let label = '';
-  for (let n = col + 1; n > 0; n = Math.floor((n - 1) / 26))
-    label = String.fromCharCode(65 + ((n - 1) % 26)) + label;
-  return label;
-}
-export function formatSheetName(name: string): string {
-  return /^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : `'${name.replace(/'/g, "''")}'`;
-}
-
-const ERROR_LITERALS = [
-  '#GETTING_DATA',
-  '#DIV/0!',
-  '#VALUE!',
-  '#SPILL!',
-  '#NAME?',
-  '#NULL!',
-  '#CALC!',
-  '#REF!',
-  '#NUM!',
-  '#N/A',
-];
-
-export interface LexOptions {
-  r1c1?: boolean;
-}
-
-const NUMBER_RE = /(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/y;
-const SHEET_RE = /[A-Za-z_\\][A-Za-z0-9_.]*(?:[ \t]+[A-Za-z0-9_.]+)*!/y;
-const ROW_RANGE_RE = /\$?(\d+):\$?(\d+)(?![A-Za-z0-9_(])/y;
-const COL_RANGE_RE = /(\$?)([A-Za-z]{1,3}):(\$?)([A-Za-z]{1,3})(?![A-Za-z0-9_(])/y;
-const CELL_REF_RE = /(\$?)([A-Za-z]{1,3})(\$?)(\d+)(?![A-Za-z0-9_(])/y;
-const IDENT_RE = /[A-Za-z_\\\u0080-\uffff][A-Za-z0-9_.\u0080-\uffff]*/y;
-const RC_ROW_RANGE_RE = /R(\[-?\d+\]|\d+)?:R(\[-?\d+\]|\d+)?(?![A-Za-z0-9_(])/y;
-const RC_COL_RANGE_RE = /C(\[-?\d+\]|\d+)?:C(\[-?\d+\]|\d+)?(?![A-Za-z0-9_(])/y;
-const RC_CELL_RE = /R(\[-?\d+\]|\d+)?C(\[-?\d+\]|\d+)?(?![A-Za-z0-9_(])/y;
-const RC_ROW_RE = /R(\[-?\d+\]|\d+)?(?![A-Za-z0-9_(])/y;
-const RC_COL_RE = /C(\[-?\d+\]|\d+)?(?![A-Za-z0-9_(])/y;
-function matchAt(re: RegExp, text: string, pos: number): RegExpExecArray | null {
-  re.lastIndex = pos;
-  return re.exec(text);
-}
-
-class Lexer {
-  private pos = 0;
-  private readonly tokens: Token[] = [];
-  constructor(
-    private readonly text: string,
-    private readonly options: LexOptions = {},
-  ) {}
-  tokenize(): Token[] {
-    let ws = false;
-    while (this.pos < this.text.length) {
-      const ch = this.text[this.pos]!;
-      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
-        ws = true;
-        this.pos++;
-        continue;
-      }
-      const start = this.pos;
-      const token = this.scan();
-      token.wsBefore = ws;
-      ws = false;
-      token.start = start;
-      token.end = this.pos;
-      this.tokens.push(token);
-    }
-    this.tokens.push({ type: 'end', text: '', start: this.pos, end: this.pos, wsBefore: ws });
-    return this.tokens;
-  }
-  private scan(): Token {
-    const text = this.text;
-    const ch = text[this.pos]!;
-    if (ch === '"') return this.scanString();
-    if (ch === '#') {
-      for (const literal of ERROR_LITERALS) {
-        if (text.startsWith(literal, this.pos)) {
-          this.pos += literal.length;
-          return { type: 'error', text: literal, start: this.pos, end: this.pos, wsBefore: false, value: literal };
-        }
-      }
-      // A bare '#' is the spill operator (# suffix).
-      this.pos++;
-      return { type: 'spill', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-    }
-    if (ch === "'") return this.scanQuotedSheet();
-    if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(text[this.pos + 1] ?? ''))) {
-      const rowRange = this.scanRowRange();
-      if (rowRange) return rowRange;
-      return this.scanNumber();
-    }
-    if (ch === '$' && /[0-9]/.test(text[this.pos + 1] ?? '')) {
-      const rowRange = this.scanRowRange();
-      if (rowRange) return rowRange;
-    }
-    if (ch === '$' || /[A-Za-z_\\]/.test(ch) || ch.charCodeAt(0) > 127) {
-      const sheet = this.scanSheetPrefix();
-      if (sheet) return sheet;
-      if (this.options.r1c1) {
-        const rc = this.scanR1C1();
-        if (rc) return rc;
-      } else {
-        const range = this.scanColumnRange() ?? this.scanCellRef();
-        if (range) return range;
-      }
-      return this.scanIdent();
-    }
-    switch (ch) {
-      case '(':
-        this.pos++;
-        return { type: 'lparen', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case ')':
-        this.pos++;
-        return { type: 'rparen', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case ',':
-        this.pos++;
-        return { type: 'comma', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case ';':
-        this.pos++;
-        return { type: 'semicolon', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case '{':
-        this.pos++;
-        return { type: 'lbrace', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case '}':
-        this.pos++;
-        return { type: 'rbrace', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case ':':
-        this.pos++;
-        return { type: 'colon', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case '%':
-        this.pos++;
-        return { type: 'percent', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case '#':
-        this.pos++;
-        return { type: 'spill', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-      case '@':
-        this.pos++;
-        return { type: 'at', text: ch, start: this.pos, end: this.pos, wsBefore: false };
-    }
-    let op: string | undefined;
-    const next = text[this.pos + 1];
-    if (next === '=' || next === '>') {
-      const pair = ch + next;
-      if (pair === '<=' || pair === '>=' || pair === '<>') op = pair;
-    }
-    if (!op && '=<> &+-*/^'.includes(ch)) op = ch;
-    if (op) {
-      this.pos += op.length;
-      return { type: 'op', text: op, start: this.pos, end: this.pos, wsBefore: false, value: op };
-    }
-    throw new FormulaParseError(`Unexpected character ${ch}`, this.pos, text);
-  }
-  private scanString(): Token {
-    const text = this.text;
-    const start = this.pos;
-    this.pos++;
-    let value = '';
-    while (this.pos < text.length) {
-      const ch = text[this.pos]!;
-      if (ch === '"') {
-        if (text[this.pos + 1] === '"') {
-          value += '"';
-          this.pos += 2;
-          continue;
-        }
-        this.pos++;
-        return { type: 'string', text: text.slice(start, this.pos), start, end: this.pos, wsBefore: false, value };
-      }
-      value += ch;
-      this.pos++;
-    }
-    throw new FormulaParseError('Unterminated string literal', start, text);
-  }
-  private scanQuotedSheet(): Token {
-    const text = this.text;
-    const start = this.pos;
-    this.pos++;
-    let name = '';
-    while (this.pos < text.length) {
-      const ch = text[this.pos]!;
-      if (ch === "'") {
-        if (text[this.pos + 1] === "'") {
-          name += "'";
-          this.pos += 2;
-          continue;
-        }
-        this.pos++;
-        if (text[this.pos] !== '!') throw new FormulaParseError('Expected ! after sheet name', this.pos, text);
-        this.pos++;
-        return {
-          type: 'sheet',
-          text: text.slice(start, this.pos),
-          start,
-          end: this.pos,
-          wsBefore: false,
-          value: { name, quoted: true },
-        };
-      }
-      name += ch;
-      this.pos++;
-    }
-    throw new FormulaParseError('Unterminated sheet name', start, text);
-  }
-  private scanSheetPrefix(): Token | undefined {
-    const text = this.text;
-    const start = this.pos;
-    // Unquoted sheet names may contain spaces; they end at the bang.
-    const match = matchAt(SHEET_RE, text, this.pos);
-    if (!match) return undefined;
-    const raw = match[0];
-    if (this.options.r1c1) {
-      // R1C1 addresses never contain a bang, so this is always a sheet.
-    }
-    this.pos += raw.length;
-    const name = raw.slice(0, -1).replace(/\s+/g, '');
-    return {
-      type: 'sheet',
-      text: raw,
-      start,
-      end: this.pos,
-      wsBefore: false,
-      value: { name, quoted: false },
-    };
-  }
-  private scanNumber(): Token {
-    const text = this.text;
-    const start = this.pos;
-    const match = matchAt(NUMBER_RE, text, this.pos);
-    if (!match) throw new FormulaParseError('Invalid number', start, text);
-    this.pos += match[0].length;
-    return {
-      type: 'number',
-      text: match[0],
-      start,
-      end: this.pos,
-      wsBefore: false,
-      value: Number(match[0]),
-    };
-  }
-  private scanRowRange(): Token | undefined {
-    if (this.options.r1c1) return undefined;
-    const text = this.text;
-    const match = matchAt(ROW_RANGE_RE, text, this.pos);
-    if (!match) return undefined;
-    const r1 = Number(match[1]),
-      r2 = Number(match[2]);
-    if (r1 < 1 || r1 > MAX_ROW || r2 < 1 || r2 > MAX_ROW) return undefined;
-    this.pos += match[0].length;
-    return {
-      type: 'rowrange',
-      text: match[0],
-      start: this.pos,
-      end: this.pos,
-      wsBefore: false,
-      value: { r1: Math.min(r1, r2) - 1, r2: Math.max(r1, r2) - 1, abs1: match[0].startsWith('$'), abs2: match[0].includes(':$') },
-    };
-  }
-  private scanColumnRange(): Token | undefined {
-    const text = this.text;
-    const match = matchAt(COL_RANGE_RE, text, this.pos);
-    if (!match) return undefined;
-    const c1 = columnIndex(match[2]!),
-      c2 = columnIndex(match[4]!);
-    if (c1 < 0 || c2 < 0) return undefined;
-    this.pos += match[0].length;
-    return {
-      type: 'colrange',
-      text: match[0],
-      start: this.pos,
-      end: this.pos,
-      wsBefore: false,
-      value: {
-        c1: Math.min(c1, c2),
-        c2: Math.max(c1, c2),
-        abs1: match[1] === '$',
-        abs2: match[3] === '$',
-      },
-    };
-  }
-  private scanCellRef(): Token | undefined {
-    const text = this.text;
-    const match = matchAt(CELL_REF_RE, text, this.pos);
-    if (!match) return undefined;
-    const col = columnIndex(match[2]!),
-      row = Number(match[4]);
-    if (col < 0 || row < 1 || row > MAX_ROW) return undefined;
-    this.pos += match[0].length;
-    const node = {
-      kind: 'ref',
-      type: 'ref',
-      text: match[0],
-      start: this.pos,
-      end: this.pos,
-      wsBefore: false,
-      value: undefined as unknown as Token['value'],
-      r1: row - 1,
-      c1: col,
-      r2: row - 1,
-      c2: col,
-      r1Rel: match[3] !== '$',
-      c1Rel: match[1] !== '$',
-      r2Rel: match[3] !== '$',
-      c2Rel: match[1] !== '$',
-      r1Abs: match[3] === '$',
-      c1Abs: match[1] === '$',
-      r2Abs: match[3] === '$',
-      c2Abs: match[1] === '$',
-    };
-    node.value = node;
-    return node as unknown as Token;
-  }
-  private scanR1C1(): Token | undefined {
-    const text = this.text;
-    const rowRange = matchAt(RC_ROW_RANGE_RE, text, this.pos);
-    if (rowRange) {
-      this.pos += rowRange[0].length;
-      return {
-        type: 'rowrange',
-        text: rowRange[0],
-        start: this.pos,
-        end: this.pos,
-        wsBefore: false,
-        value: {
-          r1: parseRcPart(rowRange[1]),
-          r2: parseRcPart(rowRange[2]),
-          rel1: isRelativePart(rowRange[1]),
-          rel2: isRelativePart(rowRange[2]),
-          abs1: false,
-          abs2: false,
-          rc: true,
-        },
-      };
-    }
-    const colRange = matchAt(RC_COL_RANGE_RE, text, this.pos);
-    if (colRange) {
-      this.pos += colRange[0].length;
-      return {
-        type: 'colrange',
-        text: colRange[0],
-        start: this.pos,
-        end: this.pos,
-        wsBefore: false,
-        value: {
-          c1: parseRcPart(colRange[1]),
-          c2: parseRcPart(colRange[2]),
-          rel1: isRelativePart(colRange[1]),
-          rel2: isRelativePart(colRange[2]),
-          abs1: false,
-          abs2: false,
-          rc: true,
-        },
-      };
-    }
-    const cell = matchAt(RC_CELL_RE, text, this.pos);
-    if (cell) {
-      this.pos += cell[0].length;
-      return {
-        type: 'ref',
-        text: cell[0],
-        start: this.pos,
-        end: this.pos,
-        wsBefore: false,
-        value: {
-          r1: parseRcPart(cell[1]),
-          c1: parseRcPart(cell[2]),
-          r2: parseRcPart(cell[1]),
-          c2: parseRcPart(cell[2]),
-          r1Rel: isRelativePart(cell[1]),
-          c1Rel: isRelativePart(cell[2]),
-          r2Rel: isRelativePart(cell[1]),
-          c2Rel: isRelativePart(cell[2]),
-          r1Abs: false,
-          c1Abs: false,
-          r2Abs: false,
-          c2Abs: false,
-          rc: true,
-        },
-      };
-    }
-    const rowOnly = matchAt(RC_ROW_RE, text, this.pos);
-    if (rowOnly) {
-      this.pos += rowOnly[0].length;
-      return {
-        type: 'ref',
-        text: rowOnly[0],
-        start: this.pos,
-        end: this.pos,
-        wsBefore: false,
-        value: {
-          r1: parseRcPart(rowOnly[1]),
-          c1: 0,
-          r2: parseRcPart(rowOnly[1]),
-          c2: 0,
-          r1Rel: isRelativePart(rowOnly[1]),
-          c1Rel: true,
-          r2Rel: isRelativePart(rowOnly[1]),
-          c2Rel: true,
-          r1Abs: false,
-          c1Abs: false,
-          r2Abs: false,
-          c2Abs: false,
-          rowOnly: true,
-          rc: true,
-        },
-      };
-    }
-    const colOnly = matchAt(RC_COL_RE, text, this.pos);
-    if (colOnly) {
-      this.pos += colOnly[0].length;
-      return {
-        type: 'ref',
-        text: colOnly[0],
-        start: this.pos,
-        end: this.pos,
-        wsBefore: false,
-        value: {
-          r1: 0,
-          c1: parseRcPart(colOnly[1]),
-          r2: 0,
-          c2: parseRcPart(colOnly[1]),
-          r1Rel: true,
-          c1Rel: isRelativePart(colOnly[1]),
-          r2Rel: true,
-          c2Rel: isRelativePart(colOnly[1]),
-          r1Abs: false,
-          c1Abs: false,
-          r2Abs: false,
-          c2Abs: false,
-          colOnly: true,
-          rc: true,
-        },
-      };
-    }
-    return undefined;
-  }
-  private scanIdent(): Token {
-    const text = this.text;
-    const start = this.pos;
-    const match = matchAt(IDENT_RE, text, this.pos);
-    if (!match) throw new FormulaParseError('Invalid name', start, text);
-    this.pos += match[0].length;
-    // Structured reference suffix.
-    if (text[this.pos] === '[') {
-      const specStart = this.pos;
-      let depth = 0;
-      while (this.pos < text.length) {
-        const ch = text[this.pos]!;
-        if (ch === '[') depth++;
-        else if (ch === ']') {
-          depth--;
-          if (depth === 0) {
-            this.pos++;
-            break;
-          }
-        }
-        this.pos++;
-      }
-      const spec = text.slice(specStart, this.pos);
-      return { type: 'structured', text: match[0] + spec, start, end: this.pos, wsBefore: false, value: { table: match[0], spec } };
-    }
-    return { type: 'ident', text: match[0], start, end: this.pos, wsBefore: false, value: match[0] };
-  }
-}
-
-function parseRcPart(part: string | undefined): number {
-  if (!part) return 0;
-  if (part.startsWith('[')) return Number(part.slice(1, -1));
-  return Number(part) - 1;
-}
-function isRelativePart(part: string | undefined): boolean {
-  return !part || part.startsWith('[');
-}
-
-// ---------------------------------------------------------------------------
-// Parser
-// ---------------------------------------------------------------------------
+import type {
+  ArrayNode,
+  AstNode,
+  BinaryNode,
+  BooleanNode,
+  CallNode,
+  ErrorNode,
+  FunctionNode,
+  IntersectNode,
+  MissingNode,
+  NameNode,
+  NumberNode,
+  ParenNode,
+  PercentNode,
+  RangeNode,
+  RefNode,
+  SpillNode,
+  StringNode,
+  StructuredNode,
+  UnaryNode,
+  UnionNode,
+} from './ast.js';
+export {
+  Lexer,
+  columnLabel,
+  formatSheetName,
+  FormulaParseError,
+  type LexOptions,
+  type Token,
+  type TokenType,
+};
+export type {
+  ArrayNode,
+  AstNode,
+  BinaryNode,
+  BooleanNode,
+  CallNode,
+  ErrorNode,
+  FunctionNode,
+  IntersectNode,
+  MissingNode,
+  NameNode,
+  NumberNode,
+  ParenNode,
+  PercentNode,
+  RangeNode,
+  RefNode,
+  SpillNode,
+  StringNode,
+  StructuredNode,
+  UnaryNode,
+  UnionNode,
+};
 
 const BINARY_PRECEDENCE: Record<string, number> = {
   '=': 1,
@@ -705,7 +107,7 @@ export class Parser {
     return node;
   }
   private peek(offset = 0): Token {
-    return this.tokens[Math.min(this.index + offset, this.tokens.length - 1)]!;
+    return this.tokens[this.index + offset] ?? this.tokens[this.tokens.length - 1]!;
   }
   private next(): Token {
     return this.tokens[this.index++]!;
@@ -849,6 +251,25 @@ export class Parser {
         this.next();
         const info = token.value as { table: string; spec: string };
         return { kind: 'structured', table: info.table, spec: info.spec };
+      }
+      case 'external': {
+        // `[Book1.xlsx]Sheet1!A1:B2` - a reference into another workbook. The
+        // sheet of that workbook is always part of the reference, so a bracketed
+        // name that looks like a file but is not followed by `Sheet!` is a
+        // structured column reference instead (`[Sales.Qty]` in a data view).
+        const info = token.value as { file: string; path: string; spec: string };
+        this.next();
+        const following = this.peek();
+        if (following.type !== 'sheet') return { kind: 'structured', table: '', spec: info.spec };
+        this.next();
+        const sheet = (following.value as { name: string }).name;
+        const reference = this.peek();
+        if (reference.type !== 'ref' && reference.type !== 'colrange' && reference.type !== 'rowrange')
+          throw new FormulaParseError('Expected reference after external workbook', reference.start, this.text);
+        this.next();
+        const node = this.refNode(reference);
+        node.external = { name: info.file, path: info.path, sheet };
+        return node;
       }
       case 'lparen': {
         this.next();
@@ -1051,6 +472,13 @@ function renderRef(node: RefNode, options: LexOptions): string {
         text += ':' + cell(node.r2, node.c2, node.r2Abs, node.c2Abs);
     }
   }
+  if (node.external) {
+    const workbook = node.external.path
+      ? `[${node.external.path}[${node.external.name}]]`
+      : `[${node.external.name}]`;
+    const externalSheet = node.external.sheet ? `${formatSheetName(node.external.sheet)}!` : '';
+    return `${workbook}${externalSheet}${text}`;
+  }
   return node.sheet ? `${formatSheetName(node.sheet)}!${text}` : text;
 }
 
@@ -1241,6 +669,7 @@ export function adjustRefsForStructure(
   remove: boolean,
   sheetName: string,
   formulaOnChangedSheet = true,
+  cross?: [number, number],
 ): AstNode {
   const adjust = (start: number, end: number): [number, number] | undefined => {
     const before = remove ? index : index;
@@ -1261,6 +690,9 @@ export function adjustRefsForStructure(
     if (current.kind === 'ref') {
       if (!current.sheet && !formulaOnChangedSheet) return current;
       if (current.sheet && current.sheet.toLowerCase() !== sheetName.toLowerCase()) return current;
+      // Band-restricted shifts only move cells inside the cross range, so only
+      // references that intersect it may adjust (trial Table-row semantics).
+      if (cross && (axis === 'row' ? current.c2 < cross[0] || current.c1 > cross[1] : current.r2 < cross[0] || current.r1 > cross[1])) return current;
       const rows = axis === 'row' ? adjust(current.r1, current.r2) : undefined;
       const cols = axis === 'col' ? adjust(current.c1, current.c2) : undefined;
       if (axis === 'row' && !rows) return { kind: 'error', value: '#REF!' };
@@ -1385,7 +817,17 @@ export function isErrorLiteral(value: string): boolean {
 /** Merges two static references into a single reference when possible. */
 function mergeRange(left: AstNode, right: AstNode): AstNode {
   if (left.kind === 'ref' && right.kind === 'ref' && !left.wholeRow && !right.wholeRow) {
-    if ((left.sheet ?? '') === (right.sheet ?? '')) {
+    // `Sheet1!A1:B2` names the sheet once for the whole range, so the sheet of
+    // either endpoint belongs to both sides. Only two *different* sheet names
+    // (`Sheet1!A1:Sheet2!B2`) keep the range split into two references.
+    const sheet = left.sheet ?? right.sheet;
+    const sameSheet = (left.sheet ?? '') === (right.sheet ?? '');
+    const oneSided = (left.sheet === undefined) !== (right.sheet === undefined);
+    if (sameSheet || oneSided) {
+      if (sheet !== undefined) {
+        if (left.sheet === undefined) left.sheet = sheet;
+        if (right.sheet === undefined) right.sheet = sheet;
+      }
       left.r2 = right.r2;
       left.c2 = right.c2;
       left.r2Rel = right.r2Rel;

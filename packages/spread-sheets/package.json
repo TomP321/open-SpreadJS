@@ -1,10 +1,27 @@
 {
   "name": "@opensheets/spread-sheets",
   "version": "0.1.0",
+  "description": "A complete Microsoft Excel-like JavaScript spreadsheet for web applications (clean-room OpenSheets implementation of the SpreadJS public API).",
   "type": "module",
   "main": "./dist/gc.spread.sheets.cjs",
   "module": "./dist/gc.spread.sheets.esm.js",
   "types": "./dist/gc.spread.sheets.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets",
+    "javascript spreadsheet",
+    "javascript excel",
+    "excel io",
+    "sheets",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
   "exports": {
     ".": {
       "import": {
@@ -16,21 +33,39 @@
         "default": "./dist/gc.spread.sheets.cjs"
       }
     },
+    "./internals": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.internals.d.ts",
+        "default": "./dist/gc.spread.sheets.internals.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.internals.d.cts",
+        "default": "./dist/gc.spread.sheets.internals.cjs"
+      },
+      "default": "./dist/gc.spread.sheets.internals.js"
+    },
     "./styles/*": "./styles/*",
-    "./dist/*": "./dist/*"
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "styles"
+    "styles",
+    "LICENSE.md",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "build": "tsx scripts/clean.ts && tsup && tsx scripts/finalize.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "TZ=UTC vitest run --testTimeout=30000",
     "bench": "vitest bench --run",
-    "bench:cjs": "tsx bench/cjs.ts"
+    "bench:cjs": "tsx bench/cjs.ts",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
   },
   "dependencies": {
+    "@noble/hashes": "1.8.0",
     "ssf": "0.11.2"
   }
 }

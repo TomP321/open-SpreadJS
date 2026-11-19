@@ -1,9 +1,11 @@
-import { applyMask, type MaskOptions } from './features/input-mask.js';
+import { applyMask, applyMaskInfo, type MaskOptions } from './features/input-mask.js';
+import { applyInsets, hitButton, parseInsets, type ButtonRect } from './features/cell-extras.js';
 import { filterMenu } from './features/filter-menu.js';
 import { compactMenu, renderMenu, type MenuItemData } from './features/context-menu.js';
+import { CommentUi } from './comment-ui.js';
 import { HideRowFilter, type RowFilterBase } from './features/filters.js';
 import type { WorkbookRenderer } from './rendering.js';
-import type { Worksheet } from './model.js';
+import type { Worksheet } from './worksheet.js';
 import { Range } from './primitives.js';
 import { adjustFormula } from './range.js';
 import { Events } from './events.js';
@@ -14,6 +16,8 @@ import { referenceAllowed, insertReference, closeFormulaParentheses } from './fe
 import { colorFormula, parseReference } from './features/formula-color.js';
 import { FormulaParseError } from './calc/errors.js';
 import { columnLabel } from './rendering.js';
+import { TableSheet } from './tablesheet/index.js';
+import { commandConstants } from './command-constants.js';
 
 export function encodeTSV(rows: unknown[][]): string {
   return rows.map(row => row.map(value => {
@@ -46,7 +50,18 @@ export function seriesValue(values: unknown[], index: number): unknown {
   return values[((index % values.length) + values.length) % values.length];
 }
 interface Cell { row: number; col: number }
-interface Drag { kind: 'select' | 'resizeRow' | 'resizeCol' | 'fill' | 'move'; start: Cell; range: Range; initial: number; startPixel: number; last: Cell }
+interface Drag { kind: 'select' | 'resizeRow' | 'resizeCol' | 'fill' | 'move' | 'resizeTable'; start: Cell; range: Range; initial: number; startPixel: number; last: Cell; table?: string; original?: Range }
+
+/** One Gantt chart taskbar hit: the task and the interaction zone under the pointer. */
+type GanttHit = { task: unknown; zone: 'move' | 'link' | 'resize' | 'progress' };
+/** The GanttSheet members the chart interaction uses (structural to avoid an import cycle). */
+type GanttChartApi = {
+  _ganttChartHit(x: number, y: number): { task: unknown; row: number; zone: GanttHit['zone'] } | undefined;
+  _ganttCursorFor(zone: GanttHit['zone']): string;
+  _ganttTipLines(hit: GanttHit, pointerX: number, pointerY: number, dragging?: boolean): string[];
+  _applyGanttDrag(hit: GanttHit, fromX: number, toX: number, toY: number): void;
+  _chartPreview?: { task: unknown; x: number; y: number } | undefined;
+};
 
 export class Interaction {
   private abort = new AbortController();
@@ -57,6 +72,7 @@ export class Interaction {
   private drag?: Drag;
   private anchor: Cell = { row: 0, col: 0 };
   private editing?: { sheet: Worksheet; row: number; col: number; oldValue: unknown; enter: boolean };
+  private buttonPress?: { row: number; col: number; index: number };
   private pointReference?: { start: number; end: number; anchor: Cell; last: Cell };
   private pointDragging = false;
   private formulaBar?: HTMLElement;
@@ -66,15 +82,26 @@ export class Interaction {
   private ants?: ReturnType<typeof setInterval>;
   private tabDrag?: number;
   private tabPointerX = 0;
+  private tabPointerY = 0;
   private touch?: { x: number; y: number; moved: boolean };
+  private touchPress?: { x: number; y: number; timer: ReturnType<typeof setTimeout> };
+  private ganttDrag?: { hit: GanttHit; fromX: number; fromY: number };
+  private ganttTipEl?: HTMLElement;
+  readonly commentUi: CommentUi;
   constructor(readonly view: WorkbookRenderer) {
     const { root, overlay, editor, tabs } = view, signal = this.abort.signal;
+    this.commentUi = new CommentUi(view);
     this.hints = new FormulaHints(view.workbook, editor, (start, end, value) => { editor.setRangeText(value, start, end, 'end'); editor.dispatchEvent(new Event('input', { bubbles: true })); editor.focus(); });
     root.addEventListener('keydown', event => this.keydown(event), { signal });
     overlay.addEventListener('pointerdown', event => this.pointerDown(event), { signal });
     overlay.addEventListener('pointermove', event => this.pointerMove(event), { signal });
+    overlay.addEventListener('pointerleave', () => {
+      if (view.hoverCell) { view.hoverCell = undefined; view.schedule(); }
+      this.hideGanttTip();
+      view.overlay.style.cursor = '';
+    }, { signal });
     overlay.addEventListener('pointerup', event => this.pointerUp(event), { signal });
-    overlay.addEventListener('pointercancel', () => { this.drag = undefined; this.touch = undefined; }, { signal });
+    overlay.addEventListener('pointercancel', () => { this.drag = undefined; this.touch = undefined; this.cancelTouchPress(); }, { signal });
     overlay.addEventListener('dblclick', event => this.doubleClick(event), { signal });
     root.addEventListener('wheel', event => {
       event.preventDefault();
@@ -96,7 +123,17 @@ export class Interaction {
       const active = this.editing;
       this.pointReference = undefined;
       const mask = active?.sheet.getActualStyle(active.row, active.col).mask as MaskOptions | undefined;
-      if (mask?.pattern) { const position = editor.selectionStart; editor.value = applyMask(editor.value, mask, true); editor.setSelectionRange(position, position); }
+      if (mask?.pattern) {
+        // Re-mask from the typed characters only: padding placeholders would otherwise fill slots
+        // ahead of the next keystroke (and a removed literal simply comes back).
+        const placeholderChar = mask.placeholder || '_';
+        const stripped = editor.value.split('').filter((ch) => ch !== placeholderChar).join('');
+        const info = applyMaskInfo(stripped, mask, true);
+        editor.value = info.value;
+        let caret = info.caret;
+        while (caret < info.value.length && info.value[caret] !== placeholderChar && !/[0-9a-zA-Z]/.test(info.value[caret])) caret++;
+        editor.setSelectionRange(caret, caret);
+      }
       this.positionEditor();
       this.hints.update(editor.value, editor.selectionStart);
       const edit = this.editing; if (edit) edit.sheet._emit(Events.EditChange, { sheet: edit.sheet, sheetName: edit.sheet.name(), row: edit.row, col: edit.col, editingText: editor.value });
@@ -105,31 +142,31 @@ export class Interaction {
     editor.addEventListener('click', updateHintCaret, { signal });
     editor.addEventListener('keyup', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) updateHintCaret(); }, { signal });
     tabs.addEventListener('pointerdown', event => {
-      const hit = this.tabHit(event.clientX); if (!hit) return;
+      const hit = this.tabHit(event.clientX, event.clientY); if (!hit) return;
       const pointing = hit.index >= 0 && this.canPoint();
       if (!pointing && !this.endEdit()) return;
       if (pointing) event.preventDefault();
       const wb = view.workbook;
       if (hit.index === -4) { event.stopPropagation(); this.sheetList(); }
       else if (hit.index === -1) { wb.addSheet(wb.getSheetCount()); wb.setActiveSheetIndex(wb.getSheetCount() - 1); }
-      else if (hit.index === -2) { wb.startSheetIndex(Math.max(0, wb.startSheetIndex() - 1)); wb.repaint(); }
-      else if (hit.index === -3) { wb.startSheetIndex(Math.min(wb.getSheetCount() - 1, wb.startSheetIndex() + 1)); wb.repaint(); }
+      else if (hit.index === -2) { if (view.tabStripOverflow) { wb.startSheetIndex(Math.max(0, wb.startSheetIndex() - 1)); wb.repaint(); } }
+      else if (hit.index === -3) { if (view.tabStripOverflow) { wb.startSheetIndex(Math.min(wb.getSheetCount() - 1, wb.startSheetIndex() + 1)); wb.repaint(); } }
       else {
         wb._emit(Events.SheetTabClick, { sheet: wb.getSheet(hit.index), sheetName: wb.getSheet(hit.index).name(), sheetTabIndex: hit.index });
-        wb.setActiveSheetIndex(hit.index); this.tabDrag = hit.index; this.tabPointerX = event.clientX; tabs.setPointerCapture(event.pointerId);
+        wb.setActiveSheetIndex(hit.index);
+        if (event.button === 0) {
+          this.tabDrag = hit.index; this.tabPointerX = event.clientX; this.tabPointerY = event.clientY;
+          try { tabs.setPointerCapture(event.pointerId); } catch (error) {
+            if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error;
+          }
+        }
       }
       if (pointing) { this.pointReference = undefined; this.positionEditor(); (this.formulaBar ?? editor).focus(); }
       else if (this.menu) this.menu.focus(); else root.focus();
     }, { signal });
     tabs.addEventListener('pointerup', event => {
-      if (this.tabDrag !== undefined && Math.abs(event.clientX - this.tabPointerX) > 5 && view.workbook.options.allowSheetReorder) {
-        const hit = this.tabHit(event.clientX), wb = view.workbook;
-        if (hit && hit.index >= 0 && hit.index !== this.tabDrag) {
-          const sheet = wb.getSheet(this.tabDrag), info = { sheet, sheetName: sheet.name(), fromIndex: this.tabDrag, toIndex: hit.index, cancel: false };
-          wb._emit(Events.SheetMoving, info);
-          if (!info.cancel) { wb.changeSheetIndex(sheet.name(), hit.index); wb._emit(Events.SheetMoved, info); }
-        }
-      }
+      const moved = view.tabVertical ? event.clientY - this.tabPointerY : event.clientX - this.tabPointerX;
+      if (this.tabDrag !== undefined && Math.abs(moved) > 5 && view.workbook.options.allowSheetReorder) this.dropTab(event);
       this.tabDrag = undefined;
     }, { signal });
     tabs.addEventListener('dblclick', event => this.renameTab(event), { signal });
@@ -140,19 +177,56 @@ export class Interaction {
   get isEditing(): boolean { return !!this.editing; }
   private info(cell: Cell, sheetArea = 3) { const sheet = this.view.sheet!; return { sheet, sheetName: sheet.name(), row: cell.row, col: cell.col, sheetArea }; }
   private point(event: MouseEvent): { x: number; y: number } { const rect = this.view.overlay.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; }
+  private rootPoint(event: MouseEvent): { x: number; y: number } { const rect = this.view.root.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; }
   private hit(event: MouseEvent) { const { x, y } = this.point(event); return this.view.hitTest(x, y); }
-  private tabHit(clientX: number) { const x = clientX - this.view.tabs.getBoundingClientRect().left; return this.view.tabHits.find(hit => x >= hit.x && x < hit.x + hit.width); }
+  private tabHit(clientX: number, clientY: number) {
+    const rect = this.view.tabs.getBoundingClientRect();
+    if (clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) return undefined;
+    const vertical = this.view.tabVertical;
+    const along = vertical ? clientY - rect.top : clientX - rect.left;
+    const across = vertical ? clientX - rect.left : clientY - rect.top;
+    for (let i = this.view.tabHits.length - 1; i >= 0; i--) {
+      const hit = this.view.tabHits[i];
+      if (along < hit.x || along >= hit.x + hit.width) continue;
+      if (hit.cross && (across < hit.cross[0] || across >= hit.cross[1])) continue;
+      return hit;
+    }
+    return undefined;
+  }
+  /** The trial drops onto the tab whose slot contains the cursor: the dragged sheet takes that tab's index (inserting before it). */
+  private dropTab(event: PointerEvent): void {
+    const view = this.view, wb = view.workbook, from = this.tabDrag!;
+    const rect = view.tabs.getBoundingClientRect();
+    const along = (view.tabVertical ? event.clientY : event.clientX) - (view.tabVertical ? rect.top : rect.left);
+    const slots = view.tabSlotRects;
+    const slot = slots.find(s => along >= s.x && along < s.x + s.width);
+    let target: number;
+    if (slot) target = slot.index > from ? slot.index - 1 : slot.index;
+    else {
+      const first = slots[0], last = slots[slots.length - 1];
+      // Past either end of the strip the trial clamps the drop to the first or last slot.
+      if (first && along < first.x) target = 0;
+      else if (last && along >= last.x + last.width) target = wb.getSheetCount() - 1;
+      else return;
+    }
+    if (target === from) return;
+    const sheet = wb.getSheet(from), info = { sheet, sheetName: sheet.name(), fromIndex: from, toIndex: target, cancel: false };
+    wb._emit(Events.SheetMoving, info);
+    if (!info.cancel && wb.changeSheetIndex(sheet.name(), target)) wb._emit(Events.SheetMoved, info);
+  }
   private registerCommands(): void {
     const cm = this.view.workbook.commandManager();
     const keys: [string, number, number, number, boolean?][] = [['navigationLeft', 37, 0, -1], ['navigationUp', 38, -1, 0], ['navigationRight', 39, 0, 1], ['navigationDown', 40, 1, 0], ['moveToNextCell', 9, 0, 1], ['moveToPreviousCell', 9, 0, -1, true], ['commitInputNavigationDown', 13, 1, 0], ['commitInputNavigationUp', 13, -1, 0, true]];
     for (const [name, key, dr, dc, shift] of keys) cm.register(name, { execute: () => { this.navigate(dr, dc); return true; } }, key, false, shift ?? false);
-    cm.register('undo', { execute: () => this.view.workbook.undoManager().undo() }, 90, true);
-    cm.register('redo', { execute: () => this.view.workbook.undoManager().redo() }, 89, true);
-    cm.register('clearValues', { execute: () => { this.clearValues(); return true; } }, 46);
+    cm.register('undo', { execute: () => { this.view.workbook.undoManager().undo(); return true; } }, 90, true);
+    cm.register('redo', { execute: () => { this.view.workbook.undoManager().redo(); return true; } }, 89, true);
+    cm.register('clearValues', { canUndo: true, execute: (context, options, isUndo) => commandConstants.clearValues.execute(context, options, isUndo) === true }, 46);
     cm.register('startEdit', { execute: () => { this.startEdit(); return true; } }, 113);
     const endpoint = (end: boolean, ctrl: boolean, extend: boolean) => {
       const s = this.view.sheet!;
-      const used = s._usedRange();
+      // Trial probe `cmd:navigate-states`: navigationLast goes to the last row/column of the
+      // sheet (row 199 on a fresh 200-row sheet), while Home/End stay in the current row band.
+      const used = ctrl && end ? { row: s.getRowCount() - 1, col: s.getColumnCount() - 1 } : s._usedRange();
       this.selectTo(ctrl ? end ? used.row : 0 : s.getActiveRowIndex(), end ? ctrl ? used.col : s.getColumnCount() - 1 : 0, extend);
       this.view.showCell(s.getActiveRowIndex(), s.getActiveColumnIndex()); return true;
     };
@@ -164,12 +238,12 @@ export class Interaction {
       const name = `${extend ? 'selection' : 'navigation'}Page${down ? 'Down' : 'Up'}`;
       cm.register(name, { execute: () => { this.navigate((down ? 1 : -1) * Math.max(1, this.view.rows.length - 2), 0, extend); return true; } }, key, false, extend);
     }
-    for (const [name, dr, dc] of [['moveToNextCellThenControl', 0, 1], ['moveToPreviousCellThenControl', 0, -1]] as const) cm.register(name, { execute: () => { this.navigate(dr, dc); return true; } });
-    cm.register('commitInput', { execute: () => this.endEdit() });
-    cm.register('cancelInput', { execute: () => this.endEdit(true) });
-    cm.register('selectAll', { execute: () => { this.view.sheet!.setSelection(-1, -1, -1, -1); return true; } }, 65, true);
-    cm.register('navigationNextSheet', { execute: () => { const wb = this.view.workbook; wb.setActiveSheetIndex(Math.min(wb.getSheetCount() - 1, wb.getActiveSheetIndex() + 1)); return true; } }, 34, true);
-    cm.register('navigationPreviousSheet', { execute: () => { const wb = this.view.workbook; wb.setActiveSheetIndex(Math.max(0, wb.getActiveSheetIndex() - 1)); return true; } }, 33, true);
+    for (const [name, dr, dc] of [['moveToNextCellThenControl', 0, 1], ['moveToPreviousCellThenControl', 0, -1]] as const) cm.register(name, { execute: () => { this.navigate(dr, dc); return name === 'moveToPreviousCellThenControl' ? { ignoreCancelDefault: true } : true; } }); // trial values (probe `cmd:isolated`)
+    cm.register('commitInput', { execute: () => (this.isEditing ? this.endEdit() : false) }); // trial: false when nothing is being edited
+    cm.register('cancelInput', { execute: () => { if (this.isEditing) this.endEdit(true); return undefined; } }); // trial: null on a fresh workbook
+    cm.register('selectAll', { execute: () => { this.view.sheet!._userSetSelection(-1, -1, -1, -1); return true; } }, 65, true);
+    cm.register('navigationNextSheet', { execute: () => { const wb = this.view.workbook, index = wb.getActiveSheetIndex(); if (index >= wb.getSheetCount() - 1) return undefined; wb.setActiveSheetIndex(index + 1); return true; } }, 34, true);
+    cm.register('navigationPreviousSheet', { execute: () => { const wb = this.view.workbook, index = wb.getActiveSheetIndex(); if (index <= 0) return undefined; wb.setActiveSheetIndex(index - 1); return true; } }, 33, true);
 
     for (const [key, dr, dc, direction] of [[37, 0, -1, 'Left'], [38, -1, 0, 'Up'], [39, 0, 1, 'Right'], [40, 1, 0, 'Down']] as const) {
       cm.register(`selection${direction}`, { execute: () => { this.navigate(dr, dc, true); return true; } }, key, false, true);
@@ -179,8 +253,9 @@ export class Interaction {
   }
   startEdit(selectAll = false, defaultText?: string): void {
     const s = this.view.sheet;
-    if (!s || this.editing || s.options.isProtected) return;
-    const row = s.getActiveRowIndex(), col = s.getActiveColumnIndex(), info = { ...this.info({ row, col }), cancel: false };
+    const editRow = s?.getActiveRowIndex() ?? 0, editCol = s?.getActiveColumnIndex() ?? 0;
+    if (!s || this.editing || !s._isEditableCell(editRow, editCol)) return;
+    const row = editRow, col = editCol, info = { ...this.info({ row, col }), cancel: false };
     s._emit(Events.EditStarting, info); if (info.cancel) return;
     const editor = this.view.editor;
     this.editing = { sheet: s, row, col, oldValue: s.getValue(row, col), enter: defaultText !== undefined };
@@ -204,14 +279,35 @@ export class Interaction {
     const { row, col, sheet } = this.editing;
     this.view.editor.style.opacity = sheet === this.view.sheet ? '1' : '0';
     const rect = this.view.cellRect(row, col), style = sheet.getActualStyle(row, col), editor = this.view.editor;
+    // Style.cellPadding insets the editor exactly like the painted text (task 62).
+    const insets = parseInsets(style.cellPadding);
+    const box = applyInsets(rect, insets, this.view.zoom);
     const ctx = this.view.context; ctx.save(); ctx.font = this.view.font(style);
-    const lines = editor.value.split('\n');
-    const measured = Math.max(...lines.map(line => ctx.measureText(line).width)); ctx.restore();
-    const width = style.wordWrap ? rect.width - 1 : Math.min(this.view.viewWidth - rect.x, Math.max(rect.width + 1, Math.ceil(measured) + 2));
-    const height = Math.max(rect.height - (style.wordWrap ? 1 : 0), lines.length * 19 * this.view.zoom) ;
+    const softLines = editor.value.split('\n');
+    const measured = Math.max(...softLines.map(line => ctx.measureText(line).width));
+    // Trial editor sizing (task 56 probe `.probe/t56/probe-t56-editor.json`, cell 62x20):
+    // inner width = max(cellWidth - 1, ceil(textWidth) + 1); inner height = max(cellHeight - 1,
+    // textLines * 17) with wrapped lines counted at the box width.
+    const boxWidth = style.wordWrap ? box.width - 1 : Math.min(this.view.viewWidth - box.x, Math.max(box.width - 1, Math.ceil(measured) + 1));
+    const wrapped: string[] = [];
+    if (style.wordWrap) {
+      const limit = Math.max(1, boxWidth - 2 * this.view.zoom);
+      for (const line of softLines) {
+        let current = '';
+        for (const word of line.split(' ')) {
+          const candidate = current ? `${current} ${word}` : word;
+          if (!current || ctx.measureText(candidate).width <= limit) current = candidate;
+          else { wrapped.push(current); current = word; }
+        }
+        wrapped.push(current);
+      }
+    } else wrapped.push(...softLines);
+    ctx.restore();
+    const width = boxWidth;
+    const height = Math.max(box.height - this.view.zoom, wrapped.length * 17 * this.view.zoom);
     if (!this.editorContainer) { this.editorContainer = document.createElement('div'); this.editorContainer.className = 'gc-cell-editor-container'; this.view.root.append(this.editorContainer); }
-    Object.assign(this.editorContainer.style, { display: editor.style.display, left: `${rect.x - 2}px`, top: `${rect.y - 2}px`, width: `${width + 4}px`, height: `${height + 4}px`, background: String(style.backColor ?? 'white') });
-    Object.assign(editor.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${width}px`, height: `${height}px`, font: this.view.font(style), color: String(style.foreColor ?? '#243148'), caretColor: String(style.foreColor ?? '#243148'), background: 'transparent', textAlign: style.hAlign === 2 ? 'right' : style.hAlign === 1 ? 'center' : 'left', padding: '0px' });
+    Object.assign(this.editorContainer.style, { display: editor.style.display, left: `${rect.x - 2 + this.view.viewportX}px`, top: `${rect.y - 2 + this.view.viewportY}px`, width: `${width + 4}px`, height: `${height + 4}px`, background: String(style.backColor ?? 'white') });
+    Object.assign(editor.style, { left: `${box.x + this.view.viewportX}px`, top: `${box.y + this.view.viewportY}px`, width: `${width}px`, height: `${height}px`, font: this.view.font(style), color: String(style.foreColor ?? '#243148'), caretColor: String(style.foreColor ?? '#243148'), background: 'transparent', textAlign: style.hAlign === 2 ? 'right' : style.hAlign === 1 ? 'center' : 'left', padding: '0px' });
     editor.scrollLeft = 0;
     this.renderFormulaOverlay();
   }
@@ -254,7 +350,7 @@ export class Interaction {
   private drawReference(first: Cell, last: Cell, color: string, solid = false): void {
     const a = this.view.cellRect(Math.min(first.row, last.row), Math.min(first.col, last.col)), b = this.view.cellRect(Math.max(first.row, last.row), Math.max(first.col, last.col));
     const line = (direction: 'right' | 'bottom') => solid ? `linear-gradient(${color}, ${color})` : `repeating-linear-gradient(to ${direction}, ${color} 0 6px, transparent 6px 12px)`;
-    const border = document.createElement('div'); Object.assign(border.style, { position: 'absolute', pointerEvents: 'none', zIndex: '3', boxSizing: 'border-box', backgroundImage: `${line('right')}, ${line('right')}, ${line('bottom')}, ${line('bottom')}, linear-gradient(${color}1a, ${color}1a)`, backgroundSize: '100% 2px, 100% 2px, 2px 100%, 2px 100%, calc(100% - 4px) calc(100% - 4px)', backgroundPosition: '1px 0, bottom left, left -1px, right -2px, 2px 2px', backgroundRepeat: 'no-repeat', left: `${a.x - 1}px`, top: `${a.y - 1}px`, width: `${b.x + b.width - a.x + 1}px`, height: `${b.y + b.height - a.y + 1}px` });
+    const border = document.createElement('div'); Object.assign(border.style, { position: 'absolute', pointerEvents: 'none', zIndex: '3', boxSizing: 'border-box', backgroundImage: `${line('right')}, ${line('right')}, ${line('bottom')}, ${line('bottom')}, linear-gradient(${color}1a, ${color}1a)`, backgroundSize: '100% 2px, 100% 2px, 2px 100%, 2px 100%, calc(100% - 4px) calc(100% - 4px)', backgroundPosition: '1px 0, bottom left, left -1px, right -2px, 2px 2px', backgroundRepeat: 'no-repeat', left: `${a.x - 1 + this.view.viewportX}px`, top: `${a.y - 1 + this.view.viewportY}px`, width: `${b.x + b.width - a.x + 1}px`, height: `${b.y + b.height - a.y + 1}px` });
     for (const [horizontal, vertical] of [['left', 'top'], ['right', 'top'], ['left', 'bottom'], ['right', 'bottom']] as const) {
       const handle = document.createElement('div'); Object.assign(handle.style, { position: 'absolute', width: '5px', height: '5px', background: color, [horizontal]: '-1px', [vertical]: '-1px' }); border.append(handle);
     }
@@ -289,6 +385,14 @@ export class Interaction {
     return formatter.parse(text) ?? text;
   }
   private keydown(event: KeyboardEvent): void {
+    // Keys typed inside a comment overlay (thread card input, note editor) belong to that
+    // editor; the grid must never run shortcuts/editing on them.
+    if (this.commentUi.consumes(event.target)) return;
+    if (event.key === 'Escape' && this.commentUi.isOpen() && !this.commentUi.consumes(event.target)) {
+      this.commentUi.keydown(event);
+      event.preventDefault();
+      return;
+    }
     if (event.isComposing) return;
     if (this.editing) {
       if (event.key === 'Escape') { event.preventDefault(); this.endEdit(true); return; }
@@ -316,7 +420,7 @@ export class Interaction {
     const s = this.view.sheet; if (!s) return;
     const ctrl = event.ctrlKey || event.metaKey;
     if (event.key === 'Escape') { this.clearCopy(); this.closeMenu(); return; }
-    if (ctrl && event.key.toLowerCase() === 'a') { event.preventDefault(); s.setSelection(-1, -1, -1, -1); return; }
+    if (ctrl && event.key.toLowerCase() === 'a') { event.preventDefault(); s._userSetSelection(-1, -1, -1, -1); return; }
     if (event.key === 'Backspace') { event.preventDefault(); this.startEdit(false, ''); return; }
     if (event.key.length === 1 && !ctrl && !event.altKey) { event.preventDefault(); this.startEdit(false, event.key); }
   }
@@ -360,7 +464,7 @@ export class Interaction {
         else ranges.push(new Range(row, col, 1, 1));
         s._setUserSelections(ranges, row, col);
       }
-      else s.setActiveCell(row, col);
+      else s._userSetActiveCell(row, col);
     } else {
       const range = new Range(Math.min(this.anchor.row, row), Math.min(this.anchor.col, col), Math.abs(row - this.anchor.row) + 1, Math.abs(col - this.anchor.col) + 1);
       s._setUserSelections([range], this.anchor.row, this.anchor.col);
@@ -410,8 +514,35 @@ export class Interaction {
     editor.setSelectionRange(end, end); this.positionEditor(); this.hints.update(editor.value, end);
     const edit = this.editing!; edit.sheet._emit(Events.EditChange, { sheet: edit.sheet, sheetName: edit.sheet.name(), row: edit.row, col: edit.col, editingText: editor.value });
   }
+  /**
+   * Long-press on a touch pointer opens the workbook touch toolstrip
+   * (`Events.TouchToolStripOpening` first; `handled: true` prevents the popup).
+   * Threshold measured against the trial with real CDP touch events (probe
+   * segment `touchreal`: no event at a 500 ms hold, event at a 900 ms hold).
+   */
+  private startTouchPress(x: number, y: number): void {
+    this.cancelTouchPress();
+    const timer = setTimeout(() => {
+      this.touchPress = undefined;
+      const strip = this.view.workbook.touchToolStrip;
+      if (!strip) return;
+      strip._paintOnTouch();
+      const args = { x, y, handled: false };
+      this.view.workbook._emit(Events.TouchToolStripOpening, args);
+      if (!args.handled) strip.open(x, y);
+    }, 700);
+    this.touchPress = { x, y, timer };
+  }
+  private cancelTouchPress(): void {
+    if (!this.touchPress) return;
+    clearTimeout(this.touchPress.timer);
+    this.touchPress = undefined;
+  }
   private pointerDown(event: PointerEvent): void {
     if (event.button !== 0) return;
+    // Clicking anywhere on the sheet drops the selection of floating objects/pictures (official behavior).
+    const clickedSheet = this.view.sheet;
+    if (clickedSheet) for (const item of [...clickedSheet.floatingObjects.all(), ...clickedSheet.pictures.all(), ...(clickedSheet.shapes?.all() ?? [])]) if (item.isSelected()) item.isSelected(false);
     if (this.canPoint()) {
       const hit = this.hit(event);
       if (hit && (hit.row >= 0 || hit.col >= 0)) {
@@ -421,10 +552,69 @@ export class Interaction {
     }
     if (!this.endEdit()) return;
     this.closeMenu(); event.preventDefault(); this.view.root.focus(); this.view.overlay.setPointerCapture(event.pointerId);
+    {
+      const gp = this.point(event);
+      const ganttHit = this.ganttChartHit(gp.x, gp.y);
+      if (ganttHit) {
+        // Gantt chart part: the taskbar under the pointer takes the gesture (no grid selection).
+        this.ganttDrag = { hit: ganttHit.hit, fromX: gp.x, fromY: gp.y };
+        this.hideGanttTip();
+        if (ganttHit.hit.zone === 'link') { ganttHit.api._chartPreview = { task: ganttHit.hit.task, x: gp.x, y: gp.y }; this.view.schedule(); }
+        return;
+      }
+    }
     const hit = this.hit(event), s = this.view.sheet; if (!hit || !s) return;
+    this.commentUi.commit(hit.row, hit.col);
+    if (hit.row >= 0 && hit.col >= 0 && hit.sheetArea === 3) this.commentUi.reveal(hit.row, hit.col);
     const { x, y } = this.point(event);
+    if (s instanceof TableSheet && hit.row >= 0 && hit.col >= 0) {
+      const outline = s._hierarchyOutline(hit.row, hit.col);
+      const col = this.view.cols.find(item => item.index === hit.col);
+      const row = this.view.rows.find(item => item.index === hit.row);
+      const top = row ? row.position + (row.size - 16 * this.view.zoom) / 2 : -1;
+      if (outline?.hasChildren && col && x >= col.position + outline.offset * this.view.zoom
+        && x < col.position + (outline.offset + 16) * this.view.zoom && y >= top && y < top + 16 * this.view.zoom) {
+        s._toggleHierarchyOutline(hit.row);
+        return;
+      }
+    }
+    if (s instanceof TableSheet && hit.col >= 0 && (hit.row < 0 || s._groupRowHasOutline(hit.row, hit.col))
+      && s._groupColumnHasOutline(hit.col)) {
+      const col = this.view.cols.find(item => item.index === hit.col);
+      const row = this.view.rows.find(item => item.index === hit.row);
+      const top = hit.row < 0 ? (this.view.headerHeight - 16 * this.view.zoom) / 2
+        : row ? row.position + (row.size - 16 * this.view.zoom) / 2 : -1;
+      if (col && x >= col.position + 6 * this.view.zoom && x < col.position + 22 * this.view.zoom
+        && y >= top && y < top + 16 * this.view.zoom) {
+        s._toggleGroupOutline(hit.row, hit.col);
+        return;
+      }
+    }
+    if (s instanceof TableSheet && hit.row >= 0 && hit.col < 0) {
+      const index = Math.floor((x / this.view.zoom - 2) / 18);
+      const row = this.view.rows.find(item => item.index === hit.row);
+      const top = row ? row.position + (row.size - 16 * this.view.zoom) / 2 : -1;
+      const level = Math.floor((x / this.view.zoom - 14) / 32);
+      if (level >= 0 && x >= (14 + level * 32) * this.view.zoom && x < (30 + level * 32) * this.view.zoom
+        && y >= top && y < top + 16 * this.view.zoom && s._groupHeaderOutlineLevels(hit.row).includes(level)) {
+        s._toggleGroupHeaderOutline(hit.row, level);
+        return;
+      }
+      if (index >= 0 && s._executeRowAction(hit.row, index)) return;
+    }
+    const pressed = hit.row >= 0 && hit.col >= 0 ? this.cellButtonAt(hit.row, hit.col, x, y) : undefined;
+    this.buttonPress = pressed ? { row: hit.row, col: hit.col, index: pressed.button.index } : undefined;
     if (this.handleM4Hit(hit, x, y)) { event.stopPropagation(); return; }
-    if (event.pointerType === 'touch') this.touch = { x, y, moved: false };
+    if (event.pointerType === 'touch') {
+      this.touch = { x, y, moved: false };
+      this.view.workbook.touchToolStrip?._paintOnTouch();
+      this.startTouchPress(x, y);
+    }
+    const table = this.tableHandleHit(x, y);
+    if (table) {
+      const original = s.tables.findByName(table.name)?.range();
+      if (original) { this.drag = { kind: 'resizeTable', start: hit, last: hit, range: original, original, initial: 0, startPixel: 0, table: table.name }; return; }
+    }
     const resize = this.resizeHit(event);
     if (resize) {
       this.drag = { kind: resize.row ? 'resizeRow' : 'resizeCol', start: { row: resize.row ? resize.index : 0, col: resize.row ? 0 : resize.index }, range: new Range(), initial: (resize.row ? s.getRowHeight(resize.index) : s.getColumnWidth(resize.index)) ?? 0, startPixel: resize.pixel, last: hit }; return;
@@ -448,7 +638,7 @@ export class Interaction {
     const menu = document.createElement('div');
     menu.className = 'gc-contextmenu gc-ui-contextmenu-container';
     menu.setAttribute('role', 'menu');
-    Object.assign(menu.style, { left: `${Math.min(x, this.view.width - 180)}px`, top: `${Math.min(y, this.view.height - 40 - items.length * 26)}px` });
+    Object.assign(menu.style, { left: `${Math.min(x, this.view.width - 180) + this.view.viewportX}px`, top: `${Math.min(y, this.view.height - 40 - items.length * 26) + this.view.viewportY}px` });
     for (const [label, action] of items) {
       const item = document.createElement('button');
       item.textContent = label;
@@ -549,14 +739,46 @@ export class Interaction {
     if (this.pointDragging && this.pointReference) { const hit = this.hit(event); if (hit) { const anchor = this.pointReference.anchor; const last = { row: anchor.row < 0 ? -1 : Math.max(0, hit.row), col: anchor.col < 0 ? -1 : Math.max(0, hit.col) }; this.pointAt(anchor, last); } return; }
     const { x, y } = this.point(event), s = this.view.sheet;
     if (!s) return;
+    if (this.ganttDrag) {
+      const gantt = this.ganttApi();
+      if (gantt) {
+        if (this.ganttDrag.hit.zone === 'link') { gantt._chartPreview = { task: this.ganttDrag.hit.task, x, y }; this.view.schedule(); }
+        this.showGanttTip(this.ganttDrag.hit, x, y, true);
+      }
+      return;
+    }
     if (this.touch) {
       if (Math.abs(x - this.touch.x) + Math.abs(y - this.touch.y) > 4) {
+        this.cancelTouchPress();
         this.view.scroll((this.touch.y - y) / this.view.zoom, (this.touch.x - x) / this.view.zoom); this.touch = { x, y, moved: true }; this.drag = undefined;
       }
       return;
     }
     const drag = this.drag;
-    if (!drag) { this.view.overlay.style.cursor = this.resizeHit(event) ? this.resizeHit(event)!.row ? 'row-resize' : 'col-resize' : this.handleHit(event) === 'fill' ? 'crosshair' : this.handleHit(event) === 'move' ? 'move' : 'cell'; return; }
+    if (!drag) {
+      const ganttHit = this.ganttChartHit(x, y);
+      if (ganttHit) {
+        // Hovering the Gantt chart part: zone cursor + info tooltip, no grid hover.
+        if (this.view.hoverCell) { this.view.hoverCell = undefined; this.view.schedule(); }
+        this.view.overlay.style.cursor = ganttHit.api._ganttCursorFor(ganttHit.hit.zone);
+        this.showGanttTip(ganttHit.hit, x, y);
+        return;
+      }
+      this.hideGanttTip();
+      const hoverHit = this.view.hitTest(x, y);
+      const previousCell = this.view.hoverCell;
+      this.view.hoverCell = hoverHit && hoverHit.sheetArea === 3 && hoverHit.row >= 0 && hoverHit.col >= 0
+        ? { row: hoverHit.row, col: hoverHit.col } : undefined;
+      if (s.cellStates._hasAny() && (previousCell?.row !== this.view.hoverCell?.row
+        || previousCell?.col !== this.view.hoverCell?.col)) this.view.schedule();
+      const hoverButton = hoverHit && hoverHit.row >= 0 && hoverHit.col >= 0 ? this.cellButtonAt(hoverHit.row, hoverHit.col, x, y) : undefined;
+      const previousHover = this.view.hoverButton;
+      this.view.hoverButton = hoverButton ? { row: hoverHit!.row, col: hoverHit!.col, index: hoverButton.button.index } : undefined;
+      const changed = (!!this.view.hoverButton !== !!previousHover) || (this.view.hoverButton && previousHover && (this.view.hoverButton.row !== previousHover.row || this.view.hoverButton.col !== previousHover.col || this.view.hoverButton.index !== previousHover.index));
+      if (changed) this.view.schedule();
+      this.view.overlay.style.cursor = hoverButton ? 'pointer' : this.tableHandleHit(x, y) ? 'se-resize' : this.resizeHit(event) ? this.resizeHit(event)!.row ? 'row-resize' : 'col-resize' : this.handleHit(event) === 'fill' ? 'crosshair' : this.handleHit(event) === 'move' ? 'move' : 'cell';
+      const hit = this.view.hitTest(x, y); if (hit && hit.row >= 0 && hit.col >= 0 && hit.sheetArea === 3) this.commentUi.hover(hit.row, hit.col); else this.commentUi.hoverOut(); return;
+    }
     if (drag.kind === 'resizeRow' || drag.kind === 'resizeCol') {
       const row = drag.kind === 'resizeRow', index = row ? drag.start.row : drag.start.col;
       const size = Math.max(0, drag.initial + ((row ? y : x) - drag.startPixel) / this.view.zoom);
@@ -571,6 +793,12 @@ export class Interaction {
     const hit = this.view.hitTest(Math.max(0, Math.min(this.view.viewWidth - 1, x)), Math.max(0, Math.min(this.view.viewHeight - 1, y)));
     if (!hit) return;
     drag.last = { row: Math.max(0, hit.row), col: Math.max(0, hit.col) };
+    if (drag.kind === 'resizeTable' && drag.original) {
+      const o = drag.original;
+      const next = new Range(o.row, o.col, Math.max(1, drag.last.row - o.row + 1), Math.max(1, drag.last.col - o.col + 1));
+      if (!next.equals(drag.range)) { s.tables.resize(String(drag.table), next); drag.range = next; }
+      return;
+    }
     if (drag.kind === 'select') {
       if (s.selectionPolicy() === 0) return;
       let range = new Range(Math.min(Math.max(0, drag.start.row), drag.last.row), Math.min(Math.max(0, drag.start.col), drag.last.col), Math.abs(drag.last.row - Math.max(0, drag.start.row)) + 1, Math.abs(drag.last.col - Math.max(0, drag.start.col)) + 1);
@@ -580,9 +808,66 @@ export class Interaction {
       s._setUserSelections([...before, range], this.anchor.row, this.anchor.col); this.applySelectionUnit();
     }
   }
+  // ---------------------------------------------------------------------------
+  // Gantt chart-part pointer helpers (structural API so `interaction.ts` stays free
+  // of a gantt import cycle).
+  // ---------------------------------------------------------------------------
+  private ganttApi(): GanttChartApi | undefined {
+    const s = this.view.sheet as unknown as Partial<GanttChartApi> | undefined;
+    return s && typeof s._ganttChartHit === 'function' ? s as GanttChartApi : undefined;
+  }
+  private ganttChartHit(x: number, y: number): { api: GanttChartApi; hit: GanttHit } | undefined {
+    const api = this.ganttApi();
+    const hit = api?._ganttChartHit(x, y);
+    return api && hit ? { api, hit } : undefined;
+  }
+  private showGanttTip(hit: GanttHit, x: number, y: number, dragging = false): void {
+    const api = this.ganttApi();
+    if (!api) return;
+    const lines = api._ganttTipLines(hit, x, y, dragging);
+    if (!lines.length) { this.hideGanttTip(); return; }
+    if (!this.ganttTipEl) {
+      const tip = document.createElement('div');
+      tip.style.cssText = 'position:absolute;z-index:30;background:#fff;border:1px solid #d0d0d0;'
+        + 'box-shadow:1px 2px 3px rgba(0,0,0,0.2);font:12.8px Calibri;color:#000;padding:3px 8px;'
+        + 'pointer-events:none;white-space:nowrap';
+      this.view.root.appendChild(tip);
+      this.ganttTipEl = tip;
+    }
+    this.ganttTipEl.replaceChildren(...lines.map(line => { const d = document.createElement('div'); d.textContent = line; return d; }));
+    const rect = this.view.overlay.getBoundingClientRect();
+    const rootRect = this.view.root.getBoundingClientRect();
+    const w = this.ganttTipEl.offsetWidth;
+    const h = this.ganttTipEl.offsetHeight;
+    this.ganttTipEl.style.left = `${Math.max(2, Math.min(rect.left - rootRect.left + x + 12, rootRect.width - w - 4))}px`;
+    this.ganttTipEl.style.top = `${Math.max(2, Math.min(rect.top - rootRect.top + y - h / 2, rootRect.height - h - 4))}px`;
+  }
+  private hideGanttTip(): void {
+    this.ganttTipEl?.remove();
+    this.ganttTipEl = undefined;
+  }
   private pointerUp(event: PointerEvent): void {
     if (this.pointDragging) { this.pointDragging = false; (this.formulaBar ?? this.view.editor).focus(); return; }
-    const drag = this.drag; this.drag = undefined; this.touch = undefined;
+    if (this.ganttDrag) {
+      const { hit, fromX } = this.ganttDrag;
+      this.ganttDrag = undefined;
+      const gantt = this.ganttApi();
+      if (gantt) {
+        if (hit.zone === 'link') { gantt._chartPreview = undefined; this.view.schedule(); }
+        const { x, y } = this.point(event);
+        gantt._applyGanttDrag(hit, fromX, x, y);
+      }
+      this.hideGanttTip();
+      return;
+    }
+    const press = this.buttonPress;
+    if (press) {
+      this.buttonPress = undefined;
+      const { x, y } = this.point(event);
+      const over = hitButton(this.view.cellButtons(press.row, press.col), x, y);
+      if (over && over.button.index === press.index) this.activateCellButton(press.row, press.col, press.index);
+    }
+    const drag = this.drag; this.drag = undefined; this.touch = undefined; this.cancelTouchPress();
     if (!drag) return;
     if (drag.kind === 'resizeRow' || drag.kind === 'resizeCol') {
       const s = this.view.sheet!, row = drag.kind === 'resizeRow', index = row ? drag.start.row : drag.start.col;
@@ -590,7 +875,28 @@ export class Interaction {
       this.recordResize(row, index, drag.initial, next);
     } else if (drag.kind === 'fill') this.fill(drag.range, drag.last, event.ctrlKey);
     else if (drag.kind === 'move') this.move(drag.range, drag.last.row - drag.start.row, drag.last.col - drag.start.col);
+    else if (drag.kind === 'resizeTable' && drag.original && !drag.original.equals(drag.range)) this.recordTableResize(String(drag.table), drag.original, drag.range);
     this.view.overlay.title = '';
+  }
+  /** Pointer position over a table resize handle (drawn by the renderer). */
+  private tableHandleHit(x: number, y: number): { name: string } | null {
+    for (const handle of this.view._tableHandles) {
+      if (x >= handle.x - 3 && x <= handle.x + handle.size + 3 && y >= handle.y - 3 && y <= handle.y + handle.size + 3) return handle;
+    }
+    return null;
+  }
+  private recordTableResize(name: string, previous: Range, next: Range): void {
+    const s = this.view.sheet!;
+    let first = true;
+    this.view.workbook.commandManager().register('_userTableResize', { canUndo: true, execute: (_ctx, _options, undo) => {
+      if (first) { first = false; return true; }
+      const table = s.tables.findByName(name);
+      if (!table) return true;
+      table._resize(undo ? previous : next);
+      s._invalidate();
+      return true;
+    } });
+    this.view.workbook.commandManager().execute({ cmd: '_userTableResize' });
   }
   private recordResize(row: boolean, index: number, previous: number, next: number): void {
     if (previous === next) return;
@@ -616,7 +922,7 @@ export class Interaction {
     }
     const hit = this.hit(event); if (!hit) return;
     s._emit(Events.CellDoubleClick, this.info(hit, hit.sheetArea));
-    if (hit.row >= 0 && hit.col >= 0) { s.setActiveCell(hit.row, hit.col); this.startEdit(); }
+    if (hit.row >= 0 && hit.col >= 0) { s._userSetActiveCell(hit.row, hit.col); this.startEdit(); }
   }
   private sheetList(hidden = false): void {
     this.closeMenu();
@@ -633,36 +939,51 @@ export class Interaction {
     wrapper.append(label, search, menu); this.view.root.append(wrapper); this.menu = wrapper;
   }
   private renameTab(event: MouseEvent): void {
-    const hit = this.tabHit(event.clientX), wb = this.view.workbook;
+    const hit = this.tabHit(event.clientX, event.clientY), wb = this.view.workbook;
     if (!hit || hit.index < 0) return;
     const s = wb.getSheet(hit.index);
     wb._emit(Events.SheetTabDoubleClick, { sheet: s, sheetName: s.name(), sheetTabIndex: hit.index });
     if (!wb.options.tabEditable) return;
-    const input = document.createElement('input'); input.className = 'gc-tab-editor'; input.value = s.name();
-    Object.assign(input.style, { left: `${hit.x}px`, top: `${this.view.viewHeight}px`, width: `${hit.width}px`, height: '26px' });
+    const rect = this.view.tabs.getBoundingClientRect(), rootRect = this.view.root.getBoundingClientRect();
+    const input = document.createElement('input'); input.className = 'gc-sheetTabEditor'; input.value = s.name();
+    const vertical = this.view.tabVertical;
+    // The trial's editor hugs the tab text: inset box over the slot, no border, white background.
+    Object.assign(input.style, vertical
+      ? { left: `${rect.left - rootRect.left + 9}px`, top: `${rect.top - rootRect.top + hit.x}px`, width: '41px', height: '16px' }
+      : { left: `${rect.left - rootRect.left + hit.x + 14}px`, top: `${rect.top - rootRect.top + 2}px`, width: `${hit.width - 22}px`, height: '20px' });
     this.view.root.append(input); input.focus(); input.select();
-    const finish = (cancel: boolean) => { if (!cancel && input.value !== s.name()) { try { s.name(input.value); } catch { input.focus(); return; } } input.remove(); this.view.schedule(); };
+    let done = false;
+    const finish = (cancel: boolean) => { if (done) return; done = true; if (!cancel && input.value !== s.name()) { try { s.name(input.value); } catch { done = false; input.focus(); return; } } input.remove(); this.view.schedule(); };
     input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') finish(e.key === 'Escape'); });
     input.addEventListener('blur', () => finish(false));
   }
-  private copy(event: ClipboardEvent, cut: boolean): void {
-    if (this.editing) return;
+  private copy(event: ClipboardEvent | null, cut: boolean): void {
+    if (event && (this.editing || this.commentUi.consumes(event.target))) return;
     const s = this.view.sheet!, selected = s.getSelections().at(-1); if (!selected) return;
     const used = s._usedRange();
     const range = selected.normalized(selected.row < 0 ? used.row + 1 : s.getRowCount(), selected.col < 0 ? used.col + 1 : s.getColumnCount());
     const info = { ...this.info(range), cellRange: range, copyData: '', cancel: false, isCutting: cut };
-    s._emit(Events.ClipboardChanging, info); if (info.cancel) { event.preventDefault(); return; }
+    s._emit(Events.ClipboardChanging, info); if (info.cancel) { event?.preventDefault(); return; }
     const values = s.getArray(range.row, range.col, range.rowCount, range.colCount), text = encodeTSV(values);
     const escape = (value: unknown) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-    event.clipboardData?.setData('text/plain', text);
-    event.clipboardData?.setData('text/html', '<table>' + values.map(row => '<tr>' + row.map(value => `<td>${escape(value)}</td>`).join('') + '</tr>').join('') + '</table>');
-    event.preventDefault(); this.clipboard = { sheet: s, range, values }; this.cut = cut; this.view.copiedRange = range;
+    event?.clipboardData?.setData('text/plain', text);
+    event?.clipboardData?.setData('text/html', '<table>' + values.map(row => '<tr>' + row.map(value => `<td>${escape(value)}</td>`).join('') + '</tr>').join('') + '</table>');
+    event?.preventDefault(); this.clipboard = { sheet: s, range, values }; this.cut = cut; this.view.copiedRange = range;
     if (this.ants) clearInterval(this.ants);
     this.ants = setInterval(() => this.view.drawSelection(), 120);
     s._emit(Events.ClipboardChanged, { ...info, copyData: text }); this.view.drawSelection();
   }
+  /** Programmatic Copy/Cut (used by the Designer context menu, mirrors Ctrl+C/X). */
+  _copySelection(cut: boolean): void { this.copy(null, cut); }
+  /** Clear the pending copy/cut state (after a cut-paste completes the move). */
+  _clearClipboard(): void {
+    this.clipboard = undefined; this.cut = false;
+    this.view.copiedRange = undefined;
+    if (this.ants) { clearInterval(this.ants); this.ants = 0 as never; }
+    this.view.drawSelection();
+  }
   private paste(event: ClipboardEvent): void {
-    if (this.editing) return;
+    if (this.editing || this.commentUi.consumes(event.target)) return;
     event.preventDefault();
     const html = event.clipboardData?.getData('text/html'), text = event.clipboardData?.getData('text/plain') ?? '';
     let values = decodeTSV(text);
@@ -675,7 +996,7 @@ export class Interaction {
   }
   pasteValues(values: string[][]): void {
     const s = this.view.sheet!, row = s.getActiveRowIndex(), col = s.getActiveColumnIndex();
-    if (s.options.isProtected) return;
+    if (!s._isEditableCell(row, col)) return;
     const range = new Range(row, col, values.length, Math.max(...values.map(row => row.length)));
     const info = { ...this.info(range), cellRange: range, pasteData: { text: encodeTSV(values) }, cancel: false };
     s._emit(Events.ClipboardPasting, info); if (info.cancel) return;
@@ -684,7 +1005,7 @@ export class Interaction {
       this.undoableMutation('clipboardPaste', [source, range], () => { if (this.cut) s.moveTo(source.row, source.col, row, col, source.rowCount, source.colCount); else s.copyTo(source.row, source.col, row, col, source.rowCount, source.colCount); });
       if (this.cut) this.clearCopy();
     } else this.batchValues(range, (r, c) => this.parseText(values[r - row]?.[c - col] ?? '', r, c));
-    s.setSelection(range.row, range.col, range.rowCount, range.colCount);
+    s._userSetSelection(range.row, range.col, range.rowCount, range.colCount);
     s._emit(Events.ClipboardPasted, info);
   }
   private batchValues(range: Range, value: (r: number, c: number) => unknown): void {
@@ -721,10 +1042,10 @@ export class Interaction {
   }
   private clearValues(): void {
     const s = this.view.sheet!;
-    if (s.options.isProtected) return;
+    if (s.options.isProtected && !s.getSelections().some(range => s._isEditableCell(range.row, range.col))) return;
     const ranges = s.getSelections();
     this.undoableMutation('clearRange', ranges, () => {
-      for (const [row, col, oldValue, formula] of s._storedCells()) if ((oldValue != null || formula) && ranges.some(range => range.contains(row, col))) {
+      for (const [row, col, oldValue, formula] of s._storedCells()) if ((oldValue != null || formula) && ranges.some(range => range.contains(row, col)) && s._isEditableCell(row, col)) {
         s.setValue(row, col, null); s._emit(Events.ValueChanged, { ...this.info({ row, col }), oldValue: oldValue ?? null, newValue: null });
       }
     });
@@ -754,14 +1075,14 @@ export class Interaction {
         const next = s.getValue(r, c); if (!Object.is(oldValue, next)) s._emit(Events.ValueChanged, { ...this.info({ row: r, col: c }), oldValue, newValue: next });
       }
     });
-    s.setSelection(target.row, target.col, target.rowCount, target.colCount); s._emit(Events.DragFillBlockCompleted, info);
+    s._userSetSelection(target.row, target.col, target.rowCount, target.colCount); s._emit(Events.DragFillBlockCompleted, info);
   }
   private move(source: Range, dr: number, dc: number): void {
     const s = this.view.sheet!; if (!dr && !dc) return;
     const row = Math.max(0, Math.min(s.getRowCount() - source.rowCount, source.row + dr)), col = Math.max(0, Math.min(s.getColumnCount() - source.colCount, source.col + dc));
     const info = { sheet: s, sheetName: s.name(), fromRow: source.row, fromCol: source.col, toRow: row, toCol: col, rowCount: source.rowCount, colCount: source.colCount, cancel: false };
     s._emit(Events.DragDropBlock, info); if (info.cancel) return;
-    this.undoableMutation('dragDrop', [source, new Range(row, col, source.rowCount, source.colCount)], () => s.moveTo(source.row, source.col, row, col, source.rowCount, source.colCount)); s.setSelection(row, col, source.rowCount, source.colCount); s._emit(Events.DragDropBlockCompleted, info);
+    this.undoableMutation('dragDrop', [source, new Range(row, col, source.rowCount, source.colCount)], () => s.moveTo(source.row, source.col, row, col, source.rowCount, source.colCount)); s._userSetSelection(row, col, source.rowCount, source.colCount); s._emit(Events.DragDropBlockCompleted, info);
   }
   openFilter(filter: RowFilterBase, column: number, x: number, y: number, title: string): void {
     this.closeMenu();
@@ -769,31 +1090,35 @@ export class Interaction {
       this.closeMenu(); this.view.root.append(dialog); this.menu = dialog;
     });
     // The trial aligns to the cell's left and clamps to the host edge.
-    Object.assign(root.style, { left: `${Math.max(5, Math.min(x + this.view.cellRect(0, filter.range!.col + column).width - 239, this.view.width - 244))}px`, top: `${Math.max(0, Math.min(y, this.view.height - 416))}px` });
+    Object.assign(root.style, { left: `${Math.max(5, Math.min(x + this.view.cellRect(0, filter.range!.col + column).width - 239, this.view.width - 244)) + this.view.viewportX}px`, top: `${Math.max(0, Math.min(y, this.view.height - 416)) + this.view.viewportY}px` });
     this.view.root.append(root); this.menu = root; root.focus();
   }
   private contextMenu(event: MouseEvent): void {
     const wb = this.view.workbook;
     if (!wb.options.allowContextMenu || this.editing) return;
     event.preventDefault(); this.closeMenu();
-    const { x, y } = this.point(event), tab = y >= this.view.viewHeight ? this.tabHit(event.clientX) : undefined;
+    const { x, y } = this.point(event), tab = this.tabHit(event.clientX, event.clientY);
+    const rootPoint = this.rootPoint(event);
     if (tab && tab.index >= 0) wb.setActiveSheetIndex(tab.index);
     const s = this.view.sheet!, hit = this.hit(event);
     if (!tab && hit && !s.getSelections().some(range => range.contains(hit.row, hit.col))) {
       if (hit.row < 0 || hit.col < 0) s._setUserSelections([new Range(hit.row, hit.col, hit.row < 0 ? -1 : 1, hit.col < 0 ? -1 : 1)], Math.max(0, hit.row), Math.max(0, hit.col));
-      else s.setActiveCell(hit.row, hit.col);
+      else s._userSetActiveCell(hit.row, hit.col);
     }
     const area = tab ? 'sheetTab' : !hit || hit.row < 0 && hit.col < 0 ? 'corner' : hit.row < 0 ? 'colHeader' : hit.col < 0 ? 'rowHeader' : 'viewport';
     const table = hit && hit.row >= 0 && hit.col >= 0 ? s.tables.find(hit.row, hit.col) : null;
     const comment = s.comments.get(s.getActiveRowIndex(), s.getActiveColumnIndex());
-    const excluded = new Set(['gc.spread.pasteSpecial', 'gc.spread.paste', 'gc.spread.ganttSheetPaste', 'gc.spread.insertCopiedCells', 'gc.spread.insertCutCells', 'gc.spread.rowHeaderinsertCopiedCells', 'gc.spread.rowHeaderinsertCutCells', 'gc.spread.colHeaderinsertCopiedCells', 'gc.spread.colHeaderinsertCutCells', 'gc.spread.pinRows', 'gc.spread.pinColumns', 'gc.spread.colHeadermodifyColumn', 'gc.spread.colHeaderremoveColumn', 'gc.spread.colHeadersetPrimaryKey', 'gc.spread.rowHeaderpromote', 'gc.spread.rowHeaderdemote', 'gc.spread.rowHeadermoveUp', 'gc.spread.rowHeadermoveDown', 'gc.spread.rowHeaderaddAfter', 'gc.spread.rowHeaderaddBefore', 'gc.spread.rowHeaderaddAbove', 'gc.spread.rowHeaderaddBelow', 'gc.spread.replyToThreadedComment', 'gc.spread.deleteThreadedComment']);
+    const thread = s.threadedComments.get(s.getActiveRowIndex(), s.getActiveColumnIndex());
+    const excluded = new Set(['gc.spread.pasteSpecial', 'gc.spread.paste', 'gc.spread.ganttSheetPaste', 'gc.spread.insertCopiedCells', 'gc.spread.insertCutCells', 'gc.spread.rowHeaderinsertCopiedCells', 'gc.spread.rowHeaderinsertCutCells', 'gc.spread.colHeaderinsertCopiedCells', 'gc.spread.colHeaderinsertCutCells', 'gc.spread.pinRows', 'gc.spread.pinColumns', 'gc.spread.colHeadermodifyColumn', 'gc.spread.colHeaderremoveColumn', 'gc.spread.colHeadersetPrimaryKey', 'gc.spread.rowHeaderpromote', 'gc.spread.rowHeaderdemote', 'gc.spread.rowHeadermoveUp', 'gc.spread.rowHeadermoveDown', 'gc.spread.rowHeaderaddAfter', 'gc.spread.rowHeaderaddBefore', 'gc.spread.rowHeaderaddAbove', 'gc.spread.rowHeaderaddBelow']);
     const menu = wb.contextMenu;
     const items = compactMenu(menu.menuData.filter(item => {
       if (item.visible === false || excluded.has(item.name ?? '') || item.name?.startsWith('reportSheet')) return false;
       if (/colHeader(?:expand|collapse)/.test(item.name ?? '') && s.columnOutlines.getMaxLevel() < 0) return false;
       if (item.type === 'separator') return true;
       if (['gc.spread.editComment', 'gc.spread.deleteComment', 'gc.spread.toggleComment'].includes(item.name ?? '') && !comment) return false;
-      if (['gc.spread.insertComment', 'gc.spread.insertThreadedComment'].includes(item.name ?? '') && (comment || area === 'corner')) return false;
+      if (item.name === 'gc.spread.insertComment' && (comment || thread || area === 'corner')) return false;
+      if (item.name === 'gc.spread.insertThreadedComment' && (thread || comment || area === 'corner')) return false;
+      if (['gc.spread.replyToThreadedComment', 'gc.spread.deleteThreadedComment'].includes(item.name ?? '') && !thread) return false;
       return !item.workArea || item.workArea.includes(area) || !!table && item.workArea.includes('table');
     }).map(item => item.name === 'gc.spread.unhideSheet' ? { ...item, disable: !wb.sheets.some(sheet => !sheet.visible()) } : { ...item }));
     const hitInfo = tab ? { tabStripHitInfo: { sheetTab: { sheetName: s.name(), sheetIndex: wb.getActiveSheetIndex() } }, x, y } : { worksheetHitInfo: { x, y, row: Math.max(0, hit?.row ?? 0), col: Math.max(0, hit?.col ?? 0), rowViewportIndex: hit && hit.row < 0 ? -1 : 1, colViewportIndex: hit && hit.col < 0 ? -1 : 1, hitTestType: area === 'corner' ? 0 : area === 'colHeader' ? 1 : area === 'rowHeader' ? 2 : 3 }, x, y };
@@ -804,8 +1129,11 @@ export class Interaction {
     });
     if (tab) root.classList.add('opensheets-tab-menu');
     this.view.root.append(root); this.menu = root;
-    root.style.left = `${Math.max(0, Math.min(x, this.view.width - root.offsetWidth))}px`;
-    root.style.top = `${Math.max(0, Math.min(y, (tab ? this.view.viewHeight + 12 : this.view.height) - root.offsetHeight))}px`;
+    // The trial right-aligns the menu to the cursor when it would overflow the host, and lets tab menus reach 13px past the strip edge.
+    const menuWidth = root.offsetWidth;
+    const left = rootPoint.x + menuWidth > this.view.width ? Math.max(0, rootPoint.x - menuWidth + 4) : rootPoint.x;
+    root.style.left = `${Math.max(0, left)}px`;
+    root.style.top = `${Math.max(0, Math.min(rootPoint.y, (tab ? this.view.viewHeight + this.view.viewportY + 12 : this.view.height) - root.offsetHeight))}px`;
     root.focus();
   }
   private menuCommand(item: MenuItemData, options: unknown, event: MouseEvent): void {
@@ -834,9 +1162,12 @@ export class Interaction {
       case 'unhideSheet': this.sheetList(true); return;
       case 'filter': { const used = s._usedRange(); const filter = new HideRowFilter(new Range(0, 0, used.row + 1, used.col + 1)); s.rowFilter(filter); return; }
       case 'sortAscend': case 'sortDescend': { const used = s._usedRange(); s.sortRange(0, 0, used.row + 1, used.col + 1, true, [{ index: s.getActiveColumnIndex(), ascending: action === 'sortAscend' }]); return; }
-      case 'insertComment': { const comment = s.comments.add(s.getActiveRowIndex(), s.getActiveColumnIndex(), ''); comment.displayMode(1); return; }
-      case 'deleteComment': s.comments.remove(s.getActiveRowIndex(), s.getActiveColumnIndex()); return;
-      case 'toggleComment': { const comment = s.comments.get(s.getActiveRowIndex(), s.getActiveColumnIndex()); if (comment) comment.displayMode(comment.displayMode() === 1 ? 0 : 1); return; }
+      case 'insertComment': this.commentUi.insertComment(); return;
+      case 'editComment': this.commentUi.editComment(); return;
+      case 'deleteComment': this.commentUi.commit(); s.comments.remove(s.getActiveRowIndex(), s.getActiveColumnIndex()); return;
+      case 'toggleComment': this.commentUi.toggleComments(); return;
+      case 'insertThreadedComment': case 'replyToThreadedComment': this.commentUi.openThread(); return;
+      case 'deleteThreadedComment': this.commentUi.deleteThread(); return;
       default: notImplemented(`ContextMenu.${item.command ?? action}`);
     }
   }
@@ -845,5 +1176,24 @@ export class Interaction {
   editingAt(row: number, col: number): boolean {
     return !!this.editing && this.editing.row === row && this.editing.col === col;
   }
-  destroy(): void { this.hints.close(); this.formulaLayer?.remove(); for (const layer of this.referenceLayers) layer.remove(); this.abort.abort(); if (this.ants) clearInterval(this.ants); this.closeMenu(); }
+  /** Cell button (style.cellButtons) covering the host point, if any. */
+  private cellButtonAt(row: number, col: number, x: number, y: number): ButtonRect | undefined {
+    return hitButton(this.view.cellButtons(row, col), x, y);
+  }
+  /** Run a pressed cell button's command: callback or command name, plus the ButtonClicked event. */
+  private activateCellButton(row: number, col: number, index: number): void {
+    const s = this.view.sheet;
+    if (!s) return;
+    const style = s.getActualStyle(row, col) as Record<string, unknown>;
+    const list = Array.isArray(style.cellButtons) ? style.cellButtons as unknown[] : [];
+    const option = (list[index] ?? {}) as Record<string, unknown>;
+    if (option.enabled === false) return;
+    s._emit(Events.ButtonClicked, { sheet: s, sheetName: s.name(), row, col, sheetArea: 3, index, command: option.command });
+    const command = option.command;
+    if (typeof command === 'function') { (command as (sheet: Worksheet, row: number, col: number, option: unknown) => void)(s, row, col, option); return; }
+    if (typeof command !== 'string' || !command || command === 'none') return;
+    const cm = this.view.workbook.commandManager() as object;
+    if (Object.prototype.hasOwnProperty.call(cm, command)) this.view.workbook.commandManager().execute({ cmd: command, sheetName: s.name(), row, col });
+  }
+  destroy(): void { this.hints.close(); this.formulaLayer?.remove(); for (const layer of this.referenceLayers) layer.remove(); this.abort.abort(); if (this.ants) clearInterval(this.ants); this.closeMenu(); this.commentUi.destroy(); }
 }

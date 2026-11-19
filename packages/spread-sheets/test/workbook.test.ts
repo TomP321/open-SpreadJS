@@ -31,6 +31,10 @@ describe('Workbook', () => {
     expect(wb.activeSheetIndex()).toBe(2);
     expect(wb.startSheetIndex(1)).toBe(wb);
     expect(wb.startSheetIndex()).toBe(1);
+    expect(wb.startSheetIndex(99)).toBe(wb);
+    expect(wb.startSheetIndex()).toBe(0);
+    expect(wb.startSheetIndex(-1)).toBe(wb);
+    expect(wb.startSheetIndex()).toBe(0);
     expect(wb.changeSheetIndex('Inserted', 2)).toBe(true);
     expect(wb.changeSheetIndex('absent', 0)).toBe(false);
     wb.removeSheet(0);
@@ -44,6 +48,27 @@ describe('Workbook', () => {
     expect(() => wb.addSheet(-1)).toThrow(RangeError);
     expect(() => wb.setSheetCount(-1)).toThrow(RangeError);
     expect(() => new Workbook(undefined, { sheetCount: 0.5 })).toThrow(RangeError);
+  });
+  it('activates by Worksheet object or index and keeps Sheet<N> naming on a growing counter', () => {
+    const wb = new Workbook(undefined, { sheetCount: 1 });
+    expect(wb.getSheet(0).name()).toBe('Sheet1');
+    wb.setActiveSheet(0);
+    expect(wb.getActiveSheetIndex()).toBe(0);
+    wb.setSheetCount(2);
+    wb.setActiveSheet(wb.getSheet(1));
+    expect(wb.getActiveSheetIndex()).toBe(1);
+    wb.setActiveSheetIndex(0);
+    wb.setActiveSheet(wb.getSheet(1));
+    expect(wb.getActiveSheetIndex()).toBe(1);
+    // Auto names keep counting past existing and removed sheets, like the trial's Sheet6 after five sheets.
+    wb.addSheet(wb.getSheetCount());
+    expect(wb.getSheet(wb.getSheetCount() - 1).name()).toBe('Sheet3');
+    wb.addSheet(0);
+    expect(wb.getSheet(0).name()).toBe('Sheet4');
+    wb.removeSheet(3);
+    wb.removeSheet(3);
+    wb.addSheet(wb.getSheetCount());
+    expect(wb.getSheet(wb.getSheetCount() - 1).name()).toBe('Sheet5');
   });
   it('supports cancellation and exact active sheet event arguments', () => {
     const wb = new Workbook(undefined, { sheetCount: 2 });

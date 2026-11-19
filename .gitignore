@@ -8,4 +8,11 @@ playwright-report/
 .supervisor/
 .pnpm-store/
 .playwright-browsers/
+.npm/
+.scratch/
+.probe/
 .claude/settings.local.json
+
+# temp screenshots must never be committed (official pixels)
+/tmp-*.png
+/*.png

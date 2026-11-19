@@ -55,6 +55,17 @@ describe('Worksheet', () => {
     s.setValue(4, 1, { richText: [{ text: 'a' }, { text: 'b' }] });
     expect(s.getText(4, 1)).toBe('ab');
   });
+  it('accepts legacy A1-string overloads of setValue/getValue', () => {
+    const wb = new Workbook(),
+      s = wb.getSheet(0);
+    const setA1 = (a1: string, value: unknown): void => (s.setValue as (...args: unknown[]) => void)(a1, value);
+    const getA1 = (a1: string): unknown => (s.getValue as (...args: unknown[]) => unknown)(a1);
+    setA1('B2', 'x');
+    expect(s.getValue(1, 1)).toBe('x');
+    expect(getA1('B2')).toBe('x');
+    setA1('$aa$10', 5);
+    expect(s.getValue(9, 26)).toBe(5);
+  });
   it('resolves cell > row > column > default, with named parent chains and cycles', () => {
     const wb = new Workbook(),
       s = wb.getSheet(0);
@@ -264,14 +275,15 @@ describe('Worksheet', () => {
     s.copyTo(3, 0, 7, 0, 2, 2, CopyToOptions.span);
     expect(s.getSpan(8, 1)).toMatchObject({ row: 7, col: 0, rowCount: 2, colCount: 2 });
   });
-  it('tracks original dirty values, limits ranges, clears and suspends tracking', () => {
+  it('tracks dirty values like the trial (each change reports the value it replaced), limits ranges, clears and suspends tracking', () => {
     const s = new Worksheet('Dirty');
     s.setValue(1, 1, 1);
     s.setValue(1, 1, 2);
     s.setValue(8, 8, 3);
     expect(s.isDirty()).toBe(true);
     expect(s.hasPendingChanges()).toBe(true);
-    expect(s.getDirtyCells(0, 0, 3, 3)).toEqual([{ row: 1, col: 1, oldValue: undefined, newValue: 2 }]);
+    // Trial probe `dirty6`: setValue a then b reports oldValue 'a'.
+    expect(s.getDirtyCells(0, 0, 3, 3)).toEqual([{ row: 1, col: 1, oldValue: 1, newValue: 2 }]);
     s.clearPendingChanges({ row: 0, col: 0, rowCount: 3, colCount: 3 });
     expect(s.getDirtyCells()).toHaveLength(1);
     s.clearPendingChanges();

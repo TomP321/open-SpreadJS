@@ -2,7 +2,8 @@
  * Public calculation API (GC.Spread.Sheets.CalcEngine and
  * GC.Spread.CalcEngine). These mirror the declared v19 surface.
  */
-import type { Workbook, Worksheet } from '../model.js';
+import type { Workbook } from '../workbook.js';
+import type { Worksheet } from '../worksheet.js';
 import type { CalcEngine } from './engine.js';
 import { Range } from '../primitives.js';
 import { columnLabel, parseFormula, astToText, translateRefs } from './parser.js';
@@ -197,7 +198,9 @@ export function expressionToFormula(
 }
 
 function expressionToAst(expression: Expression): unknown {
-  const record = expression as unknown as Record<string, unknown>;
+  // `Expression` carries a `[key: string]: unknown` index signature, so the
+  // duck-typed reads below need no assertion.
+  const record: Record<string, unknown> = expression;
   if (record._node) return record._node;
   const type = Number(record.type);
   const args = (record.arguments as Expression[] | undefined)?.map(expressionToAst);
@@ -266,6 +269,11 @@ function expressionToAst(expression: Expression): unknown {
   }
 }
 
+/** A `Range` carrying the sheet a formula reference points to (output of `formulaToRanges`). */
+export interface FormulaRange extends Range {
+  sheetName?: string;
+}
+
 /** Returns the ranges referenced by a formula. */
 export function formulaToRanges(
   sheet: Worksheet,
@@ -276,8 +284,10 @@ export function formulaToRanges(
   const engine = engineOf(sheet);
   if (!engine) return [];
   return engine.formulaRanges(formula, sheet, baseRow, baseCol).map((area) => {
-    const range = new Range(area.r1, area.c1, area.r2 - area.r1 + 1, area.c2 - area.c1 + 1);
-    (range as unknown as { sheetName?: string }).sheetName = area.sheet.name();
+    // Like the reference build: the returned object is a Range plus the name of
+    // the sheet the reference points to (read back by `resolveContextSheet`).
+    const range: FormulaRange = new Range(area.r1, area.c1, area.r2 - area.r1 + 1, area.c2 - area.c1 + 1);
+    range.sheetName = area.sheet.name();
     return range;
   });
 }

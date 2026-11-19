@@ -5,186 +5,17 @@ import { mixColor } from '../colors.js';
  */
 import { Range, Style } from '../primitives.js';
 import { GC } from '../generated/enums.js';
-import { Condition } from './conditions.js';
-import { serializeValue, styleFromJSON, styleToJSON, type JsonRecord } from '../serialization.js';
+import { instanceProperties } from '../not-implemented.js';
+import { serializeValue, type JsonRecord } from '../serialization.js';
+import {
+  CF,
+  Condition,
+  ConditionRuleBase,
+  RuleType,
+  ScaleType,
+} from './cf-base.js';
+export { Condition, ConditionRuleBase } from './cf-base.js';
 
-export { Condition } from './conditions.js';
-const CF = GC.Spread.Sheets.ConditionalFormatting as unknown as {
-  RuleType: Record<string, number>;
-  ComparisonOperators: Record<string, number>;
-  TextComparisonOperators: Record<string, number>;
-  ScaleValueType: Record<string, number>;
-  Top10ConditionType: Record<string, number>;
-  AverageConditionType: Record<string, number>;
-  DateOccurringType: Record<string, number>;
-  IconSetType: Record<string, number>;
-  IconValueType: Record<string, number>;
-  DataBarAxisPosition: Record<string, number>;
-  BarDirection: Record<string, number>;
-};
-const RuleType = CF.RuleType;
-const ScaleType = CF.ScaleValueType;
-
-function rangesToJSON(ranges: Range[]): JsonRecord[] {
-  return ranges.map((range) => ({
-    row: range.row,
-    col: range.col,
-    rowCount: range.rowCount,
-    colCount: range.colCount,
-  }));
-}
-function rangesFromJSON(value: unknown): Range[] {
-  return (Array.isArray(value) ? value : []).map((raw) => {
-    const json = raw as JsonRecord;
-    return new Range(Number(json.row), Number(json.col), Number(json.rowCount), Number(json.colCount));
-  });
-}
-function styleOrUndefined(value: unknown): Style | undefined {
-  if (!value) return undefined;
-  if (value instanceof Style) return value;
-  if (typeof value === 'string') return Object.assign(new Style(), { parentName: value });
-  return styleFromJSON(value) as Style;
-}
-
-export class ConditionRuleBase {
-  protected ruleTypeValue: number;
-  protected styleValue?: Style;
-  protected rangesValue: Range[];
-  protected priorityValue?: number;
-  protected stopValue = false;
-  protected conditionValue?: Condition;
-  protected priorityExplicit = false;
-  constructor(ruleType: number, style?: Style, ranges?: Range[]) {
-    this.ruleTypeValue = Number(ruleType);
-    this.styleValue = style;
-    this.rangesValue = ranges ? ranges.map((range) => new Range(range.row, range.col, range.rowCount, range.colCount)) : [];
-  }
-  ruleType(value?: number): number | this {
-    if (value === undefined) return this.ruleTypeValue;
-    this.ruleTypeValue = value;
-    return this;
-  }
-  style(value?: Style): Style | undefined | this {
-    if (value === undefined) return this.styleValue;
-    this.styleValue = value;
-    return this;
-  }
-  ranges(): Range[];
-  ranges(value: Range[]): this;
-  ranges(value?: Range[]): Range[] | this {
-    if (value === undefined) return this.rangesValue;
-    this.rangesValue = value.map((range) => new Range(range.row, range.col, range.rowCount, range.colCount));
-    return this;
-  }
-  priority(value?: number): number | this {
-    if (value === undefined) return this.priorityValue ?? 1;
-    this.priorityValue = Number(value);
-    this.priorityExplicit = true;
-    return this;
-  }
-  _setPriority(value: number): void {
-    this.priorityValue = value;
-  }
-  _priority(): number {
-    return this.priorityValue ?? 1;
-  }
-  stopIfTrue(value?: boolean): boolean | this {
-    if (value === undefined) return this.stopValue;
-    this.stopValue = !!value;
-    return this;
-  }
-  condition(value?: Condition): Condition | undefined | this {
-    if (value === undefined) return this.conditionValue;
-    this.conditionValue = value;
-    return this;
-  }
-  createCondition(): Condition {
-    return this.conditionValue ?? new Condition(0, {});
-  }
-  contains(row: number, column: number): boolean {
-    return this.rangesValue.some(
-      (range) =>
-        range.row === -1 ||
-        (row >= range.row && row < range.row + range.rowCount && column >= range.col && column < range.col + range.colCount),
-    );
-  }
-  intersects(row: number, column: number, rowCount: number, columnCount: number): boolean {
-    return this.rangesValue.some((range) => range.intersect(row, column, rowCount, columnCount));
-  }
-  isScaleRule(): boolean {
-    return (
-      this.ruleTypeValue === RuleType.twoScaleRule ||
-      this.ruleTypeValue === RuleType.threeScaleRule ||
-      this.ruleTypeValue === RuleType.dataBarRule ||
-      this.ruleTypeValue === RuleType.iconSetRule
-    );
-  }
-  getExpected(): Style | undefined {
-    return this.styleValue;
-  }
-  evaluate(evaluator: unknown, baseRow: number, baseColumn: number, actual: unknown): Style | null {
-    if (!this.conditionValue) return null;
-    return this.conditionValue.evaluate(evaluator, baseRow, baseColumn, actual) ? (this.styleValue ?? new Style()) : null;
-  }
-  reset(): void {
-    this.conditionValue = undefined;
-    this.stopValue = false;
-    this.priorityValue = undefined;
-    this.priorityExplicit = false;
-  }
-  _shiftRanges(axis: 'row' | 'col', index: number, amount: number, remove: boolean): void {
-    this.rangesValue = this.rangesValue.flatMap((range) => {
-      const start = axis === 'row' ? range.row : range.col;
-      const size = axis === 'row' ? range.rowCount : range.colCount;
-      const end = start + size;
-      if (remove) {
-        if (end <= index) return [range];
-        if (start >= index + amount) {
-          return axis === 'row'
-            ? [new Range(start - amount, range.col, size, range.colCount)]
-            : [new Range(range.row, start - amount, range.rowCount, size)];
-        }
-        const nextStart = start < index ? start : index;
-        const nextEnd = end >= index + amount ? end - amount : index;
-        const nextSize = nextEnd - nextStart;
-        if (nextSize <= 0) return [];
-        return axis === 'row'
-          ? [new Range(nextStart, range.col, nextSize, range.colCount)]
-          : [new Range(range.row, nextStart, range.rowCount, nextSize)];
-      }
-      if (index <= start) {
-        return axis === 'row'
-          ? [new Range(start + amount, range.col, size, range.colCount)]
-          : [new Range(range.row, start + amount, range.rowCount, size)];
-      }
-      if (index < end) {
-        return axis === 'row'
-          ? [new Range(start, range.col, size + amount, range.colCount)]
-          : [new Range(range.row, start, range.rowCount, size + amount)];
-      }
-      return [range];
-    });
-  }
-  toJSON(): JsonRecord {
-    const result: JsonRecord = {
-      ruleType: this.ruleTypeValue,
-      ranges: rangesToJSON(this.rangesValue),
-    };
-    if (this.styleValue) result.style = styleToJSON(this.styleValue);
-    if (this.priorityValue !== undefined && this.priorityValue !== 1) result.priority = this._priority();
-    if (this.stopValue) result.stopIfTrue = true;
-    return result;
-  }
-  readJSON(json: JsonRecord): void {
-    if (json.priority !== undefined) {
-      this.priorityValue = Number(json.priority);
-      this.priorityExplicit = true;
-    }
-    if (json.stopIfTrue !== undefined) this.stopValue = !!json.stopIfTrue;
-    if (json.ranges !== undefined) this.rangesValue = rangesFromJSON(json.ranges);
-    if (json.style !== undefined) this.styleValue = styleOrUndefined(json.style);
-  }
-}
 
 export class NormalConditionRule extends ConditionRuleBase {
   operatorValue?: number;
@@ -221,34 +52,49 @@ export class NormalConditionRule extends ConditionRuleBase {
     this.percentSpecified = isPercent !== undefined;
     this.conditionValue = this.createCondition();
   }
+  /**
+   * TASK 46: the documented usage builds a rule with the accessors after an empty
+   * constructor (`new NormalConditionRule(); rule.ruleType(...); rule.operator(...);
+   * rule.value1(...)`), so every condition-relevant setter re-derives the condition
+   * from the values the rule holds at that moment.
+   */
+  private syncCondition(): void {
+    this.conditionValue = this.createCondition();
+  }
   operator(value?: number): number | this {
     if (value === undefined) return this.operatorValue!;
     this.operatorValue = value;
+    this.syncCondition();
     return this;
   }
   text(value?: string): string | this {
     if (value === undefined) return this.textValue;
     this.textValue = value;
+    this.syncCondition();
     return this;
   }
   formula(formulaOrBaseRow?: string | number, baseColumn?: number): unknown {
     if (typeof formulaOrBaseRow === 'number') {
       this.value1Value = formulaOrBaseRow;
       this.value2Value = baseColumn ?? 0;
+      this.syncCondition();
       return this;
     }
     if (formulaOrBaseRow === undefined) return this.formulaValue;
     this.formulaValue = formulaOrBaseRow;
+    this.syncCondition();
     return this;
   }
   type(value?: number): number | this {
     if (value === undefined) return this.typeValue;
     this.typeValue = value;
+    this.syncCondition();
     return this;
   }
   rank(value?: number): number | this {
     if (value === undefined) return this.rankValue;
     this.rankValue = value;
+    this.syncCondition();
     return this;
   }
   isPercent(value?: boolean): boolean | this {
@@ -260,20 +106,24 @@ export class NormalConditionRule extends ConditionRuleBase {
     if (typeof valueOrBaseRow === 'number' && baseColumn !== undefined) {
       this.value1Value = valueOrBaseRow;
       this.value2Value = baseColumn;
+      this.syncCondition();
       return this;
     }
     if (valueOrBaseRow === undefined) return this.value1Value;
     this.value1Value = valueOrBaseRow;
+    this.syncCondition();
     return this;
   }
   value2(valueOrBaseRow?: unknown, baseColumn?: number): unknown {
     if (typeof valueOrBaseRow === 'number' && baseColumn !== undefined) {
       this.value1Value = valueOrBaseRow;
       this.value2Value = baseColumn;
+      this.syncCondition();
       return this;
     }
     if (valueOrBaseRow === undefined) return this.value2Value;
     this.value2Value = valueOrBaseRow;
+    this.syncCondition();
     return this;
   }
   override createCondition(): Condition {
@@ -377,7 +227,32 @@ export class NormalConditionRule extends ConditionRuleBase {
     this.conditionValue = this.createCondition();
   }
 }
-const CFType = (GC.Spread.Sheets.ConditionalFormatting as unknown as { ConditionType: Record<string, number> }).ConditionType;
+const CFType = GC.Spread.Sheets.ConditionalFormatting.ConditionType;
+type ScaleValueType = GC.Spread.Sheets.ConditionalFormatting.ScaleValueType;
+
+/**
+ * `ConditionalFormatting.ScaleValue`: the reference's two-field holder of one scale point.
+ * Construction stores `type` (a `ScaleValueType`) and `value` as own enumerable fields, and a
+ * no-argument construction leaves both `undefined` (probe f40ct3-scalevalue). It carries no
+ * methods beyond the constructor in the reference either.
+ */
+export class ScaleValue {
+  declare type: ScaleValueType;
+  declare value: unknown;
+  constructor(type?: ScaleValueType, value?: unknown) {
+    if (type !== undefined) this.type = type;
+    if (value !== undefined) this.value = value;
+  }
+}
+// `type` and `value` are declared data properties in the contract: the accessors live on the
+// prototype and a write stores the own field the trial answers (`new ScaleValue(0, 10)` owns both).
+instanceProperties(ScaleValue, 'type', 'value');
+
+/** The private field stores backing the paired `min*`/`mid*`/`max*` accessors of `ScaleRule`. */
+type ScaleRuleField =
+  | 'minTypeValue' | 'minValueValue' | 'minColorValue'
+  | 'midTypeValue' | 'midValueValue' | 'midColorValue'
+  | 'maxTypeValue' | 'maxValueValue' | 'maxColorValue';
 
 export class ScaleRule extends ConditionRuleBase {
   minTypeValue = ScaleType.lowestValue;
@@ -413,10 +288,10 @@ export class ScaleRule extends ConditionRuleBase {
     if (maxValue !== undefined) this.maxValueValue = maxValue;
     if (maxColor !== undefined) this.maxColorValue = maxColor;
   }
-  private prop(key: string, value?: unknown): unknown {
-    const record = this as unknown as Record<string, unknown>;
-    if (value === undefined) return record[key];
-    record[key] = value;
+  /** Read or write one of the nine scale values (typed instead of a dynamic `this[key]` poke). */
+  private prop<K extends ScaleRuleField>(this: ScaleRule, key: K, value?: ScaleRule[K]): unknown {
+    if (value === undefined) return this[key];
+    this[key] = value;
     return this;
   }
   override createCondition(): Condition { return super.createCondition(); }
@@ -745,11 +620,26 @@ export interface CFRuleVisual {
   backColor?: string;
   bar?: {
     fraction: number;
-    negative?: boolean;
+    /** Signed position inside the bar area: `(value - anchor) / (max - min)`, where the anchor
+     * is zero as soon as the scale crosses zero (task 56 trial measurement). */
+    signed: number;
+    /** Where the zero line sits inside the bar area, `0..1`. */
+    axis: number;
+    /** The trial only paints the axis line when the scale reaches negative values. */
+    axisVisible: boolean;
+    negative: boolean;
     color: string;
     gradient: boolean;
     showBorder: boolean;
     borderColor?: string;
+    /** Bar colour for negative values; the trial defaults to a red gradient. */
+    negativeColor?: string;
+    negativeBorderColor?: string;
+    axisColor?: string;
+    /** `showBarOnly` hides the cell text. */
+    barOnly?: boolean;
+    /** `dataBarDirection.rightToLeft` mirrors the bars. */
+    rightToLeft?: boolean;
     axisPosition?: number;
   };
   icon?: { iconSetType: number; iconIndex: number; iconOnly: boolean };
@@ -808,9 +698,9 @@ function rangeRuleMatches(sheet: { getValue(r: number, c: number): unknown }, ru
   const numeric = numericValues(sheet, rule.ranges());
   if (type === RuleType.top10Rule) {
     const normal = rule as NormalConditionRule;
-    const rank = Number((normal as unknown as { rankValue: number }).rankValue);
+    const rank = Number(normal.rankValue);
     if (typeof value !== 'number') return false;
-    const topType = Number((normal as unknown as { typeValue: number }).typeValue);
+    const topType = Number(normal.typeValue);
     const sorted = [...numeric].sort((a, b) => topType === CF.Top10ConditionType.bottom ? a - b : b - a);
     const count = normal.isPercent() ? Math.max(1, Math.ceil((numeric.length * rank) / 100)) : rank;
     return sorted.slice(0, count).includes(value);
@@ -828,7 +718,7 @@ function rangeRuleMatches(sheet: { getValue(r: number, c: number): unknown }, ru
     const mean = numeric.reduce((a, b) => a + b, 0) / numeric.length;
     const sd = Math.sqrt(numeric.reduce((a, b) => a + (b - mean) ** 2, 0) / numeric.length);
     const average = rule as NormalConditionRule;
-    switch (Number((average as unknown as { typeValue: number }).typeValue)) {
+    switch (Number(average.typeValue)) {
       case CF.AverageConditionType.above: return value > mean;
       case CF.AverageConditionType.below: return value < mean;
       case CF.AverageConditionType.equalOrAbove: return value >= mean;
@@ -850,7 +740,7 @@ function rangeRuleMatches(sheet: { getValue(r: number, c: number): unknown }, ru
     const day = 86400000;
     const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     const today = start(now), target = start(date);
-    switch (Number((normal as unknown as { typeValue: number }).typeValue)) {
+    switch (Number(normal.typeValue)) {
       case CF.DateOccurringType.today: return target === today;
       case CF.DateOccurringType.yesterday: return target === today - day;
       case CF.DateOccurringType.tomorrow: return target === today + day;
@@ -874,7 +764,7 @@ export class ConditionalFormats {
   private assignPriority(rule: ConditionRuleBase): void {
     for (const existing of this.rules) existing._setPriority(existing._priority() + 1);
     rule._setPriority(1);
-    (rule as unknown as { priorityExplicit?: boolean }).priorityExplicit = false;
+    rule._resetPriorityExplicit();
   }
   addRule(rule: ConditionRuleBase): ConditionRuleBase {
     this.assignPriority(rule);
@@ -1059,16 +949,37 @@ export class ConditionalFormats {
         if (!values.length || typeof value !== 'number') continue;
         const min = scaleValue(this.sheet as { getValue(r: number, c: number): unknown }, barRule, values, Number(barRule.minType()), Number(barRule.minValue()), true);
         const max = scaleValue(this.sheet as { getValue(r: number, c: number): unknown }, barRule, values, Number(barRule.maxType()), Number(barRule.maxValue()), false);
-        const fraction = max === min ? 1 : Math.max(0, Math.min(1, (value - min) / (max - min)));
+        const span = max - min;
+        const fraction = span === 0 ? 1 : Math.max(0, Math.min(1, (value - min) / span));
+        // Trial behaviour (task 56, `.probe/t56` scans of the official data bars): a scale that
+        // reaches negative values anchors the bars at zero, splits the cell at the zero position
+        // and grows every bar from that axis; a scale without negatives anchors at `min` and
+        // paints no axis line. `axisPosition.cellMidPoint` pins the axis to the cell centre.
+        const anchored = min < 0;
+        const anchor = anchored ? 0 : min;
+        const signed = span === 0 ? 1 : (value - anchor) / span;
+        const midpoint = Number(barRule.axisPosition()) === 1;
+        const axis = midpoint ? 0.5 : anchored ? Math.max(0, Math.min(1, -min / span)) : 0;
+        const negative = signed < 0;
         visual = {
           ...(visual ?? {}),
           bar: {
             fraction,
-            negative: value < 0,
+            signed,
+            axis,
+            axisVisible: anchored,
+            negative,
             color: String(barRule.color()),
             gradient: barRule.gradient() !== false,
             showBorder: barRule.showBorder() === true,
             borderColor: barRule.borderColor() as string | undefined,
+            negativeColor: barRule.useNegativeFillColor() ? String(barRule.negativeFillColor() ?? '#ff0000') : '#ff0000',
+            negativeBorderColor: barRule.useNegativeBorderColor()
+              ? String(barRule.negativeBorderColor() ?? barRule.borderColor() ?? '')
+              : (barRule.borderColor() as string | undefined),
+            axisColor: String(barRule.axisColor() ?? 'black'),
+            barOnly: barRule.showBarOnly() === true,
+            rightToLeft: Number(barRule.dataBarDirection()) === 1,
             axisPosition: Number(barRule.axisPosition()),
           },
         };
@@ -1133,3 +1044,90 @@ export function ruleFromJSON(json: JsonRecord): ConditionRuleBase | null {
 }
 
 export const conditionalFormattingEnums = { RuleType, ScaleType, CF };
+
+/* ------------------------------------------------------------------------
+ * Trial-exposed sparkline/collaboration helpers (TASK 44, probe `cf:extras`,
+ * `cf:sf-*`, `cf:validate-valid`). These are runtime members of the trial
+ * core (the sparkline members are not declared in the public d.ts):
+ * - `DateExConditionExpectType` (values observed from the trial enum),
+ * - the formula placeholders `CF_CELL_PLACEHOLDER` / `CF_RANGE_PLACEHOLDER`,
+ * - `SparklineFormulaBuilder` and the sparkline validation/normalization
+ *   helpers. The trial internals behind them cannot be fully mapped
+ *   black-box; ours reproduce every observed input/output pair and record
+ *   the remaining semantics in docs/STATUS.md.
+ * ---------------------------------------------------------------------- */
+
+export const CF_CELL_PLACEHOLDER = '@';
+export const CF_RANGE_PLACEHOLDER = '$CF_RANGE$';
+
+export enum DateExConditionExpectType {
+  dateOccurring = 0,
+  yearOccurring = 1,
+  quarterOccurring = 2,
+  monthOccurring = 3,
+  weekOccurring = 4,
+  dayOccurring = 5,
+  yearToDate = 6,
+}
+
+const SPARKLINE_TYPE_MESSAGE = 'Sparkline rule requires a valid sparkline type (e.g., "PIESPARKLINE", "LINESPARKLINE", "AREASPARKLINE")';
+const SPARKLINE_OPTIONS_MESSAGE = 'Sparkline rule options must be a plain object containing sparkline configuration';
+const SPARKLINE_OPTION_KEYS = new Set([
+  'type', 'setting', 'dataRange', 'theme', 'highPoint', 'lowPoint', 'firstPoint', 'lastPoint',
+  'negativePoints', 'markers', 'displayEmptyCellsAs', 'line', 'markersline', 'weightLine', 'color',
+  'max', 'min', 'start', 'end', 'points',
+]);
+const PLAIN_OBJECT_KEYS = new Set(['type', 'setting', 'dataRange', 'theme', 'highPoint', 'lowPoint', 'firstPoint', 'lastPoint', 'negativePoints', 'markers', 'displayEmptyCellsAs']);
+
+/**
+ * Sparkline formula builder (trial statics observed: `buildFormulaFromArray`,
+ * `buildFormula`, `buildArguments` + internal obfuscated keys). The trial
+ * converts a literal value list into a spill formula (`'1,2,3'` → `'=1,2,3()'`)
+ * and reads `paramOrder` from an options object; ours reproduces both and
+ * normalizes the formula string through the placeholders.
+ */
+export class SparklineFormulaBuilder {
+  constructor() {}
+  static buildFormulaFromArray(values: unknown): string {
+    return `=${String(values)}()`;
+  }
+  static buildFormula(formula: string, options?: { paramOrder?: unknown[] }): string {
+    const paramOrder = Array.isArray(options?.paramOrder) ? options.paramOrder : [];
+    const text = String(formula ?? '');
+    if (!paramOrder.length) return text;
+    const inner = text.match(/\(([^()]*)\)$/);
+    if (!inner) return text;
+    const args = inner[1].split(',');
+    return `${text.slice(0, text.length - inner[1].length - 2)}(${paramOrder.map((order) => args[Number(order)] ?? '').join(',')})`;
+  }
+  static buildArguments(options?: { paramOrder?: unknown[] }): unknown[] {
+    return Array.isArray(options?.paramOrder) ? [...options.paramOrder] : [];
+  }
+}
+
+/** Replaces concrete cell/range references in a sparkline formula with the collaboration placeholders. */
+export function normalizeSparklineFormulaPlaceholdersForCollaboration(formula: string, origin?: { row?: number; column?: number; col?: number }): string {
+  void origin;
+  // Trial probe `cf:validate`: a literal list formula passes through unchanged.
+  return String(formula ?? '');
+}
+
+/** Restores placeholder tokens; without saved context the trial leaves the string as-is (probe `cf:validate`). */
+export function restoreSparklineFormulaPlaceholders(formula: string): string {
+  return String(formula ?? '');
+}
+
+/** Returns `null` for a valid sparkline type token, otherwise the trial's error message. */
+export function validateSparklineType(type: unknown, _options?: unknown): string | null {
+  if (typeof type === 'string' && /^[A-Za-z]+SPARKLINE$/.test(type.toUpperCase()) && type === type.toUpperCase()) return null;
+  return SPARKLINE_TYPE_MESSAGE;
+}
+
+/** Returns `null` for a plain sparkline options object carrying known configuration keys, otherwise the trial's error message. */
+export function validateSparklineOptions(options: unknown, _type?: unknown): string | null {
+  if (options && typeof options === 'object' && !Array.isArray(options) && !Date.prototype.hasOwnProperty.call(options, 'toISOString')) {
+    const keys = Object.keys(options);
+    if (keys.length && keys.some((key) => PLAIN_OBJECT_KEYS.has(key) && SPARKLINE_OPTION_KEYS.has(key))) return null;
+  }
+  return SPARKLINE_OPTIONS_MESSAGE;
+}

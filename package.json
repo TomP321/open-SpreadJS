@@ -8,6 +8,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "lint": "eslint .",
+    "dropin:check": "node apps/dropin-check/scripts/dropin-check.mjs",
     "coverage:api": "pnpm --filter @opensheets/compat coverage:api",
     "inventory": "pnpm --filter @opensheets/compat inventory",
     "generate": "pnpm --filter @opensheets/compat generate",

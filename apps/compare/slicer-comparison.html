@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Slicer comparison (official vs ours)</title></head><body>
+<div id="hosts" style="position:relative;width:1100px"></div>
+<script type="module">
+import Official from '@mescius/spread-sheets';
+import '@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css';
+import OpenSheets from '@opensheets/spread-sheets';
+import '@opensheets/spread-sheets/styles/gc.spread.sheets.css';
+import shapesUrl from '../../node_modules/.pnpm/@mescius+spread-sheets-slicers@19.2.5/node_modules/@mescius/spread-sheets-shapes/dist/gc.spread.sheets.shapes.min.js?url';
+import slicersUrl from '@mescius/spread-sheets-slicers/dist/gc.spread.sheets.slicers.min.js?url';
+window.GC = Official;
+const fixFs = src => typeof src === 'string' ? src.replace(/^\/@fs(?=\/@fs\/)/, '') : src;
+const loadScript = src => new Promise((resolve, reject) => {
+  const el = document.createElement('script');
+  el.src = src;
+  el.onload = resolve;
+  el.onerror = () => reject(new Error('failed to load ' + src));
+  document.head.append(el);
+});
+// The official in-sheet slicer UI ships as a UMD plugin on top of core + shapes.
+await loadScript(fixFs(shapesUrl));
+await loadScript(fixFs(slicersUrl));
+
+const LIBS = { official: Official, ours: OpenSheets };
+window.__LIBS__ = LIBS; // exposed for the style-dump probe
+const sessions = {};
+const FIXTURE = [
+  ['Name', 'City', 'Salary'],
+  ['Bob', 'NewYork', 80],
+  ['Betty', 'NewYork', 90],
+  ['Alice', 'Washington', 70],
+  ['Carl', 'London', 100],
+];
+const MANY_CITIES = [['Name', 'City', 'Salary']].concat(
+  Array.from({ length: 18 }, (_, i) => ['P' + (i + 1), 'City' + String.fromCharCode(65 + i), i + 1]));
+
+function strip(value) {
+  const walk = any => {
+    if (Array.isArray(any)) return any.map(walk);
+    if (any && typeof any === 'object') {
+      const out = {};
+      for (const key of Object.keys(any)) {
+        const item = any[key];
+        if (key === 'toImageSrc' || key === 'toImageSrcAsync') { out[key] = typeof item === 'string' ? '<png:' + item.length + '>' : item; continue; }
+        out[key] = walk(item);
+      }
+      return out;
+    }
+    return any;
+  };
+  return walk(JSON.parse(JSON.stringify(value)));
+}
+
+function makeTable(kind, names) {
+  const s = sessions[kind];
+  const CF = s.GC.Spread.Sheets.ConditionalFormatting;
+  const condition = new CF.Condition(CF.ConditionType.textCondition, {
+    compareType: CF.TextCompareType.equalsTo, expected: names.expected, useWildCards: false, ignoreCase: true,
+  });
+  const filter = s.sheet.tables.findByName('TableCities').rowFilter();
+  filter.addFilterItem(names.col, condition);
+  filter.filter();
+  return true;
+}
+
+/** Generic operation runner: ops are [target.member, argsArray] pairs. */
+function apply(kind, ops) {
+  const s = sessions[kind];
+  const GC = s.GC;
+  for (const entry of ops) {
+    const path = entry[0];
+    let args = (entry[1] || []).map(a => {
+      if (a && typeof a === 'object' && a.__point) return new GC.Spread.Sheets.Point(a.x, a.y);
+      if (a && typeof a === 'object' && a.__style) return GC.Spread.Sheets.Slicers.SlicerStyles[a.__style]();
+      return a;
+    });
+    const dot = path.lastIndexOf('.');
+    const targetName = path.slice(0, dot);
+    const member = path.slice(dot + 1);
+    const target = {
+      slicer: () => s.slicer,
+      sheet: () => s.sheet,
+      wb: () => s.wb,
+      table: () => s.sheet.tables.findByName('TableCities'),
+      filter: () => s.sheet.tables.findByName('TableCities').rowFilter(),
+    }[targetName]();
+    if (!target) throw new Error('unknown op target ' + path);
+    target[member](...args);
+  }
+  return true;
+}
+
+function mainCanvasRect(kind) {
+  const host = sessions[kind].host;
+  const list = [...host.querySelectorAll('canvas')].map(c => c.getBoundingClientRect());
+  list.sort((a, b) => b.width * b.height - a.width * a.height);
+  return list[0];
+}
+
+const GSD_MATRIX = [
+  [{ value: 'Bob', text: 'Bob' }, { value: 'NewYork', text: 'NewYork' }, { value: 80, text: '80' }],
+  [{ value: 'Betty', text: 'Betty' }, { value: 'NewYork', text: 'NewYork' }, { value: 90, text: '90' }],
+  [{ value: 'Alice', text: 'Alice' }, { value: 'Washington', text: 'Washington' }, { value: 70, text: '70' }],
+  [{ value: 'Carl', text: 'Carl' }, { value: 'London', text: 'London' }, { value: 100, text: '100' }],
+];
+
+/** GeneralSlicerData API matrix (TASK 29 coverage, kept running on both libraries). */
+function gsd(kind) {
+  const GC = LIBS[kind];
+  const out = { kind, steps: {} };
+  const record = (label, fn) => {
+    try { out.steps[label] = fn(); } catch (error) { out.steps[label] = { thrown: String(error.message) }; }
+  };
+  const g = new GC.Spread.Slicers.GeneralSlicerData(GSD_MATRIX.map(row => row.slice()), ['Name', 'City', 'Salary']);
+  const Agg = GC.Spread.Slicers.SlicerAggregateType;
+  const Fod = GC.Spread.Slicers.FilteredOutDataType;
+  record('gsd.columns', () => g.columnNames);
+  record('gsd.getColumnIndex', () => [g.getColumnIndex('City'), g.getColumnIndex('Nope')]);
+  record('gsd.getData', () => g.getData('City'));
+  record('gsd.getExclusiveData', () => g.getExclusiveData('City'));
+  record('gsd.getRowIndexes', () => g.getRowIndexes('City', 0));
+  record('gsd.getExclusiveRowIndex', () => [g.getExclusiveRowIndex('City', 1), g.getExclusiveRowIndex('City', 2)]);
+  record('gsd.aggregate', () => ['sum', 'count', 'counta', 'average', 'max', 'min', 'product', 'stdev', 'stdevp', 'vars', 'varp']
+    .map(name => Number(g.aggregateData('Salary', Agg[name]).toFixed(6))));
+  record('gsd.aggregateRange', () => Number(g.aggregateData('Salary', Agg.sum, { min: 80, max: 100 }).toFixed(6)));
+  record('gsd.getDataRange', () => g.getData('City', { min: 85, max: 100 }));
+  let filteredEvents = 0;
+  let lastEvent = null;
+  const listener = {
+    onFiltered: data => { filteredEvents++; lastEvent = { isPreview: data.isPreview, count: data.rowIndexes.length }; },
+    onDataChanged: () => { filteredEvents++; },
+    onRowsChanged: () => { filteredEvents++; },
+    onColumnNameChanged: () => { filteredEvents++; },
+    onColumnRemoved: () => { filteredEvents++; },
+  };
+  g.attachListener(listener);
+  g.doFilter('City', { exclusiveRowIndexes: [0, 1] });
+  record('gsd.filtered', () => ({
+    rows: g.getFilteredRowIndexes(),
+    outRows: g.getFilteredOutRowIndexes(),
+    indexes: g.getFilteredIndexes('City'),
+    outAll: g.getFilteredOutIndexes('City', Fod.all),
+    outSelf: g.getFilteredOutIndexes('City', Fod.byCurrentColumn),
+    outOther: g.getFilteredOutIndexes('City', Fod.byOtherColumns),
+    salaryIndexes: g.getFilteredIndexes('Salary'),
+    salaryOut: g.getFilteredOutIndexes('Salary', Fod.all),
+    events: filteredEvents,
+    last: lastEvent,
+  }));
+  g.doFilter('Salary', { ranges: [{ min: 75, max: 95 }] }, true);
+  record('gsd.preview', () => ({
+    inPreview: g.inPreview(),
+    rows: g.getFilteredRowIndexes(),
+    ranges: g.getFilteredRanges('Salary'),
+    outRanges: g.getFilteredOutRanges('Salary'),
+    events: filteredEvents,
+  }));
+  g.clearPreview();
+  g.doUnfilter('City');
+  record('gsd.afterClear', () => ({
+    inPreview: g.inPreview(),
+    rows: g.getFilteredRowIndexes(),
+    outAll: g.getFilteredOutIndexes('City', Fod.all),
+    events: filteredEvents,
+  }));
+  const beforeSuspend = filteredEvents;
+  g.suspendFilteredEvents();
+  g.doFilter('City', { exclusiveRowIndexes: [2] });
+  g.doUnfilter('City');
+  const duringSuspend = filteredEvents - beforeSuspend;
+  record('gsd.resume', () => { g.resumeFilteredEvents(); return true; });
+  record('gsd.suspendResume', () => ({ during: duringSuspend, afterResume: filteredEvents - beforeSuspend }));
+  record('gsd.rename', () => { g.onColumnNameChanged('City', 'Town'); return true; });
+  record('gsd.renamed', () => ({ columns: g.columnNames, exclusive: g.getExclusiveData('Town'), events: filteredEvents }));
+  record('gsd.removeColumn', () => { g.onColumnsRemoved(1, 1); return true; });
+  record('gsd.columnRemoved', () => ({ columns: g.columnNames, row0: g.data[0].length, events: filteredEvents }));
+  record('gsd.addRows', () => { g.onRowsAdded(0, 1); return true; });
+  record('gsd.removeRows', () => { g.onRowsRemoved(0, 1); return true; });
+  record('gsd.rows', () => ({ rows: g.data.length, events: filteredEvents }));
+  record('gsd.setCell', () => {
+    g.onDataChanged({ columnName: 'Name', row: 0, rowIndex: 0, data: { value: 'Bobby', text: 'Bobby' } });
+    return true;
+  });
+  record('gsd.dataChanged', () => ({ first: g.getData('Name')[0], events: filteredEvents }));
+  record('gsd.onFilteredRaw', () => { g.onFiltered(); return true; });
+  record('gsd.onFiltered', () => ({ events: filteredEvents }));
+  return out;
+}
+
+window.hs = {
+  gsd,
+  debugShapes(kind) { return JSON.stringify(strip(sessions[kind].sheet.toJSON().shapes)); },
+  ready: () => Object.keys(LIBS),
+  setup(kind, opts) {
+    if (sessions[kind]) {
+      try { sessions[kind].wb.destroy(); } catch { /* ignore */ }
+      sessions[kind].host.remove();
+      delete sessions[kind];
+    }
+    const GC = LIBS[kind];
+    const host = document.createElement('div');
+    host.id = 'host-' + kind;
+    host.style.cssText = 'width:520px;height:640px;position:absolute;top:20px;left:' + (kind === 'official' ? 10 : 560) + 'px';
+    document.getElementById('hosts').append(host);
+    const wb = new GC.Spread.Sheets.Workbook(host, { sheetCount: 1 });
+    const sheet = wb.getActiveSheet();
+    sheet.options.rowHeaderVisible = false;
+    sheet.options.colHeaderVisible = false;
+    const rows = opts && opts.rows === 'many' ? MANY_CITIES : FIXTURE;
+    for (let r = 0; r < rows.length; r++) for (let c = 0; c < 3; c++) sheet.setValue(r, c, rows[r][c]);
+    sheet.tables.add('TableCities', 0, 0, rows.length, 3);
+    const slicer = sheet.slicers.add('Slicer1', 'TableCities', 'City');
+    const events = [];
+    sheet.bind(GC.Spread.Sheets.Events.SlicerChanged, (e, a) => events.push(a.propertyName));
+    sessions[kind] = { GC, wb, sheet, slicer, events, host, rowCount: rows.length };
+    return { rowCount: rows.length };
+  },
+  apply,
+  geom(kind) {
+    const s = sessions[kind];
+    try { s.sheet.showRow(0, s.GC.Spread.Sheets.VerticalPosition ? s.GC.Spread.Sheets.VerticalPosition.top : 0); } catch { /* ignore */ }
+    const x = Number(s.slicer.x());
+    const y = Number(s.slicer.y());
+    const width = Number(s.slicer.width());
+    const height = Number(s.slicer.height());
+    const canvas = mainCanvasRect(kind);
+    const zoom = (s.wb.options && s.wb.options.zoom) || 1;
+    return {
+      sheetX: x, sheetY: y, width, height, zoom,
+      left: canvas.left + x * zoom, top: canvas.top + y * zoom,
+      itemHeight: Number(s.slicer.itemHeight()), columnCount: Number(s.slicer.columnCount()),
+      showHeader: s.slicer.showHeader() !== false,
+      clip: { x: canvas.left + x * zoom - 12, y: canvas.top + y * zoom - 12, width: (width + 24) * zoom, height: (height + 24) * zoom },
+      options: {
+        rowHeaderVisible: s.sheet.options.rowHeaderVisible,
+        colHeaderVisible: s.sheet.options.colHeaderVisible,
+      },
+    };
+  },
+  state(kind) {
+    const s = sessions[kind];
+    const sheetJson = strip(s.sheet.toJSON());
+    const table = s.sheet.tables.findByName('TableCities');
+    const filterJson = strip(table.rowFilter().toJSON());
+    if (filterJson.tableId) filterJson.tableId = '<id>';
+    return {
+      events: s.events.slice(),
+      slicerJson: strip(s.slicer.toJSON()),
+      sheetSlicers: sheetJson.slicers || null,
+      sheetShapes: sheetJson.shapes || null,
+      sheetTopKeys: Object.keys(sheetJson),
+      tableFilter: filterJson,
+      wbCaches: strip(s.wb.toJSON()).tableSlicerCaches ?? null,
+      visibleRows: Array.from({ length: s.rowCount }, (_, r) => !!s.sheet.getRowVisible(r)),
+      items: typeof s.slicer.getItems === 'function'
+        ? s.slicer.getItems().map(i => ({ text: i.text, selected: !!i.selected, noData: !!i.noData }))
+        : null,
+    };
+  },
+  dispose(kind) {
+    if (!sessions[kind]) return;
+    try { sessions[kind].wb.destroy(); } catch { /* ignore */ }
+    sessions[kind].host.remove();
+    delete sessions[kind];
+  },
+  makeTable,
+};
+window.__hsReady = true;
+</script></body></html>

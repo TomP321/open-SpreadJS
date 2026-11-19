@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>drop-in sample (e) script tags / window.GC</title>
+    <link rel="stylesheet" href="./node_modules/@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css" />
+  </head>
+  <body>
+    <div id="sheet" style="width: 980px; height: 480px"></div>
+    <script src="./node_modules/@mescius/spread-sheets/dist/gc.spread.sheets.all.min.js"></script>
+    <script src="./node_modules/@mescius/spread-sheets-io/dist/gc.spread.sheets.io.min.js"></script>
+    {{EXTRA_SCRIPT}}
+    <script>
+      (function () {
+        var host = document.getElementById('sheet');
+        var workbook = new GC.Spread.Sheets.Workbook(host, { sheetCount: 1 });
+        var sheet = workbook.getActiveSheet();
+        sheet.suspendPaint();
+        sheet.name('Script');
+        sheet.setColumnWidth(0, 150);
+        sheet.setColumnWidth(1, 110);
+        sheet.setValue(0, 0, 'Region');
+        sheet.setValue(0, 1, 'Units');
+        sheet.setValue(1, 0, 'North');
+        sheet.setValue(1, 1, 1200);
+        sheet.setValue(2, 0, 'South');
+        sheet.setValue(2, 1, 900);
+        sheet.setValue(3, 0, 'Total');
+        sheet.setFormula(3, 1, '=SUM(B2:B3)');
+        sheet.setFormatter(1, 1, '#,##0');
+        sheet.setFormatter(3, 1, '#,##0');
+        sheet.charts.add('UnitsChart', GC.Spread.Sheets.Charts.ChartType.columnClustered, 360, 8, 420, 260, 'A1:B3');
+        sheet.resumePaint();
+        window.__RESULT__ = {
+          globalGCType: typeof GC,
+          workbookCtorType: typeof GC.Spread.Sheets.Workbook,
+          ioMethods: ['import', 'export', 'open', 'save'].map(function (name) { return typeof workbook[name]; }),
+          sheetName: sheet.name(),
+          formulaValue: sheet.getValue(3, 1),
+          formattedTotal: sheet.getText(3, 1),
+          chartCount: sheet.charts.all().length,
+          hostClasses: Array.prototype.slice.call(host.classList),
+          findControlIsWorkbook: GC.Spread.Sheets.findControl(host) === workbook
+        };
+        window.__READY__ = true;
+      })();
+    </script>
+  </body>
+</html>

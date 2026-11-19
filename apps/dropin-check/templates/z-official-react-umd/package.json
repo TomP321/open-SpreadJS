@@ -1,0 +1,17 @@
+{
+  "name": "dropin-z-official-react-umd",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{OFFICIAL_core}}",
+    "@mescius/spread-sheets-react": "file:{{OFFICIAL_react}}",
+    "@mescius/spread-sheets-charts": "file:{{OFFICIAL_charts}}",
+    "@mescius/spread-sheets-shapes": "file:{{OFFICIAL_shapes}}",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "overrides": {
+    "@mescius/spread-sheets": "$@mescius/spread-sheets",
+    "@mescius/spread-sheets-shapes": "$@mescius/spread-sheets-shapes"
+  }
+}

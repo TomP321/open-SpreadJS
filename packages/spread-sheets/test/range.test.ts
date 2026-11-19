@@ -4,7 +4,7 @@ import { styleProperties } from '../src/primitives.js';
 const { Worksheet, Style, LineBorder, Range, CellRange, StorageType } = GC.Spread.Sheets;
 describe('Style and CellRange', () => {
   for (const key of styleProperties)
-    it(`supports Style.${key} and applies CellRange.${key} across cells`, () => {
+    it(`supports Style.${key}${key.startsWith('apply') ? ' (the trial CellRange exposes no apply* accessor)' : ` and applies CellRange.${key} across cells`}`, () => {
       const s = new Worksheet('Style'),
         range = s.getRange(1, 2, 2, 3),
         value = { property: key };
@@ -12,10 +12,18 @@ describe('Style and CellRange', () => {
       expect(st[key]).toBeUndefined();
       st[key] = value;
       expect(st[key]).toBe(value);
-      const accessor = range[key];
+      if (key.startsWith('apply')) {
+        // TASK 46 trial probe: GC.Spread.Sheets.CellRange has no apply* style accessors and the
+        // d.ts contract does not declare them; the members only exist on Style itself.
+        expect((range as unknown as Record<string, unknown>)[key]).toBeUndefined();
+        s.setStyle(1, 2, st);
+        expect(s.getStyle(1, 2)?.[key]).toBe(value);
+        return;
+      }
+      const accessor = (range as unknown as Record<string, (v?: unknown) => unknown>)[key];
       expect(accessor.call(range, value)).toBe(range);
       for (let r = 1; r < 3; r++) for (let c = 2; c < 5; c++) expect(s.getStyle(r, c)?.[key]).toBe(value);
-      expect(range[key]()).toBe(value);
+      expect((range as unknown as Record<string, () => unknown>)[key]()).toBe(value);
       expect(s.getStyle(0, 0)).toBeNull();
     });
   it('supports constructor arguments and deep clones borders and nested style values', () => {
@@ -168,4 +176,193 @@ it('resolves live default styles and composite font fields', () => {
   expect(font.fontSize).toBe('12px');
   font.fontSize = '20px';
   expect(font.font).toBe('italic bold 20px Arial');
+});
+
+describe('Rect and Point', () => {
+  const { Rect, Point } = GC.Spread.Sheets;
+  it('Rect owns x, y, width and height in the trial order', () => {
+    const rect = new Rect(1, 2, 10, 5);
+    expect([rect.x, rect.y, rect.width, rect.height]).toEqual([1, 2, 10, 5]);
+    expect(Object.keys(rect)).toEqual(['x', 'y', 'width', 'height']);
+    expect(Object.getOwnPropertyNames(Rect.prototype).sort()).toEqual(
+      // The trial keeps only the methods on the prototype and stores the values as
+      // own instance fields. Our fallback gate additionally requires a descriptor
+      // for every declared data property on the prototype, so those four lazy
+      // accessors are present there too; every instance shadows them with its own
+      // field, which is what reads and writes reach.
+      ['constructor', 'contains', 'getIntersectRect', 'intersect', 'intersectRect', 'height', 'width', 'x', 'y'].sort(),
+    );
+    // The trial tolerates missing constructor arguments and leaves the fields undefined.
+    const NoArgumentRect = Rect as unknown as new () => InstanceType<typeof Rect>;
+    const empty = new NoArgumentRect();
+    expect(Object.keys(empty)).toEqual(['x', 'y', 'width', 'height']);
+    expect([empty.x, empty.y, empty.width, empty.height]).toEqual([undefined, undefined, undefined, undefined]);
+  });
+  it('Rect.contains(x, y) is true only strictly inside the rectangle', () => {
+    const rect = new Rect(1, 2, 10, 5);
+    const points: [number, number][] = [
+      [1, 2], [11, 2], [1, 7], [11, 7], [10.99, 6.99], [2, 2], [1, 3], [6, 2], [11, 4], [4, 7], [2, 6.9], [2, 7.1],
+    ];
+    expect(points.map(([x, y]) => rect.contains(x, y))).toEqual([
+      false, false, false, false, true, false, false, false, false, false, true, false,
+    ]);
+    expect([rect.contains(1, 2), rect.contains(10, 6), rect.contains(11, 2), rect.contains(1, 7), rect.contains(0, 2), rect.contains(10.5, 6.5)]).toEqual([
+      false, true, false, false, false, true,
+    ]);
+  });
+  it('Rect.intersect(x, y, width, height) and intersectRect(rect) report shared area', () => {
+    const rect = new Rect(1, 2, 10, 5);
+    expect([
+      rect.intersect(5, 3, 4, 4), rect.intersect(11, 2, 4, 4), rect.intersect(10, 2, 4, 4), rect.intersect(-5, 2, 6, 5),
+      rect.intersect(1, 7, 1, 1), rect.intersectRect(new Rect(9, 6, 5, 5)), rect.intersectRect(new Rect(11, 2, 5, 5)),
+    ]).toEqual([true, false, true, false, false, true, false]);
+  });
+  it('Rect.getIntersectRect(rect) returns the shared rectangle or null', () => {
+    const rect = new Rect(1, 2, 10, 5);
+    const size = (value: { x: number; y: number; width: number; height: number } | null) =>
+      value ? [value.x, value.y, value.width, value.height] : null;
+    expect(size(rect.getIntersectRect(new Rect(5, 3, 20, 20)))).toEqual([5, 3, 6, 4]);
+    expect(size(rect.getIntersectRect(new Rect(11, 2, 5, 5)))).toBeNull();
+    expect(size(rect.getIntersectRect(new Rect(9, 6, 5, 5)))).toEqual([9, 6, 2, 1]);
+    expect(size(rect.getIntersectRect(new Rect(-5, -5, 10, 10)))).toEqual([1, 2, 4, 3]);
+    expect(rect.getIntersectRect(new Rect(20, 20, 2, 2)) instanceof Rect).toBe(false);
+  });
+  it('Point.clone() returns a new Point with the same coordinates', () => {
+    const point = new Point(3, 4),
+      copy = point.clone();
+    expect([copy.x, copy.y]).toEqual([3, 4]);
+    expect(copy).toBeInstanceOf(Point);
+    expect(copy).not.toBe(point);
+    copy.x = 9;
+    expect(point.x).toBe(3);
+  });
+});
+
+describe('CellRange geometry and toHtml', () => {
+  const { SheetArea, HeaderOptions, TextDecorationType } = GC.Spread.Sheets;
+  it('row, col, rowCount, colCount, sheetArea and sheet are own properties of the range', () => {
+    const sheet = new Worksheet('Geometry'),
+      range = sheet.getRange(1, 2, 3, 4);
+    expect([range.row, range.col, range.rowCount, range.colCount, range.sheetArea]).toEqual([1, 2, 3, 4, SheetArea.viewport]);
+    expect(range.sheet).toBe(sheet);
+    expect(Object.keys(range)).toEqual(['sheet', 'row', 'col', 'rowCount', 'colCount', 'sheetArea']);
+    expect(sheet.getRange(0, 0, 1, 1, SheetArea.rowHeader).sheetArea).toBe(SheetArea.rowHeader);
+  });
+  it('toHtml() serialises the visible cells as the trial table', () => {
+    const sheet = new Worksheet('Html');
+    sheet.setValue(0, 0, 5);
+    sheet.setValue(0, 1, 'abc');
+    sheet.setValue(1, 0, true);
+    sheet.getRange(0, 0, 2, 2).backColor('rgb(255,0,0)');
+    const cell = (text: string, align: string) =>
+      `<td style="padding: 0; background-color: rgb(255,0,0); font: 11.00pt Calibri, 'Helvetica Neue', Arial, sans-serif; ` +
+      `white-space: nowrap; vertical-align: top; text-align: ${align}; overflow: hidden;height: 19px;line-height: 16px; ` +
+      `width: 61px;max-width: 61px;min-width: 61px;">${text}</td>`;
+    expect(sheet.getRange(0, 0, 2, 2).toHtml()).toBe(
+      `<table style="border-collapse: collapse"><tr>${cell('5', 'right')}${cell('abc', 'left')}</tr>` +
+      `<tr>${cell('TRUE', 'center')}${cell('', 'left')}</tr></table>`,
+    );
+  });
+  it('toHtml() uses gridline borders and plain cells when styles are switched off', () => {
+    const sheet = new Worksheet('Plain');
+    sheet.getRange(0, 0).value('5');
+    const gridline = 'border-top: 1px solid rgb(212, 212, 212); border-bottom: 1px solid rgb(212, 212, 212); ' +
+      'border-left: 1px solid rgb(212, 212, 212); border-right: 1px solid rgb(212, 212, 212); ';
+    expect(sheet.getRange(0, 0, 1, 1).toHtml()).toBe(
+      `<table style="border-collapse: collapse"><tr><td style="padding: 0; ` +
+      `font: 11.00pt Calibri, 'Helvetica Neue', Arial, sans-serif; white-space: nowrap; vertical-align: top; ` +
+      `text-align: left; ${gridline}overflow: hidden;height: 19px;line-height: 16px; ` +
+      `width: 61px;max-width: 61px;min-width: 61px;">5</td></tr></table>`,
+    );
+    expect(sheet.getRange(0, 0, 1, 1).toHtml(HeaderOptions.noHeaders, false)).toBe(
+      '<table style="border-collapse: collapse"><tr><td>5</td></tr></table>',
+    );
+    // An explicit background removes the gridline borders, an explicit border replaces only that edge.
+    sheet.getRange(0, 0).backColor('yellow');
+    const backed = sheet.getRange(0, 0, 1, 1).toHtml();
+    expect(backed).toContain('background-color: yellow; ');
+    for (const edge of ['top', 'bottom', 'left', 'right']) expect(backed).not.toContain(`border-${edge}`);
+    sheet.getRange(0, 0).backColor(null);
+    expect(sheet.getRange(0, 0, 1, 1).toHtml()).toContain(gridline);
+    sheet.getRange(0, 0).borderTop(new LineBorder('blue', 3));
+    const styled = sheet.getRange(0, 0, 1, 1).toHtml();
+    expect(styled).toContain('border-top: 0.5pt dashed blue; ');
+    expect(styled).not.toContain('border-bottom');
+    expect(styled).toContain('border-left: 1px solid rgb(212, 212, 212); ');
+    expect(styled).toContain('border-right: 1px solid rgb(212, 212, 212); ');
+  });
+  it('toHtml() skips hidden rows and columns and spans merged cells', () => {
+    const sheet = new Worksheet('Hidden');
+    sheet.setValue(0, 0, 'a');
+    sheet.setValue(1, 0, 'b');
+    sheet.setValue(0, 1, 'c');
+    sheet.setRowVisible(1, false);
+    sheet.setColumnVisible(1, false);
+    expect(sheet.getRange(0, 0, 2, 2).toHtml()).toContain('<tr><td style="padding: 0; ');
+    expect(sheet.getRange(0, 0, 2, 2).toHtml().split('<td').length - 1).toBe(1);
+    const merged = new Worksheet('Merged');
+    merged.setValue(0, 0, 'm');
+    merged.addSpan(0, 0, 2, 2);
+    const cells = merged.getRange(0, 0, 3, 3).toHtml().split('<td').slice(1);
+    expect(cells[0]).toContain(' rowSpan=2 colSpan=2 ');
+    expect(cells[0]).toContain('height: 39px;');
+    expect(cells[0]).toContain('width: 123px;');
+    expect(cells.filter((cell) => cell.includes('rowSpan')).length).toBe(1);
+    expect(cells.length).toBe(6);
+    // The covered cells are not emitted: the merged rows hold two cells each.
+    expect(
+      merged.getRange(0, 0, 3, 3).toHtml().split('<tr>').slice(1).map((line) => line.split('<td').length - 1),
+    ).toEqual([2, 1, 3]);
+  });
+  it('toHtml() renders the row and column header areas like the trial labels', () => {
+    const sheet = new Worksheet('Headers');
+    const rowHeader = sheet.getRange(0, 0, 2, 1, SheetArea.rowHeader).toHtml(),
+      colHeader = sheet.getRange(0, 0, 1, 2, SheetArea.colHeader).toHtml();
+    expect([...rowHeader.matchAll(/>(\d)<\/td>/g)].map((match) => match[1])).toEqual(['1', '2']);
+    expect([...colHeader.matchAll(/>([A-Z])<\/td>/g)].map((match) => match[1])).toEqual(['A', 'B']);
+    expect(rowHeader).toContain('vertical-align: middle; text-align: center;');
+    expect(rowHeader).toContain('border-top: 1px solid #d4d4d4;');
+    expect(rowHeader).toContain('width: 39px;');
+    expect(colHeader).toContain('width: 61px;');
+    expect(sheet.getRange(0, 0, 1, 1, SheetArea.corner).toHtml()).toBe('');
+  });
+  it('toHtml() escapes text, applies underline decoration and honours the formatter', () => {
+    const sheet = new Worksheet('Text');
+    sheet.setValue(0, 0, 'a<b>&"c\u00e9');
+    expect(sheet.getRange(0, 0, 1, 1).toHtml()).toContain('a&lt;b&gt;&amp;&quot;c\u00e9');
+    sheet.getRange(0, 0).clear(7);
+    sheet.setValue(0, 0, 1234.5);
+    sheet.getRange(0, 0).formatter('#,##0.00');
+    expect(sheet.getRange(0, 0, 1, 1).toHtml()).toContain('>1,234.50<');
+    sheet.getRange(0, 0).formatter('@');
+    expect(sheet.getRange(0, 0, 1, 1).toHtml()).toContain('>1234.5<');
+    sheet.getRange(0, 0).clear(7);
+    sheet.setValue(0, 0, 't');
+    sheet.getRange(0, 0).textDecoration(TextDecorationType.underline);
+    expect(sheet.getRange(0, 0, 1, 1).toHtml()).toContain('<u>t</u>');
+  });
+  it('applyNamedCellTemplate(name) applies the template style like the trial', () => {
+    const workbook = new GC.Spread.Sheets.Workbook(undefined, { sheetCount: 1 }),
+      sheet = workbook.getSheet(0);
+    workbook.namedCellTemplates.add('money', { style: { formatter: '0.00$', backColor: '#eeeeee' } });
+    sheet.setValue(0, 0, 12.5);
+    sheet.getRange(0, 0, 2, 2).applyNamedCellTemplate('money');
+    expect([sheet.getFormatter(0, 0), sheet.getFormatter(1, 1), sheet.getRange(0, 0).backColor(), sheet.getFormatter(0, 3)]).toEqual([
+      '0.00$', '0.00$', '#eeeeee', undefined,
+    ]);
+    expect(sheet.getValue(0, 0)).toBe(12.5);
+    // Unknown template names are ignored (the trial does not throw).
+    expect(sheet.getRange(0, 0, 1, 1).applyNamedCellTemplate('nope')).toBeUndefined();
+    // Whole rows and whole columns are addressed like the trial's 'A:A' and '5:6' forms.
+    sheet.applyNamedCellTemplate('money', 'B:B');
+    expect([sheet.getFormatter(0, 1), sheet.getFormatter(199, 1)]).toEqual(['0.00$', '0.00$']);
+    sheet.applyNamedCellTemplate('money', '9:10');
+    expect([sheet.getFormatter(8, 10), sheet.getFormatter(10, 10)]).toEqual(['0.00$', undefined]);
+    expect(sheet.applyNamedCellTemplate('money', 'not a range')).toBeUndefined();
+    expect(sheet.applyNamedCellTemplate('nope', 'A1')).toBeUndefined();
+    // The trial stores whole-row/whole-column applications as row/column styles.
+    const data = sheet.toJSON().data as { rowDataArray?: unknown[]; columnDataArray?: unknown[] };
+    expect((data.rowDataArray as { style: { formatter: string } }[])[8].style.formatter).toBe('0.00$');
+    expect(((data.columnDataArray as { style: { formatter: string } }[])[1]).style.formatter).toBe('0.00$');
+  });
 });

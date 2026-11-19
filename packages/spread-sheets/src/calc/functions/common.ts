@@ -1,5 +1,5 @@
 /** Shared helpers for the built-in function library. */
-import type { Worksheet } from '../../model.js';
+import type { Worksheet } from '../../worksheet.js';
 import {
   Args,
   EvalContext,
@@ -202,6 +202,14 @@ export const NUMBER_MODES = {
 export function numeric(value: number): number | CalcError {
   if (Number.isNaN(value)) return error(ErrorCode.num);
   return normalizeNumber(value);
+}
+
+/**
+ * Coerce a helper result that may be an error value into a number for plain
+ * arithmetic, exactly like the implicit JS coercion did (CalcError object -> NaN).
+ */
+export function forMath(value: number | CalcError): number {
+  return typeof value === 'number' ? value : Number.NaN;
 }
 
 export function integer(value: number): number {

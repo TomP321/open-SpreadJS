@@ -13,7 +13,7 @@ import {
   normalizeNumber,
   parseNumberText,
 } from '../values.js';
-import { type DefinedFunction, define, entries } from './common.js';
+import { type DefinedFunction, define, entries, forMath } from './common.js';
 
 function collectValues(args: Args, ctx: EvalContext, index: number): number[] {
   const values: number[] = [];
@@ -40,8 +40,8 @@ function pow(base: number, exponent: number): number {
   return Math.pow(base, exponent);
 }
 
-function pmt(rate: number, nper: number, pv: number, fv: number, type: number): number {
-  if (nper === 0) return error(ErrorCode.num) as unknown as number;
+function pmt(rate: number, nper: number, pv: number, fv: number, type: number): number | CalcError {
+  if (nper === 0) return error(ErrorCode.num);
   if (rate === 0) return -(pv + fv) / nper;
   const factor = pow(1 + rate, nper);
   return (-(pv * factor + fv) * rate) / ((1 + rate * type) * (factor - 1));
@@ -145,7 +145,7 @@ function xirr(values: number[], dates: number[]): number {
 }
 
 function ipmtValue(rate: number, period: number, nperValue: number, pvValue: number, fvValue: number, type: number): number {
-  const payment = pmt(rate, nperValue, pvValue, fvValue, type);
+  const payment = forMath(pmt(rate, nperValue, pvValue, fvValue, type));
   if (type !== 0 && period === 1) return 0;
   const offset = type !== 0 ? period - 1 : period - 1;
   const balance = pvValue * pow(1 + rate, offset) + payment * ((pow(1 + rate, offset) - 1) / rate);
@@ -255,7 +255,7 @@ export const FINANCIAL_FUNCTIONS: DefinedFunction[] = [
     const present = args.number(3);
     if (period < 1 || period > nperValue) return error(ErrorCode.num);
     const interest = ipmtValue(rate, period, nperValue, present, optional(args, 4, 0), optional(args, 5, 0));
-    return numericOrError(pmt(rate, nperValue, present, optional(args, 4, 0), optional(args, 5, 0)) - interest);
+    return numericOrError(forMath(pmt(rate, nperValue, present, optional(args, 4, 0), optional(args, 5, 0))) - interest);
   }),
   define('CUMIPMT', 6, 6, (args) => {
     const rate = args.number(0);
@@ -280,7 +280,7 @@ export const FINANCIAL_FUNCTIONS: DefinedFunction[] = [
     if (start < 1 || end > nperValue || start > end) return error(ErrorCode.num);
     let sum = 0;
     for (let period = start; period <= end; period++)
-      sum += pmt(rate, nperValue, present, 0, type) - ipmtValue(rate, period, nperValue, present, 0, type);
+      sum += forMath(pmt(rate, nperValue, present, 0, type)) - ipmtValue(rate, period, nperValue, present, 0, type);
     return numericOrError(sum);
   }),
   define('SLN', 3, 3, (args) => {
@@ -401,7 +401,8 @@ export const FINANCIAL_FUNCTIONS: DefinedFunction[] = [
   }),
 ];
 
-function numericOrError(value: number): number | CalcError {
+function numericOrError(value: number | CalcError): number | CalcError {
+  if (value instanceof CalcError) return value;
   if (!Number.isFinite(value) || Number.isNaN(value)) return error(ErrorCode.num);
   return normalizeNumber(value);
 }

@@ -1,5 +1,5 @@
 /** Logical, lookup-ish information and dynamic-array helper functions. */
-import type { Worksheet } from '../../model.js';
+import type { Worksheet } from '../../worksheet.js';
 import { Args, EvalContext, MISSING, toMatrix } from '../evaluate.js';
 import {
   CalcArray,

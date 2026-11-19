@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>drop-in reference (f) React wrapper through script tags - official trial</title>
+    <link rel="stylesheet" href="./node_modules/@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css" />
+  </head>
+  <body>
+    <div id="sheet" style="width: 980px; height: 480px"></div>
+    <script src="./node_modules/react/umd/react.production.min.js"></script>
+    <script src="./node_modules/react-dom/umd/react-dom.production.min.js"></script>
+    <script src="./node_modules/@mescius/spread-sheets/dist/gc.spread.sheets.all.min.js"></script>
+    <script src="./node_modules/@mescius/spread-sheets-shapes/dist/gc.spread.sheets.shapes.min.js"></script>
+    <script src="./node_modules/@mescius/spread-sheets-charts/dist/gc.spread.sheets.charts.min.js"></script>
+    <!-- Black-box finding (TASK 59): the official gc.spread.sheets.react.min.js does NOT install a
+         browser global; it only exports on the UMD's CommonJS branch. To exercise its script-tag
+         components we hand it module/exports/require mapped onto the page globals (React + GC). -->
+    <script>
+      window.__REQUIRE_MAP__ = { react: window.React, 'react-dom': window.ReactDOM, '@mescius/spread-sheets': window.GC };
+      window.module = { exports: {} };
+      window.exports = window.module.exports;
+      window.require = function (name) { return window.__REQUIRE_MAP__[String(name)]; };
+    </script>
+    <script src="./node_modules/@mescius/spread-sheets-react/dist/gc.spread.sheets.react.min.js"></script>
+    <script>
+      (function () {
+        var host = document.getElementById('sheet');
+        var reactNamespace = window.module.exports || null;
+        var SpreadSheets = reactNamespace && reactNamespace.SpreadSheets;
+        var Worksheet = reactNamespace && reactNamespace.Worksheet;
+        function paint(workbook) {
+          var sheet = workbook.getActiveSheet();
+          sheet.suspendPaint();
+          sheet.name('Reactive');
+          sheet.setColumnWidth(0, 150);
+          sheet.setColumnWidth(1, 110);
+          sheet.setValue(0, 0, 'Region');
+          sheet.setValue(0, 1, 'Units');
+          sheet.setValue(1, 0, 'East');
+          sheet.setValue(1, 1, 700);
+          sheet.setValue(2, 0, 'West');
+          sheet.setValue(2, 1, 430);
+          sheet.setValue(3, 0, 'Total');
+          sheet.setFormula(3, 1, '=B2+B3');
+          sheet.charts.add('UnitsChart', GC.Spread.Sheets.Charts.ChartType.columnClustered, 360, 8, 420, 260, 'A1:B3');
+          sheet.resumePaint();
+          window.__RESULT__ = {
+            reactGlobalType: typeof window.React,
+            reactDOMGlobalType: typeof window.ReactDOM,
+            reactNamespaceType: typeof reactNamespace,
+            namespaceKeys: reactNamespace ? Object.keys(reactNamespace).filter(function (key) { return key !== '__esModule'; }).sort() : [],
+            sheetName: sheet.name(),
+            columnWidth: sheet.getColumnWidth(0),
+            formulaValue: sheet.getValue(3, 1),
+            chartCount: sheet.charts.all().length,
+            workbookInitialized: true,
+          };
+          window.__READY__ = true;
+        }
+        if (typeof SpreadSheets !== 'function' || typeof Worksheet !== 'function') {
+          window.__RESULT__ = {
+            reactGlobalType: typeof window.React,
+            reactDOMGlobalType: typeof window.ReactDOM,
+            reactNamespaceType: typeof reactNamespace,
+            namespaceKeys: reactNamespace ? Object.keys(reactNamespace).filter(function (key) { return key !== '__esModule'; }).sort() : [],
+            failure: 'the official wrapper script tag did not export {SpreadSheets,Worksheet}',
+          };
+          window.__READY__ = true;
+          return;
+        }
+        var root = ReactDOM.createRoot(host);
+        root.render(
+          React.createElement(
+            SpreadSheets,
+            { workbookInitialized: function (workbook) { requestAnimationFrame(function () { requestAnimationFrame(function () { paint(workbook); }); }); } },
+            React.createElement(Worksheet, { name: 'Reactive' })
+          )
+        );
+      })();
+    </script>
+  </body>
+</html>

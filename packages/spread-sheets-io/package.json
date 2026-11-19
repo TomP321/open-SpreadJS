@@ -1,10 +1,28 @@
 {
   "name": "@opensheets/spread-sheets-io",
   "version": "0.1.0",
+  "description": "OpenSheets import/export (IO) plugin for the spreadsheet workbook, drop-in for the SpreadJS IO plugin.",
   "type": "module",
   "main": "./dist/gc.spread.sheets.io.cjs",
   "module": "./dist/gc.spread.sheets.io.esm.js",
   "types": "./dist/gc.spread.sheets.io.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-io",
+    "opensheets-io",
+    "javascript spreadsheet",
+    "javascript excel",
+    "io",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
   "exports": {
     ".": {
       "import": {
@@ -16,17 +34,22 @@
         "default": "./dist/gc.spread.sheets.io.cjs"
       }
     },
-    "./dist/*": "./dist/*"
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE.md",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
-  "sideEffects": true,
   "scripts": {
     "build": "tsup && tsx scripts/finalize.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "bench": "tsx bench/large.ts"
+    "bench": "tsx bench/large.ts",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
   },
   "dependencies": {
     "@noble/ciphers": "1.3.0",

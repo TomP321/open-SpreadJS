@@ -14,7 +14,9 @@ describe('commands and undo', () => {
       return true;
     });
     cm.register('put', { canUndo: true, execute });
-    expect(cm.execute({ cmd: 'missing' })).toBe(false);
+    // Trial: executing an unregistered command name returns null (probed via
+    // `collapseRowOutline`/`DefineColumn` on the trial core); TASK 44.
+    expect(cm.execute({ cmd: 'missing' })).toBe(undefined);
     expect(cm.execute({ cmd: 'put', value: 7 })).toBe(true);
     expect(s.getValue(0, 0)).toBe(7);
     expect(um.canUndo()).toBe(true);

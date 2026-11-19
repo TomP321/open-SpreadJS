@@ -5,7 +5,7 @@
 .opensheets-host .gc-selection-canvas { cursor: cell; }
 .opensheets-host .gc-tab-strip { cursor: default; }
 .opensheets-host .gc-cell-editor { position: absolute; z-index: 5; box-sizing: border-box; margin: 0; border: 0; border-radius: 0; outline: none; resize: none; overflow: hidden; user-select: text; white-space: pre-wrap; }
-.opensheets-host .gc-tab-editor { position: absolute; z-index: 6; box-sizing: border-box; margin: 0; border: 1px solid #217346; outline: none; padding: 2px; font: 10pt Arial; text-align: center; }
+.opensheets-host .gc-sheetTabEditor, .opensheets-host .gc-tab-editor { position: absolute; z-index: 1; box-sizing: border-box; margin: 0; border: 0; outline: none; padding: 0; background: #fff; font: 700 10pt "Segoe UI", Arial, sans-serif; }
 .opensheets-host .gc-scroll-container { position: absolute; background: #eaeaea; box-sizing: border-box; }
 .opensheets-host .gc-vertical-scrollbar { width: 15px; }
 .opensheets-host .gc-horizontal-scrollbar { height: 15px; }
@@ -30,6 +30,7 @@
 .opensheets-host .gc-contextmenu-menuitem:hover { background: #e1e1e1; }
 
 .opensheets-host .gc-sheet-canvas { border-right: 1px solid #ababab; }
+.opensheets-host .gc-gantt-canvas { border-right-color: #ffffff; }
 
 .opensheets-host .gc-cell-editor-container { position: absolute; z-index: 4; box-sizing: border-box; border: 2px solid #5292f7; box-shadow: 1px 2px 5px #0006; background: white; }
 .opensheets-host .gc-ui-contextmenu-container { font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
@@ -52,17 +53,22 @@
 .opensheets-host .opensheets-submenu { position: absolute; top: -1px; left: 100%; }
 .opensheets-host .opensheets-filter-menu { position: absolute; z-index: 12; width: 239px; height: 412px; min-width: 239px; min-height: 350px; box-sizing: border-box; border: 1px solid #ababab; background: #fff; box-shadow: 2px 3px 5px #0004; resize: both; overflow: hidden; font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; color: #222; }
 .opensheets-host .opensheets-filter-command { display: block; position: relative; border: 0; margin: 0; padding: 0 18px 0 29px; background: transparent; color: inherit; font: inherit; text-align: left; height: 26px; width: 100%; white-space: nowrap; cursor: default; }
-.opensheets-host .opensheets-filter-command > canvas { position: absolute; left: 5px; top: 3.5px; }
+.opensheets-host .opensheets-filter-command > canvas { position: absolute; left: 5px; top: 4px; }
 .opensheets-host .opensheets-filter-command:disabled { color: #c4bec2; }
-.opensheets-host .opensheets-filter-command:disabled canvas { opacity: .35; }
+/* The trial does not wash out a disabled row's pictogram: the dim look is painted into
+   the icon art itself (solid #c3c3c3 funnel body, X reduced to its light #f5f6f6 halo). */
+.opensheets-host .opensheets-filter-command:disabled canvas { opacity: 1; }
 .opensheets-host .opensheets-filter-command:not(:disabled):hover, .opensheets-host .opensheets-filter-command:focus { background: #e1e1e1; outline: none; }
 .opensheets-host .opensheets-filter-has-submenu::after { content: ''; position: absolute; right: 7px; top: 10px; border-left: 4px solid #999; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
 .opensheets-host .opensheets-filter-has-submenu:disabled::after { border-left-color: #ddd; }
 .opensheets-host .opensheets-filter-submenu { position: absolute; left: 100%; top: 130px; display: none; min-width: 180px; background: white; border: 1px solid #ababab; box-shadow: 2px 3px 5px #0004; z-index: 14; }
 .opensheets-host .opensheets-filter-menu:has(.opensheets-filter-submenu:hover), .opensheets-host .opensheets-filter-menu:has(.opensheets-filter-command:hover) { overflow: visible; }
 .opensheets-host .opensheets-filter-search { position: absolute; left: 28px; top: 168px; width: calc(100% - 54px); height: 21px; border: 1px solid #ababab; border-radius: 0; padding: 0; box-sizing: border-box; font: 12px Arial; }
-.opensheets-host .opensheets-filter-check-actions { position: absolute; left: 28px; top: 193px; display: flex; gap: 7px; }
+.opensheets-host .opensheets-filter-check-actions { position: absolute; left: 28px; top: 193px; display: flex; gap: 7px; transform: translateZ(0); background: #fcfdfd; }
 .opensheets-host .opensheets-filter-check-actions button { display: inline-flex; align-items: flex-start; border: 0; padding: 0; background: transparent; color: #1e395b; font: inherit; height: 16px; }
+/* Trial lays this row out with fractional table cells; the 0.1px text nudge reproduces its
+   measured sub-pixel raster phase (−148 px content diff on the sheet-filter popup). */
+.opensheets-host .opensheets-filter-check-actions button > span { position: relative; left: .1px; }
 .opensheets-host .opensheets-filter-values { position: absolute; left: 25px; top: 222px; border: 1px solid #a2a9b7; border-radius: 2px; }
 .opensheets-host .opensheets-filter-footer { position: absolute; bottom: 3px; left: 36px; right: 18px; display: flex; gap: 2px; }
 .opensheets-host .opensheets-filter-footer button { flex: 1; height: 27px; min-width: 60px; padding: 1px 6px; border: 1px solid #acacac; border-radius: 0; background: linear-gradient(#eee,#e5e5e5); font: 12px Arial; }
@@ -82,12 +88,18 @@
 .opensheets-host .opensheets-dialog-footer button { width: 75px; height: 23px; border: 1px solid #bbb; background: #e1e1e1; font: 12px Arial; }
 .opensheets-host .opensheets-filter-menu { outline: none; }
 .opensheets-host .opensheets-floating-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.opensheets-host .opensheets-slicer-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 120; }
+.opensheets-host .opensheets-slicer { touch-action: none; user-select: none; font: 11pt Calibri, 'Segoe UI', Arial, sans-serif; }
+.opensheets-host .opensheets-slicer > canvas { position: absolute; left: -1px; top: -1px; width: calc(100% + 2px); height: calc(100% + 2px); }
 .opensheets-host .opensheets-floating-object { position: absolute; pointer-events: auto; outline: none; box-sizing: border-box; }
 .opensheets-host .opensheets-floating-content { width: 100%; height: 100%; overflow: hidden; }
 .opensheets-host .opensheets-floating-object.selected { outline: 1px solid #777; }
-.opensheets-host .opensheets-floating-handle { display: none; position: absolute; width: 7px; height: 7px; margin: -4px; border: 1px solid #666; background: white; box-sizing: border-box; }
+.opensheets-host .opensheets-slicer.selected { outline: none; }
+.opensheets-host .opensheets-floating-handle { display: none; position: absolute; width: 7px; height: 7px; margin: -4px; border: 1px solid #808080; background: white; box-sizing: border-box; }
 .opensheets-host .selected.resizable .opensheets-floating-handle { display: block; }
 .opensheets-host .handle-nw { left: 0; top: 0; cursor: nw-resize; }.opensheets-host .handle-n { left: 50%; top: 0; cursor: n-resize; }.opensheets-host .handle-ne { left: 100%; top: 0; cursor: ne-resize; }.opensheets-host .handle-w { left: 0; top: 50%; cursor: w-resize; }.opensheets-host .handle-e { left: 100%; top: 50%; cursor: e-resize; }.opensheets-host .handle-sw { left: 0; top: 100%; cursor: sw-resize; }.opensheets-host .handle-s { left: 50%; top: 100%; cursor: s-resize; }.opensheets-host .handle-se { left: 100%; top: 100%; cursor: se-resize; }
+.opensheets-host .opensheets-shape-rotate { position: absolute; left: 50%; top: -18px; width: 9px; height: 9px; margin: -4.5px; border: 1px solid #4472c4; border-radius: 50%; background: white; cursor: grab; box-sizing: border-box; }
+.opensheets-host .opensheets-shape-rotate::before { content: ''; position: absolute; left: 50%; top: 9px; width: 1px; height: 9px; background: #4472c4; }
 .opensheets-formula-input { min-height: 20px; padding: 3px; box-sizing: border-box; font: 11pt Calibri; white-space: pre-wrap; outline: none; background: white; color: black; }
 .opensheets-name-input { width: 100%; height: 100%; min-height: 22px; border: 1px solid #ccc; padding: 2px 4px; box-sizing: border-box; font: 11pt Calibri; }
 .opensheets-status-bar { display: flex; gap: 16px; align-items: center; min-height: 22px; border-top: 1px solid #ccc; background: #f6f6f6; font: 12px 'Segoe UI', Arial; color: #444; padding: 0 8px; box-sizing: border-box; }
@@ -126,6 +138,12 @@
 .opensheets-host .gc-ui-contextmenu-menuitem-content { height: 16px; min-height: 16px; }
 .opensheets-host .gc-ui-contextmenu-icon { width: 16px; flex-basis: 16px; margin-right: 12px; }
 .opensheets-host .gc-ui-contextmenu-text { line-height: 16px; }
+/* Trial (measured): every top-level row reserves a 16x16 icon gutter at menu (6,6) even
+   for icon-less items, so all labels start at x=34; the group-header row pads a bit wider. */
+.opensheets-host .gc-ui-contextmenu-container:not(.opensheets-sheet-list) > .gc-ui-contextmenu-menuitem > .gc-ui-contextmenu-menuitem-content { padding-left: 31px; }
+.opensheets-host .gc-ui-contextmenu-container:not(.opensheets-sheet-list) > .gc-ui-contextmenu-menuitem > .gc-ui-contextmenu-menuitem-content > .gc-ui-contextmenu-icon { position: absolute; left: 3px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; margin: 0; }
+.opensheets-host .gc-ui-contextmenu-container:not(.opensheets-sheet-list) > .gc-ui-contextmenu-menuitem > .gc-ui-contextmenu-menuitem-content.gc-ui-contextmenu-group-header { padding-left: 33px; }
+.opensheets-host .gc-ui-contextmenu-container:not(.opensheets-sheet-list) > .gc-ui-contextmenu-menuitem > .gc-ui-contextmenu-menuitem-content.gc-ui-contextmenu-group-header > .gc-ui-contextmenu-icon { left: 5px; }
 .opensheets-host .gc-ui-contextmenu-menuitem-content:hover, .opensheets-host .gc-ui-contextmenu-menuitem-content:focus { background: #d3f0e0; }
 .opensheets-host .gc-ui-contextmenu-group-header { height: 16px; padding: 5px; font-weight: bold; }
 .opensheets-host .gc-ui-contextmenu-groupitems-container { height: 46px; box-sizing: border-box; margin-left: 28px; padding: 5px; align-items: center; }
@@ -138,14 +156,14 @@
 .opensheets-host .opensheets-tab-menu { width: 190px; }
 .opensheets-host .opensheets-filter-menu { border-color: #a7abb0; background: #fcfdfd; box-shadow: 2px 4px 5px #00000026; resize: none; overflow: visible; }
 .opensheets-host .opensheets-filter-command:not(:disabled):hover, .opensheets-host .opensheets-filter-command:not(:disabled):focus { background: #d3f0e0; }
-.opensheets-host .opensheets-filter-command { transform: translateY(-.5px); }
-.opensheets-host .opensheets-filter-command:nth-of-type(4) { transform: none; }
+.opensheets-host .opensheets-filter-command > canvas { transform: translateY(-.5px); }
+.opensheets-host .opensheets-filter-command > canvas.opensheets-filter-icon-18 { left: 3px; top: 3px; }
 .opensheets-host .opensheets-filter-submenu { min-width: 0; width: max-content; border-color: #a7abb0; box-shadow: none; background: #fff; }
 .opensheets-host .opensheets-filter-submenu .opensheets-filter-command { height: 24px; padding: 0 24px 0 28px; transform: none; }
 .opensheets-host .opensheets-filter-values { border-color: #a7abb0; border-radius: 3px; }
 .opensheets-host .opensheets-filter-check-actions { top: 192.5px; }
 .opensheets-host .opensheets-filter-footer { right: 19px; }
-.opensheets-host .opensheets-filter-resize { position: absolute; right: 0; bottom: 0; width: 12px; height: 12px; cursor: nwse-resize; background: linear-gradient(135deg,transparent 56%,#888 56%,#888 61%,transparent 61%,transparent 70%,#888 70%,#888 75%,transparent 75%,transparent 84%,#888 84%,#888 89%,transparent 89%); clip-path: polygon(100% 0,100% 100%,0 100%); }
+.opensheets-host .opensheets-filter-resize { position: absolute; right: 1px; bottom: 2px; width: 9px; height: 7px; cursor: nwse-resize; background: linear-gradient(135deg,transparent 52%,#666666 52%,#666666 60%,transparent 63%,transparent 78%,#666666 76%,#666666 84%,transparent 89%); clip-path: polygon(100% 0,100% 100%,0 100%); }
 .opensheets-host .opensheets-sheet-search { box-sizing: border-box; width: 202px; border: 1px solid #ccc; padding: 5px 0; background: white; box-shadow: 2px 4px 5px #00000026; color: #444; font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
 .opensheets-host .opensheets-sheet-search label { display: block; margin: 2px 15px; height: 14px; }
 .opensheets-host .opensheets-sheet-search input { display: block; box-sizing: border-box; margin: 5px 15px; padding: 1px 8px; width: 170px; height: 26px; border: 1px solid #ccc; font: inherit; }
@@ -158,7 +176,6 @@
 .opensheets-host .opensheets-filter-submenu .opensheets-filter-command { padding: 0 10px 0 24px; line-height: 24px; }
 .opensheets-host .opensheets-filter-command { transform: none; }
 .opensheets-host .opensheets-filter-menu > .opensheets-filter-command > span { position: relative; top: -.5px; }
-.opensheets-host .opensheets-filter-menu > .opensheets-filter-command:nth-of-type(4) > span { top: 0; }
 .opensheets-host .opensheets-filter-color-menu { width: 142px; }
 .opensheets-host .opensheets-filter-color-caption { height: 32px; line-height: 32px; text-indent: 8px; background: #ebebeb; color: #6a6a6a; margin-bottom: 7px; white-space: nowrap; }
 .opensheets-host .opensheets-filter-color-menu .opensheets-filter-color-row { height: 29px; line-height: 23px; padding: 2px 0 2px 27px; border: 1px solid transparent; box-sizing: border-box; }
@@ -177,7 +194,11 @@
 .opensheets-host .opensheets-filter-menu > .opensheets-filter-command:not(:disabled):hover::before, .opensheets-host .opensheets-filter-menu > .opensheets-filter-command:not(:disabled):focus::before { content: ''; position: absolute; left: 24px; right: 18px; top: 0; bottom: 0; background: #d3f0e0; }
 .opensheets-host .opensheets-filter-menu > .opensheets-filter-command > span { position: relative; z-index: 1; }
 .opensheets-host .opensheets-filter-search { top: 167.5px; }
-.opensheets-host .opensheets-filter-footer button { background: #efefef; }
+.opensheets-host .opensheets-filter-footer button { background: #ebebeb; border-color: #acacac; color: #000; }
+/* Keep footer captions on their own layer: the trial paints them with LCD (colour-AA) text like
+   this, which only holds for promoted elements inside a canvas-backed host. Measured −231 px. */
+
+.opensheets-host .opensheets-filter-footer button:disabled { background: #f6f6f6; border-color: #dfe0e0; color: #a0a0a0; }
 .opensheets-host .opensheets-custom-filter { position: fixed; left: calc(50vw - 421px); top: calc(50vh - 131px); width: 842px; height: 262px; box-sizing: border-box; border: 1px solid #a7abb0; background: #f0f0f0; color: #242f48; font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
 .opensheets-custom-title { position: absolute; left: 1px; top: 1px; width: 840px; height: 34px; background: white; }
 .opensheets-custom-title-text { position: absolute; left: 12px; top: 0; line-height: 34px; }
@@ -241,3 +262,94 @@
 /* Fixed popups can be culled by the host clip. Paint containment keeps their
    text on the LCD path while leaving the declared content bounds unchanged. */
 .opensheets-host .opensheets-filter-submenu, .opensheets-host .opensheets-custom-filter { contain: layout paint; }
+
+/* TableSheet field panel (.gc-table-sheet-*): geometry, palette and typography measured
+ * black-box from the reference panel; every glyph below is drawn by our own SVG paths. */
+.gc-table-sheet-panel { position: relative; width: 100%; min-width: 300px; height: 100%; overflow: hidden; background: #fff; color: #000; font-size: 12px; font-family: "Segoe UI", Calibri, Arial, Verdana, sans-serif; }
+.gc-table-sheet-panel .gc-no-user-select { user-select: none; -webkit-user-select: none; }
+.gc-table-sheet-field-container { position: relative; overflow: hidden; }
+.gc-table-sheet-field-header { display: block; height: 20px; margin-left: 10px; width: 300px; position: relative; font-size: 18px; font-weight: 600; color: #333; }
+.gc-table-sheet-add-calculate-column { display: block; position: absolute; right: 22px; top: 4px; width: 16px; height: 16px; cursor: pointer; background-repeat: no-repeat; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill-rule='evenodd' clip-rule='evenodd' d='M7 1v6H1v2h6v6h2V9h6V7H9V1H7Z' fill='%23000000'/></svg>"); }
+.gc-table-sheet-field-panel { box-sizing: border-box; margin: 5px 8px 0 10px; height: calc(100% - 28px); border: 1px solid #dae2ed; overflow: hidden; }
+.gc-table-sheet-group-panel { position: relative; overflow: hidden; }
+.gc-table-sheet-group-header { display: inline; margin-left: 10px; font-size: 18px; font-weight: 600; color: #333; }
+.gc-table-sheet-group-list { box-sizing: content-box; list-style: none; margin: 6px 0 0 9px; padding: 0; width: 280px; height: calc(100% - 40px); position: relative; border: 1px dashed #dae2ed; overflow: hidden; }
+.gc-table-sheet-group-tip { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); white-space: nowrap; font-size: 12px; color: #333; }
+.gc-table-sheet-group-item { box-sizing: border-box; list-style: none; margin: 2px 2px 1px; height: 23px; line-height: 23px; border: 1px solid #dae2ed; background: #fff; color: #333; font-size: 12px; overflow: hidden; position: relative; cursor: default; }
+.gc-table-sheet-group-item.selected { background: #a0b9dd; color: #fff; }
+.gc-table-sheet-group-item-label { display: inline-block; height: 23px; line-height: 23px; margin-left: 5px; width: 219px; overflow: hidden; white-space: nowrap; vertical-align: top; }
+.gc-table-sheet-group-item-remove { display: block; position: absolute; right: 4px; top: 3px; width: 16px; height: 16px; cursor: pointer; background-repeat: no-repeat; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill-rule='evenodd' clip-rule='evenodd' d='M6.4 1C5.6 1 5 1.6 5 2.4V3H2v1.6h.6L3.4 15h9.2l.8-10.4h.6V3h-3v-.6C11 1.6 10.4 1 9.6 1h-3.2Zm.6 1h2c.3 0 .6.2.6.5V3H6.4v-.5c0-.3.2-.5.6-.5ZM4.9 4.6h6.2L10.4 14H5.6L4.9 4.6Zm1.3 1.6v6h1v-6h-1Zm2.6 0v6h1v-6h-1Z' fill='%23ffffff'/></svg>"); }
+.gc-table-sheet-group-input { display: none; position: absolute; left: 5px; top: 1px; width: 230px; height: 19px; box-sizing: content-box; margin: 0; padding: 0 2px; border: 1px solid #dae2ed; background: #fff; color: #333; font: 12px "Segoe UI", Calibri, Arial, Verdana, sans-serif; outline: none; z-index: 2; }
+.gc-table-sheet-cross-panel { display: none; }
+.gc-table-sheet-hidden { display: none; }
+.gc-table-sheet-summary-container { box-sizing: content-box; margin: 0 9px; border: 1px solid #d3d3d3; font-size: 12px; overflow: hidden; }
+.gc-table-sheet-summary-header { position: relative; height: 23px; background: #d7e6f7; }
+.gc-table-sheet-summary-label { display: block; margin-left: 4px; height: 20px; line-height: 20px; width: 224px; font-size: 12px; font-weight: 500; color: #333; overflow: hidden; white-space: nowrap; }
+.gc-table-sheet-summary-function, .gc-table-sheet-summary-remove { display: block; position: absolute; top: 2px; width: 16px; height: 16px; cursor: pointer; background-repeat: no-repeat; }
+.gc-table-sheet-summary-function { right: 2px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill-rule='evenodd' clip-rule='evenodd' d='M3.2 2.5h9.6v2.2H7.4l1.8 3.3 1.8 3.3h5.4v2.2H2.6v-2.2h4.9L5.5 8 3.2 4.7 3.2 2.5Z' fill='%23666666'/></svg>"); }
+.gc-table-sheet-summary-remove { right: 23px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill-rule='evenodd' clip-rule='evenodd' d='M6.4 1C5.6 1 5 1.6 5 2.4V3H2v1.6h.6L3.4 15h9.2l.8-10.4h.6V3h-3v-.6C11 1.6 10.4 1 9.6 1h-3.2Zm.6 1h2c.3 0 .6.2.6.5V3H6.4v-.5c0-.3.2-.5.6-.5ZM4.9 4.6h6.2L10.4 14H5.6L4.9 4.6Zm1.3 1.6v6h1v-6h-1Zm2.6 0v6h1v-6h-1Z' fill='%23666666'/></svg>"); }
+.gc-table-sheet-summary-list-container { list-style: none; margin: 0; padding: 0; height: calc(100% - 23px); overflow: hidden; }
+.gc-table-sheet-summary-item { box-sizing: content-box; border-top: 1px solid #d3d3d3; }
+.gc-table-sheet-summary-item-formula, .gc-table-sheet-summary-item-caption, .gc-table-sheet-summary-item-slice { position: relative; height: 20px; width: 280px; margin: 2px 0 0 2px; }
+.gc-table-sheet-summary-item-label { display: inline-block; width: 70px; height: 14px; margin-left: 5px; margin-top: 4px; vertical-align: top; font-size: 12px; color: #333; }
+.gc-table-sheet-summary-item input { position: absolute; left: 78px; top: 0; width: 168px; height: 16px; box-sizing: content-box; border: 1px solid #dae2ed; background: #fff; color: #333; }
+.gc-table-sheet-summary-item-remove-icon { display: block; position: absolute; right: 8px; top: 0; width: 16px; height: 16px; cursor: pointer; background-repeat: no-repeat; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill-rule='evenodd' clip-rule='evenodd' d='M6.4 1C5.6 1 5 1.6 5 2.4V3H2v1.6h.6L3.4 15h9.2l.8-10.4h.6V3h-3v-.6C11 1.6 10.4 1 9.6 1h-3.2Zm.6 1h2c.3 0 .6.2.6.5V3H6.4v-.5c0-.3.2-.5.6-.5ZM4.9 4.6h6.2L10.4 14H5.6L4.9 4.6Zm1.3 1.6v6h1v-6h-1Zm2.6 0v6h1v-6h-1Z' fill='%23666666'/></svg>"); }
+/* Scenario panel (TASK 46 item 4, our own panel DOM). */
+.opensheets-scenario-panel { position: relative; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; font: 12px 'Segoe UI', Arial; color: #333; background: #fff; }
+.opensheets-scenario-panel .fixed-header { padding: 8px 10px 4px; }
+.opensheets-scenario-panel .title { font-size: 13px; font-weight: 600; }
+.opensheets-scenario-panel .action-bar { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.opensheets-scenario-panel .primary-actions { display: flex; gap: 4px; }
+.opensheets-scenario-panel .opensheets-scenario-action { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #ccc; background: #fff; color: #555; cursor: pointer; }
+.opensheets-scenario-panel .opensheets-scenario-action svg { width: 14px; height: 14px; flex: none; }
+.opensheets-scenario-panel .opensheets-scenario-action:disabled { color: #bbb; cursor: default; background: #f7f7f7; }
+.opensheets-scenario-panel .active-badge { margin-left: auto; font-size: 11px; color: #217346; }
+.opensheets-scenario-panel .header-actions { position: absolute; right: 8px; top: 8px; }
+.opensheets-scenario-panel .scrollable-container { flex: 1; overflow: auto; }
+.opensheets-scenario-panel .scenario-card { margin: 6px 10px; padding: 6px 8px; border: 1px solid #dde3ea; border-radius: 3px; background: #fff; cursor: pointer; }
+.opensheets-scenario-panel .scenario-card.active { border-color: #217346; background: #f2f8f4; }
+.opensheets-scenario-panel .item-header-content { display: flex; gap: 8px; align-items: baseline; }
+.opensheets-scenario-panel .item-header-content .name { font-weight: 600; }
+.opensheets-scenario-panel .item-header-content .count { color: #777; font-size: 11px; }
+.opensheets-scenario-panel .details { margin-top: 4px; color: #555; font-size: 11px; }
+.opensheets-scenario-panel .item-footer { display: flex; align-items: center; gap: 6px; margin-top: 6px; justify-content: center; }
+.opensheets-scenario-panel .item-footer .chip { padding: 2px 8px; border: 1px solid #dde3ea; border-radius: 10px; background: #f5f7fa; color: #555; font-size: 11px; }
+.opensheets-scenario-panel .item-footer .activate { padding: 2px 10px; border: 1px solid #dde3ea; border-radius: 10px; background: #f5f7fa; color: #333; font-size: 11px; cursor: pointer; }
+.opensheets-scenario-panel .item-footer .activate:hover { background: #e8eef5; }
+.opensheets-scenario-panel .empty { margin: 24px 12px; color: #777; text-align: center; white-space: pre-line; display: none; }
+.opensheets-scenario-panel .empty.visible { display: block; }
+/* Threaded comments panel (TASK 46 item 4, our own panel DOM). */
+.opensheets-threaded-comment-panel { height: 100%; display: flex; flex-direction: column; box-sizing: border-box; font: 12px 'Segoe UI', Arial; color: #333; background: #fafafa; }
+.opensheets-tc-header { padding: 8px 10px; background: #fff; border-bottom: 1px solid #e5e5e5; }
+.opensheets-tc-title { font-size: 13px; font-weight: 600; }
+.opensheets-tc-buttons { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.opensheets-tc-new { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #ccc; background: #fff; padding: 2px 8px; font: 12px 'Segoe UI', Arial; cursor: pointer; }
+.opensheets-tc-new svg { width: 14px; height: 14px; flex: none; }
+.opensheets-tc-count { color: #666; }
+.opensheets-tc-filter-wrap { margin-left: auto; position: relative; }
+.opensheets-tc-filter { position: relative; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #ccc; background: #fff; color: #555; cursor: pointer; }
+.opensheets-tc-filter svg { width: 14px; height: 14px; flex: none; }
+.opensheets-tc-filter-badge { position: absolute; top: -6px; right: -6px; min-width: 12px; background: #217346; color: #fff; border-radius: 8px; font-size: 10px; padding: 0 4px; }
+.opensheets-tc-filter-dropdown { position: absolute; right: 0; top: 24px; z-index: 10; min-width: 150px; padding: 4px 0; background: #fff; border: 1px solid #d8d8d8; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
+.opensheets-tc-filter-option { display: flex; align-items: center; gap: 6px; padding: 4px 10px; cursor: pointer; }
+.opensheets-tc-filter-option:hover { background: #f0f4f8; }
+.opensheets-tc-filter-separator { padding: 4px 10px; color: #888; font-size: 11px; border-top: 1px solid #e5e5e5; margin-top: 4px; }
+.opensheets-tc-filter-checkbox { width: 12px; height: 12px; display: inline-block; border: 1px solid #bbb; background: #fff; }
+.opensheets-tc-filter-checkbox.checked { background: #217346; border-color: #217346; }
+.opensheets-tc-scrollable { flex: 1; overflow: auto; padding: 8px 10px; }
+.opensheets-tc-item { margin-bottom: 8px; }
+.opensheets-tc-comment { padding: 8px; background: #fff; border: 1px solid #e2e2e2; border-radius: 4px; }
+.opensheets-tc-resolved { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1px solid #eee; color: #555; font-size: 11px; }
+.opensheets-tc-resolved-action { margin-left: auto; cursor: pointer; color: #777; padding: 0 4px; }
+.opensheets-tc-reply { display: flex; gap: 6px; align-items: baseline; margin: 3px 0; }
+.opensheets-tc-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.opensheets-tc-avatar { width: 18px; height: 18px; border-radius: 50%; color: #fff; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.opensheets-tc-author { font-weight: 600; }
+.opensheets-tc-tag { margin-left: auto; color: #777; font-size: 11px; }
+.opensheets-tc-menu { border: none; background: none; color: #888; cursor: pointer; font-size: 12px; padding: 0; }
+.opensheets-tc-text { color: #444; }
+.opensheets-tc-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
+.opensheets-tc-actions button { border: 1px solid #ccc; background: #fff; cursor: pointer; }
+.opensheets-tc-navigate { padding: 6px 0; text-align: center; color: #555; cursor: pointer; display: none; }
+.opensheets-tc-navigate.visible { display: block; }
+.opensheets-tc-editor { width: 100%; box-sizing: border-box; margin: 4px 0; font: 12px 'Segoe UI', Arial; }

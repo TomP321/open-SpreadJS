@@ -7,15 +7,13 @@ import { resolveColor } from '../colors.js';
 import { Range } from '../primitives.js';
 import { GC } from '../generated/enums.js';
 import { evaluateFormula } from '../calc/api.js';
-import type { Worksheet } from '../model.js';
+import type { Worksheet } from '../worksheet.js';
 import { serializeValue, deserializeValue, type JsonRecord } from '../serialization.js';
 
-const { ConditionalFormatting } = GC.Spread.Sheets;
-const enumValues = ConditionalFormatting as unknown as Record<string, Record<string, number>>;
-const ConditionType = enumValues.ConditionType!;
-const Compare = enumValues.ComparisonOperators!;
-const TextCompare = enumValues.TextCompareType!;
-const DateCompare = enumValues.DateCompareType!;
+const ConditionType = GC.Spread.Sheets.ConditionalFormatting.ConditionType;
+const Compare = GC.Spread.Sheets.ConditionalFormatting.ComparisonOperators;
+const TextCompare = GC.Spread.Sheets.ConditionalFormatting.TextCompareType;
+const DateCompare = GC.Spread.Sheets.ConditionalFormatting.DateCompareType;
 
 export type EvalHost = Worksheet;
 
@@ -161,6 +159,8 @@ export class Condition {
     this.conType = Number(conditionType);
     this.args = { ...args };
     if (args.compareType !== undefined) this.cmp = Number(args.compareType);
+    if (args.ignoreCase !== undefined) this.ignoreCase_ = !!args.ignoreCase;
+    if (args.useWildCards !== undefined) this.wildCards_ = !!args.useWildCards;
     if (args.item1 !== undefined) this.one = args.item1 as Condition;
     if (args.item2 !== undefined) this.two = args.item2 as Condition;
   }
@@ -302,6 +302,8 @@ export class Condition {
     for (const key of ['expected', 'formula', 'expectTypeId', 'customValueType', 'integerValue'])
       if (this.args[key] !== undefined && !(key === 'integerValue' && !this.args[key])) json[key] = serializeValue(this.args[key]);
     if (this.args.ignoreBlank !== undefined) json.ignoreBlank = this.args.ignoreBlank;
+    if (this.args.ignoreCase !== undefined) json.ignoreCase = this.args.ignoreCase;
+    if (this.args.useWildCards !== undefined) json.useWildCards = this.args.useWildCards;
     if (this.ranges_.length)
       json.ranges = this.ranges_.map((range) => ({
         row: range.row,

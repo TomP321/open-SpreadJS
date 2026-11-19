@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+  Task 16 oracle page: renders OUR print pages twice, once into a real canvas
+  (`paintPrintPage`) and once as a PDF (`Workbook.savePDF`), so the raster of
+  the PDF can be diffed against the canvas. The official trial has no PDF
+  plugin, so our own pagination and painting is the reference.
+  Driven by scripts/pdf-oracle.mjs (Playwright + pymupdf); not part of the gates.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OpenSheets savePDF oracle</title>
+    <link rel="stylesheet" href="@opensheets/spread-sheets/styles/gc.spread.sheets.excel2013white.css" />
+    <style>
+      body { margin: 0; font: 13px system-ui, sans-serif; background: #f5f5f5; }
+      #status { padding: 8px 12px; }
+      canvas { position: absolute; left: -10000px; top: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="status">loading…</div>
+    <script type="module" src="/src/pdf-oracle.ts"></script>
+  </body>
+</html>

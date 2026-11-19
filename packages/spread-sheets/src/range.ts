@@ -1,7 +1,11 @@
-import type { Worksheet } from './model.js';
+import type { Worksheet } from './worksheet.js';
+import { columnLabel } from './calc/parser.js';
 import { Comment } from './comments.js';
 import { GC } from './generated/enums.js';
 import { LineBorder, Range, Style, styleProperties } from './primitives.js';
+import { instanceProperties } from './not-implemented.js';
+import { applyNamedCellTemplate } from './named-cell-templates.js';
+import { applyFormatter } from './formatter.js';
 
 interface Accessor {
   (): unknown;
@@ -9,12 +13,6 @@ interface Accessor {
 }
 export class CellRange {
   declare allowEditInCell: Accessor;
-  declare applyAlignment: Accessor;
-  declare applyBorder: Accessor;
-  declare applyFill: Accessor;
-  declare applyFont: Accessor;
-  declare applyNumberFormat: Accessor;
-  declare applyProtection: Accessor;
   declare backColor: Accessor;
   declare backgroundImage: Accessor;
   declare backgroundImageLayout: Accessor;
@@ -280,8 +278,245 @@ export class CellRange {
   clear(type: number): void {
     this.sheet.clear(this.row, this.col, this.rowCount, this.colCount, this.sheetArea, type);
   }
+  /**
+   * Serialises the range as an HTML table (`CellRange.toHtml`), following the
+   * trial's output: one `<td>` per visible cell, `rowSpan`/`colSpan` for merged
+   * cells, the cell's resolved style as an inline `style` attribute and the
+   * sheet's gridline colour as the border of unstyled cells.
+   * `headerOptions` only applies to whole-row/whole-column ranges;
+   * `includeStyle` (default `true`) switches the inline styles off.
+   */
+  toHtml(headerOptions?: number, includeStyle = true): string {
+    return rangeToHtml(this, headerOptions, includeStyle);
+  }
+  /** Applies a registered named cell template to every cell of the range. */
+  applyNamedCellTemplate(name: string): void {
+    applyNamedCellTemplate(this.sheet, name, this.row, this.col, this.rowCount, this.colCount, this.sheetArea);
+  }
 }
-for (const key of styleProperties)
+instanceProperties(CellRange, 'sheet', 'row', 'col', 'rowCount', 'colCount', 'sheetArea');
+
+const AREAS = GC.Spread.Sheets.SheetArea;
+const HEADERS = GC.Spread.Sheets.HeaderOptions;
+const { viewport, rowHeader, colHeader } = AREAS;
+const DECORATIONS = GC.Spread.Sheets.TextDecorationType;
+/** Border width in points and CSS style per `LineStyle` value, as the trial emits them. */
+const BORDER_CSS: [string, string][] = [
+  ['undefined', 'none'],
+  ['0.5', 'solid'],
+  ['1', 'solid'],
+  ['0.5', 'dashed'],
+  ['0.5', 'dotted'],
+  ['1.5', 'solid'],
+  ['1.5', 'double'],
+  ['0.5', 'dotted'],
+  ['1', 'dashed'],
+  ['0.5', 'dashed'],
+  ['1', 'dashed'],
+  ['0.5', 'dashed'],
+  ['1', 'dashed'],
+  ['1', 'dashed'],
+];
+const BORDER_EDGES = ['top', 'bottom', 'left', 'right'] as const;
+const OPPOSITE: Record<string, string> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+/** Reference line box: Chromium rounds hhea ascent (1854), descent (434) and line gap (67) per 2048 em. */
+function lineBoxHeight(px: number): number {
+  const scale = px / 2048;
+  return Math.round(1854 * scale) + Math.round(434 * scale) + Math.round(67 * scale);
+}
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+function fontPixels(style: Style): number {
+  const value = String(style.fontSize ?? style.font ?? '14.6667px').match(/(\d+(?:\.\d+)?)\s*(pt|px)?/);
+  const size = value ? Number(value[1]) : 14.6667;
+  return value?.[2] === 'pt' ? (size * 4) / 3 : size;
+}
+function fontFamily(style: Style): string {
+  if (typeof style.fontFamily === 'string' && style.fontFamily) return style.fontFamily;
+  const match = String(style.font ?? '').match(/\s\S+$/);
+  return match?.[0].trim() ?? 'Calibri';
+}
+function alignOf(align: unknown, value: unknown, text: string): string {
+  const names = ['left', 'center', 'right', 'left', 'center', 'right', 'left'];
+  if (typeof align === 'number' && align >= 0 && align < names.length && align !== 3) return names[align];
+  if (text === '') return 'left';
+  if (typeof value === 'boolean') return 'center';
+  if (typeof value === 'number' || value instanceof Date) return 'right';
+  return 'left';
+}
+function verticalOf(align: unknown): string {
+  return align === 2 ? 'bottom' : align === 1 ? 'middle' : 'top';
+}
+/** Sums the sizes of `count` visible axis entries (`toHtml` draws each line 1px thinner). */
+function extentSize(sheet: Worksheet, axis: 'row' | 'col', index: number, count: number, area: number): number {
+  let total = 0;
+  for (let i = index; i < index + count; i++) {
+    const size = axis === 'row' ? sheet.getRowHeight(i, area) : sheet.getColumnWidth(i, area);
+    if (size) total += size;
+  }
+  return Math.max(0, total - 1);
+}
+
+interface HtmlCell {
+  /** `v` for a viewport cell, otherwise the header kind with its axis index. */
+  row?: number;
+  col?: number;
+  header?: 'row' | 'col' | 'corner';
+}
+
+function rangeToHtml(range: CellRange, headerOptions: number | undefined, includeStyle: boolean): string {
+  const sheet = range.sheet;
+  const area = range.sheetArea;
+  if (area === AREAS.corner) return '';
+  const headers = headerOptions ?? HEADERS.noHeaders;
+  const wholeRows = range.row === -1;
+  const wholeColumns = range.col === -1;
+  const rows: number[] = [];
+  if (area !== colHeader) {
+    const count = wholeRows ? sheet.getRowCount(viewport) : Math.max(0, range.rowCount);
+    for (let i = 0; i < count; i++) {
+      const index = wholeRows ? i : range.row + i;
+      if (index < sheet.getRowCount(viewport) && sheet.getRowVisible(index, viewport)) rows.push(index);
+    }
+  }
+  const cols: number[] = [];
+  if (area !== rowHeader) {
+    const count = wholeColumns ? sheet.getColumnCount(viewport) : Math.max(0, range.colCount);
+    for (let i = 0; i < count; i++) {
+      const index = wholeColumns ? i : range.col + i;
+      if (index < sheet.getColumnCount(viewport) && sheet.getColumnVisible(index, viewport)) cols.push(index);
+    }
+  }
+  const whole = wholeRows || wholeColumns;
+  const withColumnHeaders = area === viewport && whole && (headers & HEADERS.columnHeaders) !== 0;
+  const withRowHeaders = area === viewport && whole && (headers & HEADERS.rowHeaders) !== 0;
+  const corner = withColumnHeaders && withRowHeaders && wholeRows && wholeColumns && headers === HEADERS.allHeaders;
+  const lines: HtmlCell[][] = [];
+  if (area === colHeader) lines.push(cols.map((col) => ({ header: 'col' as const, col })));
+  else if (area === rowHeader) lines.push(...rows.map((row) => [{ header: 'row' as const, row }]));
+  else {
+    if (withColumnHeaders)
+      lines.push([
+        ...(corner ? [{ header: 'corner' as const }] : []),
+        ...cols.map((col) => ({ header: 'col' as const, col })),
+      ]);
+    for (const row of rows)
+      lines.push([
+        ...(withRowHeaders ? [{ header: 'row' as const, row }] : []),
+        ...cols.map((col) => ({ row, col })),
+      ]);
+  }
+  const cells = lines.map((line) => line.map((cell) => htmlCell(sheet, area, cell, includeStyle)).filter(Boolean));
+  return (
+    '<table style="border-collapse: collapse">' +
+    cells.map((line) => '<tr>' + line.join('') + '</tr>').join('') +
+    '</table>'
+  );
+}
+
+function htmlCell(sheet: Worksheet, area: number, cell: HtmlCell, includeStyle: boolean): string {
+  if (cell.header === 'corner') return '<td></td>';
+  const isHeader = cell.header === 'row' || cell.header === 'col';
+  const rowIndex = cell.row ?? 0;
+  const colIndex = cell.col ?? 0;
+  const styleArea = cell.header === 'row' ? rowHeader : cell.header === 'col' ? colHeader : area;
+  const style = sheet.getActualStyle(rowIndex, colIndex, styleArea);
+  let span: { row: number; col: number; rowCount: number; colCount: number } | null = null;
+  if (!isHeader) {
+    const found = sheet.getSpan(rowIndex, colIndex, area);
+    if (found && (found.row !== rowIndex || found.col !== colIndex)) return '';
+    span = found;
+  }
+  const rowCount = span?.rowCount ?? 1;
+  const colCount = span?.colCount ?? 1;
+  let text = '';
+  if (cell.header === 'row') text = String(sheet.getValue(rowIndex, 0, rowHeader) ?? rowIndex + 1);
+  else if (cell.header === 'col') text = String(sheet.getValue(0, colIndex, colHeader) ?? columnLabel(colIndex));
+  else text = sheet.getText(rowIndex, colIndex, area);
+  const decoration = Number(style.textDecoration ?? 0);
+  const marked = (decoration & DECORATIONS.underline) !== 0 ? `<u>${escapeHtml(text)}</u>` : escapeHtml(text);
+  if (!includeStyle) return `<td>${marked}</td>`;
+  const value = isHeader ? '' : sheet.getValue(rowIndex, colIndex, area);
+  // Header cells: the labelled axis (row/col) is measured in the viewport band,
+  // the header band supplies the thickness of the header itself.
+  const height = extentSize(
+    sheet,
+    'row',
+    cell.header === 'col' ? 0 : rowIndex,
+    cell.header === 'col' ? 1 : rowCount,
+    cell.header === 'col' ? colHeader : viewport,
+  );
+  const width = extentSize(
+    sheet,
+    'col',
+    cell.header === 'row' ? 0 : colIndex,
+    cell.header === 'row' ? 1 : colCount,
+    cell.header === 'row' ? rowHeader : viewport,
+  );
+  const font = fontPixels(style);
+  const parts: string[] = ['padding: 0; '];
+  // The trial lets the cell's formatter override the text colour: a format (or a
+  // `FormatterBase` subclass) that reports a conditional colour wins over
+  // `foreColor`, which is how `[Red]0.0;[Blue]-0.0` cells and custom formatters
+  // come out with their own colour in `toHtml`.
+  const formatted: { conditionalForeColor?: string } = {};
+  if (!isHeader && value != null) applyFormatter(sheet.getFormatter(rowIndex, colIndex, area), value, formatted);
+  const foreColor = formatted.conditionalForeColor ?? style.foreColor;
+  if (style.backColor != null) parts.push(`background-color: ${style.backColor}; `);
+  if (foreColor != null) parts.push(`color: ${foreColor}; `);
+  const fontStyleText = String(style.fontStyle ?? '');
+  const modifiers =
+    (fontStyleText === 'italic' || fontStyleText === 'oblique' ? 'italic ' : '') +
+    (style.fontWeight === 'bold' || Number(style.fontWeight) >= 600 ? 'bold ' : '');
+  parts.push(
+    `font: ${modifiers}${(font * 0.75).toFixed(2)}pt ${fontFamily(style)}, 'Helvetica Neue', Arial, sans-serif; `,
+  );
+  parts.push(style.wordWrap ? 'word-wrap: break-word; white-space: break-spaces; ' : 'white-space: nowrap; ');
+  parts.push(`vertical-align: ${verticalOf(style.vAlign)}; `);
+  parts.push(`text-align: ${alignOf(style.hAlign, value, text)}; `);
+  const borders: Record<string, LineBorder | undefined> = {};
+  for (const edge of BORDER_EDGES)
+    borders[edge] = style[
+      `border${edge[0].toUpperCase()}${edge.slice(1)}` as 'borderTop' | 'borderBottom' | 'borderLeft' | 'borderRight'
+    ] as LineBorder | undefined;
+  for (const edge of ['left', 'right', 'top', 'bottom']) {
+    const border = borders[edge];
+    if (!border) continue;
+    const [weight, line] = BORDER_CSS[Number(border.style)] ?? BORDER_CSS[1];
+    parts.push(`border-${edge}: ${weight}pt ${line} ${border.color}; `);
+  }
+  const header = isHeader;
+  for (const edge of BORDER_EDGES) {
+    if (borders[edge] || borders[OPPOSITE[edge]!]) continue;
+    // Header cells always show their separators; the viewport follows the gridline options.
+    const shown =
+      header ||
+      (edge === 'top' || edge === 'bottom'
+        ? sheet.options.gridline.showHorizontalGridline
+        : sheet.options.gridline.showVerticalGridline);
+    if (!shown || (!header && style.backColor != null)) continue;
+    parts.push(`border-${edge}: 1px solid ${header ? '#d4d4d4' : String(sheet.options.gridline.color)}; `);
+  }
+  parts.push(`overflow: hidden;height: ${height}px;line-height: ${Math.min(height, lineBoxHeight(font))}px; `);
+  parts.push(`width: ${width}px;max-width: ${width}px;min-width: ${width}px;`);
+  const attributes =
+    (span && rowCount > 1 ? ` rowSpan=${rowCount}` : '') +
+    (span && colCount > 1 ? ` colSpan=${colCount}` : '') +
+    ' style="' +
+    parts.join('') +
+    '"';
+  return `<td${attributes}>${marked}</td>`;
+}
+for (const key of styleProperties) {
+  // The trial's CellRange does not expose the `apply*` merge flags as accessors (TASK 46 probe;
+  // they are also absent from the d.ts CellRange contract).
+  if (key.startsWith('apply')) continue;
   Object.defineProperty(CellRange.prototype, key, {
     configurable: true,
     writable: true,
@@ -291,6 +526,7 @@ for (const key of styleProperties)
       return this;
     },
   });
+}
 export function adjustFormula(formula: string, rows: number, columns: number): string {
   return formula
     .split(/("(?:[^"]|"")*")/)
@@ -314,5 +550,3 @@ export function adjustFormula(formula: string, rows: number, columns: number): s
     )
     .join('');
 }
-for (const key of ['sheet', 'row', 'col', 'rowCount', 'colCount', 'sheetArea'])
-  Object.defineProperty(CellRange.prototype, key, { value: undefined, writable: true, configurable: true });

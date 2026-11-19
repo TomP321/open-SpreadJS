@@ -76,7 +76,16 @@ describe('tables', () => {
     expect(AnyThemes.medium2).toBeDefined();
     expect(AnyThemes.light21).toBeDefined();
     expect(TableThemes.dark11).toBeDefined();
-    expect((TableThemes as unknown as { professional1?: unknown }).professional1).toBeUndefined();
+    // Trial value (probe f40b-professional-full): the `professional` themes are
+    // real TableTheme objects (hidden from enumeration, `getTheme` still resolves
+    // them); the previous "undefined" expectation was self-derived and is replaced.
+    type ThemeView = { toJSON(): { name: string } & Record<string, unknown> };
+    const rawProfessional = (TableThemes as unknown as Record<string, ThemeView | undefined>).professional1;
+    expect(rawProfessional).toBeDefined();
+    const professional = rawProfessional as ThemeView;
+    expect(professional.toJSON().name).toBe('professional1');
+    expect(Object.prototype.propertyIsEnumerable.call(TableThemes, 'professional1')).toBe(false);
+    expect(professional.toJSON().headerRowStyle).toBeTruthy();
     const tokens = (TableThemes as unknown as { medium2: { toJSON(): { name: string } } }).medium2.toJSON();
     expect(tokens.name).toBe('Medium2');
     expect(JSON.stringify(tokens)).toContain('Accent 1 20');
@@ -103,6 +112,91 @@ describe('tables', () => {
     sheet.tables.remove('T', 0);
     expect(sheet.tables.all()).toHaveLength(0);
     expect((sheet.getCellType(1, 0) as { typeName: string }).typeName).toBe('1');
+  });
+
+  it('keeps values and styles when removing with the keepAll option (Convert to Range)', () => {
+    const sheet = sheetWithValues([['H1', 'H2'], ['a', 1], ['b', 2]]);
+    const style = new Style();
+    style.backColor = '#ff0000';
+    sheet.setStyle(1, 0, style);
+    sheet.tables.add('K', 0, 0, 3, 2, AnyThemes.light1);
+    sheet.tables.remove('K', 3);
+    expect(sheet.tables.all()).toHaveLength(0);
+    expect(sheet.getValue(1, 0)).toBe('a');
+    expect(sheet.getValue(2, 1)).toBe(2);
+    expect(sheet.getActualStyle(1, 0)?.backColor).toBe('#ff0000');
+  });
+
+  it('evaluates unqualified [Column] structured references from inside the table', () => {
+    const sheet = sheetWithValues([['Region', 'Q1', 'Q4'], ['N', 120, 165], ['S', 90, 125], ['E', 75, 100]]);
+    sheet.tables.add('Sales', 0, 0, 4, 3, AnyThemes.light1);
+    sheet.setFormula(4, 2, '=SUBTOTAL(109,[Q4])');
+    expect(sheet.getValue(4, 2)).toBe(390);
+  });
+});
+
+describe('band row/column shifts (Designer table commands)', () => {
+  const salesSheet = () => {
+    const sheet = sheetWithValues([
+      ['Region', 'Q1', 'Q2', 'Q3', 'Q4', 'Total'],
+      ['North', 120, 135, 150, 165, 570],
+      ['South', 90, 105, 95, 125, 415],
+      ['East', 75, 80, 90, 100, 345],
+      ['West', 110, 115, 105, 130, 460],
+    ]);
+    for (let r = 1; r < 5; r++) sheet.setFormula(r, 5, `=SUM(B${r + 1}:E${r + 1})`);
+    sheet.setFormula(0, 7, '=SUM(F2:F4)');
+    return sheet;
+  };
+
+  it('_shiftRowsInColumns moves only band columns and adjusts intersecting references', () => {
+    const sheet = salesSheet();
+    sheet._shiftRowsInColumns(2, 1, 0, 4, false);
+    expect(sheet.getRowCount()).toBe(200);
+    expect(sheet.getValue(2, 0)).toBeNull();
+    expect(sheet.getValue(3, 0)).toBe('South');
+    expect(sheet.getValue(5, 0)).toBe('West');
+    // F cells keep their addresses; references into the band follow the move.
+    expect(sheet.getFormula(1, 5)).toBe('SUM(B2:E2)');
+    expect(sheet.getFormula(2, 5)).toBe('SUM(B4:E4)');
+    expect(sheet.getValue(2, 5)).toBe(415);
+    expect(sheet.getFormula(4, 5)).toBe('SUM(B6:E6)');
+    // References to columns outside the band stay untouched.
+    expect(sheet.getFormula(0, 7)).toBe('SUM(F2:F4)');
+  });
+
+  it('_shiftRowsInColumns(remove) collapses the band and turns hit references into #REF!', () => {
+    const sheet = salesSheet();
+    sheet._shiftRowsInColumns(2, 1, 0, 4, true);
+    expect(sheet.getRowCount()).toBe(200);
+    expect(sheet.getValue(2, 0)).toBe('East');
+    expect(sheet.getValue(3, 0)).toBe('West');
+    expect(sheet.getFormula(2, 5)).toBe('SUM(#REF!)');
+    expect(sheet.getFormula(3, 5)).toBe('SUM(B3:E3)');
+    expect(sheet.getValue(3, 5)).toBe(345);
+    expect(sheet.getFormula(0, 7)).toBe('SUM(F2:F4)');
+  });
+
+  it('_shiftColumnsInRows moves only the row band', () => {
+    const sheet = salesSheet();
+    sheet._shiftColumnsInRows(1, 1, 1, 1, false);
+    expect(sheet.getColumnCount()).toBe(20);
+    expect(sheet.getValue(1, 1)).toBeNull();
+    expect(sheet.getValue(1, 2)).toBe(120);
+    // The formula cell itself sits in the band, so it moves right too.
+    expect(sheet.getFormula(1, 5)).toBeNull();
+    expect(sheet.getFormula(1, 6)).toBe('SUM(C2:F2)');
+    // Other rows keep their addresses.
+    expect(sheet.getValue(2, 1)).toBe(90);
+    expect(sheet.getFormula(2, 5)).toBe('SUM(B3:E3)');
+  });
+
+  it('_shiftRowsInColumns keeps row heights and tags (cells move, rows do not)', () => {
+    const sheet = salesSheet();
+    sheet.setRowHeight(3, 40);
+    sheet._shiftRowsInColumns(2, 1, 0, 4, false);
+    expect(sheet.getRowHeight(3)).toBe(40);
+    expect(sheet.getValue(4, 0)).toBe('East');
   });
 });
 
@@ -135,6 +229,18 @@ describe('filters', () => {
     expect([0, 1, 2].map((r) => sheet.getValue(1 + r, 0))).toEqual([1, 2, 3]);
     expect([1, 2, 3].map((r) => sheet.getFormula(r, 1))).toEqual(['A2', 'A3', 'A4']);
     expect(sheet.getCell(3, 0).backColor()).toBe('red');
+  });
+
+  // Observed in the trial (Data tab quick Sort A→Z on b/50, a/40, b/30, a/20,
+  // b/10): the result is a/40, a/20, b/50, b/30, b/10 — equal keys keep their
+  // original relative order, so the quick sort is a stable single-key sort and
+  // NOT a cascade over the following columns.
+  it('keeps equal keys in their original relative order (stable sort)', () => {
+    const sheet = sheetWithValues([['A', 'B'], ['b', 50], ['a', 40], ['b', 30], ['a', 20], ['b', 10]]);
+    sheet.sortRange(1, 0, 5, 2, true, [{ index: 0, ascending: true }]);
+    expect([0, 1, 2, 3, 4].map((r) => [sheet.getValue(1 + r, 0), sheet.getValue(1 + r, 1)])).toEqual([
+      ['a', 40], ['a', 20], ['b', 50], ['b', 30], ['b', 10],
+    ]);
   });
 
   it('round-trips row filter JSON', () => {

@@ -33,11 +33,16 @@ export class SparseGrid<T> {
     for (const chunk of this.chunks.values()) for (const row of chunk.values()) count += row.size;
     return count;
   }
-  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean): void {
+  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean, crossStart = Number.NEGATIVE_INFINITY, crossEnd = Number.POSITIVE_INFINITY): void {
     const entries = [...this.entries()];
     this.clear();
     for (const [r, c, value] of entries) {
       const old = axis === 'row' ? r : c;
+      const cross = axis === 'row' ? c : r;
+      if (cross < crossStart || cross > crossEnd) {
+        this.set(r, c, value);
+        continue;
+      }
       if (remove && old >= index && old < index + count) continue;
       const next = old >= index + (remove ? count : 0) ? old + (remove ? -count : count) : old;
       this.set(axis === 'row' ? next : r, axis === 'col' ? next : c, value);
@@ -208,10 +213,15 @@ class ColumnValueGrid {
       }
   }
   clear(): void { this.columns.clear(); this.length = 0; this.lastBlock = undefined; }
-  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean): void {
+  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean, crossStart = Number.NEGATIVE_INFINITY, crossEnd = Number.POSITIVE_INFINITY): void {
     const entries = [...this.entries()]; this.clear();
     for (const [r, c, value] of entries) {
       const old = axis === 'row' ? r : c;
+      const cross = axis === 'row' ? c : r;
+      if (cross < crossStart || cross > crossEnd) {
+        this.set(r, c, value);
+        continue;
+      }
       if (remove && old >= index && old < index + count) continue;
       const next = old >= index + (remove ? count : 0) ? old + (remove ? -count : count) : old;
       this.set(axis === 'row' ? next : r, axis === 'col' ? next : c, value);
@@ -277,10 +287,15 @@ export class ValueGrid {
     yield* this.overflow.entries();
   }
   clear(): void { this.pages.clear(); this.overflow.clear(); this.length = 0; this.lastBlock = undefined; }
-  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean): void {
+  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean, crossStart = Number.NEGATIVE_INFINITY, crossEnd = Number.POSITIVE_INFINITY): void {
     const entries = [...this.entries()]; this.clear();
     for (const [r, c, value] of entries) {
       const old = axis === 'row' ? r : c;
+      const cross = axis === 'row' ? c : r;
+      if (cross < crossStart || cross > crossEnd) {
+        this.set(r, c, value);
+        continue;
+      }
       if (remove && old >= index && old < index + count) continue;
       const next = old >= index + (remove ? count : 0) ? old + (remove ? -count : count) : old;
       this.set(axis === 'row' ? next : r, axis === 'col' ? next : c, value);
@@ -322,8 +337,9 @@ export class CellStore<T extends { value?: unknown }> {
     yield* this.metadata.entries();
   }
   clear(): void { this.numeric.clear(); this.metadata.clear(); }
-  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean): void {
-    this.numeric.shift(axis, index, count, remove); this.metadata.shift(axis, index, count, remove);
+  shift(axis: 'row' | 'col', index: number, count: number, remove: boolean, crossStart = Number.NEGATIVE_INFINITY, crossEnd = Number.POSITIVE_INFINITY): void {
+    this.numeric.shift(axis, index, count, remove, crossStart, crossEnd);
+    this.metadata.shift(axis, index, count, remove, crossStart, crossEnd);
   }
 }
 
@@ -331,8 +347,12 @@ export class DirtyGrid {
   private before = new ValueGrid();
   private after = new ValueGrid();
   get size(): number { return this.before.size; }
+  /**
+   * The trial keeps the value each change replaced, so a second write to the
+   * same cell updates `oldValue` instead of keeping the first one.
+   */
   record(row: number, col: number, oldValue: unknown, newValue: unknown): void {
-    if (!this.before.has(row, col)) this.before.set(row, col, oldValue ?? undefined);
+    this.before.set(row, col, oldValue ?? undefined);
     this.after.set(row, col, newValue);
   }
   update(row: number, col: number, value: unknown): void {
@@ -341,7 +361,9 @@ export class DirtyGrid {
   set(row: number, col: number, _value: undefined): void { this.before.delete(row, col); this.after.delete(row, col); }
   *entries() {
     for (const [row, col, oldValue] of this.before.entries())
-      yield [row, col, { row, col, oldValue, newValue: this.after.get(row, col) }] as const;
+      // The trial's key order is `row, col, newValue, oldValue` (and it carries
+      // no `oldValue` at all when the cell had no previous value).
+      yield [row, col, { row, col, newValue: this.after.get(row, col), oldValue }] as const;
   }
   clear(): void { this.before.clear(); this.after.clear(); }
   shift(axis: 'row' | 'col', index: number, count: number, remove: boolean): void {

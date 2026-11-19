@@ -27,6 +27,7 @@ import {
   NUMBER_MODES,
   define,
   entries,
+  forMath,
   integer,
   makeCriterion,
   matchesCriterion,
@@ -644,8 +645,8 @@ export const MATH_FUNCTIONS: DefinedFunction[] = [
     if (values.some((value) => value < 0)) return error(ErrorCode.num);
     const total = values.reduce((sum, value) => sum + Math.trunc(value), 0);
     let denominator = 1;
-    for (const value of values) denominator *= factorial(Math.trunc(value));
-    return numeric(factorial(total) / denominator);
+    for (const value of values) denominator *= forMath(factorial(Math.trunc(value)));
+    return numeric(forMath(factorial(total)) / denominator);
   }),
   define('RAND', 0, 0, () => Math.random(), { volatile: true }),
   define('RANDBETWEEN', 2, 2, (args) => {
@@ -711,12 +712,24 @@ function pairAggregate(args: Args, ctx: EvalContext, combine: (a: number, b: num
   return numeric(sum);
 }
 
+/**
+ * Cells SUBTOTAL leaves out: every referenced cell whose own formula calls
+ * SUBTOTAL or AGGREGATE. Like the trial, a nested subtotal is never counted
+ * twice by the summary above it (hidden rows, in contrast, are still counted).
+ */
+function nestedSubtotalCell(ctx: EvalContext): OmitCell {
+  return (sheet, row, col) => {
+    const text = ctx.host.getFormulaText(sheet, row, col);
+    return !!text && /(?:^|[^A-Za-z0-9_.])@?(?:SUBTOTAL|AGGREGATE)\s*\(/i.test(text);
+  };
+}
+
 function subtotal(args: Args, ctx: EvalContext): Value {
   const code = Math.trunc(args.number(0));
   const mode = code >= 100 ? code - 100 : code;
   const valuesArgs = new Array(args.count - 1);
   for (let index = 1; index < args.count; index++) valuesArgs[index - 1] = args.value(index);
-  const nested = new NestedArgs(valuesArgs);
+  const nested = new NestedArgs(valuesArgs, nestedSubtotalCell(ctx));
   switch (mode) {
     case 1:
       return averageValues(nested, ctx);
@@ -798,9 +811,18 @@ function aggregate(args: Args, ctx: EvalContext): Value {
   }
 }
 
+/**
+ * Cells an aggregate must leave out, asked per referenced cell.
+ * Used by SUBTOTAL to skip nested subtotals, like the trial does.
+ */
+type OmitCell = (sheet: Parameters<EvalContext['host']['getFormulaText']>[0], row: number, col: number) => boolean;
+
 /** Minimal Args-compatible wrapper used by SUBTOTAL/AGGREGATE. */
 class NestedArgs {
-  constructor(readonly values: Value[]) {}
+  constructor(
+    readonly values: Value[],
+    readonly omit?: OmitCell,
+  ) {}
   get count(): number {
     return this.values.length;
   }
@@ -845,8 +867,11 @@ function iterateWrapped(args: NestedArgs, ctx: EvalContext): Iterable<ScalarValu
       if (value instanceof ReferenceValue) {
         for (const area of value.areas)
           for (let row = area.r1; row <= area.r2; row++)
-            for (let col = area.c1; col <= area.c2; col++)
+            for (let col = area.c1; col <= area.c2; col++) {
+              // SUBTOTAL/AGGREGATE never count a nested subtotal cell.
+              if (args.omit && args.omit(area.sheet, row, col)) continue;
               yield ctx.host.getCellValue(area.sheet, row, col);
+            }
       } else if (value instanceof CalcArray) {
         for (const row of value.array) for (const item of row) yield item as ScalarValue;
       } else if (value !== MISSING) yield value as ScalarValue;
@@ -953,12 +978,12 @@ function modeValue(values: number[]): Value {
   return best === undefined ? error(ErrorCode.na) : best;
 }
 
-function factorial(value: number): number {
+function factorial(value: number): number | CalcError {
   let result = Math.trunc(value);
-  if (result < 0) return error(ErrorCode.num) as unknown as number;
+  if (result < 0) return error(ErrorCode.num);
   let product = 1;
   for (let index = 2; index <= result; index++) product *= index;
-  if (!Number.isFinite(product)) return error(ErrorCode.num) as unknown as number;
+  if (!Number.isFinite(product)) return error(ErrorCode.num);
   result = product;
   return result;
 }

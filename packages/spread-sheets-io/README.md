@@ -37,3 +37,17 @@ XLSX, macro-enabled export, advanced header/frozen conversions, and several othe
 options remain unsupported. Unsupported operations report `NotImplemented`; the
 package does not provide full behavioral or visual compatibility yet. The XLSX
 implementation is independent and uses MIT-licensed `fflate` for ZIP compression.
+
+## Package layout
+
+| Path | Format |
+| --- | --- |
+| `dist/gc.spread.sheets.io.esm.js` | ESM (side-effect import; patches the core `Workbook.prototype`) |
+| `dist/gc.spread.sheets.io.cjs` | CommonJS (`require('@opensheets/spread-sheets-io')`) |
+| `dist/gc.spread.sheets.io.umd.js` | browser script tag; uses the global `GC` (AMD/CommonJS aware) |
+| `dist/gc.spread.sheets.io.d.ts` / `.d.cts` | type declarations |
+
+The plugin resolves the core through the `@mescius/spread-sheets` name, which the drop-in
+alias above provides (peer dependency).
+
+Licence: MIT (see `LICENSE.md`). Third-party notices: `THIRD_PARTY_NOTICES.md`.

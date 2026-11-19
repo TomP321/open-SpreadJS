@@ -1,0 +1,78 @@
+/* TASK 60 item 3: the display names the running trial gives every shape-gallery item
+ * (read from its gallery DOM as visible UI strings; they drive the thumb tooltips and
+ * aria-labels, so the gallery never exposes a raw preset id like "noHeadStraight").
+ */
+export const shapeGalleryLabels: Record<string, string> = {
+  // Lines
+  "noHeadStraight": "Line", "endArrowHeadStraight": "Line Arrow", "beginEndArrowHeadStraight": "Line Double Arrow",
+  "Elbow": "Elbow Connector", "endArrowHeadElbow": "Elbow Arrow Connector", "beginEndArrowHeadElbow": "Elbow Double-Arrow Connector",
+  "Curved": "Curved Connector", "endArrowHeadCurved": "Curved Arrow Connector", "beginEndArrowHeadCurved": "Curved Double-Arrow Connector",
+  // Rectangles
+  "rectangle": "Rectangle", "roundedRectangle": "Rounded Rectangle", "snip1Rectangle": "Snip Single Corner Rectangle",
+  "snip2SameRectangle": "Snip Same Side Corner Rectangle", "snip2DiagRectangle": "Snip Diagonal Corner Rectangle", "snipRoundRectangle": "Snip and Round Single Corner Rectangle",
+  "round1Rectangle": "Round Single Corner Rectangle", "round2SameRectangle": "Round Same Side Corner Rectangle", "round2DiagRectangle": "Round Diagonal Corner Rectangle",
+  // Basic Shapes
+  "hor-text-box": "Horizontal Text Box", "oval": "Oval", "isoscelesTriangle": "Isosceles Triangle",
+  "rightTriangle": "Right Triangle", "parallelogram": "Parallelogram", "trapezoid": "Trapezoid",
+  "diamond": "Diamond", "regularPentagon": "Regular Pentagon", "hexagon": "Hexagon",
+  "heptagon": "Heptagon", "octagon": "Octagon", "decagon": "Decagon",
+  "dodecagon": "Dodecagon", "pie": "Pie", "chord": "Chord",
+  "tear": "Tear", "frame": "Frame", "halfFrame": "Half Frame",
+  "corner": "Corner", "diagonalStripe": "Diagonal Stripe", "cross": "Cross",
+  "plaque": "Plaque", "can": "Can", "cube": "Cube",
+  "bevel": "Bevel", "donut": "Donut", "noSymbol": "\"No\" Symbol",
+  "blockArc": "Block Arc", "foldedCorner": "Folded Corner", "smileyFace": "Smiley Face",
+  "heart": "Heart", "lightningBolt": "Lightning Bolt", "sun": "Sun",
+  "moon": "Moon", "cloud": "Cloud", "arc": "Arc",
+  "doubleBracket": "Double Bracket", "doubleBrace": "Double Brace", "leftBracket": "Left Bracket",
+  "rightBracket": "Right Bracket", "leftBrace": "Left Brace", "rightBrace": "Right Brace",
+  "upDownArrowCallout": "Up-Down Arrow Callout", "actionButtonHome": "Action Button Home", "actionButtonHelp": "Action Button Help",
+  "actionButtonInformation": "Action Button Information", "actionButtonBackorPrevious": "Action Button Back or Previous", "actionButtonForwardorNext": "Action Button Forward or Next",
+  "actionButtonBeginning": "Action Button Beginning", "actionButtonEnd": "Action Button End", "actionButtonReturn": "Action Button Return",
+  "actionButtonDocument": "Action Button Document", "actionButtonSound": "Action Button Sound", "actionButtonMovie": "Action Button Movie",
+  "flowchartOfflineStorage": "Flowchart: Offline Storage", "leftRightRibbon": "Left-Right Ribbon", "chartStar": "Chart Star",
+  "chartPlus": "Chart Plus", "lineInverse": "Line Inverse", "leftCircularArrow": "Left Circular Arrow",
+  "leftRightCircularArrow": "left-Right Circular Arrow", "swooshArrow": "Swoosh Arrow", "chartX": "Chart X",
+  "gear6": "Gear 6", "gear9": "Gear 9", "funnel": "Funnel",
+  "pieWedge": "Pie Wedge", "nonIsoscelesTrapezoid": "Non Isosceles Trapezoid", "cornerTabs": "Corner Tabs",
+  "squareTabs": "Square Tabs", "plaqueTabs": "Plaque Tabs",
+  // Block Arrows
+  "rightArrow": "Right Arrow", "leftArrow": "Left Arrow", "upArrow": "Up Arrow",
+  "downArrow": "Down Arrow", "leftRightArrow": "Left-Right Arrow", "upDownArrow": "Up-Down Arrow",
+  "quadArrow": "Quad Arrow", "leftRightUpArrow": "Left-Right-Up Arrow", "bentArrow": "Bent Arrow",
+  "uTurnArrow": "u-Turn Arrow", "leftUpArrow": "Left-Up Arrow", "bentUpArrow": "Bent Up Arrow",
+  "curvedRightArrow": "Curved Right Arrow", "curvedLeftArrow": "Curved Left Arrow", "curvedUpArrow": "Curved Up Arrow",
+  "curvedDownArrow": "Curved Down Arrow", "stripedRightArrow": "Striped Right Arrow", "notchedRightArrow": "Notched Right Arrow",
+  "pentagon": "Pentagon", "chevron": "Chevron", "rightArrowCallout": "Right Arrow Callout",
+  "downArrowCallout": "Down Arrow Callout", "leftArrowCallout": "Left Arrow Callout", "upArrowCallout": "Up Arrow Callout",
+  "leftRightArrowCallout": "Left-Right Arrow Callout", "quadArrowCallout": "Quad Arrow Callout", "circularArrow": "Circular Arrow",
+  // Equation Shapes
+  "mathPlus": "Plus", "mathMinus": "Minus", "mathMultiply": "Multiply",
+  "mathDivide": "Division", "mathEqual": "Equal", "mathNotEqual": "Not Equal",
+  // Flowchart
+  "flowchartProcess": "Flowchart: Process", "flowchartAlternateProcess": "Flowchart: Alternate Process", "flowchartDecision": "Flowchart: Decision",
+  "flowchartData": "Flowchart: Data", "flowchartPredefinedProcess": "Flowchart: Predefined Process", "flowchartInternalStorage": "Flowchart: Internal Storage",
+  "flowchartDocument": "Flowchart: Document", "flowchartMultidocument": "Flowchart: Multidocument", "flowchartTerminator": "Flowchart: Terminator",
+  "flowchartPreparation": "Flowchart: Preparation", "flowchartManualInput": "Flowchart: Manual Input", "flowchartManualOperation": "Flowchart: Manual Operation",
+  "flowchartConnector": "Flowchart: Connector", "flowchartOffpageConnector": "Flowchart: Offpage Connector", "flowchartCard": "Flowchart: Card",
+  "flowchartPunchedTape": "Flowchart: PunchedTape", "flowchartSummingJunction": "Flowchart: Summing Junction", "flowchartOr": "Flowchart: Or",
+  "flowchartCollate": "Flowchart: Collate", "flowchartSort": "Flowchart: Sort", "flowchartExtract": "Flowchart: Extract",
+  "flowchartMerge": "Flowchart: Merge", "flowchartStoredData": "Flowchart: Stored Data", "flowchartDelay": "Flowchart: Delay",
+  "flowchartSequentialAccessStorage": "Flowchart: Sequential Access Storage", "flowchartMagneticDisk": "Flowchart: Magnetic Disk", "flowchartDirectAccessStorage": "Flowchart: Direct Access Storage",
+  "flowchartDisplay": "Flowchart: Display",
+  // Stars and Banners
+  "explosion1": "Explosion 1", "explosion2": "Explosion 2", "shape4pointStar": "4-Point Star",
+  "shape5pointStar": "5-Point Star", "star6Point": "6-Point Star", "star7Point": "7-Point Star",
+  "shape8pointStar": "8-Point Star", "star10Point": "10-Point Star", "star12Point": "12-Point Star",
+  "shape16pointStar": "16-Point Star", "shape24pointStar": "24-Point Star", "shape32pointStar": "32-Point Star",
+  "upRibbon": "Up Ribbon", "downRibbon": "Down Ribbon", "curvedUpRibbon": "Curved Up Ribbon",
+  "curvedDownRibbon": "Curved Down Ribbon", "verticalScroll": "Vertical Scroll", "horizontalScroll": "Horizontal Scroll",
+  "wave": "Wave", "doubleWave": "Double Wave",
+  // Callouts
+  "rectangularCallout": "Rectangular Callout", "roundedRectangularCallout": "Rounded Rectangular Callout", "ovalCallout": "Oval Callout",
+  "cloudCallout": "Cloud Callout", "lineCallout2": "Line Callout 2", "lineCallout3": "Line Callout3",
+  "lineCallout4": "Line Callout 4", "lineCallout2AccentBar": "Line Callout 2 (Accent Bar)", "lineCallout3AccentBar": "Line Callout 3 (Accent Bar)",
+  "lineCallout4AccentBar": "Line Callout 4 (Accent Bar)", "lineCallout2NoBorder": "Line Callout 2 (No Border)", "lineCallout3NoBorder": "Line Callout 3 (No Border)",
+  "lineCallout4NoBorder": "Line Callout 4 (No Border)", "lineCallout2BorderandAccentBar": "Line Callout 2 (Border and Accent Bar)", "lineCallout3BorderandAccentBar": "Line Callout 3 (Border and Accent Bar)",
+  "lineCallout4BorderandAccentBar": "Line Callout 4 (Border and Accent Bar)",
+};

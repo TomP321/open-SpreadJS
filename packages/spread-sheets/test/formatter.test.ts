@@ -85,15 +85,42 @@ describe('culture registration', () => {
     a.fontScriptCode = 'Latn';
     const resources = { hello: 'world' };
     CultureManager.addCultureInfo('xx-YY', a, resources);
-    expect(a.name()).toBe('xx-yy');
+    // Trial probe `culture:assign`/`culture:builtin-names`: a registered culture
+    // keeps its own name (empty for a hand-made one) and `culture()` reports the
+    // spelling it was called with.
+    expect(a.name()).toBe('');
     expect(CultureManager.getCultureInfo('XX-YY')).toBe(a);
     expect(CultureManager.getCultureInfo(999)).toBe(a);
     expect(CultureManager.getLanguage('xx-yy')).toBe(resources);
     expect(CultureManager.getResources('xx-yy')).toBe(resources);
-    expect(CultureManager.culture('xx-YY', true)).toBe('xx-yy');
-    expect(CultureManager.culture()).toBe('xx-yy');
+    expect(CultureManager.culture('xx-YY', true)).toBe('xx-YY');
+    expect(CultureManager.culture()).toBe('xx-YY');
     expect(CultureManager.getCultureInfo()).toBe(a);
     expect(() => CultureManager.culture('missing')).toThrow('Unknown culture');
+  });
+  it('ships the trial-core ja-JP culture with its ten equalCharacters pairs (trial probes `culture:names`, `culture9`)', () => {
+    const ja = CultureManager.getCultureInfo('ja-jp')!;
+    expect(ja).not.toBeNull();
+    expect(ja.name()).toBe('ja-JP');
+    expect(CultureManager.getCultureInfo('EN-us')!.name()).toBe('en-US');
+    expect(CultureManager.culture('ja-jp')).toBe('ja-JP');
+    expect(ja.id).toBe(1041);
+    expect(ja.displayName).toBe('Japanese (Japan)');
+    expect(ja.paperKind).toBe(1);
+    expect(ja.fontScriptCode).toBeUndefined();
+    // The ten Japanese equivalence pairs transcribed through the public API.
+    expect(ja.equalCharacters).toEqual([
+      '―ゝゞ゠ヽヾー', '㆐㆑㇤㇥', '‸⁊', '.․', '&⁋', '%⁏', '$⁒', '#⁗', '"⁍', '‹⁓',
+    ]);
+    expect(ja.DateTimeFormat.amDesignator).toBe('午前');
+    expect(ja.DateTimeFormat.pmDesignator).toBe('午後');
+    expect(ja.DateTimeFormat.shortDatePattern).toBe('yyyy/MM/dd');
+    expect(ja.DateTimeFormat.monthNames![1]).toBe('2月');
+    expect(ja.NumberFormat.currencySymbol).toBe('¥');
+    // Current culture feeds an unnamed formatter (trial `culture:current-effect`).
+    CultureManager.culture('ja-jp');
+    expect(new GC.Spread.Formatter.GeneralFormatter('0.00').format(1.5)).toBe('1.50');
+    expect(new GC.Spread.Formatter.GeneralFormatter('mmmm d, yyyy').format(45351)).toBe('2月 29, 2024');
   });
   it('formats and parses registered separators and translated date names', () => {
     const c = new CultureInfo();
@@ -109,7 +136,7 @@ describe('culture registration', () => {
     expect(f.parse('€1.234,50')).toBe(1234.5);
     expect(new GeneralFormatter('mmmm d, yyyy', 'test-de').format(45351)).toBe('Februar 29, 2024');
     expect(new GeneralFormatter('General', 'test-de').parse('29/02/2024')).toEqual(new Date(2024, 1, 29));
-    CultureManager.culture('test-de');
+    expect(CultureManager.culture('test-de')).toBe('test-de');
     expect(new GeneralFormatter('0.00').format(1.5)).toBe('1,50');
   });
 });

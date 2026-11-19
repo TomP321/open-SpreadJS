@@ -1,0 +1,24 @@
+{
+  "name": "dropin-z-official-react",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{OFFICIAL_core}}",
+    "@mescius/spread-sheets-react": "file:{{OFFICIAL_react}}",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@mescius/spread-sheets-charts": "file:{{OFFICIAL_charts}}",
+    "@mescius/spread-sheets-shapes": "file:{{OFFICIAL_shapes}}"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
+  },
+  "overrides": {
+    "@mescius/spread-sheets": "$@mescius/spread-sheets",
+    "@mescius/spread-sheets-shapes": "$@mescius/spread-sheets-shapes"
+  }
+}

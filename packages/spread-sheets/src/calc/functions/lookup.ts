@@ -1,5 +1,5 @@
 /** Lookup and reference functions. */
-import type { Worksheet } from '../../model.js';
+import type { Worksheet } from '../../worksheet.js';
 import { Args, EvalContext, raiseError} from '../evaluate.js';
 import {
   AreaRef,

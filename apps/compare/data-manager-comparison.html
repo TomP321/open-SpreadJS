@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Data manager comparison</title></head><body>
+<script type="module">
+import Official from '@mescius/spread-sheets';
+import '@mescius/spread-sheets-tablesheet';
+import OpenSheets from '@opensheets/spread-sheets';
+window.dataManagerLibraries = { official: Official, ours: OpenSheets };
+window.dataManagerScenario = async (which) => {
+  const GC = which === 'official' ? Official : OpenSheets;
+  const manager = new GC.Data.DataManager();
+  const remoteCalls = [];
+  const remoteTable = manager.addTable('remote', { remote: { read: async options => {
+    remoteCalls.push(options); return [{ id: 1 }];
+  } } });
+  const remoteRows = await remoteTable.fetch();
+  await remoteTable.refreshRemoteData();
+  const originalFetch = window.fetch;
+  const httpCalls = [];
+  let httpRows;
+  try {
+    window.fetch = async (url, options) => {
+      httpCalls.push({ url, options });
+      return new Response(JSON.stringify([{ id: 2 }]), { status: 200 });
+    };
+    httpRows = await manager.addTable('http', { remote: { read: {
+      url: '/data', method: 'POST', options: { headers: { 'X-Test': 'yes' } }, body: { q: 1 }
+    } } }).fetch();
+    const httpBatch = manager.addTable('httpBatch', { batch: true, remote: {
+      read: async () => [{ id: 1 }], batch: { url: '/batch', method: 'PUT', options: { headers: { 'X-Test': 'yes' } } }
+    } }).addView('v');
+    await httpBatch.fetch();
+    httpBatch.updateItem(0, { id: 2 });
+    await httpBatch.submitChanges();
+  } finally { window.fetch = originalFetch; }
+  const table = manager.addTable('people', { data: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] });
+  const rows = await table.fetch();
+  const view = table.addView('peopleView', ['id', 'name']);
+  const viewRows = await view.fetch();
+  const schemaTable = manager.addTable('mapped', { data: { items: [{ id: '2', label: 'A', flag: '' }] },
+    schema: { dataPath: 'items', columns: { id: { dataType: 'number' }, name: { dataName: 'label' }, flag: { dataType: 'boolean' } } } });
+  const schemaView = schemaTable.addView('mappedView');
+  const schemaRows = await schemaView.fetch();
+  const metadataView = manager.addTable('metadata', { data: [{ id: 1, name: 'A' }], schema: { columns: {
+    id: { isPrimaryKey: true, caption: 'Identifier' },
+    name: { readonly: true, visible: false, defaultValue: 'Default', width: 123 }
+  } } }).addView('metadataView');
+  await metadataView.fetch();
+  const metadataColumns = metadataView.getColumn().map(({ name, value, width, isPrimaryKey, caption, readonly, visible, defaultValue }) =>
+    ({ name, value, width, isPrimaryKey, caption, readonly, visible, defaultValue }));
+  const lookupView = manager.addTable('lookup', { data: [{ value: 'a' }], schema: { columns: {
+    value: { lookup: ['a', 'b'], showNullAs: 'NULL', showEmptyAs: 'EMPTY' }
+  } } }).addView('v');
+  await lookupView.fetch();
+  const lookupColumns = lookupView.getColumn().map(({ lookup, showNullAs, showEmptyAs, style }) =>
+    ({ lookup, showNullAs, showEmptyAs, style }));
+  const dateFilterView = manager.addTable('dateFilter', { data: [
+    { value: new Date('2020-01-01') }, { value: new Date('2020-01-02') }, { value: null }
+  ] }).addView('v');
+  await dateFilterView.fetch();
+  const dateFilterCounts = Object.fromEntries(['eq', 'neq', 'gt', 'gte', 'lt', 'lte'].map(operator =>
+    [operator, dateFilterView.filter({ field: 'value', operator, value: new Date('2020-01-01') })]));
+  const quotedView = manager.addTable('quotedFields', { data: [
+    { 'first name': 'A', obj: { 'a aa': 5, 'a.b': 7 } }
+  ] }).addView('v', ['=[@[first name]]', '=[@[obj].[a aa]]', '=[@[obj].[a.b]]']);
+  await quotedView.fetch();
+  const quotedRow = quotedView.getRowData(0);
+  const quotedSuppliers = manager.addTable('quotedSuppliers', { data: [{ id: 1, 'unit price': 5 }] });
+  const quotedProducts = manager.addTable('quotedProducts', { data: [{ supplierId: 1 }] });
+  manager.addRelationship(quotedProducts, 'supplierId', 'supplier', quotedSuppliers, 'id', 'products');
+  const quotedRelatedView = quotedProducts.addView('v', ['=[@[supplier].[unit price]]']);
+  const quotedRelatedFetch = await quotedRelatedView.fetch();
+  const quotedRelatedRow = quotedRelatedView.getRowData(0);
+  const aggregateSuppliers = manager.addTable('aggregateSuppliers', { data: [{ id: 1, price: 5 }, { id: 2, price: 9 }] });
+  const aggregateProducts = manager.addTable('aggregateProducts', { data: [{ supplierId: 1 }, { supplierId: 2 }] });
+  manager.addRelationship(aggregateProducts, 'supplierId', 'supplier', aggregateSuppliers, 'id', 'products');
+  const relatedAggregateView = aggregateProducts.addView('aggregate', ['=SUM([supplier.price])']);
+  const relatedAggregateFetch = await relatedAggregateView.fetch();
+  const relatedAggregateRows = [relatedAggregateView.getRowData(0), relatedAggregateView.getRowData(1)];
+  const rowTemplateView = manager.addTable('rowTemplate', { data: [{ id: 1, name: 'A' }] })
+    .addView('v', [{ value: '=[@]' }]);
+  await rowTemplateView.fetch();
+  const rowTemplate = rowTemplateView.getRowData(0);
+  const arrayPathView = manager.addTable('arrayPath', { data: [{ arr: [10, 20], obj: { x: 5 } }] })
+    .addView('v', ['=[@obj.x]', '=[@arr.1]', '=[@arr.0]', 'arr.1', 'arr.0']);
+  await arrayPathView.fetch();
+  const arrayPathRow = arrayPathView.getRowData(0);
+  const explicitMetadataView = manager.tables.metadata.addView('explicitMetadata', ['id', 'name']);
+  await explicitMetadataView.fetch();
+  const explicitMetadataColumns = explicitMetadataView.getColumn().map(({ name, value, width, isPrimaryKey, caption, readonly, visible, defaultValue }) =>
+    ({ name, value, width, isPrimaryKey, caption, readonly, visible, defaultValue }));
+  const patterns = await manager.addTable('patterns', { data: [{ amount: '20,75', yes: 'Yes', no: 'No', date: '31/12/2021' }], schema: { columns: {
+    amount: { dataType: 'number', dataPattern: ',' }, yes: { dataType: 'boolean', dataPattern: 'Yes|No' },
+    no: { dataType: 'boolean', dataPattern: 'Yes|No' }, date: { dataType: 'date', dataPattern: 'dd/MM/yyyy' }
+  } } }).fetch();
+  const timedPatterns = await manager.addTable('timedPatterns', {
+    data: [{ date: '2023-05-06 13:14:15.123', other: '06/05/2023 13:14:15' }], schema: { columns: {
+      date: { dataType: 'date', dataPattern: 'yyyy-MM-dd hh:mm:ss.000' },
+      other: { dataType: 'date', dataPattern: 'dd/MM/yyyy HH:mm:ss' }
+    } }
+  }).fetch();
+  const cancelled = manager.addTable('cancelled', { batch: true, remote: {
+    read: async () => [{ id: 1, name: 'A' }, { id: 2, name: 'B' }]
+  } }).addView('v');
+  await cancelled.fetch();
+  cancelled.updateItem(0, { name: 'Z' });
+  cancelled.insertItem(1, { id: 3 });
+  cancelled.removeItem(2);
+  await cancelled.cancelChanges();
+  const cancelledResult = { changes: cancelled.getChanges(), rows: [cancelled.getRowData(0), cancelled.getRowData(1)] };
+  const singleCancelled = manager.addTable('singleCancelled', { remote: {
+    read: async () => [{ id: 1, n: 'a' }, { id: 2, n: 'b' }]
+  } }).addView('v');
+  await singleCancelled.fetch();
+  singleCancelled.updateItem(0, { n: 'z' });
+  singleCancelled.insertItem(1, { id: 3 });
+  singleCancelled.removeItem(2);
+  await singleCancelled.cancelChanges();
+  const singleCancelledResult = { changes: singleCancelled.getChanges(),
+    rows: [singleCancelled.getRowData(0), singleCancelled.getRowData(1)] };
+  const grouped = manager.addTable('grouped', { data: [
+    { id: 1, a: 'b', b: 'x' }, { id: 2, a: 'a', b: 'y' }, { id: 3, a: 'b', b: 'z' }
+  ] }).addView('v');
+  await grouped.fetch();
+  grouped.groupBy([{ field: 'a' }, { field: 'b' }]);
+  const groupedRows = Array.from({ length: grouped.visibleLength() }, (_, i) => grouped.getRowData(i));
+  grouped.groupBy([{ field: 'a', collapsed: true, summaryFields: [{ field: 'id', aggregate: 'sum' }] }]);
+  const groupMetadataRows = Array.from({ length: grouped.visibleLength() }, (_, i) => grouped.getRowData(i));
+  grouped.removeGroupBy();
+  const ungroupedRows = Array.from({ length: grouped.visibleLength() }, (_, i) => grouped.getRowData(i));
+  schemaView.addStyleRule('dirty', { backColor: 'red' }, { direction: 1, state: 64 });
+  const styleRule = schemaView.getStyleRule('dirty');
+  const teams = manager.addTable('teams', { data: [{ id: 7, title: 'Blue' }] });
+  const members = manager.addTable('members', { data: [{ id: 3, teamId: 7, extra: 'kept' }], schema: { columns: { id: { dataType: 'number' } } } });
+  manager.addRelationship(members, 'teamId', 'team', teams, 'id', 'members');
+  const relatedView = members.addView('related', ['id', 'team.title']);
+  const related = await relatedView.fetch();
+  const relatedRow = relatedView.getRowData(0);
+  const reverseView = teams.addView('reverse', ['title', 'members.id']);
+  await reverseView.fetch();
+  const reverseRow = reverseView.getRowData(0);
+  const numericSearch = members.search('3', 'id');
+  const editable = manager.addTable('editable', { data: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] });
+  const editView = editable.addView('edit', ['id', 'name']);
+  await editView.fetch();
+  editView.updateItem(0, { name: 'Z' });
+  editView.insertItem(1, { id: 3, name: 'C' });
+  editView.updateItem(1, { name: 'D' });
+  const changes = editView.getChanges();
+  editView.sort([{ field: 'name', ascending: false }]);
+  const editedRows = Array.from({ length: editView.visibleLength() }, (_, i) => editView.getRowData(i));
+  const sorted = manager.addTable('sorted', { data: [{ id: 1, n: 'b' }, { id: 2, n: 'a' }, { id: 3, n: 'c' }] });
+  const sortedView = sorted.addView('sorted', ['id', 'n']);
+  await sortedView.fetch();
+  sortedView.sort([{ field: 'n', ascending: true }]);
+  sortedView.updateItem(0, { n: 'z' });
+  const sortedChanges = sortedView.getChanges();
+  sortedView.removeItem(0);
+  const sortedRows = Array.from({ length: sortedView.visibleLength() }, (_, i) => sortedView.getRowData(i));
+  const filtered = manager.addTable('filtered', { data: [{ id: 1, group: 'a' }, { id: 2, group: 'b' }, { id: 3, group: 'b' }] });
+  const filteredView = filtered.addView('filtered');
+  await filteredView.fetch();
+  const filteredCount = filteredView.filter([{ field: 'group', value: 'b' }, { field: 'id', value: 3 }]);
+  const filteredRow = filteredView.getRowData(0);
+  const clearedCount = filteredView.filter();
+  const operatorResults = [];
+  const nullFilterView = manager.addTable('nullFilter', { data: [{ n: 1 }, { n: null }, { n: '' }, {}] }).addView('v');
+  await nullFilterView.fetch();
+  const nullFilterCounts = [nullFilterView.filter({ field: 'n' }),
+    nullFilterView.filter({ field: 'n', value: null, operator: 'neq' }),
+    nullFilterView.filter({ field: 'n', value: 1, operator: 'bogus' })];
+  for (const operator of ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'doesnotcontain', 'startswith', 'endswith']) {
+    const operatorView = manager.addTable(`operator-${operator}`, { data: [
+      { value: 'Alpha' }, { value: 'beta' }, { value: 'xyz' }, { value: null }, { value: '' }
+    ] }).addView('v');
+    await operatorView.fetch();
+    const count = operatorView.filter({ field: 'value', operator, value: 'a' });
+    operatorResults.push({ operator, count, rows: Array.from({ length: count }, (_, i) => operatorView.getRowData(i)) });
+  }
+  const multiSort = manager.addTable('multiSort', { data: [
+    { id: 1, group: 'b', rank: 2, priority: 1 }, { id: 2, group: 'a', rank: 1, priority: 1 },
+    { id: 3, group: 'b', rank: 3, priority: 1 }, { id: 4, group: 'b', rank: 3, priority: 2 },
+    { id: 5, group: 'b', rank: 3, priority: 2 }
+  ] }).addView('v');
+  await multiSort.fetch();
+  multiSort.filter([{ field: 'group', value: 'b' }]);
+  multiSort.sort([{ field: 'rank', ascending: false }, { field: 'priority', ascending: false }]);
+  const multiSortRows = Array.from({ length: multiSort.visibleLength() }, (_, i) => multiSort.getRowData(i));
+  const countries = manager.addTable('countries', { data: [{ id: 8, name: 'North' }] });
+  const offices = manager.addTable('offices', { data: [{ id: 9, countryId: 8 }] });
+  const workers = manager.addTable('workers', { data: [{ id: 10, officeId: 9 }] });
+  manager.addRelationship(workers, 'officeId', 'office', offices, 'id', 'workers');
+  manager.addRelationship(offices, 'countryId', 'country', countries, 'id', 'offices');
+  const locationView = workers.addView('location', ['office.country.name']);
+  const multiHop = await locationView.fetch();
+  const locationRow = locationView.getRowData(0);
+  const calculated = manager.addTable('calculated', { data: [{ price: 4, quantity: 3 }], schema: { columns: {
+    total: { dataType: 'formula', value: '=[@price]*[@quantity]' }
+  } } }).addView('calculatedView');
+  const calculatedFetch = await calculated.fetch();
+  const calculatedBefore = calculated.getRowData(0);
+  calculated.updateItem(0, { quantity: 5 });
+  const calculatedAfter = calculated.getRowData(0);
+  const rowReferences = manager.addTable('rowReferences', { data: [{ n: 10 }, { n: 20 }, { n: 30 }] })
+    .addView('v', ['=[@+1n]', '=[@-1n]', '=[#1[n]]', '=[#last[n]]', '=[n]'].map(value => ({ value })));
+  await rowReferences.fetch();
+  const rowReferenceRows = [0, 1, 2].map(index => rowReferences.getRowData(index));
+  const aggregateRefs = ['=[#odd[n]]', '=[#even[n]]', '=SUM([n])', '=SUM([#odd[n]])',
+    '=SUM([#even[n]])', '=SUM([#1:@[n]])', '=SUM([@:#last[n]])',
+    '=SUM([#1,@-1:@+1,#last[n]])'];
+  const aggregateView = manager.addTable('aggregateRefs', { data: [{ n: 10 }, { n: 20 }, { n: 30 }] })
+    .addView('v', aggregateRefs.map(value => ({ value })));
+  await aggregateView.fetch();
+  const aggregateRows = [0, 1, 2].map(index => aggregateView.getRowData(index));
+  const suppliers = manager.addTable('formulaSuppliers', { data: [{ id: 1, price: 5 }] });
+  const products = manager.addTable('formulaProducts', { data: [{ id: 1, supplierId: 1, price: 2 }], schema: { columns: {
+    total: { dataType: 'formula', value: '=[@supplier.price]+[@price]' }
+  } } });
+  manager.addRelationship(products, 'supplierId', 'supplier', suppliers, 'id', 'products');
+  const formulaView = products.addView('v', ['id', 'total', { value: '=[@price]*2', caption: 'double' }]);
+  const formulaFetch = await formulaView.fetch();
+  const formulaBefore = formulaView.getRowData(0);
+  formulaView.updateItem(0, { price: 3 });
+  const formulaAfter = formulaView.getRowData(0);
+  const lifecycle = manager.addTable('lifecycle', { data: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] }).addView('v');
+  await lifecycle.fetch();
+  lifecycle.updateItem(0, { name: 'Z' });
+  lifecycle.insertItem(1, { id: 3, name: 'C' });
+  await lifecycle.cancelChanges();
+  await lifecycle.submitChanges();
+  const pending = lifecycle.getChanges();
+  lifecycle.resetItem(0);
+  lifecycle.resetItem(1);
+  const resetRows = [lifecycle.getRowData(0), lifecycle.getRowData(1)];
+  lifecycle.saveItem(1);
+  lifecycle.removeItem(0);
+  const lifecycleResult = { pending, resetRows, changes: lifecycle.getChanges(), row: lifecycle.getRowData(0) };
+  const aliasSource = [{ x: '2', label: 'A' }];
+  const aliasTable = manager.addTable('aliases', { data: aliasSource, schema: { columns: { id: { dataName: 'x', dataType: 'number' }, name: { dataName: 'label' } } } });
+  const aliasView = aliasTable.addView('v');
+  const aliasFirst = await aliasTable.fetch();
+  await aliasView.fetch();
+  aliasView.updateItem(0, { id: 3, name: 'B' });
+  const aliasSecond = await aliasTable.fetch();
+  aliasView.insertItem(1, { id: 4, name: 'C' });
+  const aliasResult = { first: aliasFirst, second: aliasSecond, source: aliasSource, row: aliasView.getRowData(1) };
+  const batchCalls = [];
+  const batchView = manager.addTable('batchSubmit', { batch: true, remote: {
+    read: async () => [{ id: 1, n: 'a' }, { id: 2, n: 'b' }],
+    batch: async (data, options) => { batchCalls.push({ data, options }); return {}; }
+  } }).addView('v');
+  await batchView.fetch();
+  batchView.updateItem(0, { n: 'z' });
+  batchView.removeItem(1);
+  batchView.insertItem(1, { id: 3, n: 'c' });
+  batchView.saveItem(0);
+  batchView.saveItem(1);
+  await batchView.submitChanges();
+  const batchChanges = batchView.getChanges();
+  const batchResponseView = manager.addTable('batchResponse', { batch: true, remote: {
+    read: async () => [{ id: 1, n: 'a' }, { id: 2, n: 'x' }], batch: async () => [{}, {}, {}]
+  } }).addView('v');
+  await batchResponseView.fetch();
+  batchResponseView.updateItem(0, { n: 'b' });
+  batchResponseView.removeItem(1);
+  batchResponseView.insertItem(1, { id: 3, n: 'c' });
+  const batchResponseEvent = await batchResponseView.submitChanges();
+  const batchResponseRows = Array.from({ length: batchResponseView.visibleLength() }, (_, i) => batchResponseView.getRowData(i));
+  const batchResponseChanges = batchResponseView.getChanges();
+  const singleCalls = [];
+  const single = manager.addTable('single', { remote: {
+    read: async () => [{ id: 1, n: 'a' }],
+    update: async (...args) => { singleCalls.push(['update', ...args]); return {}; },
+    create: async (...args) => { singleCalls.push(['create', ...args]); return {}; }
+  } }).addView('v');
+  await single.fetch();
+  single.updateItem(0, { n: 'z' });
+  await single.saveItem(0);
+  single.insertItem(1, { id: 2, n: 'b' });
+  await single.saveItem(1);
+  await single.submitChanges();
+  const singleChanges = single.getChanges();
+  const autoCalls = [];
+  const auto = manager.addTable('auto', { autoSync: true, remote: {
+    read: async () => [{ id: 1, n: 'a' }, { id: 2, n: 'b' }],
+    update: async (...args) => { autoCalls.push(['update', ...args]); return {}; },
+    create: async (...args) => { autoCalls.push(['create', ...args]); return {}; },
+    delete: async (...args) => { autoCalls.push(['delete', ...args]); return {}; }
+  } }).addView('v');
+  await auto.fetch();
+  auto.updateItem(0, { n: 'z' }); auto.saveItem(0);
+  auto.insertItem(1, { id: 3, n: 'c' }); auto.saveItem(1);
+  auto.removeItem(2);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const autoChanges = auto.getChanges();
+  let saveResponse = { id: 9, n: 'server', extra: 'ignored' };
+  const responseView = manager.addTable('responses', { autoSync: true, remote: {
+    read: async () => [{ id: 1, n: 'a' }], update: async () => saveResponse
+  } }).addView('v');
+  await responseView.fetch();
+  responseView.updateItem(0, { n: 'b' }); responseView.saveItem(0);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const responseRow = responseView.getRowData(0);
+  saveResponse = null;
+  responseView.updateItem(0, { n: 'retry' }); responseView.saveItem(0);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const nullResponse = { row: responseView.getRowData(0), changes: responseView.getChanges() };
+  let finishSave;
+  const delayedSave = new Promise(resolve => { finishSave = resolve; });
+  const concurrent = manager.addTable('concurrent', { autoSync: true, remote: {
+    read: async () => [{ id: 1, n: 'a' }], update: () => delayedSave
+  } }).addView('v');
+  await concurrent.fetch();
+  concurrent.updateItem(0, { n: 'b' }); concurrent.saveItem(0); concurrent.updateItem(0, { n: 'c' });
+  finishSave({});
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const concurrentResult = { changes: concurrent.getChanges(), row: concurrent.getRowData(0) };
+  const structuredValues = await manager.addTable('structuredValues', { data: [
+    { object: '{"x":1}', array: '[1,2]' }, { object: '[1]', array: '{"x":1}' },
+    { object: 'invalid', array: '123' }, { object: null, array: '' }
+  ], schema: { columns: { object: { dataType: 'object' }, array: { dataType: 'array' } } } }).fetch();
+  const defaults = manager.addTable('defaults', { data: [{ id: 1, n: 2 }], schema: { columns: {
+    id: { isPrimaryKey: true }, n: { defaultValue: 7 }, s: { defaultValue: 'new' }
+  } } }).addView('v');
+  await defaults.fetch();
+  defaults.insertItem(1, { id: 2 });
+  defaults.insertItem(2, { id: 1, n: null });
+  const defaultRows = Array.from({ length: defaults.visibleLength() }, (_, i) => defaults.getRowData(i));
+  return { quotedRow, quotedRelatedFetch, quotedRelatedRow, aggregateRows, singleCancelledResult, arrayPathRow, responseRow, nullResponse, structuredValues, defaultRows, operatorResults,
+    nullFilterCounts, autoCalls, autoChanges, concurrentResult,
+    singleCalls, singleChanges, batchCalls, batchChanges, batchResponseEvent, batchResponseRows, batchResponseChanges,
+    remoteCalls, remoteRows, httpCalls, httpRows,
+    timedPatterns, relatedAggregateFetch, relatedAggregateRows, cancelledResult, groupedRows, groupMetadataRows, ungroupedRows,
+    metadataColumns, explicitMetadataColumns, lookupColumns, dateFilterCounts, rowTemplate, aliasResult, lifecycleResult,
+    calculatedFetch, calculatedBefore, calculatedAfter, rowReferenceRows, formulaFetch, formulaBefore, formulaAfter,
+    changes, editedRows, sortedChanges, sortedRows,
+    filteredCount, filteredRow, clearedCount, multiSortRows, multiHop, locationRow, related, relatedRow,
+    reverseRow, numericSearch, schemaRows, patterns, styleRule, tables: Object.keys(manager.tables),
+    views: Object.keys(table.views), rows, viewRows,
+    columns: view.getColumn(), length: view.length(), visibleLength: view.visibleLength(),
+    search: table.search('B', 'name') };
+};
+</script></body></html>

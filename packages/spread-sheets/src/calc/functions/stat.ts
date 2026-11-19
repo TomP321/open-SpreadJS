@@ -1,5 +1,5 @@
 /** Statistical functions. */
-import type { Worksheet } from '../../model.js';
+import type { Worksheet } from '../../worksheet.js';
 import { Args, EvalContext, raise, raiseError } from '../evaluate.js';
 import {
   CalcArray,

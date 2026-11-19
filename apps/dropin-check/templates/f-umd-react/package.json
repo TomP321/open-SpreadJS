@@ -1,0 +1,11 @@
+{
+  "name": "dropin-f-umd-react",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{TARBALLS}}/opensheets-spread-sheets-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-react": "file:{{TARBALLS}}/opensheets-spread-sheets-react-{{VERSION}}.tgz",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

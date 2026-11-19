@@ -1,0 +1,10 @@
+{
+  "name": "@opensheets/dropin-check",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Drop-in packaging gate: installs the packed @opensheets tarballs under the @mescius package names with npm aliases and builds/runs five sample apps headlessly.",
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/dropin-check.mjs"
+  }
+}

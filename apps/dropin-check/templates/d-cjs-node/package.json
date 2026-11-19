@@ -1,0 +1,15 @@
+{
+  "name": "dropin-d-cjs-node",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "main": "src/main.cjs",
+  "scripts": { "build": "esbuild src/main.cjs --bundle --platform=browser --format=iife --outfile=dist/bundle.js" },
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{TARBALLS}}/opensheets-spread-sheets-{{VERSION}}.tgz"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "@types/node": "^22.0.0"
+  }
+}

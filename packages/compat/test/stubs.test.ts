@@ -16,9 +16,15 @@ function check(descriptor: PropertyDescriptor, path: string) {
   }
 }
 it('all generated class, function and property fallbacks fail explicitly', () => {
+  // Trial-measured runtime absences (TASK 54, `.probe/t54/probe-t54-gantt.json`
+  // `collection:surface`): the declared member does not exist on the TRIAL namespace either
+  // (`typeof GC.Spread.Sheets.GanttSheet.Collection === undefined`), so we deliberately do
+  // not publish it; the same list lives in `src/not-implemented.ts` (TRIAL_ABSENT_MEMBERS).
+  const trialAbsent = new Set(['GC.Spread.Sheets.GanttSheet.Collection']);
   let checked = 0;
   for (const entry of inventory.entries) {
     if (!['class', 'function', 'variable'].includes(entry.kind)) continue;
+    if (trialAbsent.has(entry.path) || trialAbsent.has(entry.path.split('.').slice(0, -1).join('.'))) continue;
     const descriptor = resolve(entry.path);
     expect(descriptor, entry.path).toBeDefined();
     check(descriptor, entry.path);

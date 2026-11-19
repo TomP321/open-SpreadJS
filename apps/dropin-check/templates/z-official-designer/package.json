@@ -1,0 +1,27 @@
+{
+  "name": "dropin-z-official-designer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "build": "vite build" },
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{OFFICIAL_core}}",
+    "@mescius/spread-sheets-barcode": "file:{{OFFICIAL_barcode}}",
+    "@mescius/spread-sheets-charts": "file:{{OFFICIAL_charts}}",
+    "@mescius/spread-sheets-designer": "file:{{OFFICIAL_designer}}",
+    "@mescius/spread-sheets-designer-resources-en": "file:{{OFFICIAL_resources}}",
+    "@mescius/spread-sheets-io": "file:{{OFFICIAL_io}}",
+    "@mescius/spread-sheets-pdf": "file:{{OFFICIAL_pdf}}",
+    "@mescius/spread-sheets-pivot-addon": "file:{{OFFICIAL_pivot}}",
+    "@mescius/spread-sheets-print": "file:{{OFFICIAL_print}}",
+    "@mescius/spread-sheets-shapes": "file:{{OFFICIAL_shapes}}"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
+  },
+  "overrides": {
+    "@mescius/spread-sheets": "$@mescius/spread-sheets",
+    "@mescius/spread-sheets-shapes": "$@mescius/spread-sheets-shapes",
+    "@mescius/spread-sheets-print": "$@mescius/spread-sheets-print"
+  }
+}

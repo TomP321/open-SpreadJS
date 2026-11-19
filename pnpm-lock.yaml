@@ -51,6 +51,30 @@ importers:
         specifier: workspace:*
         version: link:../../packages/spread-sheets-io
     devDependencies:
+      '@mescius/spread-sheets-charts':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-datacharts-addon':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-ganttsheet':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-pivot-addon':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-print':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-reportsheet-addon':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-slicers':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-tablesheet':
+        specifier: 19.2.5
+        version: 19.2.5
       '@types/pngjs':
         specifier: ^6.0.5
         version: 6.0.5
@@ -63,6 +87,93 @@ importers:
       vite:
         specifier: ^6.4.1
         version: 6.4.5(@types/node@22.20.5)(tsx@4.23.15)
+
+  apps/designer-compare:
+    dependencies:
+      '@mescius/spread-sheets':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-barcode':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-charts':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-designer':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-designer-react':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-designer-resources-en':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-io':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-languagepackages':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-pdf':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-print':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@mescius/spread-sheets-shapes':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@opensheets/spread-sheets':
+        specifier: workspace:*
+        version: link:../../packages/spread-sheets
+      '@opensheets/spread-sheets-designer':
+        specifier: workspace:*
+        version: link:../../packages/spread-sheets-designer
+      '@opensheets/spread-sheets-designer-react':
+        specifier: workspace:*
+        version: link:../../packages/spread-sheets-designer-react
+      '@opensheets/spread-sheets-designer-resources-en':
+        specifier: workspace:*
+        version: link:../../packages/spread-sheets-designer-resources-en
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@mescius/spread-sheets-pivot-addon':
+        specifier: 19.2.5
+        version: 19.2.5
+      '@playwright/test':
+        specifier: ^1.56.0
+        version: 1.65.0
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.31)
+      pixelmatch:
+        specifier: ^8.0.0
+        version: 8.0.0
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^6.4.1
+        version: 6.4.5(@types/node@22.20.5)(tsx@4.23.15)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
+
+  apps/dropin-check: {}
 
   apps/playground:
     dependencies:
@@ -115,9 +226,56 @@ importers:
 
   packages/spread-sheets:
     dependencies:
+      '@noble/hashes':
+        specifier: 1.8.0
+        version: 1.8.0
       ssf:
         specifier: 0.11.2
         version: 0.11.2
+
+  packages/spread-sheets-designer:
+    dependencies:
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@mescius/spread-sheets':
+        specifier: workspace:@opensheets/spread-sheets@*
+        version: link:../spread-sheets
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.31)
+
+  packages/spread-sheets-designer-react:
+    dependencies:
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@mescius/spread-sheets-designer':
+        specifier: workspace:@opensheets/spread-sheets-designer@*
+        version: link:../spread-sheets-designer
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.31)
+
+  packages/spread-sheets-designer-resources-en:
+    devDependencies:
+      '@mescius/spread-sheets-designer':
+        specifier: workspace:@opensheets/spread-sheets-designer@*
+        version: link:../spread-sheets-designer
 
   packages/spread-sheets-io:
     dependencies:
@@ -136,11 +294,10 @@ importers:
         version: link:../spread-sheets
 
   packages/spread-sheets-react:
-    dependencies:
-      '@opensheets/spread-sheets':
-        specifier: workspace:*
-        version: link:../spread-sheets
     devDependencies:
+      '@mescius/spread-sheets':
+        specifier: workspace:@opensheets/spread-sheets@*
+        version: link:../spread-sheets
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.31
@@ -733,11 +890,56 @@ packages:
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
 
+  '@mescius/spread-sheets-barcode@19.2.5':
+    resolution: {integrity: sha512-Mfi9Rh+9/HEaEIVdJ0p51LQ4+CZpK4LF+ZXu9cZP+kg/a3BxlIS8+hY6NDrBrOG7mgYOAJp5rB1SPB5A7OnfPA==}
+
+  '@mescius/spread-sheets-charts@19.2.5':
+    resolution: {integrity: sha512-OGgVZF/Ya0jP7ldYhUJsWgs0g3jLYzglE0jFGZDGvhlqYD3etmVwe8JH8zVWKljZV1fibwbDBhTIVUtEkNjmUw==}
+
+  '@mescius/spread-sheets-datacharts-addon@19.2.5':
+    resolution: {integrity: sha512-cU9wqaNXaSDCoQHKvQsFdIwxvvWqJsYv2tIqykGclHtzxSeVlf78pZbWBJLmcXt7LLsQZ6AP3rwIi5Mx5XO3IA==}
+
+  '@mescius/spread-sheets-designer-react@19.2.5':
+    resolution: {integrity: sha512-5xFBtb+YjccGEujhY4+pRm6+5Y5CguK8Q/yRmY4uuPkayEqfgzwB9NKk62+i5xtcq1DuZj0r3WwzUCFSUX0Q+Q==}
+
+  '@mescius/spread-sheets-designer-resources-en@19.2.5':
+    resolution: {integrity: sha512-P+QmFVtlkXuDbIOFVZofeLz2I9kOt9VOU0SdcbW8Tc1i8CLvu/q/tB9Aq2ygtDsk77BUfBYEEeawsn1RKtsmHg==}
+
+  '@mescius/spread-sheets-designer@19.2.5':
+    resolution: {integrity: sha512-ZoHAwlasvmk+n56EfpIuDqynXxuYLsO5m2GocMvnd0Gj5nKs8WI5WQCjklMZjCDnSlHWizhKh0QPHg/mYZMHCw==}
+
+  '@mescius/spread-sheets-ganttsheet@19.2.5':
+    resolution: {integrity: sha512-Dx2jPGpng/u1SVe6EpYZpte7UaO/dJ3BuPs+Lr8zZZblhYaWwVEL5+TC7qWTEZjSUD21VyOjM2ok5Epp145a1Q==}
+
   '@mescius/spread-sheets-io@19.2.5':
     resolution: {integrity: sha512-1KSMwZY+26YdAymzGfkIqaC0h5pYwKkQkaRuCqQnjUprvOirYV8lPFaRgDWHsmoBlI7hZk+dtbMNJUVqhSL4DQ==}
 
+  '@mescius/spread-sheets-languagepackages@19.2.5':
+    resolution: {integrity: sha512-vso4jWlCfytv33TCcSuBneMrVzvCBWm8kk9EqdcF/CzAqjn0V+emIOWD2efTs3zIIKW0jqSUs4q+bhE8QENyfA==}
+
+  '@mescius/spread-sheets-pdf@19.2.5':
+    resolution: {integrity: sha512-33BmhLUHMYPGLXXkucVJCABOyPIwxDjimthnFtu+Tq7g+sakB5GQ6L8fe1vgrkujI9IKI8x3BMKVugVGfDD+8A==}
+
+  '@mescius/spread-sheets-pivot-addon@19.2.5':
+    resolution: {integrity: sha512-HYkWhLlw27YIAW2vsnfaBH3CIsTsOzXOV/3K2uOHMCPCO63qSR9pft9fNR7qD+k0okBMRAxEW7sQ0bl64gePfQ==}
+
+  '@mescius/spread-sheets-print@19.2.5':
+    resolution: {integrity: sha512-0hugcJoBj3xbJkjr+zhSnZvk2HxxIf8+bVnYWzrhhB98WPshNuL1sdlnHYXI+JRxqPtWeN41rtBsB2YSHdziig==}
+
   '@mescius/spread-sheets-react@19.2.5':
     resolution: {integrity: sha512-M5awmQoF6d5v4bderYAL79gsT68TaipFMFj2RnHJMouhlLHlv1q+nWh+x3Krpwsh2OoOrh85m3g68vdJtO/Twg==}
+
+  '@mescius/spread-sheets-reportsheet-addon@19.2.5':
+    resolution: {integrity: sha512-l6h04z6xrsCbo4Jnmz59zmYFlg5uht3hGQEcKUlU9QXcvJbvdktAW6BDFcfRehMJ1zaHB8pWZqz2dJAI6/9aag==}
+
+  '@mescius/spread-sheets-shapes@19.2.5':
+    resolution: {integrity: sha512-YuXEvSuPxMnMe3H2j74U/Hpr5owuQEVi566CSuR4uaLuR55fxz7xgpAl5jLQbvkHXJkuQM8sM6v+s8Xi8eNZsQ==}
+
+  '@mescius/spread-sheets-slicers@19.2.5':
+    resolution: {integrity: sha512-gi+NDTk2BoBjOcq48XBBuV/VdEYHvl0mmMDfoUPBOfdXhXu22hCgyFbyDVhddA+AZAq7spkxjezgJiM+HdmZEw==}
+
+  '@mescius/spread-sheets-tablesheet@19.2.5':
+    resolution: {integrity: sha512-QYnX/YoOR6Hb0RAwkKPqwT+we1e/c4VhUkGHSZt5+RUgGQ5BnarpqOj+q0ZImU0yzc8B9iXtIMqFVKstRzAJiQ==}
 
   '@mescius/spread-sheets@19.2.5':
     resolution: {integrity: sha512-dREcCcE+eBkzkpnbZT523ijX0XTDWRIZLfg4wwWXdBw+AK5MRoP8q1qbebxUDtOvGj67iMG3xtpGCFEuxfRdDg==}
@@ -2142,11 +2344,72 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
+  '@mescius/spread-sheets-barcode@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+
+  '@mescius/spread-sheets-charts@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+      '@mescius/spread-sheets-shapes': 19.2.5
+
+  '@mescius/spread-sheets-datacharts-addon@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+      '@mescius/spread-sheets-shapes': 19.2.5
+
+  '@mescius/spread-sheets-designer-react@19.2.5': {}
+
+  '@mescius/spread-sheets-designer-resources-en@19.2.5': {}
+
+  '@mescius/spread-sheets-designer@19.2.5': {}
+
+  '@mescius/spread-sheets-ganttsheet@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+      '@mescius/spread-sheets-tablesheet': 19.2.5
+
   '@mescius/spread-sheets-io@19.2.5':
     dependencies:
       '@mescius/spread-sheets': 19.2.5
 
+  '@mescius/spread-sheets-languagepackages@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+
+  '@mescius/spread-sheets-pdf@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+      '@mescius/spread-sheets-print': 19.2.5
+
+  '@mescius/spread-sheets-pivot-addon@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+      '@mescius/spread-sheets-shapes': 19.2.5
+
+  '@mescius/spread-sheets-print@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+
   '@mescius/spread-sheets-react@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+
+  '@mescius/spread-sheets-reportsheet-addon@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+      '@mescius/spread-sheets-print': 19.2.5
+
+  '@mescius/spread-sheets-shapes@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+
+  '@mescius/spread-sheets-slicers@19.2.5':
+    dependencies:
+      '@mescius/spread-sheets': 19.2.5
+      '@mescius/spread-sheets-shapes': 19.2.5
+
+  '@mescius/spread-sheets-tablesheet@19.2.5':
     dependencies:
       '@mescius/spread-sheets': 19.2.5
 

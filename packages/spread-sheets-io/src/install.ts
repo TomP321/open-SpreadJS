@@ -12,10 +12,39 @@ export interface IoWorkbook {
   getSheet(index:number):{name():string;fromJSON(data:object):void;getRowCount():number;getColumnCount():number;getText(row:number,col:number):string};
   calculate():void;
 }
-export interface IoGC { Spread:{Sheets:{Workbook:{prototype:object}}} }
+export interface IoGC { Spread:{Sheets:{Workbook:{prototype:object};IO?:Record<symbol,unknown>}} }
 export type IoCallback=(...args:unknown[])=>void;
 const formatError=()=>({errorCode:1,errorMessage:'Incorrect file format.'});
 const state=new WeakMap<object,IoState>();
+// Core's GC.Spread.Sheets.IO.getPartialValues delegates binary XLSX decoding to
+// this package through the hidden hook the core exposes (TASK 44 item 3; trial
+// behaviour probed in `.probe/api-sweep-probe.mjs` segment `io2`).
+const IO_PARSER_HOOK=Symbol.for('@opensheets/io-file-parser');
+interface PartialRef{items?:{source?:unknown}[]}
+async function partialValuesParser(file:Blob|File,refs:PartialRef[]):Promise<Record<string,Record<string,Record<string,unknown>>>>{
+  const bytes=new Uint8Array(await file.arrayBuffer());
+  const {json}=readXlsx(bytes,{});
+  const needed=new Set<string>();
+  for(const ref of refs)for(const item of ref.items??[])for(const source of Array.isArray(item.source)?item.source:[item.source]){const name=(source as{sheetName?:string}|undefined)?.sheetName;if(name)needed.add(name);}
+  const out:Record<string,Record<string,Record<string,unknown>>>={};
+  const sheets=obj((json as RecordValue).sheets);
+  for(const key of Object.keys(sheets)){
+    const sheet=obj(sheets[key]);
+    const name=String(sheet.name??'');
+    if(!needed.has(name))continue;
+    const rows:Record<string,Record<string,unknown>>={};
+    const table=obj(obj(sheet.data).dataTable);
+    for(const r of Object.keys(table)){
+      const rowObj=obj(table[r]);
+      for(const c of Object.keys(rowObj)){
+        const cell=obj(rowObj[c]);
+        if(cell.value!==undefined)(rows[r]??= {})[c]=cell.value;
+      }
+    }
+    out[name]=rows;
+  }
+  return out;
+}
 function applyImportedMetadata(book:IoWorkbook,json:RecordValue,theme:string[]):void {
   const palette:Record<string,string>={};
   const names=['Background 1','Text 1','Background 2','Text 2','Accent 1','Accent 2','Accent 3','Accent 4','Accent 5','Accent 6','Hyperlink','Followed Hyperlink'];
@@ -83,5 +112,7 @@ export function install(GC:IoGC):void {
     void (async()=>{validateOptions(options);const result=readSjs(await bytesOf(file),options);await this.fromJSON(result.json,jsonOptions(options));applyImportedMetadata(this,result.json,result.state.theme??defaultTheme);state.set(this,result.state);report(result.state.warnings);if(options.fullRecalc)this.calculate();})().then(()=>success?.({}),e=>error?.(errorResult(e)));
   }});
   Object.defineProperty(proto,'save',{configurable:true,writable:true,value:function(this:IoWorkbook,success?:IoCallback,error?:IoCallback,options:IoOptions={}){void Promise.resolve().then(()=>{validateOptions(options);const result=writeSjs(this.toJSON(jsonOptions(options)),options,state.get(this));report(result.warnings);return new Blob([result.bytes as Uint8Array<ArrayBuffer>],{type:'application/zip'});}).then(blob=>success?.(blob),e=>error?.(errorResult(e)));}});
+  const hook=GC.Spread.Sheets.IO?.[IO_PARSER_HOOK];
+  if(typeof hook==='function')(hook as (parser:unknown)=>void)(partialValuesParser);
 }
 void arr;void obj;

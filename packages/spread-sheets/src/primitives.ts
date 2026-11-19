@@ -1,3 +1,5 @@
+import { instanceProperties } from './not-implemented.js';
+
 export function clone<T>(value: T): T {
   if (value instanceof Date) return new Date(value.getTime()) as T;
   if (Array.isArray(value)) return value.map(clone) as T;
@@ -74,18 +76,60 @@ export class Range {
     );
   }
 }
+instanceProperties(Range, 'row', 'col', 'rowCount', 'colCount');
 
 export class Point {
   constructor(
     public x = 0,
     public y = 0,
   ) {}
+  /** Returns a new point with the same coordinates. */
+  clone(): Point {
+    return new Point(this.x, this.y);
+  }
 }
+
+/** A rectangle defined by its top-left corner, width and height. */
+export class Rect {
+  constructor(
+    public x: number,
+    public y: number,
+    public width: number,
+    public height: number,
+  ) {}
+  /** True when (x, y) falls strictly inside the rectangle. */
+  contains(x: number, y: number): boolean {
+    return x > this.x && x < this.x + this.width && y > this.y && y < this.y + this.height;
+  }
+  /** True when the given rectangle shares area with this one. */
+  intersect(x: number, y: number, width: number, height: number): boolean {
+    return x < this.x + this.width && x + width > this.x && y < this.y + this.height && y + height > this.y;
+  }
+  /** True when the given rectangle shares area with this one. */
+  intersectRect(rect: Rect): boolean {
+    return !!rect && this.intersect(rect.x, rect.y, rect.width, rect.height);
+  }
+  /** The shared area of the two rectangles, or null when they do not intersect. */
+  getIntersectRect(rect: Rect): Rect | null {
+    if (!this.intersectRect(rect)) return null;
+    const x = Math.max(this.x, rect.x),
+      y = Math.max(this.y, rect.y);
+    return new Rect(x, y, Math.min(this.x + this.width, rect.x + rect.width) - x, Math.min(this.y + this.height, rect.y + rect.height) - y);
+  }
+}
+instanceProperties(Rect, 'x', 'y', 'width', 'height');
+
 export class LineBorder {
   constructor(
     public color = 'black',
     public style = 0,
   ) {}
+  /**
+   * Internal hint recorded by table theme cloning (Excel border level); not part
+   * of the documented public LineBorder contract and never read by the core.
+   * @internal
+   */
+  level?: number;
 }
 
 export const styleProperties = [
@@ -172,8 +216,10 @@ function getFont(style: Style): unknown {
   const cached = fonts.get(style);
   if (cached && (!cached.parts || Object.entries(cached.parts).every(([key, value]) => style[key] === value)))
     return cached.value;
-  if (style.fontSize && style.fontFamily)
-    return [style.fontStyle, style.fontWeight, style.fontSize, style.fontFamily].filter(Boolean).join(' ');
+  // The trial composes the shorthand from any subset of the font parts (TASK 46 probe:
+  // size only -> "11pt", family only -> "Georgia", full combo -> "italic bold 11pt Calibri").
+  const parts = [style.fontStyle, style.fontWeight, style.fontSize, style.fontFamily].filter(Boolean);
+  if (parts.length) return parts.join(' ');
   return cached?.value;
 }
 const styleArguments: StyleProperty[] = [
@@ -230,6 +276,11 @@ export class Style {
     setFont(this, value);
   }
   constructor(...values: unknown[]) {
+    // The official also accepts a single plain-options argument: new Style({ backColor: 'red', ... }).
+    if (values.length === 1 && values[0] !== null && typeof values[0] === 'object' && !Array.isArray(values[0]) && !(values[0] instanceof Style)) {
+      Object.assign(this, values[0]);
+      return;
+    }
     values.forEach((value, i) => {
       if (value !== undefined) this[styleArguments[i]] = value;
     });
@@ -237,11 +288,55 @@ export class Style {
   clone(): Style {
     return clone(this);
   }
+  /**
+   * Merges another style's members into this one (trial runtime extra, not declared by the
+   * d.ts contract): members this style already defines keep their value; a second truthy
+   * argument forces the source members to win (TASK 46 compose probe). Returns undefined;
+   * reading members of a missing first argument throws, like the trial.
+   */
+  compose(style: Style | undefined, override?: unknown): undefined {
+    const source = style as Style;
+    void source.labelOptions; // trial: `compose()` with no style throws on the first member read
+    const sourceJson = typeof source.toJSON === 'function' ? source.toJSON() : undefined;
+    const force = arguments.length > 1 && Boolean(override);
+    if (sourceJson)
+      for (const key of Object.keys(sourceJson)) {
+        const current = (this as Record<string, unknown>)[key];
+        if (force || current === undefined) (this as Record<string, unknown>)[key] = sourceJson[key];
+      }
+    return undefined;
+  }
+  /** Applies the members of a settings object to this style (trial runtime extra). */
+  fromJSON(settings: object): void {
+    for (const [key, value] of Object.entries(settings ?? {})) {
+      if (typeof value === 'function') continue;
+      (this as Record<string, unknown>)[key] = value;
+    }
+  }
+  /** Serialize the style's own defined fields (undefined ones stay out, matching the official
+   *  named-style `toJSON()` shape used by `workbook.getNamedStyle(name).toJSON()`). The trial
+   *  returns `undefined` for a style without any assigned member (TASK 46 probe). */
+  toJSON(): Record<string, unknown> | undefined {
+    const out: Record<string, unknown> = {};
+    for (const key of styleProperties) {
+      if (key === 'font') continue; // represented through fontStyle/fontWeight/fontSize/fontFamily
+      const value = (this as Record<string, unknown>)[key];
+      if (value === undefined) continue;
+      out[key] = value && typeof value === 'object' && typeof (value as { toJSON?: unknown }).toJSON === 'function'
+        ? (value as { toJSON: () => unknown }).toJSON()
+        : clone(value);
+    }
+    const font = getFont(this);
+    if (font !== undefined) out.font = clone(font);
+    return Object.keys(out).length ? out : undefined;
+  }
 }
-// Absent style fields remain undefined, and are distinct from resolved defaults.
-for (const key of [...styleProperties, 'quotePrefix'])
-  if (key !== 'font')
-    Object.defineProperty(Style.prototype, key, { value: undefined, writable: true, configurable: true });
+// Absent style fields remain undefined, and are distinct from resolved defaults. The trial
+// declares none of them on the prototype (they appear only as own data properties once
+// assigned), but the public contract declares them, so they exist as accessor pairs
+// (`instanceProperties`): a read without an assigned value still yields `undefined`, and an
+// assignment shadows the accessor with an own enumerable data property - the trial's shape.
+instanceProperties(Style, ...styleProperties, 'quotePrefix');
 
 export class NameInfo {
   _onRename?: (previous: string, next: string) => void;

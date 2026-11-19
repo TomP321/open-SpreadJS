@@ -1,0 +1,66 @@
+{
+  "name": "@opensheets/spread-sheets-designer-react",
+  "version": "0.1.0",
+  "description": "React wrapper component for the OpenSheets Designer control.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.designer.react.cjs",
+  "module": "./dist/gc.spread.sheets.designer.react.esm.js",
+  "types": "./dist/gc.spread.sheets.designer.react.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets",
+    "javascript spreadsheet",
+    "javascript excel",
+    "sheets",
+    "sheet",
+    "designer",
+    "react",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.designer.react.d.ts",
+        "default": "./dist/gc.spread.sheets.designer.react.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.designer.react.d.cts",
+        "default": "./dist/gc.spread.sheets.designer.react.cjs"
+      }
+    },
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsx scripts/clean.ts && tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets-designer": "*",
+    "react": ">=16.8",
+    "react-dom": ">=16.8"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets-designer": "workspace:@opensheets/spread-sheets-designer@*",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1"
+  }
+}

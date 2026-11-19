@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { SpreadSheets, Worksheet, Column } from '../src/index.js';
-import GC from '@opensheets/spread-sheets';
+import GC from '@mescius/spread-sheets';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 it('creates a workbook, configures children, calls the initializer, and destroys on unmount', () => {
   const host = document.createElement('div');
@@ -29,6 +29,20 @@ it('uses one default sheet and has declarative marker components', () => {
   act(() => root.unmount());
   expect(new Worksheet({}).render()).toBeNull();
   expect(new Column({}).render()).toBeNull();
+});
+
+it('fills its parent with the host element, the way the official wrapper does, unless hostStyle overrides it', () => {
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  act(() => root.render(<SpreadSheets><Worksheet name="Fill" /></SpreadSheets>));
+  const element = host.firstElementChild as HTMLElement;
+  expect(element.style.width).toBe('100%');
+  expect(element.style.height).toBe('100%');
+  expect(element.style.overflow).toBe('visible');
+  act(() => root.render(<SpreadSheets hostStyle={{ width: 480, height: 240 }}><Worksheet name="Fill" /></SpreadSheets>));
+  expect((host.firstElementChild as HTMLElement).style.width).toBe('480px');
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('240px');
+  act(() => root.unmount());
 });
 
 it('keeps the workbook across equivalent parent renders and updates host styles', () => {

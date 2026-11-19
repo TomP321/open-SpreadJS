@@ -39,7 +39,9 @@ describe('calculation engine performance', () => {
     expect(sheet.getValue(99_999, 0)).toBe(100_004);
     console.log(`100k-chain first calculation: ${elapsed.toFixed(0)} ms`);
     workbook.destroy();
-  });
+    // Supervisor (PF-3): this case asserts correctness (no stack overflow), not speed; the vitest default 5 s
+    // timeout made it fail only when both coders load the machine. Its own timing is logged above.
+  }, 30_000);
 
   it('recalculates 10k dependent SUMs in under 50 ms after one input change', () => {
     const workbook = new GC.Spread.Sheets.Workbook();

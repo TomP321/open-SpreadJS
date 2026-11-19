@@ -75,6 +75,8 @@ describe('M5 input masks', () => {
     expect(applyMask('12x34', { pattern: '000-000', excludeLiteral: true, excludePlaceholder: true })).toBe('1234');
     expect(applyMask('hELLO', { pattern: '><<<<' })).toBe('Hello');
     expect(applyMask('a7oSn', { pattern: '[>0]{5}' })).toBe('A7OSN');
-    expect(() => applyMask('20200101', { pattern: 'yyyy/MM/dd' })).toThrow('NotImplemented: InputMask date fields');
+    expect(applyMask('20200101', { pattern: 'yyyy/MM/dd' })).toBe('2020/01/01');
+    expect(applyMask('3/4/2001', { pattern: 'MM/dd/yyyy' })).toBe('03/04/2001');
+    expect(applyMask('342001', { pattern: 'M/d/yyyy' })).toBe('3/4/2001');
   });
 });
