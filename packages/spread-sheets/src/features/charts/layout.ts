@@ -86,4 +86,3 @@ export function computeLayout(width: number, height: number, options: LayoutInpu
  */
 export const RIGHT_GUTTER = 22;
 export const BOTTOM_GUTTER = 30;
-export const LEGEND_BAND = 48;

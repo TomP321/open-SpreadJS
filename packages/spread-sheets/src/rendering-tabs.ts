@@ -41,7 +41,7 @@ export function drawHeaders(renderer: WorkbookRenderer, ctx: CanvasRenderingCont
       let headerLabelWidth = col.size;
       if (headerFilter && headerFilter.range) {
         const index = col.index - headerFilter.range.col;
-        if (index >= 0 && index < headerFilter.range.colCount && headerFilter.filterButtonVisible(index) !== false)
+        if (index >= 0 && index < headerFilter.range.colCount && headerFilter.filterButtonVisible(col.index) !== false)
           headerLabelWidth -= Math.min(18, col.size - 4) + 2;
       }
       ctx.fillText(text == null ? columnLabel(col.index) : String(text), col.position + headerLabelWidth / 2 - 0.5, columnBandTop + fontMetrics(ctx.font).baseline + (columnBandHeight - fontMetrics(ctx.font).height - 3) / 2);
@@ -210,7 +210,7 @@ export function drawSelection(renderer: WorkbookRenderer, ): void {
         if (!r || !c) continue;
         const rect = renderer.rangeRect(range, r, c);
         ctx.save(); ctx.beginPath(); ctx.rect(Math.max(renderer.headerWidth - 2, colPane.min - 2), Math.max(renderer.headerHeight - 2, rowPane.min - 2), colPane.max - colPane.min + 3, rowPane.max - rowPane.min + 3); ctx.clip();
-        if ((renderer.sheet as unknown as { _isGanttSheet?: boolean })._isGanttSheet) {
+        if (renderer.sheet && '_isGanttSheet' in renderer.sheet) {
           // The Gantt trial marks the active cell with a plain 1px grey rect inset in the cell
           // (no green border, no fill, no drag handle; measured x+0..1 / y+1 edges).
           ctx.strokeStyle = '#7f7f7f'; ctx.lineWidth = 1;
@@ -478,7 +478,7 @@ export function filterButtonHit(renderer: WorkbookRenderer, x: number, y: number
     if (filter && filter.range && renderer.headerHeight > 0) {
       for (const col of renderer.cols) {
         const index = col.index - filter.range.col;
-        if (index < 0 || index >= filter.range.colCount || filter.filterButtonVisible(index) === false) continue;
+        if (index < 0 || index >= filter.range.colCount || filter.filterButtonVisible(col.index) === false) continue;
         if (geometry(col.position, 0, col.size, renderer.headerHeight)) return { kind: 'sheet', col: col.index };
       }
     }

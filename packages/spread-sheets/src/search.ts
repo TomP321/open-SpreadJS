@@ -161,16 +161,47 @@ function candidateCells(
   target: number,
   from: { row: number; col: number },
   size: { rows: number; cols: number },
-): [number, number][] {
+): Iterable<[number, number]> {
   const data = sheet.areas.get(condition.sheetArea ?? SheetArea.viewport);
+  const cellLike = (target & (SearchFoundFlags.cellText | SearchFoundFlags.cellTag | SearchFoundFlags.cellFormula)) !== 0;
+  const commentLike = (target & (SearchFoundFlags.cellComment | SearchFoundFlags.cellThreadedComment)) !== 0;
+  // Fast path: the common cell text/tag/formula search streams the sparse grid
+  // in scan order and stops at the first match — no materialisation, no sort.
+  if (data && cellLike && !commentLike) {
+    const reverse = condition.searchOrder === SearchOrder.nOrder;
+    const slots = size.rows * size.cols;
+    const cellCount = data.cells.size;
+    if (slots <= Math.max(65536, cellCount * 32)) {
+      // Dense rectangle: probing (row, col) positions beats streaming three
+      // merged generators — no per-position allocation, near-array cost.
+      return (function* probe(): Iterable<[number, number]> {
+        if (!reverse) {
+          for (let row = from.row; row < size.rows; row++)
+            for (let col = row === from.row ? from.col : 0; col < size.cols; col++)
+              if (data.cells.has(row, col)) yield [row, col];
+        } else {
+          for (let row = size.rows - 1; row >= from.row; row--)
+            for (let col = size.cols - 1; col >= (row === from.row ? from.col : 0); col--)
+              if (data.cells.has(row, col)) yield [row, col];
+        }
+      })();
+    }
+    return (function* stream(): Iterable<[number, number]> {
+      for (const [row, col, cell] of data.cells.orderedEntries(reverse)) {
+        if (!cell) continue;
+        if (row < 0 || row >= size.rows || col < 0 || col >= size.cols) continue;
+        if (row < from.row || (row === from.row && col < from.col)) continue;
+        yield [row, col];
+      }
+    })();
+  }
   const found = new Map<string, [number, number]>();
   const add = (row: number, col: number): void => {
     if (row < from.row || row >= size.rows || col < 0 || col >= size.cols) return;
     if (row === from.row && col < from.col) return;
     found.set(`${row}:${col}`, [row, col]);
   };
-  if (data && target & (SearchFoundFlags.cellText | SearchFoundFlags.cellTag | SearchFoundFlags.cellFormula))
-    for (const [row, col, cell] of data.cells.entries()) if (cell) add(row, col);
+  if (data && cellLike) for (const [row, col, cell] of data.cells.entries()) if (cell) add(row, col);
   if (data && target & SearchFoundFlags.cellComment) for (const comment of sheet.comments.all()) add(comment.rowIndex(), comment.colIndex());
   if (data && target & SearchFoundFlags.cellThreadedComment)
     for (const thread of sheet.threadedComments.all()) add(thread.row(), thread.col());

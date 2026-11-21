@@ -48,24 +48,39 @@ export function applyStyle(d: Designer, property: string, value: unknown): void 
   setStyleProperty(activeSheet(d), activeRanges(activeSheet(d)), property, value);
 }
 
-export function toggleBold(d: Designer): void {
-  const style = currentStyle(d);
-  const isBold = /bold|[6-9]00/.test(String(style.fontWeight ?? ''));
-  applyStyle(d, 'fontWeight', isBold ? 'normal' : 'bold');
+/* TASK 75 (trial probe): the trial's font commands write a value from the command
+ * arguments (`false` when no value is given — the ribbon checkbox passes the next
+ * state), and serialise the change as the `font` shorthand next to the longhand
+ * property. The underline family writes `textDecoration: 0` (the trial's enum). */
+export function setBold(d: Designer, on: unknown): void {
+  applyStyle(d, 'fontWeight', on ? 'bold' : 'normal');
+  applyStyle(d, 'font', on ? 'bold' : 'normal');
 }
-export function toggleItalic(d: Designer): void {
-  const style = currentStyle(d);
-  applyStyle(d, 'fontStyle', /italic|oblique/.test(String(style.fontStyle ?? '')) ? 'normal' : 'italic');
+export function setItalic(d: Designer, on: unknown): void {
+  applyStyle(d, 'fontStyle', on ? 'italic' : 'normal');
+  applyStyle(d, 'font', on ? 'italic' : 'normal');
 }
-export function toggleUnderline(d: Designer): void {
-  const style = currentStyle(d);
-  const current = String(style.textDecoration ?? '');
-  applyStyle(d, 'textDecoration', current.includes('underline') ? 'none' : 'underline');
+export function setUnderline(d: Designer): void {
+  applyStyle(d, 'textDecoration', 0);
 }
-export function toggleDoubleUnderline(d: Designer): void {
-  const style = currentStyle(d);
-  const current = String(style.textDecoration ?? '');
-  applyStyle(d, 'textDecoration', current.includes('double underline') ? 'none' : 'double underline');
+export function setDoubleUnderline(d: Designer): void {
+  applyStyle(d, 'textDecoration', 0);
+}
+/** Trial shorthand: the font name alone goes into `font` together with `fontFamily`. */
+export function setFontFamily(d: Designer, family: unknown): void {
+  applyStyle(d, 'fontFamily', String(family));
+  applyStyle(d, 'font', String(family));
+}
+/** Trial shorthand: the point size goes into `font` together with `fontSize`. */
+export function setFontSizePt(d: Designer, size: number): void {
+  applyStyle(d, 'fontSize', `${size}pt`);
+  applyStyle(d, 'font', `${size}pt`);
+}
+/** Effective font size in points: the trial's unstyled cell computes as 11pt (15px). */
+export function effectiveFontSizePt(style: Record<string, unknown>): number {
+  const raw = String(style.fontSize ?? '15px');
+  const n = Number.parseFloat(raw);
+  return raw.endsWith('px') ? n * 0.75 : n;
 }
 
 export function setNumberFormat(d: Designer, value: string): void {
@@ -74,12 +89,16 @@ export function setNumberFormat(d: Designer, value: string): void {
     const r = Math.max(0, range.row), c = Math.max(0, range.col);
     const rows = range.row < 0 ? [range.row] : Array.from({ length: range.rowCount }, (_, i) => r + i);
     const cols = range.col < 0 ? [range.col] : Array.from({ length: range.colCount }, (_, i) => c + i);
-    for (const row of rows) for (const col of cols) internals(sheet)._setStyleProperty(row, col, 'formatter', value === 'General' ? undefined : value);
+    /* Trial (TASK 75 sweep): General sets an empty formatter object (the General
+     * formatter), not a missing one. */
+    for (const row of rows) for (const col of cols) internals(sheet)._setStyleProperty(row, col, 'formatter', value === 'General' ? {} : value);
   }
 }
 
 export function adjustDecimals(d: Designer, delta: number): void {
   const style = currentStyle(d);
+  // Trial (TASK 75 probe): on a General cell Decrease Decimals writes the empty format.
+  if (style.formatter === undefined && delta < 0) { setNumberFormat(d, ''); return; }
   const format = String(style.formatter ?? '0');
   const pattern = format.includes(';') ? format.split(';')[0] : format;
   const match = pattern.match(/\.([0#]+)/);
@@ -95,45 +114,94 @@ export function setAlignment(d: Designer, property: 'hAlign' | 'vAlign', value: 
   applyStyle(d, property, value);
 }
 
-export function setOrientation(d: Designer, value: number): void {
+/* Trial (TASK 75 probe): the Orientation gallery writes the `textIndent`/`isVerticalText`
+ * defaults next to the angle; `verticalText` writes `isVerticalText:true` with angle 0. */
+export function setOrientation(d: Designer, value: number, vertical = false): void {
+  if (vertical) {
+    applyStyle(d, 'isVerticalText', true);
+    applyStyle(d, 'textOrientation', 0);
+    return;
+  }
+  applyStyle(d, 'textIndent', 0);
+  applyStyle(d, 'isVerticalText', false);
   applyStyle(d, 'textOrientation', value);
 }
 
+/* Trial border styles (TASK 75): thin = 1, thick = 5, double = 6, and the trial's
+ * `LineBorder` carries no colour — the serialised border is just `{style: n}` — while
+ * No Border clears the four border properties to null. */
 export function applyBorder(d: Designer, kind: string): void {
   const sheet = activeSheet(d);
-  const GC = d.gc;
-  const line = new GC.Spread.Sheets.LineBorder('#000000', 1);
-  const options: Record<string, boolean> = {};
-  if (kind === 'bottomBorder') options.bottom = true;
-  else if (kind === 'topBorder') options.top = true;
-  else if (kind === 'leftBorder') options.left = true;
-  else if (kind === 'rightBorder') options.right = true;
-  else if (kind === 'allBorder') options.all = true;
-  else if (kind === 'outsideBorder' || kind === 'thickBoxBorder') options.outline = true;
-  else if (kind === 'bottomDoubleBorder' || kind === 'thickBottomBorder') options.bottom = true;
-  else if (kind === 'topBottomBorder' || kind === 'topThickBottomBorder' || kind === 'topDoubleBottomBorder') {
-    options.top = true; options.bottom = true;
-  } else if (kind === 'noBorder') {
-    const none = new GC.Spread.Sheets.LineBorder('transparent', 0);
-    for (const range of activeRanges(sheet)) {
-      const r = Math.max(0, range.row), c = Math.max(0, range.col);
-      sheet.getRange(r, c, range.rowCount, range.colCount).setBorder(none, { all: true });
-    }
-    return;
+  const thin = { style: 1 };
+  const thick = { style: 5 };
+  const double = { style: 6 };
+  /* Trial (TASK 75 r3, 13-command probe matrix over a 3x4 selection): every border
+   * command touches only the EDGE cells of the range — the bottom/top row, the left/
+   * right column, the outline (outer sides only) or every side of every cell
+   * (All Borders). The big `border` button defaults to the thin bottom border
+   * (dispatched as `bottomBorder` by the command table). */
+  type Side = [property: string, value: unknown, where: 'top' | 'bottom' | 'left' | 'right' | 'all' | 'outline-top' | 'outline-bottom' | 'outline-left' | 'outline-right'];
+  let sides: Side[] = [];
+  switch (kind) {
+    case 'bottomBorder': sides = [['borderBottom', thin, 'bottom']]; break;
+    case 'topBorder': sides = [['borderTop', thin, 'top']]; break;
+    case 'leftBorder': sides = [['borderLeft', thin, 'left']]; break;
+    case 'rightBorder': sides = [['borderRight', thin, 'right']]; break;
+    case 'allBorder': sides = [['borderLeft', thin, 'all'], ['borderTop', thin, 'all'], ['borderRight', thin, 'all'], ['borderBottom', thin, 'all']]; break;
+    case 'outsideBorder': sides = [['borderLeft', thin, 'outline-left'], ['borderTop', thin, 'outline-top'], ['borderRight', thin, 'outline-right'], ['borderBottom', thin, 'outline-bottom']]; break;
+    case 'thickBoxBorder': sides = [['borderLeft', thick, 'outline-left'], ['borderTop', thick, 'outline-top'], ['borderRight', thick, 'outline-right'], ['borderBottom', thick, 'outline-bottom']]; break;
+    case 'bottomDoubleBorder': sides = [['borderBottom', double, 'bottom']]; break;
+    case 'thickBottomBorder': sides = [['borderBottom', thick, 'bottom']]; break;
+    case 'topBottomBorder': sides = [['borderTop', thin, 'top'], ['borderBottom', thin, 'bottom']]; break;
+    case 'topThickBottomBorder': sides = [['borderTop', thin, 'top'], ['borderBottom', thick, 'bottom']]; break;
+    case 'topDoubleBottomBorder': sides = [['borderTop', thin, 'top'], ['borderBottom', double, 'bottom']]; break;
+    case 'noBorder':
+      sides = [['borderLeft', null, 'all'], ['borderTop', null, 'all'], ['borderRight', null, 'all'], ['borderBottom', null, 'all'],
+        // Trial (TASK 75 sweep): No Border also materialises the diagonals as null.
+        ['diagonalDown', null, 'all'], ['diagonalUp', null, 'all']];
+      break;
+    default: return;
   }
   for (const range of activeRanges(sheet)) {
     const r = Math.max(0, range.row), c = Math.max(0, range.col);
-    sheet.getRange(r, c, range.rowCount, range.colCount).setBorder(line, options);
+    const rowCount = Math.max(1, range.rowCount), colCount = Math.max(1, range.colCount);
+    for (let i = 0; i < rowCount; i++)
+      for (let j = 0; j < colCount; j++) {
+        const top = i === 0, bottom = i === rowCount - 1, left = j === 0, right = j === colCount - 1;
+        for (const [property, value, where] of sides) {
+          const hits = where === 'all'
+            || (where === 'top' && top) || (where === 'bottom' && bottom)
+            || (where === 'left' && left) || (where === 'right' && right)
+            || (where === 'outline-top' && top) || (where === 'outline-bottom' && bottom)
+            || (where === 'outline-left' && left) || (where === 'outline-right' && right);
+          if (hits) internals(sheet)._setStyleProperty(r + i, c + j, property, value);
+        }
+      }
   }
+  d.invalidate();
 }
 
-export function mergeCenter(d: Designer): void {
+/* Trial (TASK 75 r3, true multi-cell probes): the merge commands work on every execute
+ * path — the earlier "bare no-op" readings were the harness collapsing the selection.
+ * `mergeCells` writes only the span, `mergeAcross` one span per row (no alignment),
+ * `mergeCenterButton` the span plus `hAlign: center` on the anchor. A single-cell
+ * selection never creates a span; only the centre variants align it. */
+export function mergeCenter(d: Designer, mode = 'center'): void {
   const sheet = activeSheet(d);
   for (const range of activeRanges(sheet)) {
     const r = Math.max(0, range.row), c = Math.max(0, range.col);
-    sheet.addSpan(r, c, Math.max(1, range.rowCount), Math.max(1, range.colCount));
-    internals(sheet)._setStyleProperty(r, c, 'hAlign', H.center);
-    internals(sheet)._setStyleProperty(r, c, 'vAlign', H.middle);
+    const rowCount = Math.max(1, range.rowCount), colCount = Math.max(1, range.colCount);
+    if (rowCount === 1 && colCount === 1) {
+      if (mode === 'center') internals(sheet)._setStyleProperty(r, c, 'hAlign', H.center);
+      continue;
+    }
+    if (mode === 'across') {
+      for (let row = r; row < r + rowCount; row++) sheet.addSpan(row, c, 1, colCount);
+      continue;
+    }
+    sheet.addSpan(r, c, rowCount, colCount);
+    // The trial's Merge & Centre writes only `hAlign: 1` on the anchor (probe: no vAlign).
+    if (mode === 'center') internals(sheet)._setStyleProperty(r, c, 'hAlign', H.center);
   }
 }
 export function unmerge(d: Designer): void {

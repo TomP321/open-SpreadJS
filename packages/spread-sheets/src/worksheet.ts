@@ -70,7 +70,7 @@ import worksheetDefaults from './worksheet-defaults.json';
 import { type AreaData, type CellData, type DirtyCell, type LiveWorkbookOptions, type SerializationOptions, type WorksheetOptions, Batching, coordinate } from './sheet-common.js';
 import { worksheetFromJSON, worksheetToJSON } from './sheet-serialization.js';
 import { _arrayFormula, _attach, _autoExpandTables, area as areaImpl, _defaultSheetSettings, _defaultsProxy, _fastValue, _flushPaint, _getFormula, _getValue, _invalidatingProxy, _isEditableCell, _isFreshHyperlink, _isSelectableCell, _onInvalidate, _resumeWorkbookCalc, _setCalculatedValue, _setCalcEngine, _setValue, _setFormulaText, _tag, _translateFormula, _usedRange, _viewCellStore, a1Cell, addCustomFunction, addCustomName, addNamedStyle, axisChanged, axisInfo, bindColumns, cell, changed, clearCustomFunctions, clearCustomNames, clearPendingChanges, ensure, flushCalc, markDirty, prune, getArray, getCell, getCustomFunction, getCustomName, getDependents, getDirtyCells, getFormulaInformation, getHyperlink, getNamedStyle, getNamedStyles, getPrecedents, getRange, getSpan, getSpans, getText, hasPassword, hasPendingChanges, invalidateLayout, isDirty, isDirtySuspended, isPaintSuspended, loadBinding, name, getParent, protect, queueCalc, recalcAll, removeCustomFunction, removeCustomName, resumeCalcService, resumePaint, removeNamedStyle, repaint, rowFilter, setArray, setArrayFormula, setDataSource, setFormula, setHyperlink, setText, resumeDirty, suspendCalcService, suspendDirty, suspendPaint, unprotect } from './sheet-cells.js';
-import { _setDataValidator, _setStyleProperty, _setValidatorRecord, _tableStyleAt, getActualStyle, getAltText, getBindingPath, getCellType, getDataValidator, getDefaultStyle, getDefaultValue, getFormatter, getStyle, getStyleName as getStyleNameImpl, getTag, isValid, setAltText, setCellType, setDefaultStyle, setDefaultValue, setFormatter, setStyle, setStyleName, setTag } from './sheet-styles.js';
+import { _setDataValidator, _setStyleProperty, _setValidatorRecord, _tableStyleAt, fillStyleRecord, getActualStyle, getAltText, getBindingPath, getCellType, getDataValidator, getDefaultStyle, getDefaultValue, getFormatter, getStyle, getStyleName as getStyleNameImpl, getTag, isValid, setAltText, setCellType, setDefaultStyle, setDefaultValue, setFormatter, setStyle, setStyleName, setTag } from './sheet-styles.js';
 import { addSpan, autoFitColumn, autoFitRow, axisMetadata, frozenColumnCount, frozenRowCount, frozenTrailingColumnCount, frozenTrailingRowCount, getCellRect, measureContext, removeSpan, setAxisMetadata, setDimension, _columnCount, _outlineGutters, _rowCount, _setColumnVisible, _setRowVisible } from './sheet-layout.js';
 import { _backgroundImageJSON, _clearPrintAreaName, _manualPageBreaks, _pageBreakIndices, _setPrintAreaRange, _themeFonts, _themePalette, _themeValue, backgroundImage, currentTheme, getBackgroundImageInfo, getColumnPageBreak, getRowPageBreak, isPrintLineVisible, printInfo, setColumnPageBreak, setRowPageBreak, showColumnOutline, showRowOutline, tabColor, visible, zoom } from './sheet-print.js';
 import { _clipboardMode, _clipboardSource, _setUserSelections, addSelection, clearSelection, getActiveColumnIndex, getActiveRowIndex, getSelections, setActiveCell, setSelection, updateSelections } from './sheet-selection.js';
@@ -101,6 +101,8 @@ export interface WorkbookHost {
   getNamedStyle(name: string): Style;
   /** True while the scenario manager is capturing value writes (hot-path flag). */
   _scenariosCapturing: boolean;
+  /** @internal Pivot slicer caches restored before their pivot tables exist; applied at the end of the load. */
+  _pendingPivotSlicerCaches?: unknown[];
   invalidateLayout(): void;
   repaint(): void;
   isPaintSuspended(): boolean;
@@ -125,7 +127,7 @@ export class Worksheet {
   /** The slicer collection (`worksheet.slicers`): table slicers filter the bound table. */
   readonly slicers = new SlicerCollection(this);
   /** The pivot table manager (`worksheet.pivotTables`), see `GC.Spread.Pivot`. */
-  readonly pivotTables = new PivotTableManager(this);
+  readonly pivotTables: PivotTableManager = new PivotTableManager(this);
   sparklineCells = new Map<string, Sparkline>();
   getSparkline(row: number, col: number): Sparkline | null { return getSparkline(this, row, col); }
   setSparkline(row: number, col: number, dataRange: Range | string, orientation: number, type: number, setting = new SparklineSetting(), dateRange?: Range | string, dateOrientation?: number): Sparkline {
@@ -396,6 +398,7 @@ export class Worksheet {
     return this.tables.find(row, col);
   }
   _tablesChanged(): void {
+    this._formatterEpoch++;
     (this.calcEngine as { tablesChanged?: () => void } | undefined)?.tablesChanged?.();
     this.slicers._refreshForTables();
   }
@@ -425,6 +428,10 @@ export class Worksheet {
   getStyleName(row: number, col: number, area = VIEW): string | null | undefined {
     return getStyleNameImpl(this, row, col, area);
   }
+  /** @internal The fill-copy style record (trial parity, TASK 75; see `fillStyleRecord`). */
+  _fillStyleRecord(row: number, col: number): Record<string, unknown> {
+    return fillStyleRecord(this, row, col);
+  }
   _setStyleProperty(row: number, col: number, property: string, value: unknown, area = VIEW): void {
     _setStyleProperty(this, row, col, property, value, area);
   }
@@ -435,6 +442,13 @@ export class Worksheet {
     setFormatter(this, row, col, value, area);
   }
   cachedDefaultCellType?: ReturnType<typeof defaultCellType>;
+  /**
+   * Bumped by every change that can alter the formatter a formatter-free cell
+   * inherits (default style, named styles, tables, conditional formats). See
+   * `getFormatter` — the per-cell cache for plain cells is validated against it.
+   */
+  _formatterEpoch = 0;
+  _formatterCache?: { epoch: number; defaultStyle: unknown; area: number; formatter: unknown };
   getCellType(row: number, col: number, area = VIEW): unknown {
     return getCellType(this, row, col, area);
   }
@@ -560,6 +574,15 @@ export class Worksheet {
   }
   setRowVisible(row: number, value: boolean, area = VIEW): void {
     _setRowVisible(this, row, value, area);
+  }
+  /**
+   * @internal Restores a hidden row WITHOUT the `visible: true` record the public setter
+   * materialises, and removes an earlier such record: the trial's filter clear shows the
+   * rows it hid silently (TASK 75 sweep, `clearFilter` / `clearFilterData`).
+   */
+  _restoreRowVisibility(row: number, area = VIEW): void {
+    _setRowVisible(this, row, true, area, false);
+    this._rowLayout(area).unrecordVisible(row);
   }
   getColumnVisible(col: number, area = VIEW): boolean {
     return this._columnLayout(area).isVisible(col);
@@ -903,8 +926,12 @@ export class Worksheet {
   _clipboardClear(): void { (this._view()?.interaction as { _clearClipboard?: () => void } | undefined)?._clearClipboard?.(); }
   startEdit(selectAll = false, defaultText?: string): void {
     const view = this._view();
-    if (view) view.interaction.startEdit(selectAll, defaultText);
-    this.editorStatusValue = EditorStatus.enter;
+    if (view) {
+      // A cancelled EditStarting (or a non-editable cell) leaves the editor closed; the trial
+      // then keeps `isEditing()` false, so only report the enter status when editing began.
+      view.interaction.startEdit(selectAll, defaultText);
+      if (view.interaction.isEditing) this.editorStatusValue = EditorStatus.enter;
+    } else this.editorStatusValue = EditorStatus.enter;
   }
   endEdit(ignoreValueChange = false): boolean {
     const result = this._view()?.interaction.endEdit(ignoreValueChange) ?? true;
@@ -1116,10 +1143,10 @@ export class Worksheet {
   getFormulaInformation(row: number, col: number): FormulaInfo {
     return getFormulaInformation(this, row, col);
   }
-  /** Searches this sheet with the given condition (`Workbook.search` covers the workbook). */
-  search(searchCondition: SearchCondition): SearchResult {
-    // Without a condition the trial answers `null` (probe items `search-5`, `search-8`).
-    if (searchCondition === undefined || searchCondition === null) return null as unknown as SearchResult;
+  /** Searches this sheet with the given condition (`Workbook.search` covers the workbook).
+   * Returns `null` when no condition is given, matching the trial (probe `search-5`, `search-8`). */
+  search(searchCondition: SearchCondition): SearchResult | null {
+    if (searchCondition === undefined || searchCondition === null) return null;
     return searchSheet(this, searchCondition, -1);
   }
   invalidateLayout(): void {

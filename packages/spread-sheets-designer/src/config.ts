@@ -1,6 +1,7 @@
 import type { IButtonGroup, ICommandGroup, IDesignerConfig, IRibbonPanel } from './types.js';
 import { createCommandMap } from './commands/index.js';
 import { pivotContextualTabs } from './pivot-ribbon.js';
+import { contextualTabs, shapeDesignGroups } from './contextual-ribbon.js';
 
 const c = (command: string): string => command;
 const dir = (direction: string, children: (ICommandGroup | string)[]): ICommandGroup => ({ direction, children });
@@ -334,34 +335,14 @@ const viewGroups: IButtonGroup[] = [
   g('Command Palette', '', { children: [dir('horizontal', [c('commandPaletteButton')])] }),
 ];
 
-/* Shape Format contextual tab (trial 19.2.5): groups observed on the official
- * designer with a shape selected — Insert Shapes, Shape Styles (Change Shape +
- * six quick styles), Accessibility, Rotate, Group, Align, Arrange (order
- * dropdown, Size dialog, Selection Pane) and Format Pane. */
-const shapeFormatGroups: IButtonGroup[] = [
-  g('Insert Shapes', 'ribbon-thumbnail-shape-insert', { children: [c('shapeFormatInsertShapes')] }, { class: 'rb-shape-insert' }),
-  g('Shape Styles', 'ribbon-thumbnail-shape-styles', {
-    children: [dir('horizontal', [
-      c('changeShape'),
-      dir('horizontal', [
-        c('shapeStyle1'), c('shapeStyle2'), c('shapeStyle3'), c('shapeStyle4'), c('shapeStyle5'), c('shapeStyle6'), c('shapeStyle7'),
-        dropdown('shapeStylesMore', []),
-      ]),
-    ])],
-  }, { class: 'rb-shape-styles' }),
-  g('Accessibility', 'ribbon-thumbnail-shape-accessibility', { children: [dir('vertical', [c('shapeAltText')])] }),
-  g('Rotate', 'ribbon-thumbnail-shape-rotate', { children: [dir('vertical', [dropdown('shapeRotate', [])])] }),
-  g('Group', 'ribbon-thumbnail-shape-group', { children: [dir('vertical', [dropdown('shapeGroup', [c('shapeUnGroup')])])] }),
-  g('Align', 'ribbon-thumbnail-shape-align', { children: [dir('vertical', [dropdown('shapeAlign', [])])] }),
-  g('Arrange', 'ribbon-thumbnail-shape-arrange', {
-    children: [dir('horizontal', [
-      c('bringShapeForward'), c('sendShapeBackward'),
-      dropdown('shapeSize', []),
-      c('selectionPaneButton'),
-    ])],
-  }),
-  g('Format Pane', 'ribbon-thumbnail-shape-format-pane', { children: [dir('vertical', [c('shapeFormatPane')])] }),
-];
+/* Contextual tabs (trial 19.2.5): TASK 74 re-grouped "Shape Format" to the
+ * trial's ten groups (Insert Shapes, Shape Styles, Accessibility, Rotate, Group,
+ * Align, Arrange, Size, Selection Pane, Format Pane — `shapeDesign` in the
+ * trial's config) and added the Table Design / Chart Design / Sparkline tabs;
+ * their groups, captions, nesting and command ids were read from the reference
+ * product's public ribbon structure (see contextual-ribbon.ts). */
+const [tableDesignTab, chartDesignTab, formulaSparklineTab, sparklineTab] = contextualTabs;
+const shapeDesignTab: IRibbonPanel = { id: 'shapeDesign', text: 'Shape Format', buttonGroups: shapeDesignGroups, contextual: true };
 
 const settingsGroups: IButtonGroup[] = [  g('Spread Settings', 'ribbon-thumbnail-spreadsettings', {
     children: [dir('horizontal', [c('spreadSettingGeneral'), dir('vertical', [c('spreadSettingScrollBar'), c('spreadSettingCalculation'), c('spreadSettingTabStrip')])])],
@@ -380,7 +361,12 @@ const mainTabs: IRibbonPanel[] = [
   { id: 'review', text: 'Review', buttonGroups: reviewGroups },
   { id: 'view', text: 'View', buttonGroups: viewGroups },
   { id: 'settings', text: 'Settings', buttonGroups: settingsGroups },
-  { id: 'shapeFormat', text: 'Shape Format', buttonGroups: shapeFormatGroups, contextual: true },
+  /* Contextual tabs in the trial's ribbon order (TASK 74). */
+  tableDesignTab,
+  shapeDesignTab,
+  chartDesignTab,
+  formulaSparklineTab,
+  sparklineTab,
   ...pivotContextualTabs,
 ];
 

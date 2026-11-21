@@ -228,14 +228,28 @@ export class FormulaEditor {
   }
 }
 
+/**
+ * The command methods live on `FormulaEditor` but are private to the class, so the
+ * command objects reach them through this single, documented module seam.
+ */
+type FormulaEditorCommandTarget = {
+  closeHints(): void;
+  commitToActiveCell(): void;
+  exitEdit(): void;
+  openHints(): void;
+  toggleReferences(): void;
+};
+const commandTarget = (editor: FormulaEditor): FormulaEditorCommandTarget =>
+  editor as unknown as FormulaEditorCommandTarget;
+
 /** Trial-declared command objects (`GC.Spread.Sheets.FormulaPanel.Commands`). */
 export const Commands: Record<'closeHints' | 'commitContentToActiveCell' | 'exitEdit' | 'formatDocument' | 'showHints' | 'toggleAbsoluteRelativeReferences', FormulaEditorCommand> = {
-  closeHints: { execute: (editor) => (editor as unknown as { closeHints(): void }).closeHints() },
-  commitContentToActiveCell: { execute: (editor) => (editor as unknown as { commitToActiveCell(): void }).commitToActiveCell() },
-  exitEdit: { execute: (editor) => (editor as unknown as { exitEdit(): void }).exitEdit() },
+  closeHints: { execute: (editor) => commandTarget(editor).closeHints() },
+  commitContentToActiveCell: { execute: (editor) => commandTarget(editor).commitToActiveCell() },
+  exitEdit: { execute: (editor) => commandTarget(editor).exitEdit() },
   formatDocument: { execute: (editor) => editor.format() },
-  showHints: { execute: (editor) => (editor as unknown as { openHints(): void }).openHints() },
-  toggleAbsoluteRelativeReferences: { execute: (editor) => (editor as unknown as { toggleReferences(): void }).toggleReferences() },
+  showHints: { execute: (editor) => commandTarget(editor).openHints() },
+  toggleAbsoluteRelativeReferences: { execute: (editor) => commandTarget(editor).toggleReferences() },
 };
 
 /** `GC.Spread.Sheets.FormulaPanel.findControl`: look up the editor registered for a host. */

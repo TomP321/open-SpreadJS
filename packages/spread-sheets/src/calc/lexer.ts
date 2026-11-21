@@ -422,12 +422,12 @@ export class Lexer {
     col--;
     const node = {
       kind: 'ref',
-      type: 'ref',
+      type: 'ref' as const,
       text: text.slice(start, index),
       start: this.pos,
       end: this.pos,
       wsBefore: false,
-      value: undefined as unknown as Token['value'],
+      value: undefined as Token['value'], // completed below: a ref token's value is itself
       r1: row - 1,
       c1: col,
       r2: row - 1,
@@ -442,7 +442,7 @@ export class Lexer {
       c2Abs: colAbs,
     };
     node.value = node;
-    return node as unknown as Token;
+    return node;
   }
   private scanR1C1(): Token | undefined {
     const text = this.text;

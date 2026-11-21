@@ -19,30 +19,23 @@
  * stored record and the identical painted modules for the same inputs.
  */
 import { Function as CalcFunctionObject } from '../calc/functions-api.js';
-import type { Args } from '../calc/evaluate.js';
 import { BarcodeExValue, ErrorCode, raise } from '../calc/values.js';
 import { drawBarcode, linearModuleString } from './barcode.js';
 import {
   BARCODE_INFOS, barcodeArgsAccepted, barcodePaintSpec, barcodeRecord, infoForSymbology,
-  LINEAR_SYMBOLOGIES, type BarcodeInfo,
+  LINEAR_SYMBOLOGIES, type BarcodeArgsSource, type BarcodeInfo,
 } from './barcode-args.js';
-import { SparklineEx, type SparklineExObject } from './sparkline-ex.js';
+import { SparklineExBase, type SparklineExObject } from './sparkline-ex.js';
 
 /** `Codabar` -> `CODABAR`: the encoder symbology key used by the paint record. */
 const symbologyOf = (typeName: string): string => typeName.toUpperCase();
 
 /** A direct `function.evaluate(a, b, ...)` call sees plain JavaScript values. */
-function listArgs(values: unknown[]): Args {
-  const args = {
+function listArgs(values: unknown[]): BarcodeArgsSource {
+  return {
     count: values.length,
-    text: (index: number) => {
-      const value = values[index];
-      return value === undefined || value === null ? '' : String(value);
-    },
-    boolean: (index: number) => values[index] === true,
     safe: (index: number) => values[index] ?? null,
   };
-  return args as unknown as Args;
 }
 
 /** The calc-function object `createFunction()` hands out, evaluated like the `BC_*` formula. */
@@ -96,15 +89,15 @@ const classType = new WeakMap<object, string>();
 
 /** The descriptor key (`Codabar`) an instance belongs to. */
 const typeNameOf = (instance: SparklineExObject): string | undefined => {
-  const own = (instance as unknown as { barcodeType?: string }).barcodeType;
+  const own = typeof instance.barcodeType === 'string' ? instance.barcodeType : undefined;
   return own ?? classType.get(Object.getPrototypeOf(instance));
 };
 
 /** Internal base of the symbology classes (the trial's `BarcodeBase`). */
 function BarcodeExBase(this: SparklineExObject): void {
-  (SparklineEx as unknown as (this: SparklineExObject) => void).call(this);
+  SparklineExBase.call(this);
 }
-BarcodeExBase.prototype = Object.create(SparklineEx.prototype as SparklineExObject) as SparklineExObject;
+BarcodeExBase.prototype = Object.create(SparklineExBase.prototype);
 Object.defineProperty(BarcodeExBase.prototype, 'constructor', { value: BarcodeExBase, writable: true, enumerable: false, configurable: true });
 for (const [key, member] of Object.entries({ createFunction, getBarcodeInfo: barcodeInfo, paint }))
   Object.defineProperty(BarcodeExBase.prototype, key, { value: member, writable: true, enumerable: false, configurable: true });
@@ -115,14 +108,17 @@ interface BarcodeClass {
   prototype: SparklineExObject;
 }
 
+/** Prototype-wiring seam: an ES5 function typed as its JS constructor (trial emits classes this way). */
+const asClass = (fn: (this: SparklineExObject) => void): BarcodeClass => fn as unknown as BarcodeClass;
+
 function barcodeClass(typeName: string): BarcodeClass {
   const info = BARCODE_INFOS[typeName]!;
-  const ctor = (function (this: SparklineExObject) {
+  const ctor = asClass(function (this: SparklineExObject) {
     // `SparklineEx`'s own constructor runs `createFunction()` and stores the created
     // function's name, so `name()` reports `BC_<TYPE>` like on the trial.
     BarcodeExBase.call(this);
     Object.defineProperty(this, 'barcodeType', { value: typeName, writable: true, enumerable: false, configurable: true });
-  }) as unknown as BarcodeClass;
+  });
   ctor.prototype = Object.create(BarcodeExBase.prototype) as SparklineExObject;
   Object.defineProperty(ctor.prototype, 'constructor', { value: ctor, writable: true, enumerable: false, configurable: true });
   Object.defineProperty(ctor.prototype, 'getBarcodeInfo', {
@@ -153,7 +149,7 @@ export interface BarcodeNamespace {
 }
 
 export const Barcode: BarcodeNamespace = {
-  BarcodeBase: BarcodeExBase as unknown as BarcodeClass,
+  BarcodeBase: asClass(BarcodeExBase),
   Codabar: barcodeClass('Codabar'),
   Code128: barcodeClass('Code128'),
   Code39: barcodeClass('Code39'),

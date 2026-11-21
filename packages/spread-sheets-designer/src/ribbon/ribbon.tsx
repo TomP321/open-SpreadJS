@@ -3,7 +3,8 @@
  * The active tab's panels are rendered by the Classic or the Toolbar mode. */
 import React, { useEffect, useRef, useState } from 'react';
 import { useDesigner, useDesignerVersion } from '../store.js';
-import { currentRibbon } from '../app-helpers.js';
+import { contextualTrigger, currentRibbon } from '../app-helpers.js';
+import { contextualTabsWithoutActivation } from '../contextual-ribbon.js';
 import { ClassicPanel, ToolbarPanel } from './controls.js';
 
 export function Ribbon(): React.ReactElement {
@@ -11,17 +12,39 @@ export function Ribbon(): React.ReactElement {
   useDesignerVersion();
   const { panels, ribbonHeight } = currentRibbon(d);
   const active = panels.find((p) => p.id === d.activeTab) ?? panels[0];
-  // Contextual tabs (Shape Format / PivotTable Analyze): jump to the newest
-  // contextual tab when it appears, back to Home when the active tab vanishes.
+  // Contextual tabs (Shape Format / Table Design / Chart Design / Sparkline /
+  // PivotTable Analyze): the trial activates a tab that just appeared and keeps
+  // the current one while it stays visible; when the active tab vanishes it
+  // falls back to Home. Tabs sharing one trigger (PivotTable Analyze + Design)
+  // activate their FIRST member; tabs of different objects activate the last one
+  // (measured: selecting a chart shows Shape Format + Chart Design and the trial
+  // lands on Chart Design). The Sparkline tabs are the exception: the trial shows
+  // them without leaving Home (`contextualTabsWithoutActivation`).
   const seenContextual = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const visible = new Set(panels.filter((p) => p.contextual).map((p) => p.id));
+    const contextual = panels.filter((p) => p.contextual);
+    const visible = new Set(contextual.map((p) => p.id));
     const previous = seenContextual.current;
     seenContextual.current = visible;
-    const fresh = [...visible].filter((id) => !previous.has(id));
-    if (fresh.length) d.activeTab = fresh[0]!; // the trial activates the first fresh contextual tab (e.g. PivotTable Analyze)
-    else if (!panels.some((p) => p.id === d.activeTab)) d.activeTab = 'home';
-    if (fresh.length || !panels.some((p) => p.id === d.activeTab)) d.invalidate();
+    const fresh = contextual.filter((p) => !previous.has(p.id) && !contextualTabsWithoutActivation.has(p.id));
+    const activeIsContextualAndVisible = contextual.some((p) => p.id === d.activeTab);
+    const activeStillExists = panels.some((p) => p.id === d.activeTab);
+    if (fresh.length && !activeIsContextualAndVisible) {
+      const triggers = new Set(fresh.map((panel) => contextualTrigger(panel)));
+      const picked = triggers.size === 1 ? fresh[0]! : fresh[fresh.length - 1]!;
+      d.activeTab = picked.id;
+      d.invalidate();
+    } else if (!activeStillExists) {
+      /* The tab under the user's feet closed (mix-on-shape: clicking a shape while
+       * Chart Design is active — the trial lands on the remaining Shape Format tab,
+       * not on Home). Prefer a still-visible activatable contextual tab; Home only
+       * when none is left. */
+      const candidates = contextual.filter((p) => !contextualTabsWithoutActivation.has(p.id));
+      const triggers = new Set(candidates.map((panel) => contextualTrigger(panel)));
+      const picked = triggers.size === 1 ? candidates[0]! : candidates[candidates.length - 1];
+      d.activeTab = picked ? picked.id : 'home';
+      d.invalidate();
+    }
   });
   const railRef = useRef<HTMLDivElement>(null);
   const [railOffset, setRailOffset] = useState(0);

@@ -617,6 +617,43 @@ const formatChartAreaTemplate: IDialogTemplate = {
 };
 
 /**
+ * TASK 74: "Resize Table" (Table Design tab). Labels and the note are transcribed
+ * from the running trial: it prefills the table's own range and keeps its header row.
+ */
+const resizeTableTemplate: IDialogTemplate = {
+  templateName: 'resizeTableDialogTemplate', title: 'Resize Table', modal: true,
+  content: [
+    row([text('Select the new data range for your table:', 'gc-resize-table-question'), { type: 'TextEditor', bindingPath: 'range', className: 'gc-resize-table-range' }]),
+    text('Note: The headers must remain in the same row, and the resulting table range must overlap the original table range.', 'gc-resize-table-note'),
+  ],
+  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+};
+
+/**
+ * TASK 74: "Sparkline Weight" (the Sparkline ▸ Style ▸ weight combo's Custom
+ * Weight... row). Trial structure transcribed from the running dialog: title
+ * "Sparkline Weight", the question "Enter the Sparkline weight(pt)", one text
+ * input prefilled with the current POINTS value, OK/Cancel.
+ */
+const sparklineWeightTemplate: IDialogTemplate = {
+  templateName: 'sparklineWeightDialogTemplate', title: 'Sparkline Weight', modal: true,
+  content: [
+    row([text('Enter the Sparkline weight(pt)', 'gc-dialog-label'), { type: 'TextEditor', bindingPath: 'weight', className: 'gc-sparkline-weight-value' }]),
+  ],
+  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+};
+
+/** TASK 74: chart "Alt Text" (Chart Design > Accessibility); trial question transcribed. */
+const chartAltTextTemplate: IDialogTemplate = {
+  templateName: 'chartAltTextDialogTemplate', title: 'Alt Text', modal: true,
+  content: [
+    text('How would you describe this object and its context to someone who is blind?', 'gc-alt-text-question'),
+    row([text('Alt Text:', 'gc-dialog-label'), { type: 'TextEditor', bindingPath: 'alt', className: 'gc-alt-text-value' }]),
+  ],
+  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+};
+
+/**
  * Go To (Home > Find & Select): the trial shows a `Go to:` list of the defined
  * names, a `Reference:` editor and a `Special...` button that hands over to
  * the Go To Special dialog.
@@ -693,6 +730,7 @@ export const extraTemplates: IDialogTemplate[] = [
   insertCellsTemplate, deleteCellsTemplate, cellTagTemplate, defaultValueTemplate, transformCellsTemplate,
   richTextTemplate, headerCellsTemplate, outlineColumnTemplate, pasteSpecialTemplate, cellTemplateTemplate,
   changeChartTypeTemplate, selectDataTemplate, moveChartTemplate, formatChartAreaTemplate, newCellStyleTemplate,
+  resizeTableTemplate, chartAltTextTemplate, sparklineWeightTemplate,
   pageSetupTemplate, spreadSettingTemplate, sheetSettingTemplate, builtInFileIconsTemplate, tabStyleSettingTemplate,
   gotoTemplate, gotoSpecialTemplate, fillSeriesTemplate,
   tableStyleTemplate, cellStatesManagerTemplate, newCellStateTemplate, newFormattingRuleTemplate, ruleManagerTemplate,

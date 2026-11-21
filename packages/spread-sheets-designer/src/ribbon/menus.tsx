@@ -20,6 +20,8 @@ import { dismissRibbonMenu } from './menu-dismissal.js';
 import { customTableThemeTiles, TablePreview, type PreviewTheme } from '../dialogs/TableStyleDialogs.js';
 import { PivotStyleGalleryMenu, ThemeGalleryMenu } from './theme-galleries.js';
 import { ChartPreviewGallery, chartPreviewGalleries, isChartPreviewGallery } from './chart-galleries.js';
+import { sparklineWeightItems } from '../contextual-actions.js';
+import { ChangeColorsGallery, ChartStyleGallery, QuickLayoutGallery } from './chart-design-galleries.js';
 
 /** Dropdowns whose items the trial renders flush-left with no icon column (TASK 51). */
 const TEXT_ONLY_ICONS_MENUS = new Set(['breaks', 'whatIfAnalysis', 'viewportFreezePanes']);
@@ -75,6 +77,11 @@ export function RibbonMenu(): React.ReactElement | null {
     shapeSize: { width: 132 },
     insertFormControlShape: { width: 200 },
     sparklineGallery: { width: 490 },
+    // TASK 74: Chart Design gallery popups (outer rects measured on the trial,
+    // `.probe/t74/measure29-official.json`: 200×232 / 235×510 / 915×308).
+    quickLayout: { width: 200, maxHeight: 232 },
+    changeColors: { width: 235, maxHeight: 510 },
+    chartStyle: { width: 915, maxHeight: 308 },
     pivotTableStyle: { width: 520, maxHeight: undefined },
     ThemeSetting: { width: 286, maxHeight: 440 },
     ThemeColors: { width: 250, maxHeight: 420 },
@@ -104,11 +111,11 @@ export function RibbonMenu(): React.ReactElement | null {
   // Combo popups match the trial: as wide as the combo box itself (TASK 51: fitPageWidth 83.36px).
   // The trial also allows a few narrow non-combo popups below the 120px CSS floor.
   const narrowWidths: Record<string, number> = { calculationOptionsPanel: 108.36 };
-  const explicitWidth = galleryWidth || (menu.command === 'fontFamily' ? 131.578 : menu.command === 'ribbonNumberFormat' || menu.command === 'conditionFormat' ? 185.72 : menu.command === 'pasteAll' ? 175 : menu.command === 'margins' ? 270 : menu.command === 'paperSize' ? 170 : isCombo && command?.comboWidth ? command.comboWidth + 3.36 : narrowWidths[menu.command]);
+  const explicitWidth = galleryWidth || (menu.command === 'fontFamily' ? 131.578 : menu.command === 'sparklineWeight' ? 147 : menu.command === 'ribbonNumberFormat' || menu.command === 'conditionFormat' ? 185.72 : menu.command === 'pasteAll' ? 175 : menu.command === 'margins' ? 270 : menu.command === 'paperSize' ? 170 : isCombo && command?.comboWidth ? command.comboWidth + 3.36 : narrowWidths[menu.command]);
   return (
     <div
       ref={hostRef}
-      className={`gc-designer-root en gc-designer-ribbon-dropdown${isCombo ? ' sd-combo-dropdown' : ''}${isGroupMenu ? ' gc-designer-group-menu' : ''}${menu.command === 'conditionFormat' ? ' gc-designer-condition-menu' : ''}${menu.command === 'cellEditors' ? ' gc-designer-cell-editors-menu' : ''}${menu.command === 'mergeCenter' ? ' gc-designer-merge-menu' : ''}${menu.command === 'border' ? ' sd-border-menu' : ''}${menu.command === 'sparklineGallery' ? ' sparklineGallery-dropdown-container' : ''}${isChartPreviewGallery(menu.command) ? ' gc-designer-large-icon' : ''} gc-designer-dropdown-slide-in`}
+      className={`gc-designer-root en gc-designer-ribbon-dropdown${isCombo ? ' sd-combo-dropdown' : ''}${isGroupMenu ? ' gc-designer-group-menu' : ''}${menu.command === 'conditionFormat' ? ' gc-designer-condition-menu' : ''}${menu.command === 'cellEditors' ? ' gc-designer-cell-editors-menu' : ''}${menu.command === 'mergeCenter' ? ' gc-designer-merge-menu' : ''}${menu.command === 'border' ? ' sd-border-menu' : ''}${menu.command === 'orientation' ? ' sd-orientation-menu' : ''}${menu.command === 'sparklineGallery' ? ' sparklineGallery-dropdown-container' : ''}${isChartPreviewGallery(menu.command) ? ' gc-designer-large-icon' : ''} gc-designer-dropdown-slide-in`}
       style={{ left, top, minWidth: explicitWidth && !isGallery ? explicitWidth : undefined, maxWidth: isGallery ? (menu.command === 'cellStyles' ? 644 : 520) : galleryWidth || maxWidth, maxHeight: isGallery ? 'none' : galleryHeight, width: isGallery ? (menu.command === 'cellStyles' ? 644 : 520) : explicitWidth, zIndex: 10000 }}
       role="menu"
       aria-label={isChartPreviewGallery(menu.command) ? commandTitle(d, command, menu.command) || undefined : undefined}
@@ -120,6 +127,9 @@ export function RibbonMenu(): React.ReactElement | null {
         menu.command === 'shapeSize' ? <ShapeSizeMenu /> :
         menu.command === 'sparklineGallery' ? <SparklineGalleryMenu /> :
         menu.command === 'pivotTableStyle' ? <PivotStyleGalleryMenu /> :
+        menu.command === 'quickLayout' || menu.command === 'quickLayoutListContent' ? <QuickLayoutGallery /> :
+        menu.command === 'changeColors' ? <ChangeColorsGallery /> :
+        menu.command === 'chartStyle' ? <ChartStyleGallery /> :
         menu.command === 'insertFormControlShape' ? <FormControlGalleryMenu /> :
         menu.command === 'ThemeSetting' || menu.command === 'ThemeColors' || menu.command === 'ThemeFonts' ? <ThemeGalleryMenu command={menu.command} /> :
         menu.command === 'namedCellTemplates' ? <NamedCellTemplatesMenu /> :
@@ -391,9 +401,14 @@ function MarginsMenu(): React.ReactElement {
         <div key={preset.name} className="sd-margins-item" role="menuitem" aria-label={preset.name} title={preset.name}
           data-command={`menu.${preset.command}`} onClick={(event) => { event.stopPropagation(); run(preset.command); }}>
           <div className="sd-margins-thumb" aria-hidden="true">
-            <div className="sd-margins-page" style={{ paddingTop: `${preset.values.top / 12}px`, paddingBottom: `${preset.values.bottom / 12}px`, paddingLeft: `${preset.values.left / 12}px`, paddingRight: `${preset.values.right / 12}px` }}>
-              <div className="sd-margins-content" />
-            </div>
+            {/* TASK 69: the trial draws a page frame with the margin rules crossing the page. */}
+            <svg className="sd-margins-svg" width="34" height="46" viewBox="0 0 34 46" role="presentation">
+              <rect x={2} y={2} width={30} height={42} fill="#ffffff" stroke="#8a8a8a" strokeWidth={1.44} />
+              <path d={`M${2 + (preset.values.left / 100) * (30 / 8.5)} 2V44`} stroke="#7fa9de" strokeWidth={1.01} fill="none" />
+              <path d={`M${2 + 30 - (preset.values.right / 100) * (30 / 8.5)} 2V44`} stroke="#7fa9de" strokeWidth={1.01} fill="none" />
+              <path d={`M2 ${2 + (preset.values.top / 100) * (42 / 11)}H32`} stroke="#7fa9de" strokeWidth={1.01} fill="none" />
+              <path d={`M2 ${2 + 42 - (preset.values.bottom / 100) * (42 / 11)}H32`} stroke="#7fa9de" strokeWidth={1.01} fill="none" />
+            </svg>
           </div>
           {/* 1px label hit-target (TASK 51): a real clickable element carrying the preset name so
               tests/users can address the card by caption, like the trial addresses its canvas rows. */}
@@ -431,11 +446,16 @@ function PaperSizeMenu(): React.ReactElement {
         // Task 55 pair check: like the trial, a fresh sheet (default kind, never chosen from
         // this menu) shows all boxes empty; a check appears only after an explicit selection.
         const selected = item.text === current && (item.text !== 'Letter' || d._paperTouched);
+        // TASK 69: the trial's Size menu shows a proportional page outline per paper, not a checkbox.
+        const dims = item.size.match(/([\d.]+)\u2033?\u00d7([\d.]+)/);
+        const wIn = dims ? Number.parseFloat(dims[1]) : 8.5;
+        const hIn = dims ? Number.parseFloat(dims[2]) : 11;
+        const k = 36 / Math.max(wIn, hIn);
         return (
           <div key={item.text} className={`sd-paper-item${selected ? ' gc-designer-ribbon-list-item-selected' : ''}`} role="menuitem"
             aria-label={`${item.text} ${item.size}`} title={`${item.text} ${item.size}`} data-command={`menu.paperKind.${item.text}`}
             onClick={(event) => { event.stopPropagation(); d.executeCommand('paperKindSelector', 'paperKindSelector', item.text); d.openMenu = null; d.invalidate(); }}>
-            <span className="sd-paper-check">{selected ? <DesignerIcon className="ribbon-checkbox-checked" size={14} /> : <DesignerIcon className="ribbon-checkbox-unchecked" size={14} />}</span>
+            <span className="sd-paper-check"><svg className="sd-paper-page" width="24" height="40" viewBox="0 0 24 40" role="presentation"><rect x={(24 - wIn * k) / 2} y={(40 - hIn * k) / 2} width={wIn * k} height={hIn * k} fill="#ffffff" stroke="#8a8a8a" strokeWidth={1.8} /></svg></span>
             <span className="sd-paper-text"><span className="sd-paper-name">{item.text}</span><span className="sd-paper-size">{item.size}</span></span><span className="gc-designer-ribbon-list-item-container sd-gallery-hit" aria-hidden="true">{item.text}</span>
           </div>
         );
@@ -557,7 +577,10 @@ function ComboMenu({ command }: { command: string }): React.ReactElement {
   const d = useDesigner();
   const item = commandOf(d, command);
   const state = d.getCommandState(command);
-  const list: IListGroupItemData[] = item?.dropdownList ?? (command === 'ribbonNumberFormat' ? formatList : []);
+  // TASK 74: the Sparkline Weight list lives with the tab behaviour (the trial
+  // keeps it out of the command map too — gallery18-official.json shows
+  // sparklineWeight with dropdownList null).
+  const list: IListGroupItemData[] = (command === 'sparklineWeight' ? sparklineWeightItems : item?.dropdownList) ?? (command === 'ribbonNumberFormat' ? formatList : []);
   const simple = command === 'fontFamily' || command === 'fontSize';
   const isCalculation = command === 'calculationOptionsPanel';
   if (simple) {
@@ -565,7 +588,7 @@ function ComboMenu({ command }: { command: string }): React.ReactElement {
       <div className="gc-designer-ribbon-menu-list">
         {list.map((entry, index) => {
           const value = entry.value ?? entry.text;
-          const selected = String(state.value ?? '') === String(value);
+          const selected = String(state.value ?? '') === String(value) || String(state.value ?? '') === String(entry.text);
           return (
             <div
               key={index}
@@ -585,7 +608,7 @@ function ComboMenu({ command }: { command: string }): React.ReactElement {
     <div className="gc-designer-ribbon-menu-list">
       {list.map((entry, index) => {
         const value = entry.value ?? entry.text;
-        const selected = String(state.value ?? '') === String(value) || (command === 'ribbonNumberFormat' && String(state.text ?? '') === String(entry.text));
+        const selected = String(state.value ?? '') === String(value) || String(state.value ?? '') === String(entry.text) || (command === 'ribbonNumberFormat' && String(state.text ?? '') === String(entry.text));
         return (
           <div
             key={index}

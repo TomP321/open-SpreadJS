@@ -60,27 +60,3 @@ export function userColorToObject(value: unknown): ColorObject | null {
   return { srgbClr: { val: [rgba[0], rgba[1], rgba[2]] } };
 }
 
-/** Resolve any chart colour (token, css colour, colour object) to a css colour for painting. */
-export function toCssColor(value: unknown, fallback = '#000000'): string {
-  if (value && typeof value === 'object') {
-    const getter = colorObjectToGetter(value);
-    return parseColor(getter || fallback) ? cssOf(getter || fallback) : fallback;
-  }
-  const text = String(value ?? '');
-  if (!text || text === 'auto') return fallback;
-  const rgba = parseColor(text);
-  return rgba ? `rgb(${rgba[0]},${rgba[1]},${rgba[2]})` : text;
-}
-
-function cssOf(token: string): string {
-  const rgba = parseColor(token);
-  return rgba ? `rgb(${rgba[0]},${rgba[1]},${rgba[2]})` : token;
-}
-
-/** `true` when the value reads back as a solid colour (not empty/noFill). */
-export function hasColor(value: unknown): boolean {
-  if (!value) return false;
-  if (typeof value === 'object') return !!(value as { srgbClr?: unknown; schemeClr?: unknown }).srgbClr
-    || !!(value as { schemeClr?: unknown }).schemeClr;
-  return String(value) !== '' && String(value) !== 'auto';
-}

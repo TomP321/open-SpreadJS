@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-tablesheet",
+  "version": "0.1.0",
+  "description": "OpenSheets table sheet add-in for the spreadsheet workbook, drop-in for the SpreadJS tablesheet add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.tablesheet.cjs",
+  "module": "./dist/gc.spread.sheets.tablesheet.esm.js",
+  "types": "./dist/gc.spread.sheets.tablesheet.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-tablesheet",
+    "opensheets-tablesheet",
+    "tablesheet",
+    "datasheet",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.tablesheet.d.ts",
+        "default": "./dist/gc.spread.sheets.tablesheet.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.tablesheet.d.cts",
+        "default": "./dist/gc.spread.sheets.tablesheet.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

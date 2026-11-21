@@ -220,6 +220,9 @@ export function CommandControl({ name, node }: { name: string; node?: ICommandGr
   const command = commandOf(d, name);
   if (!command) return null;
   const state = d.getCommandState(name);
+  // TASK 74: the trial swaps the Table Binding launchers (Convert to/from Data Table) —
+  // a command whose state says visible:false is not rendered on the strip either.
+  if (state.visible === false) return null;
   const type = command.type ?? 'button';
   const text = commandText(d, command);
   const label = command.text ? text : '';
@@ -385,7 +388,7 @@ export function CheckBoxControl({ name, command, state, title, text, disabled }:
       aria-checked={!!state.checked}
       tabIndex={0}
       data-command={`ribbon.${name}`}
-      onClick={() => { if (!disabled) { d.executeCommand(name, name); d.invalidate(); } }}
+      onClick={() => { if (!disabled) { d.executeCommand(name, name, !state.checked); d.invalidate(); } }}
     >
       <div className="gc-designer-ribbon-check-box-icon">
         <div className={`gc-designer-ribbon-icon ${command.iconClass ?? (state.checked ? 'ribbon-checkbox-checked' : 'ribbon-checkbox-unchecked')}`}><DesignerIcon className={command.iconClass ?? (state.checked ? 'ribbon-checkbox-checked' : 'ribbon-checkbox-unchecked')} /></div>
@@ -437,15 +440,17 @@ export function ComboBoxControl({ name, command, state, title, editable }: { nam
     const rect = combo?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0);
     openRibbonMenu(d, name, rect, combo ?? (event?.currentTarget as HTMLElement | null));
   };
-  const control = (
-    <div
-      className={`gc-designer-ribbon-comboBox gc-designer-ribbon-comboBox-size${editable ? ' gc-designer-ribbon-comboBox-editable' : ''}`}
-      style={{ width }}
-      data-command={printSize ? undefined : `ribbon.${name}`}
-      title={title}
-      aria-label={title}
-    >
-      {printSize ? <div className="gc-designer-ribbon-text" onClick={open}>{display}</div> : <input
+  /* Static label vs editable combo: the trial's Sparkline Weight combo shows a fixed
+   * "¾ pt" style label and opens its list through the caret, with no editor
+   * (measure29/combo28-official.json). TASK 84 R3: only that combo gets the extra
+   * `combo-static` rules — the Page Layout fit-pages labels rendered as plain
+   * `gc-designer-ribbon-text` before TASK 74 too, and the class' `padding-left: 4px`
+   * moved their text 4px away from the trial. */
+  const editor = printSize
+    ? <div className="gc-designer-ribbon-text" onClick={open}>{display}</div>
+    : name === 'sparklineWeight'
+      ? <div className="gc-designer-ribbon-text gc-designer-ribbon-combo-static" onClick={open}>{display}</div>
+      : <input
         className="spinner-input"
         value={display}
         title={title}
@@ -460,7 +465,16 @@ export function ComboBoxControl({ name, command, state, title, editable }: { nam
           } else if (event.key === 'Escape') { setEditing(false); }
         }}
         onBlur={() => setEditing(false)}
-      />}
+      />;
+  const control = (
+    <div
+      className={`gc-designer-ribbon-comboBox gc-designer-ribbon-comboBox-size${editable ? ' gc-designer-ribbon-comboBox-editable' : ''}`}
+      style={{ width }}
+      data-command={printSize ? undefined : `ribbon.${name}`}
+      title={title}
+      aria-label={title}
+    >
+      {editor}
       {name !== 'fontSize' && (
         <div className="gc-designer-ribbon-list-btn" role="button" aria-label={title} onClick={open}>
           <div className="gc-designer-ribbon-list-triangle gc-designer-ribbon-toolbar-group-list-item-arrow" />
@@ -474,11 +488,17 @@ export function ComboBoxControl({ name, command, state, title, editable }: { nam
 export function ColorPickerControl({ name, command, state, title, disabled }: { name: string; command: ICommand; state: CommandState; title: string; disabled: boolean }): React.ReactElement {
   const d = useDesigner();
   const color = String(state.color ?? (name === 'backColor' ? 'transparent' : '#000000'));
+  // The Sparkline tab's Style rows are 24px-high icon+label rows with a swatch
+  // (trial measure9-official.json: "Sparkline Color" 120×24, "Marker Color" 107×24);
+  // the Home-tab pickers keep their label-less icon+swatch form.
+  const labeled = command.maxWidth !== undefined;
+  const label = command.text ? resource(d, command.text) : '';
   return (
     <div
-      className={`gc-designer-combo-container gc-designer-ribbon-colorPicker gc-designer-ribbon-button${disabled ? ' gc-designer-ribbon-button-disable' : ''}`}
+      className={`gc-designer-combo-container gc-designer-ribbon-colorPicker gc-designer-ribbon-button${labeled ? ' gc-designer-ribbon-colorPicker-labeled' : ''}${disabled ? ' gc-designer-ribbon-button-disable' : ''}`}
       data-command={`ribbon.${name}`}
       title={title}
+      style={command.maxWidth ? { width: command.maxWidth, minWidth: command.maxWidth, maxWidth: command.maxWidth, flex: '0 0 auto' } : undefined}
     >
       <div
         className="gc-designer-color-picker-button"
@@ -491,6 +511,7 @@ export function ColorPickerControl({ name, command, state, title, disabled }: { 
         }}
       >
         <div className={`gc-designer-ribbon-icon ${command.iconClass ?? ''}`}><DesignerIcon className={command.iconClass} /></div>
+        {labeled && label ? <div className="gc-designer-ribbon-text">{label}</div> : null}
       </div>
       <div className="gc-designer-color-preview gc-designer-color-preview-toolbar" style={{ background: color === 'transparent' ? 'transparent' : color }} />
     </div>
@@ -580,7 +601,8 @@ export function DropdownControl({ name, node }: { name: string; node?: ICommandG
       </div>
     );
   }
-  const showText = !!text && (inGroupFlyout || node?.command === 'mergeCenter' || name === 'group' || name === 'ungroup' || currentRibbon(d).ribbonHeight < 115);
+  // TASK 74: the trial's Sparkline ▸ Group ▸ Clear split button shows "Clear" text on the ribbon.
+  const showText = !!text && (inGroupFlyout || node?.command === 'mergeCenter' || name === 'group' || name === 'ungroup' || name === 'clearSparkline' || currentRibbon(d).ribbonHeight < 115);
   return (
     <div
       className={`gc-designer-ribbon-list gc-designer-ribbon-list-horizontal${showText ? ' gc-designer-ribbon-list-split' : ''}${disabled ? ' gc-designer-ribbon-list-disabled' : ''}`}

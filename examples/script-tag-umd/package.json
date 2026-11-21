@@ -1,0 +1,18 @@
+{
+  "name": "opensheets-example-script-tag-umd",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "node build.mjs --check-only"
+  },
+  "dependencies": {
+    "@mescius/spread-sheets": "link:../../packages/spread-sheets",
+    "@mescius/spread-sheets-io": "link:../../packages/spread-sheets-io"
+  },
+  "devDependencies": {
+    "@opensheets/spread-sheets": "workspace:*",
+    "@opensheets/spread-sheets-io": "workspace:*"
+  }
+}

@@ -31,13 +31,17 @@ describe('Page Layout commands write through printInfo', () => {
   const pi = () => sheet.printInfo();
 
   it('Scale to Fit combos update fitPagesWide/Tall and zoomFactor', () => {
+    // Trial (TASK 75 sweep): bare executes are ignored — the ribbon combos apply the
+    // selection through their property name.
     applyBuiltin(d, 'fitPageWidth', { value: '2 pages' });
-    expect(pi().fitPagesWide()).toBe(2);
-    applyBuiltin(d, 'fitPageWidth', { value: 'Automatic' });
     expect(pi().fitPagesWide()).toBe(-1);
-    applyBuiltin(d, 'fitPageTall', { value: '1 page' });
+    applyBuiltin(d, 'fitPageWidth', { propertyName: 'fitPageWidth', value: '2 pages' });
+    expect(pi().fitPagesWide()).toBe(2);
+    applyBuiltin(d, 'fitPageWidth', { propertyName: 'fitPageWidth', value: 'Automatic' });
+    expect(pi().fitPagesWide()).toBe(-1);
+    applyBuiltin(d, 'fitPageTall', { propertyName: 'fitPageTall', value: '1 page' });
     expect(pi().fitPagesTall()).toBe(1);
-    applyBuiltin(d, 'fitPageScale', { value: 85 });
+    applyBuiltin(d, 'fitPageScale', { propertyName: 'fitPageScale', value: 85 });
     expect(pi().zoomFactor()).toBeCloseTo(0.85);
   });
 

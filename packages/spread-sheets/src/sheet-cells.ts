@@ -165,12 +165,31 @@ export function queueCalc(sheet: Worksheet, change: {
     r1c1?: boolean;
   }): void {
     if (!sheet.calcEngine) return;
+    if (change.kind !== 'formula' && (sheet.batch.calc > 0 || sheet.parent?._isCalcSuspended())) {
+      const batch = sheet.batch;
+      if (batch.calcBulk) {
+        // Past the bulk threshold, plain-value notifications are dropped (the
+        // flush recomputes every formula instead); cells that still carry a
+        // formula must keep their notification so a value write over a
+        // formula cell can remove the registration on the flush.
+        const existing = cell(sheet, change.row, change.col);
+        if (!existing?.formula && !existing?.arrayFormula) {
+          sheet.calcEngine.detachSpillCell?.(sheet, change.row, change.col, true);
+          return;
+        }
+      } else if (++batch.calcBulkCount > CALC_QUEUE_BULK_THRESHOLD) batch.calcBulk = true;
+    }
     sheet.calcQueue.set(`${change.row}:${change.col}`, change);
     if (!sheet.batch.calc && !sheet.parent?._isCalcSuspended()) sheet.flushCalc();
 }
 
+export const CALC_QUEUE_BULK_THRESHOLD = 8192;
+
 export function flushCalc(sheet: Worksheet, all = false): void {
     if (sheet.batch.calc || sheet.parent?._isCalcSuspended()) return;
+    const bulk = sheet.batch.calcBulk;
+    sheet.batch.calcBulk = false;
+    sheet.batch.calcBulkCount = 0;
     const queue = [...sheet.calcQueue.values()];
     sheet.calcQueue.clear();
     if (!sheet.calcEngine) return;
@@ -195,7 +214,7 @@ export function flushCalc(sheet: Worksheet, all = false): void {
     // Work the calculation service queued while it was suspended - a changed
     // external-workbook value pushes cells straight into the engine queue - runs
     // on the resume, like the trial (probe item `ext-suspend`).
-    if (queue.length || all || sheet.calcEngine.hasPendingWork?.()) sheet.calcEngine.recalculate(sheet, all);
+    if (queue.length || all || bulk || sheet.calcEngine.hasPendingWork?.()) sheet.calcEngine.recalculate(sheet, all || bulk);
 }
 
 export function getArray(sheet: Worksheet, row: number, col: number, rowCount: number, colCount: number, getFormula = false): unknown[][] {
@@ -490,6 +509,7 @@ export function rowFilter(sheet: Worksheet, value?: RowFilterBase | null): RowFi
 export function addNamedStyle(sheet: Worksheet, style: Style): void {
     if (typeof style.name !== 'string' || !style.name) throw new Error('Named style requires a name');
     sheet.namedStyles.set(style.name.toLowerCase(), style);
+    sheet._formatterEpoch++;
 }
 
 export function getNamedStyle(sheet: Worksheet, name: string): Style {
@@ -502,6 +522,7 @@ export function getNamedStyles(sheet: Worksheet, ): Style[] {
 
 export function removeNamedStyle(sheet: Worksheet, name: string): void {
     sheet.namedStyles.delete(name.toLowerCase());
+    sheet._formatterEpoch++;
 }
 
 export function _fastValue(sheet: Worksheet, row: number, col: number): unknown {

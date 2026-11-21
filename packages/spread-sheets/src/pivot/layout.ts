@@ -5,8 +5,8 @@
  * and the theme style slot for every cell. `PivotTable` writes the result
  * into worksheet cells.
  */
-import { PivotTableLayoutType } from './types.js';
-import type { IDataPosition, IPivotItemInfo, IValueInfo } from './types.js';
+import {} from './types.js';
+import type { IPivotItemInfo, IValueInfo } from './types.js';
 
 export interface LayoutNodeInfo {
   fieldInfos: IPivotItemInfo[];
@@ -61,15 +61,4 @@ export interface PivotLayoutModel {
   colCount: number;
   /** Column offset of the page area inside the pivot grid. */
   pageLeft: number;
-}
-
-/** Values pseudo-axis placement relative to the column fields. */
-export function valuesInColumns(valuePosition: IDataPosition, colFieldCount: number): { index: number } | null {
-  if (valuePosition.positionType !== 1 /* col */) return null;
-  const index = Math.min(Math.max(0, valuePosition.positionIndex), colFieldCount);
-  return { index };
-}
-
-export function isTabular(layout: PivotTableLayoutType): boolean {
-  return layout === PivotTableLayoutType.tabular;
 }

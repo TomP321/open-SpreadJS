@@ -11,10 +11,14 @@
 import { describe, expect, it } from 'vitest';
 import GC, { Spread } from '../src/index.js';
 import type { Args } from '../src/calc/evaluate.js';
-import { barcodePaintSpec, barcodeSpec } from '../src/calc/functions/barcodes.js';
+import { barcodePaintSpec, barcodeSpec, registerBarcodeFunctions } from '../src/calc/functions/barcodes.js';
 import type { Worksheet } from '../src/worksheet.js';
 
 void GC;
+
+// TASK 72: the trial measures with its barcode add-on loaded; the `BC_*` formula layer is
+// registered at that add-in's load, so this suite loads it explicitly (see barcode46 header).
+registerBarcodeFunctions();
 
 const { Barcode, Sparklines } = Spread.Sheets;
 

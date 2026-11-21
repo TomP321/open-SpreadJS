@@ -48,7 +48,7 @@ export class PivotTableManager {
     const pivotName = String(name);
     if (this.findByName(pivotName)) throw new Error('The pivot table name already exists in the workbook.');
     const table = new PivotTable(pivotName, this.sheet, row, col, layout, theme, options);
-    table._setCacheId(nextCacheId(this.sheet.parent as unknown as object));
+    table._setCacheId(nextCacheId(this.sheet.parent));
     this.tables.push(table);
     try {
       table._init(sourceData, row, col);
@@ -102,7 +102,7 @@ export class PivotTableManager {
     const theme = String(entry.styleName ?? '').replace(/^PivotStyle/i, '').toLowerCase() || 'light0';
     const options = entryToOptions(entry);
     const table = new PivotTable(name, this.sheet, row, col, layoutType, theme, options);
-    const cacheId = Number(entry.cacheId) || nextCacheId(this.sheet.parent as unknown as object);
+    const cacheId = Number(entry.cacheId) || nextCacheId(this.sheet.parent);
     table._setCacheId(cacheId);
     this.tables.push(table);
     try {

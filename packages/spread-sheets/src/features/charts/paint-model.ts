@@ -269,11 +269,3 @@ export function buildPaintModel(chart: ChartLike, sheet: Worksheet): PaintModel 
   return { groups: model, scale, xScale, valueAxis: primaryValueAxis, categoryAxis: primaryCategoryAxis, secondaryScale, secondaryValueAxis,
     bubbleMax: Number.isNaN(bubbleMax) ? undefined : bubbleMax };
 }
-
-
-
-/** Data fingerprint (categories, series, sheet dimensions) used to detect shifts. */
-export function fingerprintOf(model: { groups: { kind: string, categories: (string | number)[], series: { name: string, values: (number | null)[] }[] }[] }, sheet: Worksheet): string {
-  const dims = `${sheet.getRowCount()}x${sheet.getColumnCount()}`;
-  return dims + '#' + model.groups.map(g => `${g.kind}:${g.categories.join('|')}:${g.series.map(s => `${s.name}=${s.values.join(',')}`).join(';')}`).join('#');
-}

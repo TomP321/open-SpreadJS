@@ -964,6 +964,1379 @@ const icons: Record<string, React.ReactNode> = {
 icons['ribbon-thumbnail-undoredo'] = <>{g('M21 9.5H14a7 7 0 0 0 0 14h11.5', P.gray, 2.8)}{path('M17.5 4.5 11.5 9.5l6 5.2', P.gray)}{g('M15 16h8a5 5 0 0 1 0 10h-4', P.lightGray, 2.4)}</>;
 icons['ribbon-thumbnail-chart-alt-text'] = icons['ribbon-button-chart'];
 
+/* ================================================================================
+ * TASK 69 — re-cut of every non-Home tab icon family from the DPR4 pair re-shoot
+ * (.probe/t69/list.txt + sheet-<tab>.png). All geometry hand-drawn here; colours
+ * are our own palette values chosen by looking at the reference pairs.
+ * Common motif vocabulary learned from the trial:
+ *  - "document" glyphs: thin dark frame (~2.2u), folded lower-left corner, pale rules;
+ *  - settings family: document + LARGE medium-blue gear with white hub;
+ *  - chart previews: grey axis 'L', grey + pale-blue data marks (no frame box);
+ *  - function family: thin book with bottom-left fold and a centred coloured symbol;
+ *  - comment bubbles: thin sharp bubble with the accent straddling its top-left corner.
+ * ================================================================================ */
+const T69 = {
+  ink: '#666666', mid: '#7f7f7f', soft: '#a6a6a6', rule: '#bbbbbb', faint: '#e2e2e2',
+  blue: '#367fc9', midBlue: '#81befc', paleBlue: '#b3d7fd', faintBlue: '#d4e9fe', deep: '#367fc9',
+  orange: '#ee8815', red: '#d9534a', redSoft: '#e0704a', green: '#45ba6f', greenDark: '#2e7d42',
+  yellow: '#ffd95d', paleYellow: '#f8dfa0', gold: '#d19d00', graphite: '#4a4a4a', silver: '#bbbbbb', white: '#ffffff',
+  gearBlue: '#4472c4',
+};
+/** The reference's action blue used by solid gears/accents (TASK 69). */
+const GEARBLUE = '#367fc9';
+const l69 = (d: string, stroke: string, sw = 2): React.ReactElement =>
+  <path d={d} fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="butt" strokeLinejoin="miter" />;
+const l69r = (d: string, stroke: string, sw = 2): React.ReactElement =>
+  <path d={d} fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />;
+/** Eight-or-more-tooth gear, white hub (Settings family). outline for the lighter 24px variant. */
+const gear69 = (cx: number, cy: number, r = 8.6, fill = '#4472b8', outline?: string, ow = 1.3, teeth = 8): React.ReactElement => {
+  let d = '';
+  const p = (ang: number, rad: number): string => `${(Math.cos(ang) * rad).toFixed(2)} ${(Math.sin(ang) * rad).toFixed(2)}`;
+  for (let i = 0; i < teeth; i += 1) {
+    const step = (Math.PI * 2) / teeth;
+    const a = step * i - Math.PI / 2;
+    d += `${i ? 'L' : 'M'}${p(a - step * 0.3, r * 0.74)}L${p(a - step * 0.18, r)}L${p(a + step * 0.18, r)}L${p(a + step * 0.3, r * 0.74)}`;
+  }
+  return (
+    <g transform={`translate(${cx} ${cy})`}>
+      <path d={`${d}Z`} fill={fill} stroke={outline ?? 'none'} strokeWidth={outline ? ow : 0} strokeLinejoin="round" />
+      <circle r={r * 0.4} fill={T69.white} />
+    </g>
+  );
+};
+/** Thin grey axis 'L' for chart-preview glyphs. */
+const axis69 = (): React.ReactElement => l69('M7 5V27H29', T69.soft, 1.8);
+/* Thin outlined comment bubble (sharp corners) with a lower-left tail spike; r4 pair re-measure:
+   outer x3.5..20.5 y6.5..22.5, tail tip ≈(6.5,27). */
+const bubble69 = (line: string): React.ReactElement => (
+  <path d="M3.5 6.5H20.5V22.5H10.5L6.5 27V22.5H3.5Z" fill={T69.white} stroke={line} strokeWidth={1.3} strokeLinejoin="miter" />
+);
+/* Data group family (16px, measured r3): table right-flush outer x16.5..31.2 with 1.9u #666 frame,
+   1.7u rules between bar rows at y11/21; bars h2.2 centred in the rows (x20.5 w8). Arms: a 1.9u
+   vertical at x9.5 with a short bar to x14.3 at the far end. Medallion: a 12×12 box with 2u frame
+   holding a concave four-point #333 star (tips ±4.1, waist ±1.35) with a 2.7u white centre square;
+   SUBTOTAL's lower box is a plain solid diamond; UNGROUP drops the medallion and shows a red
+   (#e65249) box with a red '/' slash. */
+const outlineTable69 = (bars: string[], barY: number[], rules = [10, 20]): React.ReactElement => (
+  <>
+    <rect x={17.5} y={1.2} width={13.4} height={30.2} fill={T69.white} stroke={T69.ink} strokeWidth={1.65} />
+    {l69(`M18.5 ${rules[0]}H30.5M18.5 ${rules[1]}H30.5`, T69.ink, 1.6)}
+    {bars.map((c, i) => <rect key={i} x={20.5} y={barY[i]} width={8} height={2.2} fill={c} />)}
+  </>
+);
+const groupArms69 = (): React.ReactElement => l69('M9.5 10.5V1.5H14.3M9.5 21.5V30.5H14.3', T69.ink, 1.9);
+const diamondBox69 = (x: number, y: number, hollow = true): React.ReactElement => {
+  const cx = x + 6; const cy = y + 6;
+  return (
+    <>
+      <rect x={x} y={y} width={12} height={12} fill={T69.white} stroke={T69.ink} strokeWidth={2} />
+      {hollow
+        ? <>
+          <path d={`M${cx} ${cy - 4.1}L${cx + 1.35} ${cy - 1.35}L${cx + 4.1} ${cy}L${cx + 1.35} ${cy + 1.35}L${cx} ${cy + 4.1}L${cx - 1.35} ${cy + 1.35}L${cx - 4.1} ${cy}L${cx - 1.35} ${cy - 1.35}Z`} fill="#333333" />
+          <rect x={cx - 1.35} y={cy - 1.35} width={2.7} height={2.7} fill={T69.white} />
+        </>
+        : <path d={`M${cx} ${y + 1}L${x + 11} ${cy}L${cx} ${y + 11}L${x + 1} ${cy}Z`} fill="#333333" />}
+    </>
+  );
+};
+/* Review family accents: thin corner-straddling marks (measured from the DPR4 crops); the green +
+   of NEW is small (~8.5u arms, 2u) centred on the bubble's top-left corner. */
+icons['ribbon-button-review-newThreadedComment'] = <>{bubble69(T69.ink)}{l69('M8 0.6V12.8M1.2 7.6H13.8', T69.green, 2)}</>;
+icons['ribbon-button-review-deleteThreadedComment'] = <>{bubble69('#b1b1b1')}{l69('M3 0.5L11.5 9M11.5 0.5L3 9', '#fcb99f', 2.2)}</>;
+icons['ribbon-button-review-previousThreadedComment'] = <>{bubble69('#b1b1b1')}{l69('M16 6H2.5', '#99bee3', 2.2)}<path d="M8 1.5L2.5 6 8 10.5" fill="none" stroke="#99bee3" strokeWidth={1.54} strokeLinejoin="miter" /></>;
+icons['ribbon-button-review-nextThreadedComment'] = <>{bubble69('#b1b1b1')}{l69('M3 6H13', '#99bee3', 2.2)}<path d="M9.5 1.5L15 6 9.5 10.5" fill="none" stroke="#99bee3" strokeWidth={1.54} strokeLinejoin="miter" /></>;
+icons['ribbon-button-review-showThreadedComments'] = bubble69(T69.ink);
+
+/* --- View tab --------------------------------------------------------------------------
+   TASK 69 r3 measured via .probe/t69/bands.py on DPR4 crops: freeze docs (24px): ink
+   frame 1.35u at (2.8,3.2)-(29.8,23.2) with peel foot (left frame to y27.2, tab bottom,
+   diagonal back at x14.5, extra 23.2 line above the tab); grid rules #bbb 1.35u at
+   x11.8/20.8 x y8.2/13.2/18.2; the selected cell is exactly col2 x row2 (11.8..20.8 x
+   8.2..13.2), fill #81befc, border #367fc9 1.7u. viewportFreeze darkens the two split
+   rules and hatches only the frozen bands (row1 full width + col1); unFreeze hatches
+   the whole sheet; 45° hatch lines pitch ~6.5u, #81befc 1.7u. */
+const freezeDoc69 = (): React.ReactElement => (
+  <>
+    <path d="M2.8 27.2V3.2H29.8V23.2H14.5L11 27.2Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.35} strokeLinejoin="miter" />
+    {l69('M2.8 23.2H11', T69.ink, 1.35)}
+  </>
+);
+const freezeCell69 = (): React.ReactElement => (
+  <rect x={11.8} y={8.2} width={9} height={5} fill={T69.midBlue} stroke={T69.blue} strokeWidth={1.4} />
+);
+const hatchLines69 = (cs: number[]): React.ReactElement => (
+  <>{cs.map((c) => l69(`M${Math.max(2.8, c - 23.2).toFixed(1)} ${Math.min(23.2, c - 2.8).toFixed(1)}L${Math.min(29.8, c - 3.2).toFixed(1)} ${Math.max(3.2, c - 29.8).toFixed(1)}`, '#9dc7f0', 1.4))}</>
+);
+icons['ribbon-button-freezepane'] = <>
+  {freezeDoc69()}
+  {l69('M20.8 3.2V23.2M13.2 2.8H29.8M18.2 2.8H29.8', T69.silver, 1.35)}
+  {l69('M11.8 3.2V23.2M8.2 2.8H29.8', '#333333', 1.5)}
+  <clipPath id="t69-vf-clip"><path d="M2.8 3.2H29.8V8.2H11.8V23.2H2.8Z" /></clipPath>
+  <g clipPath="url(#t69-vf-clip)">{hatchLines69([8.7, 15.2, 21.7, 28.2, 34.7])}</g>
+  {freezeCell69()}
+</>;
+icons['ribbon-button-unfreezepane'] = <>
+  {freezeDoc69()}
+  {l69('M11.8 3.2V23.2M20.8 3.2V23.2M8.2 2.8H29.8M13.2 2.8H29.8M18.2 2.8H29.8', T69.silver, 1.35)}
+  <clipPath id="t69-uf-clip"><path d="M2.8 3.2H29.8V23.2H2.8Z" /></clipPath>
+  <g clipPath="url(#t69-uf-clip)">{hatchLines69([7, 13.5, 20, 26.5, 33, 39.5, 46, 52.5])}</g>
+  {freezeCell69()}
+</>;
+icons['ribbon-button-zoomtoselection'] = <>
+  <path d="M1.8 29.5V3.2H29.8V26.3H14L10.5 29.5Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.35} strokeLinejoin="miter" />
+  {l69('M1.8 26.3H10.5', T69.ink, 1.35)}
+  {l69('M8.8 3.2V26.3M15.8 3.2V26.3M22.8 3.2V26.3', T69.silver, 1.35)}
+  {l69('M1.8 8.2H29.8M1.8 13.2H29.8M1.8 18.2H29.8', T69.silver, 1.35)}
+  <rect x={8.8} y={8.2} width={7} height={5} fill={T69.midBlue} />
+  <rect x={15.8} y={8.2} width={7} height={5} fill={T69.paleBlue} />
+  <rect x={8.8} y={13.2} width={7} height={5} fill={T69.paleBlue} />
+  <rect x={15.8} y={13.2} width={7} height={5} fill={T69.midBlue} />
+  {l69('M8.8 8.2H22.8V18.2H8.8ZM15.8 8.2V18.2M8.8 13.2H22.8', T69.blue, 1.3)}
+  <circle cx={24.8} cy={22.8} r={6.2} fill={T69.white} stroke="#4a80c8" strokeWidth={1.8} />
+  {l69('M29.5 27.2L32 29.7', '#4a80c8', 1.9)}
+</>;
+icons['ribbon-button-zoom'] = <>
+  <circle cx={12.5} cy={12.5} r={8.5} fill="none" stroke="#5b96cf" strokeWidth={1.68} />
+  {l69('M19 19L27.5 27.5', '#5b96cf', 3)}
+</>;
+icons['ribbon-button-zoomdefault'] = <>
+  <path d="M3.8 26.2V3.2H14.5L20.8 9.5V26.2Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.4} strokeLinejoin="miter" />
+  {l69('M14.5 3.2V9.5H20.8', T69.ink, 1.3)}
+  <path d="M21.5 3.2H28.8M28.8 3.2V16.5" fill="none" stroke={T69.mid} strokeWidth={1.6} strokeDasharray="1.7 2.1" strokeLinecap="butt" />
+  {l69('M17.5 14.2H24.6', GEARBLUE, 2.2)}
+  <path d="M24.2 11.5L28 14.2l-3.8 2.7Z" fill={GEARBLUE} />
+  <rect x={16.8} y={20.6} width={12.8} height={8.8} fill={GEARBLUE} />
+  {l69('M18.8 23.9l1.5-1.1v5.6', T69.white, 1.5)}
+  {l69r('M23 26.6m-1.6 0a1.6 2.4 0 1 0 3.2 0a1.6 2.4 0 1 0 -3.2 0', T69.white, 1.5)}
+  {l69r('M26.6 26.6m-1.6 0a1.6 2.4 0 1 0 3.2 0a1.6 2.4 0 1 0 -3.2 0', T69.white, 1.5)}
+</>;
+/* focusCell (24px, measured r3): plus of five adjacent squares — mid-blue #81befc arms with thin
+   #367fc9 borders meeting a white centre cell (thin #4d4d4d border) at x10.5/21.5 × y10.5/21.5. */
+icons['ribbon-button-focuscell'] = <>
+  <rect x={10.5} y={0.6} width={11} height={10} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.2} />
+  <rect x={10.5} y={21.4} width={11} height={10} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.2} />
+  <rect x={0.6} y={10.5} width={10} height={11} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.2} />
+  <rect x={21.4} y={10.5} width={10} height={11} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.2} />
+  <rect x={10.5} y={10.5} width={11} height={11} fill={T69.white} stroke="#4d4d4d" strokeWidth={1.2} />
+</>;
+/* selectionPane (View, 24px, measured r3): yellow panel (#ffd95d fill, #ee8815 frame) at the upper
+   right (11.5,1.5)-(29,14.5); a thin white outlined pane lower-left (2.5,14)-(20.5,25.5); a
+   black-outlined white cursor overlapping the lower-right. */
+icons['gc-designer-selection-pane-ribbon'] = <>
+  <rect x={12.1} y={2.1} width={16.5} height={12} fill="#ffd95d" stroke="#ee8815" strokeWidth={1.2} />
+  <rect x={3.1} y={14.6} width={17} height={10.4} fill={T69.white} stroke={T69.ink} strokeWidth={1.2} />
+  <path d="M16.8 12.2L17.2 26.2 20.5 23.2 23.1 28.6 25.3 27.5 22.8 22.4 28.3 22.2Z" fill={T69.white} stroke="#4d4d4d" strokeWidth={1.4} strokeLinejoin="round" />
+</>;
+/* commandPalette (24px, measured r3): thin #666 square (1.5,5)-(30,28.5); blue '>_' prompt (2.3u);
+   a small plain magnifier (no gear) overlapping the top-right corner. */
+icons['ribbon-button-command-palette'] = <>
+  <rect x={2.1} y={5.6} width={27.9} height={22.9} rx={0.6} fill={T69.white} stroke={T69.ink} strokeWidth={1.2} />
+  {l69('M6.8 9.8L12.8 15.8L6.8 21.8', GEARBLUE, 2.3)}
+  {l69('M14.8 21.2H22.3', GEARBLUE, 2.3)}
+  <circle cx={24.8} cy={6.3} r={5.3} fill={T69.white} stroke={GEARBLUE} strokeWidth={1.8} />
+  {l69('M28.7 10.2L31.2 12.7', GEARBLUE, 2)}
+</>;
+
+/* --- Settings tab --------------------------------------------------------------------
+   TASK 69 r3, re-measured from the DPR4 grid-viewer crops (.probe/t69/gv-settings-*.png):
+   - 16px family: full-size peeled-foot document (frame bands #666 1.6u at x 1.45/30.3,
+     y 2.45/26.3; foot 4..12.5 down to y29.5), #bbbbbb 1.7u rules at x11.5/21.5 x y9.5/19.5,
+     and a SOLID #367fc9 gear r7.8 white hub centred at the lower-right corner ≈(24.3,24.3)
+     occluding frame/rule ends; scrollbar/tabstrip gears sit a bit higher with a small chip.
+   - 24px General pair: document (2.2,3.2)→(29.4,22.5) with fold step at the lower-left,
+     1.45u rules at x11.2/20.2 x y8.7/13.2/18.2; lighter 10-tooth gear fill #81befc,
+     outline #367fc9, hub ring + white hub at ≈(24.4,23.8). */
+const doc16s69 = (): React.ReactElement => (
+  <>
+    <rect x={2.25} y={3.25} width={27.25} height={22.25} fill={T69.white} stroke={T69.ink} strokeWidth={2} />
+    <path d="M4 25.5V29.5H9L13 25.5" fill="none" stroke={T69.ink} strokeWidth={2} strokeLinejoin="miter" />
+  </>
+);
+const gear16s69 = (cx = 24.3, cy = 24.3, r = 7.8): React.ReactElement => (
+  <>
+    {gear69(cx, cy, r, GEARBLUE)}
+    <circle cx={cx} cy={cy} r={r * 0.34} fill={T69.white} />
+  </>
+);
+const doc24s69 = (): React.ReactElement => (
+  <>
+    <path d="M2.2 3.2H29.4V22.5H15.7L12.5 26.4H2.2Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.45} strokeLinejoin="miter" />
+    {l69('M2.2 8.7H28.6M2.2 13.2H28.6M2.2 18.2H17.5', T69.silver, 1.45)}
+    {l69('M11.2 3.2V21.5M20.2 3.2V17.5', T69.silver, 1.45)}
+  </>
+);
+const gear24s69 = (): React.ReactElement => (
+  <>
+    {gear69(24.4, 23.8, 7, '#81befc', GEARBLUE, 1.15, 10)}
+    <circle cx={24.4} cy={23.8} r={4.2} fill="none" stroke="#4a80c8" strokeWidth={1.1} />
+    <circle cx={24.4} cy={23.8} r={3} fill={T69.white} />
+  </>
+);
+icons['ribbon-button-sheetgeneral'] = <>{doc24s69()}{gear24s69()}</>;
+icons['ribbon-button-gridlines'] = <>
+  {doc16s69()}
+  {l69('M2.25 9.5H29.5M2.25 19.5H17.5', T69.silver, 2)}
+  {l69('M11.5 3.25V22.5M21.5 3.25V17', T69.silver, 2)}
+  {gear16s69()}
+</>;
+/* sheetSettingHeaders (16px, measured r3): yellow band inset inside the frame top: (4.3,5)-(23.7,13.5)
+   with the frame's top edge above it; body rules below the band only. */
+icons['ribbon-button-headers'] = <>
+  {doc16s69()}
+  <rect x={4.3} y={5} width={19.4} height={8.5} fill="#ffca00" />
+  {l69('M11.5 14.5V22.5M21.5 14.5V17M2.25 19.5H17.5', T69.silver, 2)}
+  {gear16s69()}
+</>;
+/* spreadSettingTabStrip (16px, measured r3): frame: thick top bar y5..7 x2..25.5, left edge x2..4,
+   tab divider x14..16 to y20.5, bottom bar y19.5..21.5 x2..14, right tab cell: right edge x23.5..25.5
+   (y6..17.5) + its bottom bar y16.5..18.5 x16..23.5; big left arrow x7.4..12.8 (y10.2..15.8) and a
+   small one x15.4..18.2 (y10.6..13.6); a big solid blue gear centred ≈(22.2,21.8) r8.3. */
+icons['ribbon-button-tabstrip'] = <>
+  {l69('M2 6H25.5M2 6V20.5M15 6V20.5M2 20.5H15M17 17.5H24.5M24.5 6V17.5', T69.ink, 1.9)}
+  <path d="M12.8 10.2V15.8L7.4 13Z" fill={GEARBLUE} />
+  <path d="M18.2 10.6V13.6L15.4 12.1Z" fill={GEARBLUE} />
+  {gear16s69(22.2, 21.8, 8.3)}
+</>;
+icons['ribbon-button-spreadgeneral'] = <>
+  {doc24s69()}
+  <rect x={13.5} y={21.3} width={7} height={4} fill={T69.white} stroke={T69.ink} strokeWidth={1.35} />
+  {gear24s69()}
+</>;
+/* spreadSettingScrollBar (16px, measured): full-height scrollbar document x5.5..16.75 × 1..28.25
+   (#666 1.8u), dark divider under the arrow button at y14.3, solid blue up-triangle in the button
+   (11..15.9 × 6..9.8), a small solid left-arrow chip in the trough (~10..12.6 × 19..21), and a big
+   solid blue gear centred at (20.6, 23.2) r7.7 with white hub overlapping the trough's lower right. */
+icons['ribbon-button-scrollbars'] = <>
+  <rect x={5.5} y={1} width={11.25} height={27.25} fill={T69.white} stroke={T69.ink} strokeWidth={1.8} />
+  {l69('M5.5 14.3H16.75', T69.ink, 1.7)}
+  <path d="M13.4 5.9 15.9 9.8H10.9Z" fill={GEARBLUE} />
+  <path d="M12.6 18.7V21.3L9.8 20Z" fill={GEARBLUE} />
+  {gear16s69(20.6, 23.2, 7.7)}
+</>;
+icons['ribbon-button-tabstrip'] = <>
+  {l69('M2 6H29.8M2 6V20M16 6V20M2 20H16M16 16.6H29.8M29.8 6V16.6', T69.ink, 1.9)}
+  <path d="M12.6 11.2V15.6L7.3 13.4Z" fill={GEARBLUE} />
+  <path d="M23.2 10.8V13.7L20.3 12.25Z" fill={GEARBLUE} />
+  {gear16s69(24.7, 21.2, 6.9)}
+</>;
+/* spreadSettingCalculation (16px, measured via unit colour-maps): tall grid sheet x2..30 ×
+   3.5..29.5 with a full-width grey band at y10.4, header rules x11.9/x20.9 (between frame and
+   band), a body rule x11.9 down to the sheet bottom, a short grey rule y20 in the first column,
+   a peeled foot (bottom edge y26.2 to x13.6, foot strip y28.4 to x10.7, fold back to 13.6) and
+   a solid blue calculator flush at the lower-right (frame 2u blue 16..31 × 14..31, blue display
+   18..28.6 × 17..20.8, 2u keys at x18/23.5/28.5 × y23/27, right column solid orange). */
+icons['ribbon-button-calculation'] = <>
+  {l69('M2.9 3.7H30.3V10.9M2.1 3.7V28.6M2.9 25.9H13M2.1 25.9V28.6H10.4L12.9 25.9', T69.ink, 2)}
+  {l69('M11.4 4V11M20.75 4V11M2.6 9.85H30M11.4 11V23.7M3.1 19.6H10.9', T69.silver, 1.9)}
+  <rect x={16} y={14} width={15} height={17} fill={T69.white} stroke={GEARBLUE} strokeWidth={2} />
+  <rect x={17.4} y={17.4} width={11.3} height={4} fill="#8fc3f5" />
+  <rect x={18} y={17} width={10.6} height={3.8} fill={GEARBLUE} />
+  {[18, 23.5].flatMap((x) => [23, 27].map((y) => <rect key={`k${x}-${y}`} x={x} y={y} width={2.3} height={2.3} fill="#888888" />))}
+  {[23, 27].map((y) => <rect key={`o${y}`} x={28.4} y={y} width={2.3} height={2.3} fill="#fa7541" />)}
+</>;
+
+/* --- Page Layout tab ------------------------------------------------------------------- */
+/* margins (24px, measured): plain page 5.17..26.17 x 0.7..31.2 stroke #595959 1.35 with four
+   light-blue margin guides across it at x10.17/21.17 and y5.17/26.17. */
+icons['ribbon-button-margins'] = <>
+  <rect x={5.17} y={0.7} width={21} height={30.5} fill={T69.white} stroke="#595959" strokeWidth={1.35} />
+  {l69('M10.17 0.7V31.2M21.17 0.7V31.2M5.17 5.17H26.17M5.17 26.17H26.17', T69.midBlue, 1.35)}
+</>;
+/* paperSize: portrait page 9..28.3 x 6..31.3 with a folded top-right corner, a blue vertical
+   T-headed double arrow at x4.17 and a horizontal one at y1.17 (measured). */
+icons['ribbon-button-paper-size'] = <>
+  <path d="M9 31.3V6H24.3L28.3 10V31.3Z" fill={T69.white} stroke="#595959" strokeWidth={1.4} strokeLinejoin="miter" />
+  {l69('M24.3 6V10H28.3', '#595959', 1.3)}
+  {l69('M4.17 6.7V28.3M2.2 6.7H6.1M2.2 28.3H6.1', GEARBLUE, 1.6)}
+  {l69('M9 1.17H26.5M9 0V3.3M26.5 0V3.3', GEARBLUE, 1.6)}
+</>;
+/* orientation: portrait sheet behind (left frame 1.5, foot 14.2, fold at top-right
+   (11,1.5)-(14.5,5)) and a landscape sheet in front (8.5..28.5 x 13.5..31.2, fold
+   (23.5,13.5)-(28.5,18.5)). */
+icons['ribbon-button-page-layout-orientation'] = <>
+  <path d="M1.5 14.2V1.5H11L14.5 5V9.5" fill={T69.white} stroke="#595959" strokeWidth={1.35} strokeLinejoin="miter" />
+  {l69('M11 1.5V5H14.5', '#595959', 1.3)}
+  <path d="M8.5 31.2V13.5H23.5L28.5 18.5V31.2Z" fill={T69.white} stroke="#595959" strokeWidth={1.35} strokeLinejoin="miter" />
+  {l69('M23.5 13.5V18.5H28.5', '#595959', 1.3)}
+</>;
+icons['ribbon-control-orientationportrait'] = <>
+  <path d="M9 3H20L25 8V29H9Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.4} strokeLinejoin="miter" />
+  {l69('M20 3V8H25', T69.ink, 1.3)}
+</>;
+icons['ribbon-control-orientationlandscape'] = <>
+  <path d="M4 7H29V19L24 24H4Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.4} strokeLinejoin="miter" />
+  {l69('M29 19H24V24', T69.ink, 1.3)}
+</>;
+icons['ribbon-button-page-portrait'] = icons['ribbon-control-orientationportrait'];
+icons['ribbon-button-page-landscape'] = icons['ribbon-control-orientationlandscape'];
+/* printArea (24px, measured via unit map): page frame #595959 1.35u — left x3.2 (y1..30.4),
+   top edge y1 to x16.4, dog-ear fold: hypotenuse (16.4,1)→(22.2,7.3) with flap edges (vertical
+   x16.4 to y7.3 + horizontal to the right frame), right frame x22.2 from 7.3 down to ~14.5,
+   bottom edge y30.4 x3.2..12.7; blue print-area frame 1.7u x5.2..19.5 x 2.6..27.4 (corner tucked
+   under the fold); printer lower right: tray 17.7..25.1 y16.4..21, body 13.7..27 y21..27.3,
+   output paper 18..25.3 y27.3..31.4, small grey dot at the body's inner left. */
+const printer69 = (bx = 14.6, by = 21.3, ph = 4.8, oh = 4.3): React.ReactElement => (
+  <>
+    <path d={`M${bx + 4.5} ${by}V${by - ph}h7V${by}`} fill={T69.white} stroke={T69.ink} strokeWidth={1.15} />
+    <rect x={bx + 0.55} y={by + 0.55} width={14.9} height={5.4} fill={T69.white} stroke={T69.ink} strokeWidth={1.15} />
+    <path d={`M${bx + 4.5} ${by + 6}v${oh}h7v-${oh}`} fill={T69.white} stroke={T69.ink} strokeWidth={1.15} />
+    <rect x={bx + 2} y={by + 1.4} width={1.2} height={1.2} fill={T69.ink} />
+  </>
+);
+/* printArea (24px, measured r3): the page frame is only left/bottom/right + the fold flap:
+   left edge centre x3.1 (y2.4..29.8), bottom y29.7 to x13.8, right edge x24 only y8..14.8;
+   flap: vertical x17.1 (1.8..7.5), horizontal y7.5 to x24, cut-diagonal (17.6,1.6)→(23.6,7.4).
+   The blue print-area frame: top edge y2.2 from x4.9 to 16.4 (ends at the flap), left x5 full
+   to y27.2, bottom y27.2 to x13.6, and a short right edge at x22 (y8.3..14.8). Printer body
+   origin (14.6,21.3). */
+icons['ribbon-button-print-area'] = <>
+  <path d="M3.1 29.7V2.4M3.1 29.7H13.8M24 7.6V14.8" fill="none" stroke={T69.ink} strokeWidth={1.3} />
+  <path d="M17.1 1.8V7.5H24" fill="none" stroke={T69.ink} strokeWidth={1.3} />
+  {l69('M17.6 1.6L23.9 7.6', T69.ink, 1.3)}
+  <path d="M16.4 2.2H5V27.2H13.6" fill="none" stroke={GEARBLUE} strokeWidth={1.15} />
+  <path d="M22 8.3V14.8" fill="none" stroke={GEARBLUE} strokeWidth={1.15} />
+  {printer69()}
+</>;
+/* printTitles (24px, measured r3): grid #666 1.2u outer (0,2.4)-(27.8,24.6); grey #c4c4c4 1.3u
+   rules at x9.5/18.5 below the band plus one horizontal rule at y15.7; a RED #e65249 1.2u
+   outline around the whole top row band (outer x0..28, y1.8..9.8) with red dividers at x9.5/18.5
+   splitting it into three red cells; printer at body origin (16,19.5). */
+icons['ribbon-button-print-titles'] = <>
+  <rect x={0.6} y={3} width={26.6} height={21} fill={T69.white} stroke={T69.ink} strokeWidth={1.2} />
+  {l69('M9.5 9.8V24M18.5 9.8V24M1.2 15.7H26.6', '#c4c4c4', 1.3)}
+  <rect x={0.6} y={2.4} width={26.8} height={6.5} fill={T69.white} stroke="#e65249" strokeWidth={1.2} />
+  {l69('M9.5 2.4V9.5M18.5 2.4V9.5', '#e65249', 1.2)}
+  {printer69(16, 19.5, 4.5, 4.5)}
+</>;
+/* worksheetBackground: full-width grid sheet (0.5..31.5 x 3.2..25.2, gray rules at x10.5/21.5
+   y10.3/17.3, foot at the lower-left) painted with blue mountains + an orange sun (measured). */
+icons['ribbon-button-page-setup-background'] = <>
+  <rect x={0.5} y={3.2} width={31} height={22} fill={T69.white} stroke="#595959" strokeWidth={1.4} />
+  <path d="M3 25.2V29.2H9.5L13 25.2" fill="none" stroke="#595959" strokeWidth={1.4} strokeLinejoin="miter" />
+  {l69('M10.5 3.2V25.2M21.5 3.2V25.2M0.5 10.3H31.5M0.5 17.3H31.5', T69.silver, 1.35)}
+  <path d="M1.2 24.5L10.5 13.3 20 24.5Z" fill={T69.midBlue} stroke="#4a87c8" strokeWidth={1.35} strokeLinejoin="round" />
+  <path d="M16 24.5L23.5 17.3 31 24.5Z" fill={T69.midBlue} stroke="#4a87c8" strokeWidth={1.35} strokeLinejoin="round" />
+  <circle cx={24.7} cy={10.5} r={2.5} fill="#ff9a3a" />
+</>;
+icons['ribbon-button-breaks'] = <>
+  {l69('M6 1V11H26V1', T69.ink, 1.4)}
+  <path d="M1 16H31" fill="none" stroke="#7fb2e5" strokeWidth={1.3} strokeDasharray="2.6 2.2" strokeLinecap="butt" />
+  {l69('M6 31V21H26V31', T69.ink, 1.4)}
+</>;
+
+/* --- Formulas tab ---------------------------------------------------------------------- */
+/* Serif-italic blue fx (own calligraphy): hooked bowl, crossbar, curled descender ball,
+   cursive x = two arcs whose lower tails curl outwards. Local bbox ~ (0,0,22,25);
+   stroke width passed in 32-unit space. */
+/* fx glyph: italic f (top curl + crossbar + tail) with x; curly=true renders the cursive
+   double-bow x seen in the showFormulas flag glyph, straight italic × otherwise. */
+const fx69 = (x: number, y: number, k = 1, sw = 3.2, color = T69.blue, curly = false): React.ReactElement => (
+  <g transform={`translate(${x} ${y}) scale(${k})`} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15.2 5.8C14 3 10.2 2.9 8.6 6.3L4.6 18.4C3.9 21 2.8 22.7 1 24.4" strokeWidth={sw} />
+    <path d="M3.4 11.6H14.6" strokeWidth={sw * 0.75} />
+    {curly ? <>
+      <path d="M14.7 10.4C16.7 13 19 15.9 20.8 18.2c0.9 1.2 0.3 2.2-1.1 1.9" strokeWidth={sw * 0.82} />
+      <path d="M21.3 10.4C19.3 13 17 15.9 15.2 18.2c-0.9 1.2-0.3 2.2 1.1 1.9" strokeWidth={sw * 0.82} />
+    </> : <>
+      <path d="M14.4 11.2L21.4 19" strokeWidth={sw * 0.82} />
+      <path d="M21.4 11.2L15.2 19" strokeWidth={sw * 0.82} />
+    </>}
+  </g>
+);
+/* Thin dark book with folded foot bottom-left + centred coloured symbol. */
+const funcBook69 = (symbol: React.ReactNode): React.ReactElement => (
+  <>
+    <path d="M26.5 24.5V6.2Q26.5 3.4 23.6 3.4H8.4Q5.5 3.4 5.5 6.2V24.5Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.5} strokeLinejoin="round" />
+    {l69('M5.5 24.5V28.6H12.5', T69.ink, 1.5)}
+    {symbol}
+  </>
+);
+icons['ribbon-button-mathtrigfunction'] = funcBook69(<><ellipse cx={16} cy={13.6} rx={4.6} ry={6.2} fill="none" stroke={T69.green} strokeWidth={1.8} />{l69('M11.4 13.6H20.6', T69.green, 1.8)}</>);
+icons['ribbon-button-textfunction'] = funcBook69(<>{l69('M10.8 20.8L16 7.8l5.2 13M12.7 16.5h6.6', T69.blue, 2.4)}</>);
+icons['ribbon-button-financialfunction'] = funcBook69(<>
+  <ellipse cx={16} cy={9} rx={5} ry={2} fill="#70c484" stroke={T69.greenDark} strokeWidth={1.19} />
+  <path d="M11 9v6.6a5 2 0 0 0 10 0V9" fill="#70c484" stroke={T69.greenDark} strokeWidth={1.19} />
+  {l69('M11 12.2a5 2 0 0 0 10 0M11 15.4a5 2 0 0 0 10 0', T69.greenDark, 1.4)}
+</>);
+icons['ribbon-button-logicalfunction'] = funcBook69(<g transform="translate(1.5 -1.5)">{g(GL.qm, '#8546a8', 2.6)}{dot(16, 24.5, 1.5, '#8546a8')}</g>);
+icons['ribbon-button-datetimefunction'] = funcBook69(<>
+  <circle cx={16} cy={14} r={6} fill="none" stroke="#e0503c" strokeWidth={1.6} />
+  {l69('M16 9.6V14.2L19.2 16.2', '#e0503c', 1.8)}
+</>);
+icons['ribbon-button-lookupreferencefunction'] = funcBook69(<>
+  <circle cx={14.2} cy={13.4} r={5.2} fill="none" stroke={T69.blue} strokeWidth={1.6} />
+  {l69('M18 17.2L22.6 21.8', T69.blue, 2.2)}
+</>);
+icons['ribbon-button-morefunction'] = funcBook69(<>{dot(11, 14, 1.7, T69.red)}{dot(16, 14, 1.7, T69.red)}{dot(21, 14, 1.7, T69.red)}</>);
+icons['ribbon-button-insertfunction'] = fx69(5, 4.5, 1.15, 2.7);
+/* measured (bands.py + unit scans): panel = near-full 16px box (frame 1.6u at 1.75..31.25 x
+   0.75..30.75) with a big fx (bbox 6..26.5 x 5..26.5); showFormulas (16px) = flag: left bar
+   x0.5..2.5 to y24.5, top bar to x~21, hypotenuse (21,1.5)→(1.5,24.5), all #666 ~2.4u; fx sits
+   lower-right with crossbar at y~16.5. */
+icons['ribbon-show-formulas'] = <>
+  <path d="M1.6 1.6H21.4L1.6 24.4Z" fill={T69.white} stroke="#666666" strokeWidth={2} strokeLinejoin="miter" />
+  {fx69(5.5, 3, 1, 2.7, T69.blue, true)}
+</>;
+icons['gc-formula-editor-panel-ribbon-show'] = <>
+  <rect x={1.75} y={0.75} width={29.5} height={30} fill={T69.white} stroke="#595959" strokeWidth={1.5} />
+  {fx69(5.6, 3.4, 0.96, 2.5)}
+</>;
+/* autoSum (24px, measured r3b): bars 3u (y3.5..6.5 / 25.5..28.5) x3.5..29.7; 2.1u serifs at
+   x27.6..29.7 (top one y6.5..19.6, bottom one fused with the bar); diagonals as two flat bands
+   joining at the apex (outer point x21, horizontal band width ~5.8u). */
+icons['ribbon-button-autosum'] = (
+  <g fill={GEARBLUE}>
+    <rect x={3.5} y={3.5} width={26.2} height={3} />
+    <rect x={3.5} y={25.5} width={26.2} height={3} />
+    <rect x={27.6} y={6.5} width={2.1} height={13.1} />
+    <rect x={27.6} y={23.7} width={2.1} height={4.8} />
+    <path d="M3.5 6.5H9.2L21 16H15.3Z" />
+    <path d="M15.3 16H21L9.2 25.5H3.5Z" />
+  </g>
+);
+/* calculatenow (16px calc): frame 5.5..27.5 x 1.5..31.2 stroke 2 #595959; solid blue display
+   6.5..26.5 x 4.5..10.5 with lighter inset band; 3x3 keys 4u at 6u pitch #595959.
+   calculationoptions (24px, measured): frame #666 ~1.35u at 5.8..25.8 x 2.2..29.2; display band
+   #367fc9 9.4..22.4 x 5.7..10.7 with a pale #85bbfc inset; 3x3 solid #595959 keys 3u at
+   x9.33/14.33/19.33 x y12.6/17.8/23 (5u pitch); no gear. */
+icons['ribbon-button-calculateNow'] = <>
+  <rect x={5.5} y={1.5} width={22} height={29.75} fill={T69.white} stroke="#595959" strokeWidth={2} />
+  <rect x={6.5} y={4.5} width={20} height={6} fill={GEARBLUE} />
+  <rect x={8.5} y={6.3} width={16} height={2.4} fill="#a9c9ea" />
+  {[8.5, 14.5, 20.5].flatMap((x) => [12.5, 18.5, 24.5].map((y) => <rect key={`${x}-${y}`} x={x} y={y} width={4} height={4} fill="#595959" />))}
+</>;
+icons['ribbon-button-calculationoptions'] = <>
+  <rect x={5.8} y={2.2} width={20} height={27} fill={T69.white} stroke={T69.ink} strokeWidth={1.35} />
+  <rect x={9.4} y={5.7} width={13} height={5} fill={GEARBLUE} />
+  <rect x={10.2} y={6.7} width={11} height={2.7} fill="#85bbfc" />
+  {[9.33, 14.33, 19.33].flatMap((x) => [12.6, 17.8, 23].map((y) => <rect key={`${x}-${y}`} x={x} y={y} width={3} height={3} fill="#595959" />))}
+</>;
+/* calculateSheet (16px, measured): grid sheet x2.8..30 (frame 2.2u #666; right frame only down to
+   the band y10.2; thick 2.3u grey band; header rules x12.35/22.15 between frame and band; body rule
+   x12.35 down to the main bottom y22.4 which runs to x16.3; a wide white gap, then a peeled foot
+   strip y27.35 to x11.6 folding back to 14.3) + a thick gray-framed calculator flush lower-right
+   (frame 2.9u 20..31.3 x 12.8..31, blue display 22.5..28.4 x 15..17.8, 2x2 dark keys 2.5u). */
+icons['ribbon-button-calculateSheet'] = <>
+  {l69('M1.5 0.9H30.7V9.4M1.5 0.9V26.4M1.5 22.7H15.7M1.5 22.7V26.4H10.6L14.2 23.4', T69.ink, 1.8)}
+  {l69('M11.4 1.9V5.8M20.35 1.9V5.8M2.2 6.85H30.5M11.4 7.8V21.4M3.2 16.8H16', '#b8b8b8', 1.9)}
+  <rect x={19.6} y={12.7} width={11.2} height={16} fill={T69.white} stroke="#595959" strokeWidth={1.8} />
+  <rect x={22.9} y={15.8} width={5.7} height={2} fill={GEARBLUE} />
+  {[21.7, 25.7].flatMap((x) => [20, 23.6].map((y) => <rect key={`${x}-${y}`} x={x} y={y} width={1.8} height={1.8} fill="#595959" />))}
+</>;
+/* nameManager (24px, measured r3 from the DPR4 1u-grid crop): open drawer — box outline #666
+   1.8u at outer (3.2,18.7)-(22.2,26.9); behind it a gray side wall rising up-right: pentagon
+   (23.2,16)-(27.4,11.4)-(27.4,21)-(24.4,24)-(23.2,24) with a 1u white slot at (24.5,17); a gray
+   wedge tri (3.7,15.9)-(7.2,11.3) at the left; three blue folder cards with 45° bottom-right
+   chamfers: c1 x15.2..25.5 y3.3..5.9, c2 x11.5..25.5 y6.5..9.7, c3 x8.5..24.5 y10.3..15.6 (its
+   right edge verticals 12.8..15.6), c3 with a 1.7r white hole at (20.1,13.1). */
+icons['ribbon-button-namemanager'] = <>
+  <path d="M23.2 24.6V16.2l4.7-4.9V21.5l-3.4 3.1v1.2Z" fill="#666666" />
+  <rect x={24.5} y={17.2} width={1} height={5.6} fill={T69.white} />
+  <path d="M3.7 15.9H7.2V11.3Z" fill="#666666" />
+  <rect x={4.1} y={19.6} width={17.2} height={6.4} fill={T69.white} stroke="#666666" strokeWidth={1.8} />
+  <path d="M15.2 3.3H25.5L22.9 5.9H15.2Z" fill={GEARBLUE} />
+  <path d="M11.5 6.5H25.5L22.5 9.7H11.5Z" fill={GEARBLUE} />
+  <path d="M8.5 10.3H24.5V12.8L21.7 15.6H8.5Z" fill={GEARBLUE} />
+  <circle cx={20.1} cy={13.1} r={1.7} fill={T69.white} />
+</>;
+
+/* --- Data tab -------------------------------------------------------------------------- */
+icons['ribbon-button-innerGroup'] = <>{outlineTable69([T69.blue, T69.blue, T69.blue], [4.8, 14.7, 24.6])}{groupArms69()}{diamondBox69(1.5, 10.5)}</>;
+icons['ribbon-button-innerUngroup'] = <>
+  {outlineTable69([T69.blue, T69.blue, T69.blue], [4.8, 14.8, 24.8], [11, 21])}{groupArms69()}
+  <rect x={2} y={12} width={11.5} height={12} fill={T69.white} stroke="#e65249" strokeWidth={1.9} />
+  {l69('M12.1 13.9L4.1 21.9', '#e65249', 2.1)}
+</>;
+icons['ribbon-button-subtotal'] = <>
+  {outlineTable69([T69.blue, T69.blue, '#fa7541'], [4.9, 14.9, 25.2], [11, 21])}
+  {diamondBox69(2, 3)}
+  {diamondBox69(2, 18.5, false)}
+</>;
+/* customSort (24px, measured): solid blue header band #367fc9 2.6..29.4 × 1.7..6.8 (no outline),
+   thin #666 frame 1u below the band: sides x2.83/x28.83 y6.8..27.2, bottom y27.2, shared vertical
+   at x15.83; four sans letters ~6.4u tall: left cell Z(orange #fa7541) top / A(blue) bottom,
+   right cell A(blue) top / Z(orange) bottom; strokes ~2u, no arrows. */
+icons['ribbon-button-sort'] = <>
+  <rect x={2.6} y={1.7} width={26.8} height={5.1} fill={GEARBLUE} />
+  {l69('M2.83 6.8V27.2H28.83V6.8M15.83 6.8V27.2', T69.ink, 1)}
+  <g fill="none" strokeLinecap="butt" strokeLinejoin="miter">
+    <g transform="translate(6.13 4.9) scale(0.4)">{g(GL.Z, '#fa7541', 5)}</g>
+    <g transform="translate(7.13 13.3) scale(0.4)">{g(GL.A, GEARBLUE, 5)}</g>
+    <g transform="translate(20.13 5.3) scale(0.4)">{g(GL.A, GEARBLUE, 5)}</g>
+    <g transform="translate(19.13 12.9) scale(0.4)">{g(GL.Z, '#fa7541', 5)}</g>
+  </g>
+</>;
+icons['ribbon-button-sortAZ'] = <>
+  <g fill="none" strokeLinecap="butt" strokeLinejoin="miter">
+    <g transform="translate(1 -6) scale(0.9)">{g(GL.A, GEARBLUE, 2.4)}</g>
+    <g transform="translate(1 6.8) scale(0.9)">{g(GL.Z, '#fa7541', 2.4)}</g>
+  </g>
+  {l69('M24 2V21', '#666666', 4.2)}
+  <path d="M19.5 19.5L24 29 28.5 19.5Z" fill="#666666" />
+</>;
+icons['ribbon-button-sortZA'] = <>
+  <g fill="none" strokeLinecap="butt" strokeLinejoin="miter">
+    <g transform="translate(1 6.8) scale(0.9)">{g(GL.Z, '#fa7541', 2.4)}</g>
+    <g transform="translate(1 -6) scale(0.9)">{g(GL.A, GEARBLUE, 2.4)}</g>
+  </g>
+  {l69('M24 2V21', '#666666', 4.2)}
+  <path d="M19.5 19.5L24 29 28.5 19.5Z" fill="#666666" />
+</>;
+icons['ribbon-button-filter'] = <path d="M4 6H28L18 19V27L14 29V19Z" fill={T69.blue} />;
+icons['ribbon-button-clearfilter'] = <>
+  <path d="M4 6H25L16 18V25L12 27V18Z" fill={T69.blue} />
+  {l69('M10.2 14.8L19.8 24.4M19.8 14.8L10.2 24.4', T69.white, 5.2)}
+  {l69('M10.2 14.8L19.8 24.4M19.8 14.8L10.2 24.4', '#fa7541', 2.7)}
+</>;
+icons['ribbon-button-reapplyfilter'] = <>
+  <path d="M4 6H25L16 18V25L12 27V18Z" fill={T69.paleBlue} />
+  {l69('M27 19a6 6 0 1 1-3-4.5', T69.orange, 2)}<path d="M27 10.5l1.2 5.5-5.5-1.2Z" fill={T69.orange} />
+</>;
+/* textToColumn (24px, cmap + pair r4): 3 dark text rules top-left (y6/11/15, lengths 12/16/8);
+   a thin blue loop arrow sweeping left/below/right ending in an open down-right V head;
+   three outlined cells stacked at the right (x21..30), each with a mid-blue dash. */
+icons['ribbon-button-textToColumn'] = <>
+  {l69('M2.7 5.5H15M2.7 10.7H18.5M2.7 15H10.5', T69.ink, 2)}
+  <path d="M14 17.5C6.5 16.5 3 20 3.5 24C4 27.5 8.5 29 13.5 28.4" fill="none" stroke={GEARBLUE} strokeWidth={1.7} strokeLinecap="butt" />
+  <path d="M10.8 24.6L14.2 29.2L17 23.6" fill="none" stroke={GEARBLUE} strokeWidth={1.7} strokeLinejoin="miter" />
+  {[0, 1, 2].map((i) => <rect key={i} x={21.3} y={2.5 + i * 9.7} width={8.8} height={8} fill={T69.white} stroke={T69.ink} strokeWidth={1.3} />)}
+  {[0, 1, 2].map((i) => <rect key={`d${i}`} x={23.3} y={5.5 + i * 9.7} width={4.8} height={1.6} fill={GEARBLUE} />)}
+</>;
+/* removeDuplicates (24px, cmap r4): only TWO pale-blue bands (thin #367fc9 frame, no middle band):
+   top band (x4..22, y3..11) and a bottom band (x4..20, y19..29); a thin red ✗ overlaps the bottom
+   band's right end. */
+icons['ribbon-button-remove-duplicates'] = <>
+  <rect x={4} y={3.5} width={18} height={8} fill={T69.midBlue} stroke={T69.blue} strokeWidth={1.2} />
+  <rect x={4} y={19.5} width={16.5} height={9.5} fill={T69.midBlue} stroke={T69.blue} strokeWidth={1.2} />
+  {l69('M20 19.5L28 27.5M28 19.5L20 27.5', T69.white, 3.8)}
+  {l69('M20 19.5L28 27.5M28 19.5L20 27.5', '#e65249', 1.9)}
+</>;
+/* editLinks (24px, cmap r4): document x4..25 y2.5..28, big folded corner (slant (15,2.5)→(25,12.5),
+   fold vertical x15 + horizontal y12.5); two tilted hollow blue chain links over the lower half,
+   the lower-right link drawn over the first with a white gap. */
+icons['ribbon-button-editLinks'] = <>
+  <path d="M4.5 28V2.5H15L25 12.5V28Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.3} strokeLinejoin="miter" />
+  {l69('M15 2.5V12.5H25', T69.ink, 1.2)}
+  <g transform="rotate(-32 10 18)">
+    <rect x={4.5} y={15} width={11} height={6.8} rx={3.4} fill={T69.white} stroke={GEARBLUE} strokeWidth={1.9} />
+  </g>
+  <g transform="rotate(-32 21.5 22)">
+    <rect x={15.5} y={18.5} width={12} height={7} rx={3.5} fill="none" stroke={T69.white} strokeWidth={4.4} />
+    <rect x={15.5} y={18.5} width={12} height={7} rx={3.5} fill="none" stroke={GEARBLUE} strokeWidth={1.9} />
+  </g>
+</>;
+/* dataValidation (24px main, cmap-measured r4): two wide outlined rows (x4..28 & x2..26) with a
+   green ✓ over row1's right end and a red ✗ over row2's right end; thin strokes. */
+icons['gc-ribbon-control-dropdown-datavalidationsmall'] = <>
+  <rect x={3.5} y={3} width={24} height={9.5} fill={T69.white} stroke={T69.ink} strokeWidth={1.3} />
+  <rect x={2.5} y={17.5} width={23.5} height={9.5} fill={T69.white} stroke={T69.ink} strokeWidth={1.3} />
+  {l69('M19 7L22 10.5L26.5 3.5', T69.white, 4)}
+  {l69('M19 7L22 10.5L26.5 3.5', T69.green, 2.1)}
+  {l69('M21 18.5L27.5 25.5M27.5 18.5L21 25.5', T69.white, 4)}
+  {l69('M21 18.5L27.5 25.5M27.5 18.5L21 25.5', '#e65249', 2.1)}
+</>;
+/* whatIfAnalysis (24px, measured): grid frame #666 1.35u: left x2.85 (y2.2..23.2), top y2.2 to
+   x29.85, right x29.85 only down to y11.5, bottom y23.2 only to x21.3; grey 1.35u rules x12 full
+   height, x21 down to y12.5, y9.3 from x12.7, y16.2 short from x12.7; left-column cells rows 1+3
+   filled pale #85bbfc with 1.7u blue borders (2.85..12.5 × 2.25..10.35 and 16.15..23.25); a big
+   blue question mark over the lower right (hook x20.5..29.5 y11.7..21, stem 2.7u at x24.8..27.5,
+   square dot 26.2..29.8 with its own square dot). */
+icons['ribbon-button-whatIfAnalysis'] = <>
+  {l69('M2.85 2.2V23.2H21.3M2.85 2.2H29.85V11.5', T69.ink, 1.35)}
+  {l69('M12 2.2V23.2M21 2.2V12.5M12.7 9.3H29M12.7 16.2H18.6', T69.silver, 1.35)}
+  <rect x={3.7} y={3.1} width={8.8} height={6.4} fill="#85bbfc" stroke={GEARBLUE} strokeWidth={1.7} />
+  <rect x={3.7} y={17} width={8.8} height={6.3} fill="#85bbfc" stroke={GEARBLUE} strokeWidth={1.7} />
+  {l69r('M21.4 14.4a4.6 4.6 0 1 1 6.4 5.6c-1.4 1.3-1.8 2-1.8 3.9', GEARBLUE, 2.7)}
+  <rect x={24.8} y={26.2} width={2.7} height={3.1} fill={GEARBLUE} />
+</>;
+/* templateDesignMode (24px, measured): 3-col grid frame #666 1.2u x2.5..26.5 × 2.2..27.2, rules
+   x9.5/x19.5 full height, grey 1.2u horizontals y6.8/y13.5/y20.5; middle column rows 2-3 filled
+   pale blue #81befc with a 1.5u blue outline; a big paintbrush from the top-right: rounded 4.6u
+   grey handle (29.3,4.5)→(17.5,17.5), white collar at (15.5,19.5), blue bristle blob centred
+   (12.5,25.5) reaching down to y30. */
+icons['ribbon-button-template'] = <>
+  {l69('M2.5 2.2H26.5V27.2H2.5Z', T69.ink, 1.2)}
+  {l69('M9.5 2.2V27.2M19.5 2.2V27.2', T69.ink, 1.2)}
+  {l69('M2.5 6.8H26.5M2.5 13.5H26.5M2.5 20.5H26.5', T69.silver, 1.2)}
+  <rect x={9.5} y={6.8} width={10} height={13.7} fill="#81befc" stroke={GEARBLUE} strokeWidth={1.5} />
+  {l69('M9.5 13.6H19.5', GEARBLUE, 1.2)}
+  {line('M29.3 4.5L17.8 17', '#9b9b9b', 4.6, 'round')}
+  <circle cx={16.1} cy={18.9} r={2.4} fill={T69.white} stroke="#c8c8c8" strokeWidth={1.2} />
+  <path d="M13 21.4c4.4-1 7 1.5 6.6 4.6-0.5 3.8-4.4 5.6-7.8 4-2.6-1.4-3.4-4.4-1.6-7 0.8-1.1 1.8-1.4 2.8-1.6Z" fill={GEARBLUE} />
+  {l69r('M9.9 25.5c0.6-1.8 2-3.2 3.6-4', T69.white, 1.4)}
+</>;
+icons['ribbon-button-showdetail'] = <>
+  {l69('M8 6V14M4 10H12', T69.mid, 2.2)}
+  {detailBars(6)}
+</>;
+icons['ribbon-button-hidedetail'] = <>
+  {l69('M4 8H12', T69.mid, 2.2)}
+  {detailBars(4)}
+</>;
+
+/* --- Insert tab ------------------------------------------------------------------------ */
+/* 24px table (measured r3): frame #666 1.35u at (2.5,2.5)-(29.5,29.5), solid blue header band
+   flush to the frame (y2.5..8.1, #367fc9), three #666 column rules x9.3/15.8/22.5 below the header
+   and two #bbbbbb data-row rules at y13.4/20.6 (header + 3 data rows, last column widest).
+   Fractions keep the small 14u variant (changeDataSource) proportional. */
+const table69 = (x = 2.5, y = 2.5, w = 27, h = 27): React.ReactElement => {
+  return (
+    <>
+      <rect x={x} y={y} width={w} height={h} fill={T69.white} stroke={T69.ink} strokeWidth={1.35} />
+      <rect x={x + 0.02 * w} y={y + 0.02 * h} width={w - 0.04 * w} height={h * 0.2} fill={GEARBLUE} />
+      {l69(`M${x + 0.252 * w} ${y + 0.207 * h}V${y + h}M${x + 0.493 * w} ${y + 0.207 * h}V${y + h}M${x + 0.741 * w} ${y + 0.207 * h}V${y + h}`, T69.ink, 1.2)}
+      {l69(`M${x} ${y + 0.404 * h}H${x + w}M${x} ${y + 0.67 * h}H${x + w}`, T69.silver, 1.35)}
+    </>
+  );
+};
+icons['ribbon-button-table'] = table69();
+icons['ribbon-thumbnail-table'] = table69();
+icons['ribbon-button-insert-pivot-table'] = <>
+  <rect x={2.5} y={2.5} width={27} height={27} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  <rect x={6.5} y={6.5} width={5} height={4.5} fill={T69.silver} />
+  <rect x={13.5} y={6.5} width={12.5} height={4.5} fill={T69.silver} />
+  <rect x={6.5} y={13.5} width={4.5} height={9.5} fill={T69.silver} />
+  {l69('M24.5 14.5V24.5H14.5', GEARBLUE, 2.1)}
+  <path d="M21.7 17L24.5 13.6l2.8 3.4M17.6 21.7L14.2 24.5l3.4 2.8" fill="none" stroke={GEARBLUE} strokeWidth={1.9} strokeLinejoin="miter" />
+</>;
+icons['ribbon-button-chart'] = <>
+  <rect x={4} y={13} width={7} height={17} fill="#8fb4e3" />
+  <rect x={12.5} y={5} width={7} height={25} fill="#ffd966" />
+  <rect x={21} y={9} width={7} height={21} fill="#f2b9a4" />
+</>;
+icons['ribbon-button-chart-column'] = <>{axis69()}<rect x={9} y={16} width={3.5} height={10} fill="#c9c9c9" /><rect x={14} y={11} width={3.5} height={15} fill={T69.paleBlue} /><rect x={19} y={14} width={3.5} height={12} fill={T69.paleBlue} /><rect x={24} y={9} width={3.5} height={17} fill="#c9c9c9" /></>;
+icons['ribbon-button-chart-line'] = <>{axis69()}{l69r('M9 22L14 12L19 17L25 7', T69.blue, 2)}{dot(9, 22, 1.4, T69.redSoft)}{dot(14, 12, 1.4, T69.blue)}{dot(19, 17, 1.4, T69.blue)}{dot(25, 7, 1.4, T69.blue)}{l69r('M9 16L15 20L20 13L26 16', '#a6a6a6', 1.8)}</>;
+icons['ribbon-button-chart-pie'] = <>
+  <circle cx={16} cy={16.5} r={9.5} fill={T69.white} stroke={T69.mid} strokeWidth={1.40} />
+  <path d="M16 16.5V7A9.5 9.5 0 0 1 25.5 16.5Z" fill={T69.paleBlue} />
+  <circle cx={16} cy={16.5} r={4} fill={T69.white} stroke={T69.mid} strokeWidth={1.12} />
+</>;
+icons['ribbon-button-chart-combo'] = <>{axis69()}<rect x={9} y={15} width={3.5} height={11} fill="#c9c9c9" /><rect x={14} y={11} width={3.5} height={15} fill={T69.paleBlue} /><rect x={19} y={13} width={3.5} height={13} fill="#c9c9c9" />{l69r('M9 12L15 17L21 9L27 13', T69.mid, 1.8)}</>;
+icons['ribbon-button-chart-scatter'] = <>{axis69()}
+  {[[10, 12], [17, 20], [23, 9]].map(([x, y], i) => <path key={`g${i}`} d={`M${x - 2} ${y}H${x + 2}M${x} ${y - 2}V${y + 2}`} stroke="#9a9a9a" strokeWidth={1.26} fill="none" />)}
+  {[[13, 17], [21, 22], [26, 14]].map(([x, y], i) => <path key={`b${i}`} d={`M${x - 1.8} ${y - 1.8}L${x + 1.8} ${y + 1.8}M${x + 1.8} ${y - 1.8}L${x - 1.8} ${y + 1.8}`} stroke={T69.blue} strokeWidth={1.26} fill="none" />)}
+</>;
+/* treemap preview (16px, measured r3): edge-to-edge cells on a thick #7f7f7f 2.2u gray grid:
+   outer (1.2,1.2)-(30.8,30.8), a vertical rule at x13.2 (blue column | white cells), a horizontal
+   at y7.7 (x13.2..30.8), a vertical at x21 (y7.7..30.8) and a horizontal at y19.5 (x21..30.8).
+   The left column holds two pale-blue cells (#c6e0f6 fill, thin #8fb4de frames) inset in a white
+   gutter, split at y15 by a blue rule. */
+icons['ribbon-button-chart-treemap'] = <>
+  <rect x={1.2} y={1.2} width={29.6} height={29.6} fill={T69.white} stroke="#7f7f7f" strokeWidth={2.2} />
+  {l69('M13.2 1.2V30.8M13.2 7.7H30.8M21 7.7V30.8M21 19.5H30.8', '#7f7f7f', 2.2)}
+  <rect x={3.4} y={3.4} width={8.2} height={10.4} fill="#c6e0f6" stroke="#8fb4de" strokeWidth={1.4} />
+  <rect x={3.4} y={16.2} width={8.2} height={11} fill="#c6e0f6" stroke="#8fb4de" strokeWidth={1.4} />
+</>;
+icons['ribbon-button-chart-funnel'] = <>
+  <rect x={7} y={9} width={4} height={13} fill={T69.white} stroke={T69.mid} strokeWidth={1.12} />
+  {l69('M9 6V25', T69.mid, 1.5)}
+  <rect x={13} y={5} width={4} height={18} fill={T69.white} stroke={T69.mid} strokeWidth={1.12} />
+  {l69('M15 2V26', T69.mid, 1.5)}
+  <rect x={19} y={12} width={4} height={8} fill={T69.paleBlue} stroke={T69.mid} strokeWidth={1.12} />
+  {l69('M21 9V23', T69.mid, 1.5)}
+</>;
+/* barcode (24px, measured r3 on a 1u grid): finders 10u at (2.8,2.8)/(18.4,2.8)/(2.8,18.4) with
+   1.2u frames and 2.4u centred dots; two staggered dashed gutter columns at x14.6/16.6 below and
+   between the top finders; three full bar rows y13.8/15.8/17.8 (left 3.4..13.4, right 18.4..28.4
+   with random 1u breaks); a lower-right module field of broken bar rows at y20.2/23.2/26.2 plus
+   short vertical dashes; everything #666666 (the official crop has exactly two colors). */
+icons['ribbon-button-barcode'] = <>
+  {[[3.4, 3.4], [19, 3.4], [3.4, 19]].map(([x, y], i) => (
+    <React.Fragment key={i}>
+      <rect x={x} y={y} width={9} height={9} fill={T69.white} stroke={T69.ink} strokeWidth={1.2} />
+      <rect x={x + 3.3} y={y + 3.3} width={2.4} height={2.4} fill={T69.ink} />
+    </React.Fragment>
+  ))}
+  <path d="M14.6 3V6.4M14.6 8.4V12.4M14.6 13.8V18.6M16.6 2.8V5.8M16.6 7.8V12.8M16.6 19.5V22M16.6 24.5V27" fill="none" stroke={T69.ink} strokeWidth={1.2} />
+  {[[13.8, 3.4, 10], [15.8, 3.4, 10], [17.8, 3.4, 10]].map(([y, x, w], i) => <rect key={`l${i}`} x={x} y={y} width={w} height={1.1} fill={T69.ink} />)}
+  {[[13.8, 18.4, 6], [13.8, 25.4, 3], [15.8, 19.4, 5], [15.8, 26.4, 2], [17.8, 18.4, 6], [17.8, 25.4, 3]].map(([y, x, w], i) => <rect key={`r${i}`} x={x} y={y} width={w} height={1.1} fill={T69.ink} />)}
+  {[[20.2, 18.4, 3], [20.2, 22.4, 3.5], [20.2, 27, 1.4], [23.2, 19.5, 3.4], [23.2, 24, 3], [26.2, 18.4, 3.2], [26.2, 22.5, 3], [26.2, 26.5, 1.9]].map(([y, x, w], i) => <rect key={`q${i}`} x={x} y={y} width={w} height={1.1} fill={T69.ink} />)}
+  <path d="M18.9 20.2V24M21.4 23.2V27.4M25.4 20.2V24.6M27.8 14V18.4M27.8 20.2V23.5M27.8 26.2V28.8" fill="none" stroke={T69.ink} strokeWidth={1.2} />
+</>;
+icons['ribbon-button-picture-big'] = <>
+  <rect x={2.5} y={2.5} width={27} height={27} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  <path d="M3.4 28.9L10 11.5 20.5 28.9Z" fill="#d6e9f8" stroke="#4a87c8" strokeWidth={1.35} strokeLinejoin="round" />
+  <path d="M13.5 28.9L21.5 14 28.6 28.9Z" fill="#cde3f6" fillOpacity={0.85} stroke="#4a87c8" strokeWidth={1.35} strokeLinejoin="round" />
+  <circle cx={21.2} cy={7.8} r={2.2} fill="#e07030" />
+</>;
+icons['ribbon-button-picture'] = icons['ribbon-button-picture-big'];
+icons['ribbon-button-shapes'] = <>
+  <rect x={3.5} y={7.5} width={11.5} height={11.5} fill="none" stroke={T69.blue} strokeWidth={1.7} />
+  <circle cx={21} cy={10.5} r={6.5} fill="none" stroke={T69.blue} strokeWidth={1.7} />
+  <path d="M17 21.5L22 26.5L27 21.5L22 16.5Z" fill={T69.white} stroke={T69.blue} strokeWidth={1.7} strokeLinejoin="miter" />
+</>;
+icons['ribbon-button-camera-shape'] = <>
+  <rect x={1.4} y={10.8} width={29} height={16.4} rx={2} fill={T69.white} stroke={T69.ink} strokeWidth={1.3} />
+  <path d="M10 10.8V5.9a1.3 1.3 0 0 1 1.3-1.3h8.4a1.3 1.3 0 0 1 1.3 1.3v4.9" fill={T69.white} stroke={T69.ink} strokeWidth={1.25} />
+  <circle cx={4.2} cy={14.2} r={1.45} fill="#e03c31" />
+  <circle cx={15.9} cy={19.2} r={6.2} fill={T69.white} stroke="#7d7d7d" strokeWidth={1.3} />
+  <circle cx={15.9} cy={19.2} r={4.4} fill={T69.white} stroke={GEARBLUE} strokeWidth={1.4} />
+  <circle cx={15.9} cy={19.2} r={2.8} fill="#c7e3f8" />
+</>;
+icons['ribbon-button-hyperlink'] = <>
+  <g transform="rotate(-45 16 16)">
+    {l69('M7.5 12.5H12.5a3.5 3.5 0 0 1 0 7H7.5a3.5 3.5 0 0 1 0-7Z', T69.blue, 1.8)}
+    {l69('M20.5 12.5H25.5a3.5 3.5 0 0 1 0 7H20.5a3.5 3.5 0 0 1 0-7Z', T69.blue, 1.8)}
+  </g>
+</>;
+/* insertTextBox (24px, measured r3): wide thin box #666 1.2u outer x1..31 × y5..27 with a blue A
+   (2.2u strokes) fully inside: apex (16,7.5), legs to y24.5, crossbar at y17.8. */
+icons['ribbon-button-insert-textBox'] = <>
+  <rect x={1.6} y={5.6} width={28.8} height={20.8} fill={T69.white} stroke={T69.ink} strokeWidth={1.2} />
+  {l69('M11.9 24.5L16 7.5l4.1 17M13.7 17.8H18.3', GEARBLUE, 2.2)}
+</>;
+/* insertCheckBox (24px, measured r3): sharp thin box #666 1.2u outer 3.5..28.5 with a thin blue ✓. */
+icons['ribbon-button-checkbox-cell-type'] = <>
+  <rect x={4.1} y={4.1} width={23.8} height={23.8} fill={T69.white} stroke={T69.ink} strokeWidth={1.2} />
+  {l69('M8.5 14.5L13 19.2L22 8.8', GEARBLUE, 2.3)}
+</>;
+/* formControl (24px, measured r3): briefcase — body #666 1.2u outer x2..30 × y6..27, rounded
+   handle x10..18 (top y3), handle-side frame stubs, band line y15.5 up to the latch, grey latch
+   square x14..18 y13.5..17.5; a solid blue wrench (head with up-open notch at x18.5..24 y14..19.5,
+   shaft to y26.5 with rounded foot) and screwdriver (wide top x26..29.5 y13.8..16.8, thin shaft,
+   flange + rounded grip to y27.5) overlap the case's lower right. */
+icons['ribbon-button-formControl'] = <>
+  <rect x={2.6} y={6.6} width={26.8} height={19.8} rx={1} fill={T69.white} stroke={T69.ink} strokeWidth={1.2} />
+  {l69('M10.5 6.6V4a1.2 1.2 0 0 1 1.2-1.2h5.6A1.2 1.2 0 0 1 18.5 4v2.6', T69.ink, 1.2)}
+  {l69('M2.6 15.5H13.8', T69.ink, 1.15)}
+  <rect x={14.4} y={14.1} width={3.6} height={3.5} fill={T69.white} stroke="#8a8a8a" strokeWidth={1.1} />
+  <g fill={GEARBLUE}>
+    <path d="M18.7 17.2a2.7 2.7 0 1 0 5.4 0v-1.1h-1.9v1a0.9 0.9 0 1 1-1.6 0v-1h-1.9Z" />
+    <path d="M20.6 13.6h1.6v12.2a1 1 0 0 1-1.6 0Z" />
+    <rect x={20.1} y={23.8} width={2.6} height={3.4} rx={1.2} />
+    <rect x={26.2} y={13.8} width={3.3} height={3} rx={0.9} />
+    <rect x={27.2} y={16.6} width={1.5} height={8} />
+    <rect x={26} y={23.8} width={3.5} height={1.6} rx={0.6} />
+    <rect x={26.6} y={25} width={2.3} height={2.6} rx={1} />
+  </g>
+</>;
+/* sparklines (24px + gallery, measured r3): open axis — left vertical (x6, y4.5..31.5) crossed by
+   two horizontal rules (y6.7 and y30, x5..31); a slim 1.8u blue zigzag between them ending in a
+   short down-tail. */
+const sparkAxis69 = (): React.ReactElement => <>{l69('M6 4.5V31.5M5 6.7H31M5 30H31', T69.ink, 1.4)}</>;
+icons['ribbon-insert-sparkline-gallery'] = <>{sparkAxis69()}{l69('M7.5 25.5L10.5 20.5L14 28L18 15.5L21.5 20.5L24.5 16.5L27 19.5', GEARBLUE, 1.8)}</>;
+icons['ribbon-button-sparklines'] = <>{sparkAxis69()}{l69('M7.5 25.5L10.5 20.5L14 28L18 15.5L21.5 20.5L24.5 16.5L27 19.5', GEARBLUE, 1.8)}</>;
+
+/* --- Pivot contextual tabs -------------------------------------------------------------
+   TASK 69 r4 (re-measured with .probe/t69/cmap_ctx.py colour maps + per-icon pairs):
+   the Analyze "pivot document" motif (move / clear / fields-items-sets / options /
+   field-setting): full-box sheet with a #666 frame holding three header blocks — a small
+   square top-left, a long bar top-right, a column bar below the square — each a pale
+   #c8c8c8 fill with a thin #7f7f7f outline. The 24px variant fits a margin; the 16px
+   variant fills the whole box. */
+const pbar69 = (x: number, y: number, w: number, h: number): React.ReactElement => (
+  <rect x={x} y={y} width={w} height={h} fill="#c8c8c8" stroke="#7f7f7f" strokeWidth={1.1} />
+);
+const pivotDoc69 = (): React.ReactElement => (
+  <>
+    <rect x={3} y={3} width={24} height={26} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+    {pbar69(5.5, 5, 4.5, 4.5)}
+    {pbar69(13, 5, 12.5, 4.5)}
+    {pbar69(5.5, 12.5, 4.5, 12.5)}
+  </>
+);
+const pivotDoc16 = (): React.ReactElement => (
+  <>
+    <rect x={1.2} y={4.4} width={29.6} height={26.6} fill={T69.white} stroke={T69.ink} strokeWidth={1.7} />
+    {pbar69(4.4, 6.4, 5.6, 5.6)}
+    {pbar69(12.4, 6.4, 15.6, 5.6)}
+    {pbar69(4.4, 13, 5.6, 15.4)}
+  </>
+);
+icons['ribbon-button-pivot-table-analyze-options'] = <>
+  {pivotDoc16()}
+  <rect x={14.6} y={16.2} width={16.2} height={14.8} fill={T69.white} stroke={T69.ink} strokeWidth={1.7} />
+  {[[17.6, 19], [23.4, 19], [17.6, 25], [23.4, 25]].map(([x, y], i) => <rect key={i} x={x} y={y} width={4.4} height={4.4} fill={T69.blue} />)}
+</>;
+icons['ribbon-button-pivot-table-field-setting'] = <>
+  {pivotDoc16()}
+  {gear69(22.5, 22.5, 8.6, '#a8cbf2', '#5b96cf', 1.2)}
+</>;
+icons['ribbon-button-pivot-table-expand-field'] = <>
+  {l69('M13 8H27M13 16H27M13 24H27', '#b1b1b1', 2.2)}
+  {l69('M6 8V16M2 12H10', '#7fd49a', 2.6)}
+</>;
+icons['ribbon-button-pivot-table-collapse-field'] = <>
+  {l69('M13 8H27M13 16H27M13 24H27', '#b1b1b1', 2.2)}
+  {l69('M2 12H10', '#e59187', 2.6)}
+</>;
+icons['ribbon-button-pivot-table-filter-connections'] = <>
+  <rect x={3} y={3.5} width={24} height={21} fill={T69.white} stroke="#b0b0b0" strokeWidth={1.3} />
+  {l69('M3 10.5H27M3 17.5H27M9.5 3.5V24.5M15.5 3.5V24.5M21.5 3.5V24.5', '#d4d4d4', 1.15)}
+  <circle cx={23.5} cy={22} r={10} fill={T69.white} />
+  {gear69(23.5, 22, 7.4, '#a8cbf2', '#7fb3e0', 1.1)}
+</>;
+icons['ribbon-button-pivot-table-group-selection'] = <>
+  {l69('M2 15.5H22', '#81befc', 3)}
+  <path d="M18 10.5L25.5 15.5 18 20.5" fill="none" stroke="#81befc" strokeWidth={2.6} strokeLinejoin="miter" />
+</>;
+icons['ribbon-button-pivot-table-ungroup'] = <>
+  <rect x={8} y={8.5} width={7.5} height={21.5} fill={T69.white} stroke="#a6a6a6" strokeWidth={1.6} />
+  <rect x={17} y={8.5} width={13.5} height={21.5} fill={T69.white} stroke="#a6a6a6" strokeWidth={1.6} />
+  {l69('M17 13.5H30.5M17 21.5H30.5', '#a6a6a6', 1.5)}
+  <rect x={1.5} y={11.5} width={11} height={11} rx={1.2} fill={T69.white} stroke="#e8907f" strokeWidth={2} />
+  {l69('M3.8 20.2L10.2 13.8', '#e8907f', 2)}
+</>;
+icons['ribbon-button-pivot-table-group-field'] = <>
+  <rect x={1.5} y={5} width={29} height={25.5} fill={T69.white} stroke="#bdbdbd" strokeWidth={2} />
+  {l69('M7 1.5V6M23 1.5V6', '#8c8c8c', 1.8)}
+  {l69('M1.5 11H30.5', '#bdbdbd', 1.5)}
+  {l69('M10.5 14.5H20L14.8 28', '#8c8c8c', 2.4)}
+</>;
+icons['ribbon-button-pivot-table-refresh'] = <>
+  <path d="M3.5 28.5V2.5H14L21 9.5V28.5Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.35} strokeLinejoin="miter" />
+  {l69('M14 2.5V9.5H21', T69.ink, 1.35)}
+  {l69('M12.6 17.6a5.6 5.6 0 0 1 9.6-1', T69.green, 1.9)}
+  {l69('M22.4 22.4a5.6 5.6 0 0 1-9.6 1', T69.green, 1.9)}
+  <path d="M22.9 14.8l0.9 3.6-3.6 0.7Z" fill={T69.green} />
+  <path d="M12.1 25.2l-0.9-3.6 3.6-0.7Z" fill={T69.green} />
+</>;
+icons['ribbon-button-pivot-table-changeDataSource'] = <>
+  <path d="M5 27V3H16L22 9V27Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.4} strokeLinejoin="miter" />
+  {l69('M16 3V9H22', T69.ink, 1.4)}
+  {table69(15, 15, 14, 14)}
+  {l69('M20 22H29', T69.blue, 2.2)}
+  <path d="M25.5 18L29.5 22 25.5 26" fill="none" stroke={T69.blue} strokeWidth={1.7} strokeLinejoin="miter" />
+</>;
+icons['ribbon-button-pivot-table-clear'] = <>
+  {pivotDoc69()}
+  <g transform="rotate(-45 21.5 22)">
+    <rect x={14} y={18.3} width={15} height={7.6} rx={1.8} fill="#e5968c" stroke="#d87f74" strokeWidth={1.2} />
+    <rect x={22.6} y={19.1} width={5.6} height={6} fill="#efb8ae" />
+  </g>
+</>;
+icons['ribbon-button-pivot-table-clear-all'] = <>
+  <rect x={4} y={4} width={18} height={18} fill={T69.white} stroke={T69.ink} strokeWidth={1.40} />
+  {l69('M7 10H19M7 14H19', '#c8c8c8', 1.4)}
+  {l69('M21 13L31 23M31 13L21 23', T69.red, 2.4)}
+</>;
+icons['ribbon-button-pivot-table-move'] = <>
+  {pivotDoc69()}
+  {l69('M10.5 24.5H24', T69.blue, 1.8)}
+  <path d="M21.5 19.5L27.5 24.5 21.5 29.5" fill="none" stroke={T69.blue} strokeWidth={1.8} strokeLinejoin="miter" />
+</>;
+icons['ribbon-button-pivot-table-fields-items-sets'] = <>
+  {pivotDoc69()}
+  {fx69(12, 12, 0.72, 2.9, '#262626')}
+</>;
+icons['ribbon-button-pivot-table-field-list'] = <>
+  <rect x={6.5} y={2.5} width={18.5} height={26.5} fill={T69.white} stroke={T69.ink} strokeWidth={1.3} />
+  {[5, 9.3, 13.6].map((y) => <g key={y}><rect x={8} y={y} width={2.4} height={2.4} fill="#595959" /><rect x={11.5} y={y} width={9.5} height={2.4} fill="#8f8f8f" /></g>)}
+  {l69('M7 19H24.5', T69.mid, 1.3)}
+  {l69('M14.5 19V28.5M7 24H24.5', T69.ink, 1.2)}
+</>;
+icons['ribbon-button-pivot-table-drill-button'] = <>
+  <rect x={2.5} y={2.5} width={14.5} height={13} fill={T69.white} stroke={T69.ink} strokeWidth={1.25} />
+  {l69('M7 9.5H15.5M11 4.5V14', T69.blue, 1.9)}
+  <rect x={13.5} y={13.5} width={15.5} height={15.5} fill={T69.white} stroke={T69.ink} strokeWidth={1.25} />
+  {l69('M16.5 21H25.5', T69.blue, 1.9)}
+</>;
+icons['ribbon-button-pivot-table-field-headers'] = <>
+  <rect x={3} y={4} width={25} height={25} fill={T69.white} stroke={T69.ink} strokeWidth={1.25} />
+  <rect x={3} y={4} width={25} height={7.5} fill={T69.midBlue} stroke={T69.blue} strokeWidth={1.7} />
+  {l69('M3 20.5H28', T69.mid, 1.15)}
+  <path d="M19 6H25L22 10.2Z" fill="#595959" />
+</>;
+const designCard69 = (lines: React.ReactNode): React.ReactElement => (
+  <>
+    <rect x={7} y={3.5} width={20} height={25.5} rx={0.6} fill={T69.white} stroke={T69.ink} strokeWidth={1.3} />
+    {lines}
+  </>
+);
+/* Measured official layout: pairs of thin 1.6u text segments (label left, value right) in the
+   upper part of a tall card; per-icon left segments may be indented (outline forms). */
+type Row69 = [string | null, number, number, string | null, number, number, number];
+const rowsCard69 = (rows: Row69[]): React.ReactNode =>
+  rows.flatMap(([l, lx1, lx2, r, rx1, rx2, y], i) => [
+    l ? <path key={`l${i}`} d={`M${lx1} ${y}H${lx2}`} stroke={l} strokeWidth={1.6} fill="none" /> : null,
+    r ? <path key={`r${i}`} d={`M${rx1} ${y}H${rx2}`} stroke={r} strokeWidth={1.6} fill="none" /> : null,
+  ]);
+const M = T69.mid; const BL = T69.blue;
+icons['ribbon-button-pivot-table-subtotal'] = designCard69(rowsCard69([
+  [M, 10, 18, M, 19.5, 23.5, 7],
+  [M, 12, 18, M, 19.5, 23.5, 11],
+  [BL, 10, 18, BL, 19.5, 23.5, 15],
+]));
+icons['ribbon-button-pivot-table-grand-total'] = designCard69(rowsCard69([
+  [M, 12, 18, BL, 19.5, 23.5, 7],
+  [M, 12, 18, BL, 19.5, 23.5, 11],
+  [M, 10, 18, BL, 19.5, 23.5, 15],
+  [M, 12, 18, BL, 19.5, 23.5, 19],
+]));
+icons['ribbon-button-pivot-table-report-layout'] = designCard69(rowsCard69([
+  [BL, 10, 16, null, 0, 0, 7],
+  [M, 12, 18, BL, 19.5, 23.5, 11],
+  [M, 12, 18, BL, 19.5, 23.5, 15],
+]));
+icons['ribbon-button-pivot-table-blank-rows'] = designCard69(rowsCard69([
+  [BL, 10, 16, BL, 18, 22, 7],
+  [M, 12, 16, M, 18, 22, 11],
+  [M, 12, 16, M, 18, 22, 15],
+  [BL, 10, 16, BL, 18, 22, 19],
+  [M, 12, 16, M, 18, 22, 23],
+]));
+icons['ribbon-button-new-pivot-table-style'] = <>
+  <rect x={2} y={2} width={22} height={22} fill={T69.white} stroke={T69.blue} strokeWidth={1.8} />
+  <rect x={2} y={2} width={7.3} height={7.3} fill={T69.midBlue} />
+  <rect x={2} y={9.3} width={7.3} height={7.3} fill={T69.paleBlue} />
+  <rect x={2} y={16.6} width={7.3} height={7.4} fill={T69.faintBlue} />
+  {l69('M9.3 2V24M16.7 2V24M2 9.3H24M2 16.7H24', T69.blue, 1.3)}
+  {l69('M30 6L19 17', '#9a9a9a', 3)}
+  <g transform="rotate(45 17 17)">
+    <rect x={13.5} y={15.5} width={7} height={3.5} fill={T69.silver} stroke={T69.mid} strokeWidth={0.84} />
+    <path d="M13.5 19l-4.5 6.5 3.2 2.2 4.5-6.5Z" fill={T69.blue} />
+  </g>
+</>;
+/* 'PivotTable Styles'/'Format as Table' (measured r4): 4x4 pale grid (#808080 outer, #b0b0b0
+   inner rules) with a solid #81befc 2x2 block at cols 2-3 rows 2-3 (#367fc9 rules) plus one pale
+   cell at (r2,c4); a grey paintbrush from the top-right corner to the lower-left (#367fc9
+   bristles, silver ferrule). */
+icons['ribbon-button-formattable'] = <>
+  <rect x={3} y={3} width={24} height={24} fill={T69.white} stroke="#808080" strokeWidth={1.25} />
+  {l69('M9 3V27M15 3V27M21 3V27M3 9H27M3 15H27M3 21H27', '#b0b0b0', 1.1)}
+  <rect x={9} y={9} width={12} height={12} fill={T69.midBlue} />
+  <rect x={21} y={9} width={6} height={6} fill={T69.paleBlue} />
+  {l69('M9 9V21M15 9V21M21 9V21M9 9H21M9 15H21', T69.blue, 1.2)}
+  <g strokeLinecap="round">
+    {l69r('M28.8 6.2L18.8 16.2', '#8c8c8c', 3.2)}
+    {l69r('M28 7L19.4 15.6', '#c9c9c9', 1.7)}
+  </g>
+  <g transform="rotate(45 16 16)">
+    <rect x={12.6} y={14.6} width={7} height={3.6} fill="#ececec" stroke={T69.mid} strokeWidth={1} />
+    <path d="M12.6 18.2l-4.1 6.1 3 2 4.1-6.1Z" fill={T69.blue} />
+  </g>
+</>;
+icons['ribbon-thumbnail-pivot-table-active-field'] = <>
+  <rect x={5} y={7} width={22} height={18} fill={T69.white} stroke={T69.ink} strokeWidth={1.40} />
+  {l69('M5 14H27M13 7V25M20 7V25M5 19.5H27', '#c8c8c8', 1.5)}
+</>;
+
+/* --- Shape Format tab ------------------------------------------------------------------ */
+const shapeStyleTile69 = (color: string): React.ReactElement => (
+  <>
+    <rect x={3} y={5} width={26} height={22} rx={4.5} fill={T69.white} stroke={color} strokeWidth={1.35} />
+    <g fill="none" stroke="#262626" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8.4 21L11.9 11l3.5 10M9.8 17.6h4.2" />
+      <path d="M16.4 7.5V21M16.4 13.6c3.9 0 3.9 7.4 0 7.4" />
+      <path d="M25.6 12.6c-.9-1.1-2-1.7-3.3-1.7-2.1 0-3.5 1.7-3.5 4.3s1.4 4.3 3.5 4.3c1.3 0 2.4-.6 3.3-1.7" />
+    </g>
+  </>
+);
+icons['ribbon-shape-style-1'] = shapeStyleTile69('#262626');
+icons['ribbon-shape-style-2'] = shapeStyleTile69('#2e75b6');
+icons['ribbon-shape-style-3'] = shapeStyleTile69('#ed7d31');
+icons['ribbon-shape-style-4'] = shapeStyleTile69('#a6a6a6');
+icons['ribbon-shape-style-5'] = shapeStyleTile69('#ffc000');
+icons['ribbon-shape-style-6'] = shapeStyleTile69('#5b9bd5');
+icons['ribbon-shape-style-7'] = shapeStyleTile69('#70ad47');
+icons['ribbon-button-shape-change'] = <>
+  <rect x={1.5} y={8} width={13} height={13} fill="none" stroke="#6f9fd8" strokeWidth={1.5} />
+  <circle cx={21} cy={10} r={6.8} fill={T69.white} stroke="#6f9fd8" strokeWidth={1.5} />
+  <path d="M14 21L21 28L28 21L21 14Z" fill={T69.white} stroke="#6f9fd8" strokeWidth={1.5} strokeLinejoin="miter" />
+</>;
+icons['ribbon-button-shape-alt-text'] = <>
+  <rect x={1.5} y={2.5} width={22} height={23} fill={T69.white} stroke={T69.ink} strokeWidth={1.3} />
+  <path d="M3.5 23.5L11 11l5.5 6.5 4-4.5 4.5 10.5Z" fill={T69.paleBlue} stroke="#4a87c8" strokeWidth={1.35} strokeLinejoin="round" />
+  <circle cx={19.5} cy={8.5} r={2.2} fill="#e07030" />
+  <rect x={13.5} y={17.5} width={16.5} height={12.5} fill={T69.white} stroke="#4a87c8" strokeWidth={1.5} />
+  {l69('M17 22H27M17 25.5H24', '#8f8f8f', 1.9)}
+</>;
+icons['ribbon-button-rotate-shape'] = <>
+  {l69('M4.5 15A7 7 0 1 1 8 3.5', T69.blue, 1.8)}
+  <path d="M8.5 0.5L14.5 4.5 9.5 8.5 8.5 4.5Z" fill={T69.blue} />
+  <path d="M3 27H15V10Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.7} strokeLinejoin="miter" />
+  <path d="M17 27H29V9Z" fill="#808080" />
+</>;
+icons['ribbon-thumbnail-shape-rotate'] = <>{l69('M23.5 11a10 10 0 1 0 2 8', T69.blue, 2.4)}<path d="M19 2l7 5.5-8 3z" fill={T69.blue} />{rect(11, 12, 10, 8, T69.faintBlue, 1, T69.blue)}</>;
+icons['ribbon-button-shape-group'] = <>
+  <rect x={6} y={3} width={13} height={10} fill={T69.white} stroke="#8f8f8f" strokeWidth={1.5} />
+  <rect x={12} y={8} width={13} height={10} fill={T69.white} stroke="#8f8f8f" strokeWidth={1.5} />
+  <rect x={3} y={1} width={4} height={4} fill="#a9c9ea" />
+  <rect x={24} y={1} width={4} height={4} fill="#a9c9ea" />
+  <rect x={3} y={22} width={4} height={4} fill="#a9c9ea" />
+  <rect x={24} y={22} width={4} height={4} fill="#a9c9ea" />
+</>;
+icons['ribbon-thumbnail-shape-group'] = <>
+  <rect x={5} y={5} width={10} height={10} fill={T69.faintBlue} stroke={T69.blue} strokeWidth={1.12} />
+  <rect x={13} y={13} width={12} height={12} fill={T69.white} stroke={T69.ink} strokeWidth={1.12} />
+  {l69('M27 14.5H30M27 17.5H30', T69.mid, 1.4)}
+</>;
+icons['ribbon-thumbnail-shapealign'] = <>
+  {l69('M4 3V29', T69.ink, 1.5)}
+  <rect x={7} y={4} width={8} height={5} fill={T69.white} stroke={T69.ink} strokeWidth={1.35} />
+  <rect x={7} y={11} width={16} height={5} fill={T69.white} stroke={T69.ink} strokeWidth={1.35} />
+  <rect x={7} y={18} width={12} height={5} fill={T69.white} stroke={T69.ink} strokeWidth={1.35} />
+  {l69('M28 26H14', T69.blue, 2)}
+  <path d="M17.5 22.5L13.5 26 17.5 29.5" fill="none" stroke={T69.blue} strokeWidth={2} strokeLinejoin="miter" />
+</>;
+icons['ribbon-thumbnail-shape-align'] = icons['ribbon-thumbnail-shapealign'];
+const zsquares69 = (frontYellow: boolean): React.ReactElement => {
+  const yellow = <rect x={4} y={4} width={15} height={15} fill="#fae3b0" stroke="#e5b873" strokeWidth={1.8} />;
+  const white = <rect x={12} y={12} width={15} height={15} fill={T69.white} stroke="#9a9a9a" strokeWidth={1.8} />;
+  return frontYellow ? <>{white}{yellow}</> : <>{yellow}{white}</>;
+};
+icons['ribbon-button-shape-bring-forward'] = zsquares69(true);
+icons['ribbon-button-shape-send-backward'] = zsquares69(false);
+icons['ribbon-button-shape-bring-to-front'] = zsquares69(true);
+icons['ribbon-button-shape-send-to-back'] = zsquares69(false);
+icons['ribbon-button-formatPane'] = <>
+  <path d="M15 6L25 16L15 26L5 16Z" fill={T69.white} stroke={T69.ink} strokeWidth={1.40} strokeLinejoin="miter" />
+  <circle cx={15} cy={4.5} r={2} fill={T69.white} stroke={T69.ink} strokeWidth={1.05} />
+  {l69('M29 9L20 18', '#9a9a9a', 3)}
+  <g transform="rotate(45 19 18)">
+    <rect x={15.5} y={16.5} width={7} height={3.5} fill={T69.silver} stroke={T69.mid} strokeWidth={0.84} />
+    <path d="M15.5 20l-4.5 6.5 3.2 2.2 4.5-6.5Z" fill={T69.blue} />
+  </g>
+</>;
+icons['ribbon-button-format-pane'] = icons['ribbon-button-formatPane'];
+icons['ribbon-thumbnail-shape-format-pane'] = icons['ribbon-button-formatPane'];
+
+/* ================================================================================
+ * TASK 74 — contextual-tab artwork (Table Design / Chart Design / Sparkline /
+ * re-grouped Shape Format). Every glyph is hand-drawn vector geometry here; the
+ * motifs (what each official icon *means* and its rough palette) were read from
+ * the running trial's rendered tabs — no bitmap, path or colour table was copied.
+ * ================================================================================ */
+/** Shared mini-chart frame for the contextual families. */
+const frame74 = (w = 22, h = 17, x = 5, y = 8, stroke = T69.mid, fill = T69.white): React.ReactElement =>
+  <rect x={x} y={y} width={w} height={h} fill={fill} stroke={stroke} strokeWidth={1.4} />;
+/** Thin table: header band + column rules (Table Design family body). */
+const table74 = (accent: string): React.ReactElement => (
+  <>
+    <rect x={4.5} y={5.5} width={23} height={21} fill={T69.white} stroke={T69.ink} strokeWidth={1.5} />
+    <rect x={4.5} y={5.5} width={23} height={6} fill={accent} />
+    {l69('M4.5 17H27.5M4.5 22.5H27.5M12.5 11.5V26.5M19.5 11.5V26.5', '#cfcfcf', 1.1)}
+  </>
+);
+/** Clustered 4-series bars (chart family body). */
+const BARS74: [string, number][] = [['#4472c4', 12], ['#ed7d31', 7], ['#a5a5a5', 9], ['#ffc000', 5]];
+const cluster74 = (x: number, y: number, k = 1): React.ReactElement => (
+  <g>
+    {BARS74.map(([c, h], index) =>
+      <rect key={index} x={x + index * 5 * k} y={y - h * k} width={4 * k} height={h * k} fill={c} />)}
+  </g>
+);
+const plus74 = (cx: number, cy: number, s = 5, color = T69.green): React.ReactElement =>
+  <>{l69(`M${cx} ${cy - s}V${cy + s}M${cx - s} ${cy}H${cx + s}`, color, 3)}</>;
+/** Tiny blue database cylinder (data-table badge). */
+const cylinder74 = (x: number, y: number): React.ReactElement => (
+  <>
+    <path d={`M${x} ${y + 2.5}a4.5 2.5 0 0 1 9 0v9a4.5 2.5 0 0 1 -9 0Z`} fill={T69.faintBlue} stroke={GEARBLUE} strokeWidth={1.3} />
+    {l69(`M${x} ${y + 6}a4.5 2.5 0 0 0 9 0M${x} ${y + 9.5}a4.5 2.5 0 0 0 9 0`, GEARBLUE, 1)}
+  </>
+);
+/** Blue double arrow (resize/move accents). */
+const arrow74 = (d: string, color = GEARBLUE, sw = 2.2): React.ReactElement =>
+  <path d={d} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="butt" strokeLinejoin="miter" />;
+/** Quarter-turn curved arrow with head (Shape Format Rotate rows). */
+const rotateArrow74 = (flip: boolean): React.ReactElement => (
+  <g transform={flip ? 'translate(32 0) scale(-1 1)' : undefined}>
+    <rect x={13.5} y={11.5} width={12} height={12} fill={T69.faintBlue} stroke={GEARBLUE} strokeWidth={1.3} />
+    <path d="M27.5 9.5A13 13 0 0 0 6 12" fill="none" stroke={GEARBLUE} strokeWidth={2} strokeLinecap="butt" />
+    <path d="M2.6 12.8L7.6 10.6 7.2 16.2Z" fill={GEARBLUE} />
+  </g>
+);
+/** One row of the Align family: anchor bar + two shape squares. */
+const alignRow74 = (anchor: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): React.ReactElement => {
+  const vertical = anchor === 'top' || anchor === 'bottom';
+  const edge = anchor === 'left' || anchor === 'top' ? 4.5 : anchor === 'right' || anchor === 'bottom' ? 26 : 15.5;
+  const bar = vertical
+    ? <rect x={5} y={edge} width={22} height={2.4} fill={T69.graphite} />
+    : <rect x={edge} y={5} width={2.4} height={22} fill={T69.graphite} />;
+  const cell = (x: number, y: number, key: string, filled: boolean): React.ReactElement =>
+    <rect key={key} x={x} y={y} width={8} height={8} fill={filled ? T69.midBlue : T69.white} stroke={GEARBLUE} strokeWidth={1.3} />;
+  const pos: Record<string, [number, number][]> = {
+    left: [[7.5, 6], [7.5, 17]], center: [[11.5, 6], [11.5, 17]], right: [[15.5, 6], [15.5, 17]],
+    top: [[6, 7.5], [17, 7.5]], middle: [[6, 11.5], [17, 11.5]], bottom: [[6, 15.5], [17, 15.5]],
+  };
+  const pair = pos[anchor] ?? pos.left;
+  return <>{bar}{cell(...pair[0], 'a', anchor !== 'middle' && anchor !== 'center')}{cell(...pair[1], 'b', false)}</>;
+};
+/** Distribute rows: three squares + double arrow showing even gaps. */
+const distribute74 = (horizontal: boolean): React.ReactElement => (
+  <g transform={horizontal ? undefined : 'rotate(90 16 16)'}>
+    {[4.5, 12.5, 20.5].map((x, index) => <rect key={index} x={x} y={11.5} width={9} height={9} fill={index === 1 ? T69.midBlue : T69.white} stroke={GEARBLUE} strokeWidth={1.3} />)}
+    {arrow74('M2.5 5.5H29.5M6.5 2.5L2.5 5.5L6.5 8.5M25.5 2.5L29.5 5.5L25.5 8.5', T69.graphite, 1.8)}
+  </g>
+);
+/* ---- Table Design commands ------------------------------------------------------------ */
+icons['ribbon-button-resize-table'] = <>
+  {table74(GEARBLUE)}
+  <path d="M20 20L28 28M28 22.5V28H22.5" fill="none" stroke={T69.orange} strokeWidth={2.2} strokeLinecap="butt" />
+</>;
+icons['ribbon-button-converttorange'] = <>
+  <rect x={3.5} y={6.5} width={15} height={19} fill={T69.white} stroke={GEARBLUE} strokeWidth={1.5} />
+  <rect x={3.5} y={6.5} width={15} height={5} fill={GEARBLUE} />
+  {l69('M3.5 16H18.5M11.5 11.5V25.5', '#c7d8f5', 1.1)}
+  {arrow74('M20.5 16H28M24.5 12.5L28 16L24.5 19.5', T69.orange, 2.2)}
+</>;
+icons['ribbon-button-convert-to-data-table'] = <>
+  <rect x={3.5} y={6.5} width={17} height={19} fill={T69.white} stroke={T69.ink} strokeWidth={1.5} />
+  <rect x={3.5} y={6.5} width={17} height={5} fill={T69.soft} />
+  {l69('M3.5 16H20.5M12 11.5V25.5', '#d5d5d5', 1.1)}
+  {arrow74('M22 11L27 15.5M23.5 16L27 15.5L26.5 12', T69.orange, 1.8)}
+  {cylinder74(19.5, 16)}
+</>;
+icons['ribbon-button-convert-from-data-table'] = <>
+  {cylinder74(4.5, 7)}
+  {arrow74('M13 16L18.5 16M15.5 12.5L18.5 16L15.5 19.5', T69.orange, 1.9)}
+  <rect x={19.5} y={7.5} width={9} height={17} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  <rect x={19.5} y={7.5} width={9} height={4.5} fill={T69.soft} />
+  {l69('M19.5 17H28.5M24 12V24.5', '#d5d5d5', 1)}
+</>;
+
+/* ---- Chart Design commands ------------------------------------------------------------ */
+icons['ribbon-button-add-chart-element'] = <>
+  {cluster74(6, 26, 1.05)}
+  {plus74(26, 8, 5)}
+</>;
+icons['ribbon-button-quick-layout'] = <>
+  <rect x={4.5} y={4.5} width={23} height={23} fill={T69.white} stroke={T69.mid} strokeWidth={1.4} />
+  <rect x={10.5} y={7} width={11} height={3} fill={T69.graphite} />
+  {[12.5, 17, 21.5].map((x, index) => <rect key={index} x={x} y={24 - [9, 5, 7][index]} width={3} height={[9, 5, 7][index]} fill={['#4472c4', '#ed7d31', '#a5a5a5'][index]} />)}
+  {l69('M8 24H27', T69.soft, 1.2)}
+</>;
+icons['ribbon-button-change-colors'] = <>
+  {[[10, 8, '#4472c4'], [18, 7, '#ed7d31'], [23, 12, '#ffc000'], [8, 16, '#70ad47'], [16, 17, '#a5a5a5'], [23, 22, '#4472c4'], [11, 24, '#ed7d31']].map(([cx, cy, c], index) =>
+    <circle key={index} cx={cx as number} cy={cy as number} r={4.4} fill={c as string} />)}
+</>;
+icons['ribbon-button-chart-styles'] = <>
+  <rect x={4.5} y={4.5} width={23} height={18} fill={T69.white} stroke={T69.mid} strokeWidth={1.4} />
+  {[9.5, 14, 18.5].map((x, index) => <rect key={index} x={x} y={19 - [9, 5, 7][index]} width={3.2} height={[9, 5, 7][index]} fill={['#4472c4', '#ed7d31', '#a5a5a5'][index]} />)}
+  {l69('M7 19H25', T69.soft, 1.2)}
+  <path d="M4 24.5H28V28.5H4Z" fill={T69.blue} />
+  <path d="M24 22.5l5 2 -5 2Z" fill={T69.deep} />
+</>;
+icons['ribbon-button-switch-row-column'] = <>
+  <rect x={7.5} y={7.5} width={17} height={17} fill={T69.white} stroke={T69.mid} strokeWidth={1.4} />
+  {l69('M7.5 13H24.5M7.5 18.5H24.5M13 7.5V24.5M18.5 7.5V24.5', '#e0e0e0', 1)}
+  {arrow74('M4 11H21M17.5 7.5L21 11L17.5 14.5', GEARBLUE, 2)}
+  {arrow74('M28 21H11M14.5 17.5L11 21L14.5 24.5', T69.yellow, 2.4)}
+</>;
+icons['ribbon-button-selectData'] = <>
+  <rect x={4.5} y={6.5} width={23} height={19} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  <rect x={4.5} y={6.5} width={23} height={4.5} fill={T69.soft} />
+  {l69('M4.5 15H27.5M4.5 20.5H27.5M12.5 11V25.5M19.5 11V25.5', '#dcdcdc', 1)}
+  <rect x={12.5} y={11} width={7} height={4} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.1} />
+  {l69('M6.5 23.5L10.5 20.5L14.5 22.5L18.5 18.5L22.5 21.5', T69.orange, 1.6)}
+  {circle(18.5, 18.5, 1.5, T69.orange)}
+</>;
+icons['ribbon-button-change-chart-type'] = <>
+  {axis69()}
+  {cluster74(11.5, 26, 0.95)}
+  <path d="M7 4.5A11 11 0 0 1 25 8" fill="none" stroke={T69.orange} strokeWidth={2} strokeLinecap="butt" />
+  <path d="M25 3L25.4 9 20 6.6Z" fill={T69.orange} />
+</>;
+icons['ribbon-button-move-chart'] = <>
+  {frame74(20, 16, 6, 6)}
+  {[10, 14, 18].map((x, index) => <rect key={index} x={x} y={18 - [6, 3.5, 5][index]} width={2.6} height={[6, 3.5, 5][index]} fill={['#4472c4', '#ed7d31', '#a5a5a5'][index]} />)}
+  {arrow74('M16 22.5V29M13 26.5L16 29.5 19 26.5M8 24.5h-4.5M3.5 24.5l3-2.5M3.5 24.5l3 2.5M24 24.5h4.5M28.5 24.5l-3-2.5M28.5 24.5l-3 2.5', T69.mid, 1.6)}
+</>;
+icons['ribbon-button-chart-alt-text'] = <>
+  <rect x={4.5} y={6.5} width={23} height={19} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  <path d="M6.5 22L11 15l3.5 4 3-6 8 9Z" fill={T69.midBlue} />
+  <circle cx={9.5} cy={11} r={2.2} fill={T69.yellow} />
+  <rect x={6.5} y={25.5} width={12} height={2.4} fill={T69.graphite} />
+  <path d="M21.5 24.5l6 6M27.5 27.5l3-3" stroke={GEARBLUE} strokeWidth={2} fill="none" strokeLinecap="butt" />
+</>;
+icons['ribbon-button-formula-sparkline-settings'] = <>
+  {l69('M3 22l6-7 5 4 6-9 7 5', T69.blue, 2.2)}
+  {gear69(24, 24, 6.5, GEARBLUE, undefined, 0, 8)}
+</>;
+
+/* ---- Sparkline commands --------------------------------------------------------------- */
+icons['ribbon-button-sparkline-line-type'] = <>
+  {l69('M4 22l6-8 5 5 6-11 7 6', T69.blue, 2.4)}
+  {[[4, 22], [10, 14], [15, 19], [21, 8], [28, 14]].map(([cx, cy], index) => <circle key={index} cx={cx} cy={cy} r={1.6} fill={T69.midBlue} stroke={T69.blue} strokeWidth={1} />)}
+</>;
+icons['ribbon-button-sparkline-column-type'] = <>
+  {cluster74(6.5, 25.5, 1.05)}
+  {l69('M4 25.5H28', T69.mid, 1.4)}
+</>;
+icons['ribbon-button-sparkline-winloss-type'] = <>
+  {l69('M4 16H28', T69.mid, 1.6)}
+  {[[6, 6], [13, 3.5], [20, 4.5]].map(([x, h], index) => <rect key={`u${index}`} x={x} y={15 - h} width={4.5} height={h} fill={T69.green} />)}
+  {[[9.5, 5], [16.5, 7], [23.5, 3.5]].map(([x, h], index) => <rect key={`d${index}`} x={x} y={17} width={4.5} height={h} fill={T69.redSoft} />)}
+</>;
+icons['sparkline-color-icon'] = <>
+  {l69('M4 24l7-9 5 4 6-9 6 5', T69.blue, 2.4)}
+  <rect x={3.5} y={3.5} width={9} height={7} fill={T69.blue} stroke={T69.deep} strokeWidth={1.2} />
+</>;
+icons['ribbon-button-sparkline-marker-color'] = <>
+  {[6, 12, 18].flatMap((x, row) => [6, 12, 18].map((y, col) => {
+    const colors = [['#4472c4', '#ed7d31', '#a5a5a5'], ['#ffc000', '#70ad47', '#4472c4'], ['#ed7d31', '#a5a5a5', '#70ad47']];
+    return <circle key={`${row}-${col}`} cx={x + 2} cy={y + 2} r={3.4} fill={colors[row][col]} />;
+  }))}
+</>;
+icons['ribbon-button-sparkline-group'] = <>
+  <rect x={4.5} y={8.5} width={10} height={15} fill={T69.faintBlue} stroke={GEARBLUE} strokeWidth={1.3} />
+  <rect x={17.5} y={8.5} width={10} height={15} fill={T69.faintBlue} stroke={GEARBLUE} strokeWidth={1.3} />
+  {l69('M6 20l3.5-5 3 3 2.5-4M19 20l3.5-5 3 3 2.5-4', T69.blue, 1.6)}
+  {l69('M14 6H25M14 6V11M25 26H14M25 26V21', T69.green, 1.8)}
+</>;
+icons['ribbon-button-sparkline-ungroup'] = <>
+  <rect x={4.5} y={8.5} width={10} height={15} fill={T69.faintBlue} stroke={GEARBLUE} strokeWidth={1.3} />
+  <rect x={17.5} y={8.5} width={10} height={15} fill={T69.faintBlue} stroke={GEARBLUE} strokeWidth={1.3} />
+  {l69('M6 20l3.5-5 3 3 2.5-4M19 20l3.5-5 3 3 2.5-4', T69.blue, 1.6)}
+  {l69('M15.5 4L22 11M22 4L15.5 11', T69.red, 2.2)}
+</>;
+icons['ribbon-button-clearall'] = <>
+  <path d="M8 27.5L20 14l6.5 6.5L14 31H8Z" fill="#f8cbad" stroke={T69.orange} strokeWidth={1.4} strokeLinejoin="round" />
+  {l69('M8 27.5L14 31M20 14L26.5 20.5', '#c66', 1.2)}
+  {l69('M6 12l6-7 5 4 6-9 6 5', '#c9c9c9', 2.2)}
+  {circle(23, 10, 1.5, T69.midBlue)}
+</>;
+
+/* ---- Add Chart Element flyout glyphs -------------------------------------------------- */
+icons['ribbon-control-dropdown-axes'] = <>
+  {l69('M8 4V28H28', T69.ink, 1.8)}
+  {arrow74('M13 12H23M17 8.5L13 12 17 15.5M19 21H9M12 17.5L9 21 12 24.5', GEARBLUE, 1.8)}
+</>;
+icons['ribbon-control-dropdown-axistitles'] = <>
+  {l69('M12 4V24H30', T69.ink, 1.8)}
+  <rect x={4.5} y={10} width={3.4} height={14} fill={T69.graphite} />
+  <rect x={13} y={26} width={15} height={3.4} fill={T69.graphite} />
+</>;
+icons['ribbon-control-dropdown-charttitle'] = <>
+  {frame74(23, 19, 4.5, 7)}
+  <rect x={11} y={10} width={10} height={3} fill={T69.graphite} />
+</>;
+icons['ribbon-control-dropdown-errorbar'] = <>
+  {cluster74(8, 26, 1)}
+  {l69('M10.5 6.5V12M8 6.5H13M21 12.5V17M18.5 12.5H23.5', T69.ink, 1.6)}
+</>;
+icons['ribbon-control-dropdown-gridlines'] = <>
+  {l69('M5 11H27M5 17H27M5 23H27M11 5V27M17 5V27M23 5V27', '#c9c9c9', 1.3)}
+  {l69('M5 5V27H27', T69.ink, 1.8)}
+</>;
+icons['ribbon-control-dropdown-datalabels'] = <>
+  {cluster74(7, 27, 1)}
+  <rect x={10.5} y={7.5} width={6} height={4.5} fill={T69.white} stroke={T69.mid} strokeWidth={1.1} />
+  <rect x={17} y={3.5} width={6} height={4.5} fill={T69.white} stroke={T69.mid} strokeWidth={1.1} />
+  {l69('M12 10H14.5M18.5 6H21', T69.mid, 1.2)}
+</>;
+icons['ribbon-control-dropdown-legend'] = <>
+  {frame74(22, 14, 5, 6)}
+  {[9, 13.5, 18].map((x, index) => <rect key={index} x={x} y={16 - [6, 3.5, 5][index]} width={2.5} height={[6, 3.5, 5][index]} fill={['#4472c4', '#ed7d31', '#a5a5a5'][index]} />)}
+  {l69('M7 16H25', T69.soft, 1.2)}
+  {['#4472c4', '#ed7d31', '#a5a5a5'].map((c, index) => <g key={c}><rect x={5.5 + index * 8.5} y={23} width={3} height={3} fill={c} /><rect x={9.5 + index * 8.5} y={23.8} width={4} height={1.5} fill={T69.soft} /></g>)}
+</>;
+icons['ribbon-control-dropdown-trendline'] = <>
+  {l69('M4 25l6-7 5 3 6-9 7 5', T69.mid, 2)}
+  {l69('M4 24L28 7', T69.red, 2)}
+  {l69('M4 24l4-1.7M10.5 20.6l3.5-1.5', T69.white, 1.4)}
+</>;
+
+/* ---- Weight combo line glyphs (thickness = the value it writes) ------------------------ */
+const weightLine74 = (w: number): React.ReactElement =>
+  <rect x={4} y={16 - w / 2} width={24} height={w} rx={w / 2} fill={T69.graphite} />;
+icons['ribbon-control-dropdown-sparkline-dot25'] = weightLine74(1.2);
+icons['ribbon-control-dropdown-sparkline-dot1'] = weightLine74(2.4);
+icons['ribbon-control-dropdown-sparkline-dot225'] = weightLine74(4);
+icons['ribbon-control-dropdown-sparkline-dot3'] = weightLine74(5.4);
+icons['ribbon-control-dropdown-sparkline-dot45'] = weightLine74(7);
+icons['ribbon-control-dropdown-sparkline-dot6'] = weightLine74(9);
+icons['ribbon-control-dropdown-sparkline-weight-custom'] = <>
+  {l69('M4 20H28', T69.graphite, 3)}
+  {[6, 12, 18].map((x) => <rect key={x} x={x} y={4} width={3} height={3} fill={T69.soft} />)}
+  {l69('M7.5 5.5L22 17.5', GEARBLUE, 1.4)}
+  <path d="M22 17.5l4 3 -2 3 -4 -3Z" fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1} />
+</>;
+
+/* ---- Shape Format row glyphs (Rotate/Align/Arrange flyouts) --------------------------- */
+icons['ribbon-button-rotate-right-90'] = rotateArrow74(false);
+icons['ribbon-button-rotate-left-90'] = rotateArrow74(true);
+icons['ribbon-button-shape-align-left'] = alignRow74('left');
+icons['ribbon-button-shape-align-center'] = alignRow74('center');
+icons['ribbon-button-shape-align-right'] = alignRow74('right');
+icons['ribbon-button-shape-align-top'] = alignRow74('top');
+icons['ribbon-button-shape-align-middle'] = alignRow74('middle');
+icons['ribbon-button-shape-align-bottom'] = alignRow74('bottom');
+icons['ribbon-button-shape-distribute-horizontal'] = distribute74(true);
+icons['ribbon-button-shape-distribute-vertical'] = distribute74(false);
+icons['ribbon-button-shape-snap-grid'] = <>
+  {l69('M6 11H26M6 16H26M6 21H26M11 6V26M16 6V26M21 6V26', '#c9c9c9', 1.2)}
+  <rect x={12.5} y={12.5} width={9} height={9} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.4} />
+  <circle cx={12.5} cy={12.5} r={1.8} fill={T69.red} />
+</>;
+icons['ribbon-button-shape-snap-shape'] = <>
+  <rect x={5} y={9.5} width={9} height={13} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  <rect x={14} y={9.5} width={9} height={13} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.4} />
+  {arrow74('M26 16h4M27.5 13.5L30 16 27.5 18.5', T69.graphite, 1.6)}
+  <rect x={23.5} y={9.5} width={2.2} height={13} fill={T69.red} />
+</>;
+icons['ribbon-thumbnail-shape-bring-forward'] = <>
+  <rect x={6.5} y={6.5} width={13} height={13} fill={T69.white} stroke={T69.mid} strokeWidth={1.4} />
+  <rect x={13} y={13} width={13} height={13} fill={T69.yellow} stroke={T69.gold} strokeWidth={1.4} />
+</>;
+icons['ribbon-thumbnail-shape-send-backward'] = <>
+  <rect x={13} y={13} width={13} height={13} fill={T69.white} stroke={T69.mid} strokeWidth={1.4} />
+  <rect x={6.5} y={6.5} width={13} height={13} fill={T69.yellow} stroke={T69.gold} strokeWidth={1.4} />
+</>;
+
+/* ---- Adaptive group thumbnails (collapsed contextual ribbons) -------------------------
+ * Same artwork as the family's main glyph, aliased to the trial's group names. */
+icons['ribbon-thumbnail-properties'] = <>
+  <rect x={4.5} y={5.5} width={23} height={7} fill={T69.white} stroke={T69.mid} strokeWidth={1.3} />
+  <rect x={4.5} y={16.5} width={23} height={9} fill={T69.white} stroke={GEARBLUE} strokeWidth={1.5} />
+  {l69('M7.5 8.5H17', T69.mid, 1.4)}
+  {l69('M7.5 21H13', T69.graphite, 1.6)}
+</>;
+icons['ribbon-thumbnail-tools'] = <>
+  <path d="M21.5 4.5a7 7 0 0 0-9.6 9.6L4.5 21.5l6 6 7.4-7.4a7 7 0 0 0 9.6-9.6l-4.6 4.6-4-4Z" fill={T69.silver} stroke={T69.ink} strokeWidth={1.5} strokeLinejoin="round" />
+  <circle cx={23.5} cy={23.5} r={3.5} fill={T69.white} stroke={T69.ink} strokeWidth={1.5} />
+</>;
+icons['ribbon-thumbnail-tablestyleoptions'] = <>
+  {[[5, 6], [5, 15], [5, 24]].map(([x, y], index) => <rect key={index} x={x} y={y} width={7} height={7} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />)}
+  {l69('M6.5 9.5l1.6 1.8 2.4-3M6.5 18.5l1.6 1.8 2.4-3', T69.blue, 1.5)}
+  {[13, 13, 13].map((x, index) => <rect key={index} x={x} y={[6, 15, 24][index]} width={14} height={7} fill={['#dce6f6', '#f2f2f2', '#dce6f6'][index]} stroke="#c5c5c5" strokeWidth={1} />)}
+</>;
+icons['ribbon-thumbnail-tablestyles'] = table74(GEARBLUE);
+icons['ribbon-thumbnail-table-binding'] = <>{cylinder74(8.5, 5)}{l69('M22 8H28M25.5 4.5L28 8 25.5 11.5', T69.orange, 1.8)}<rect x={20.5} y={16.5} width={8} height={11} fill={T69.white} stroke={T69.ink} strokeWidth={1.3} /><rect x={20.5} y={16.5} width={8} height={3.4} fill={T69.soft} /></>;
+icons['ribbon-thumbnail-chartlayouts'] = icons['ribbon-button-quick-layout'];
+icons['ribbon-thumbnail-chartstyles'] = icons['ribbon-button-chart-styles'];
+icons['ribbon-thumbnail-chartdata'] = icons['ribbon-button-selectData'];
+icons['ribbon-thumbnail-charttype'] = icons['ribbon-button-change-chart-type'];
+icons['ribbon-thumbnail-chartlocation'] = icons['ribbon-button-move-chart'];
+icons['ribbon-thumbnail-chart-alt-text'] = icons['ribbon-button-chart-alt-text'];
+icons['ribbon-thumbnail-formatPane'] = icons['ribbon-button-formatPane'];
+icons['ribbon-thumbnail-argument'] = <>
+  {l69('M16 4V28', T69.ink, 2)}
+  <path d="M8 8h9c3.5 0 3.5 8 0 8h9" fill="none" stroke={GEARBLUE} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+  {gear69(6.5, 25, 5, T69.orange, undefined, 0, 8)}
+</>;
+icons['ribbon-thumbnai-sparkline-type'] = icons['ribbon-button-sparkline-line-type'];
+icons['ribbon-thumbnail-sparkline-show'] = <>
+  {l69('M4 22l6-8 5 5 6-11 7 6', T69.mid, 2)}
+  {[[10, 6], [21, 8], [15, 19], [4, 22]].map(([cx, cy], index) => <circle key={index} cx={cx} cy={cy} r={index < 2 ? 2.4 : 1.9} fill={index === 0 ? T69.red : index === 1 ? T69.blue : index === 2 ? T69.green : T69.yellow} />)}
+</>;
+icons['ribbon-thumbnail-sparkline-style'] = <>
+  {l69('M4 25l6-8 5 5 6-11 7 6', T69.blue, 2.4)}
+  <rect x={4.5} y={4.5} width={10} height={7} fill={T69.orange} />
+  <circle cx={22.5} cy={8} r={4} fill={T69.yellow} />
+</>;
+icons['ribbon-thumbnail-sparkline-groups'] = icons['ribbon-button-sparkline-group'];
+icons['ribbon-thumbnail-shapeinsertshape'] = icons['ribbon-button-shapes'];
+icons['ribbon-thumbnail-shapeStyles'] = <>{<rect x={4.5} y={6.5} width={12} height={12} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.4} />}<circle cx={22} cy={12.5} r={6} fill={T69.yellow} stroke={T69.gold} strokeWidth={1.4} />{l69('M6 24H26M6 28H20', T69.soft, 2)}</>;
+icons['ribbon-thumbnail-shaperotate'] = icons['ribbon-button-rotate-right-90'];
+icons['ribbon-thumbnail-shapegroup'] = <>
+  <rect x={4.5} y={4.5} width={11} height={11} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  <rect x={16.5} y={16.5} width={11} height={11} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  {l69('M4.5 26.5H27.5M26.5 26.5V4.5M4.5 4.5V11M11 4.5H27.5', T69.blue, 2)}
+</>;
+icons['ribbon-thumbnail-shapealign'] = alignRow74('left');
+/* 'ribbon-thumbnail-shape-arrange' already has artwork from TASK 69. */
+icons['ribbon-thumbnail-shapesize'] = <>
+  <rect x={8.5} y={8.5} width={15} height={15} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  {l69('M2.5 8.5V2.5H8.5M23.5 2.5H29.5V8.5M29.5 23.5V29.5H23.5M8.5 29.5H2.5V23.5', GEARBLUE, 2)}
+</>;
+icons['ribbon-thumbnail-selection-panel'] = <>
+  <rect x={4.5} y={5.5} width={23} height={21} fill={T69.white} stroke={T69.ink} strokeWidth={1.4} />
+  <rect x={17} y={5.5} width={10.5} height={21} fill={T69.faint} stroke={T69.ink} strokeWidth={1.4} />
+  {l69('M19 10.5H25.5M19 15H25.5M19 19.5H25.5', T69.mid, 1.4)}
+  <rect x={7.5} y={9} width={6} height={5} fill={T69.midBlue} stroke={GEARBLUE} strokeWidth={1.2} />
+</>;
+
 const fallbackIcons: Record<string, React.ReactNode> = {
   default: <>{rect(6, 6, 20, 20, P.paleBlue, 2, P.blue)}{line('M11 16h10M16 11v10', P.blue, 2)}</>,
 };

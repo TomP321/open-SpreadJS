@@ -2,6 +2,7 @@ import type { ICommand } from '../types.js';
 import { fontFamilies, fontSizes } from './actions.js';
 import { moreFunctionCategories, ribbonFunctions } from '../function-library.js';
 import { pivotCommandSpecs } from '../pivot-ribbon.js';
+import { contextualCommandSpecs, shapeDesignCommandSpecs } from '../contextual-ribbon.js';
 
 const r = (key: string): string => `\${res.ribbon.home.${key}}`;
 
@@ -16,7 +17,12 @@ const specs: Record<string, Spec> = {
   PasteValueGroup: { title: 'Paste Values' },
   OtherPasteGroup: { title: 'Other Paste Options' },
   pasteAll: { title: r('pasteAll'), text: r('paste'), iconClass: 'ribbon-button-paste', bigButton: true, type: 'dropdown', dropdownMaxWidth: 175 },
+  /* The trial's other name of the same big Paste button (TASK 75 r5 sweep: `missing-ours`). */
+  paste: { title: r('pasteAll'), text: r('paste'), iconClass: 'ribbon-button-paste', bigButton: true, direction: 'vertical' },
   pasteFormulas: { title: r('pasteFormulas'), text: r('pasteFormulas'), iconClass: 'ribbon-button-paste-formula' },
+  /* The trial's right-click "Paste Formula" command name (TASK 75 r5 sweep: our executor already
+   * accepted `pasteFormula`, only the registry entry was missing, so `getCommand` said undefined). */
+  pasteFormula: { title: 'Paste Formula', text: 'Paste Formula', iconClass: 'ribbon-button-paste-formula' },
   pasteFormulasAndFormatting: { title: r('pasteFormulasAndFormatting'), text: r('pasteFormulasAndFormatting'), iconClass: 'ribbon-button-paste-formula-formatting' },
   pasteFormulaAndNumberFormat: { title: 'Formulas & Number Formatting', iconClass: 'ribbon-button-paste-formula-numberFormat' },
   pasteKeepSourceFormatting: { title: 'Keep Source Formatting', iconClass: 'ribbon-button-paste-source-format' },
@@ -210,6 +216,31 @@ const specs: Record<string, Spec> = {
   setFilter: { title: r('setFilter') }, clearFilter: { title: r('clearFilter') }, reapplyFilter: { title: r('reapplyFilter') },
   editingFind: { title: r('editingFind'), text: r('find'), type: 'dropdown', iconClass: 'ribbon-button-find', bigButton: true },
   find: { title: r('find1') }, replace: { title: r('replace1') }, goto: { title: r('goto') }, gotoSpecial: { title: r('gotoSpecial') },
+
+  /* TASK 75 r3: command names the trial's registry exposes for context-menu, panel and
+   * dialog-launcher paths. Ours routed them only internally, so `getCommand(name)` was
+   * undefined; register them (behaviour routes through designer-commands aliases). */
+  contextMenuCopy: { title: 'Copy' }, contextMenuCut: { title: 'Cut' },
+  contextMenuPaste: { title: 'Paste' }, contextMenuUnhideSheet: { title: 'Unhide' },
+  insertCopiedCells: { title: 'Insert Copied Cells' }, insertCutCells: { title: 'Insert Cut Cells' },
+  designerPasteAll: { title: 'Paste All' }, designerPasteFormatting: { title: 'Paste Formatting' }, designerPasteValues: { title: 'Paste Values' },
+  columnWidth: { title: 'Column Width' }, rowHeight: { title: 'Row Height' }, defineName: { title: 'Define Name' },
+  link: { title: 'Link' }, editHyperlink: { title: 'Edit Hyperlink' }, removeHyperlink: { title: 'Remove Hyperlink' },
+  /* TASK 77 (probe t77-official-labels.json): the trial's Command Palette lists these commands
+   * with the resource text ('Protect Sheet...'), while the Review ribbon uses the separate
+   * `cellFormatProtectSheet` name for its caption — the palette title must carry the ellipsis. */
+  protectSheet: { title: r('protectSheet') }, unprotectSheet: { title: 'Unprotect Sheet...' },
+  showTabColor: { title: 'Tab Color' }, sort: { title: 'Sort' },
+  fileMenuPanel: { title: 'File' }, formulaBarPanel: { title: 'Formula Bar' }, statusBarPanel: { title: 'Status Bar' },
+  'gc.spread.contextMenu.insertRows': { title: 'Insert' }, 'gc.spread.contextMenu.deleteRows': { title: 'Delete' },
+  'gc.spread.contextMenu.insertColumns': { title: 'Insert' }, 'gc.spread.contextMenu.deleteColumns': { title: 'Delete' },
+  'gc.spread.contextMenu.hideRows': { title: 'Hide' }, 'gc.spread.contextMenu.unhideRows': { title: 'Unhide' },
+  'gc.spread.contextMenu.hideColumns': { title: 'Hide' }, 'gc.spread.contextMenu.unhideColumns': { title: 'Unhide' },
+  'gc.spread.contextMenu.clearContents': { title: 'Clear Contents' },
+  'gc.spread.contextMenu.insertSheet': { title: 'Insert' }, 'gc.spread.contextMenu.deleteSheet': { title: 'Delete' },
+  'gc.spread.contextMenu.hideSheet': { title: 'Hide' }, 'gc.spread.contextMenu.filter': { title: 'Filter' },
+  'gc.spread.contextMenu.insertComment': { title: 'Insert Comment' }, 'gc.spread.contextMenu.deleteComment': { title: 'Delete Comment' },
+  'gc.spread.contextMenu.toggleComment': { title: 'Show/Hide Comment' },
 };
 
 export function createCommandMap(): Record<string, ICommand> {
@@ -297,7 +328,7 @@ const tabSpecs: Record<string, Spec> = {
   ThemeColors: { text: 'Colors', title: 'Theme Colors' },
   ThemeFonts: { text: 'Fonts', title: 'Theme Fonts' },
   margins: { text: 'Margins', title: 'Margins', type: 'dropdown', iconClass: 'ribbon-button-margins', bigButton: true, dropdownMaxWidth: 270 },
-  orientation: { text: 'Orientation', title: 'Change Page Orientation', type: 'dropdown', iconClass: 'ribbon-button-orientation', bigButton: true, dropdownMaxWidth: 180 },
+  orientation: { text: 'Orientation', title: 'Change Page Orientation', type: 'dropdown', iconClass: 'ribbon-button-page-layout-orientation', bigButton: true, dropdownMaxWidth: 180 },
   paperSize: { text: 'Size', title: 'Size', type: 'dropdown', iconClass: 'ribbon-button-paper-size', bigButton: true, dropdownMaxWidth: 170 },
   printArea: { text: 'Print Area', title: 'Print Area', type: 'dropdown', iconClass: 'ribbon-button-print-area', bigButton: true, dropdownMaxWidth: 160 },
   breaks: { text: 'Breaks', title: 'Breaks', type: 'dropdown', iconClass: 'ribbon-button-breaks', bigButton: true, dropdownMaxWidth: 180 },
@@ -321,8 +352,8 @@ const tabSpecs: Record<string, Spec> = {
   pageLayoutGridLineSeparator: { title: '', type: 'separator' },
   marginSelector: { text: 'Normal', title: 'Normal' },
   customMargins: { text: 'Custom Margins...', title: 'Custom Margins...' },
-  orientationPortrait: { text: 'Portrait', title: 'Portrait', iconClass: 'ribbon-button-page-portrait' },
-  orientationLandscape: { text: 'Landscape', title: 'Landscape', iconClass: 'ribbon-button-page-landscape' },
+  orientationPortrait: { text: 'Portrait', title: 'Portrait', iconClass: 'ribbon-control-orientationportrait' },
+  orientationLandscape: { text: 'Landscape', title: 'Landscape', iconClass: 'ribbon-control-orientationlandscape' },
   paperKindSelector: { text: 'Letter', title: 'Letter' },
   setPrintArea: { text: 'Set Print Area', title: 'Set Print Area', iconClass: 'ribbon-button-print-area' },
   clearPrintArea: { text: 'Clear Print Area', title: 'Clear Print Area' },
@@ -350,7 +381,7 @@ const tabSpecs: Record<string, Spec> = {
   nameManager: { text: 'Name Manager', title: 'Name Manager', iconClass: 'ribbon-button-namemanager', bigButton: true, maxWidth: 70 },
   showFormulas: { text: 'Show Formulas', title: 'Show Formulas', type: 'checkbox', iconClass: 'ribbon-show-formulas' },
   showFormulaEditorPanel: { text: 'Show Formula Editor', title: 'Show Formula Editor', type: 'checkbox', iconClass: 'gc-formula-editor-panel-ribbon-show' },
-  calculationOptionsPanel: { text: 'Calculation Options', title: 'Calculation Options', type: 'dropdown', iconClass: 'ribbon-button-calculation', bigButton: true, dropdownMaxWidth: 230 },
+  calculationOptionsPanel: { text: 'Calculation Options', title: 'Calculation Options', type: 'dropdown', iconClass: 'ribbon-button-calculationoptions', bigButton: true, dropdownMaxWidth: 230 },
   calculationOptionAutomatic: { text: 'Automatic', title: 'Automatically recalculates the workbook whenever a value impacting a formula changes.' },
   calculationOptionPartial: { text: 'Partial', title: 'Automatically recalculates the workbook whenever a value impacting a formula changes, except for Data Table.' },
   calculationOptionManual: { text: 'Manual', title: 'Manually recalculates the workbook only when you select F9 or Formulas > Calculate Now.' },
@@ -448,6 +479,14 @@ for (const name of ['clusteredColumnChart','stackedColumnChart','stackedColumn10
   // "High-Low-Close", ...); never a humanised config key.
   tabSpecs[name] = { title: chartTypeRes(name), iconClass: 'ribbon-button-chart' };
 }
+/* TASK 75: the gallery group captions are real entries of the trial's command registry
+ * (`getCommand('areaChartGroup')` answers); register the same labels. */
+for (const name of ['areaChartGroup', 'barChartGroup', 'bubbleChartGroup', 'columnChartGroup', 'comboChartGroup', 'doughnutChartGroup', 'funnelChartGroup', 'lineChartGroup', 'pieChartGroup', 'radarChartGroup', 'scatterChartGroup', 'stockChartGroup', 'sunburstChartGroup', 'treemapChartGroup', 'waterfallChartGroup',
+  'barSparklineGroup', 'calendarSparklineGroup', 'lineSparklineGroup', 'otherSparklineGroup', 'pieSparklineGroup', 'scatterSparklineGroup',
+  'pivotTableOptionsList']) {
+  tabSpecs[name] = { title: humanize(name) };
+}
+tabSpecs.pivotTableStyleListContent = { title: 'PivotTable Styles', type: 'listContent' };
 for (const name of ['sparklinesLineSparkline','sparklinesAreaSparkline','sparklinesColumnSparkline','sparklinesWinLossSparkline','sparklinesStackedSparkline','sparklinesCascadeSparkline','sparklinesParetoSparkline','sparklinesHBarSparkline','sparklinesVBarSparkline','sparklinesHistogramSparkline','sparklinesPieSparkline','sparklinesScatterSparkline','sparklinesSpreadsSparkline','sparklinesMonthSparkline','sparklinesYearSparkline','sparklinesBoxPlotSparkline','sparklinesBulletSparkline','sparklinesVarianceSparkline','sparklinesRangeBlockSparkline','sparklinesGaugeKPISparkline','sparklineImageSparkline','sparklinesLollipopVarianceSparkline','sparklinesProgressSparkline']) {
   tabSpecs[name] = { text: humanize(name), title: humanize(name), iconClass: 'ribbon-button-sparklines' };
 }
@@ -457,3 +496,7 @@ for (const name of ['insertShapeRectangle','insertShapeEllipse','insertShapeLine
 for (const [commandName, spec] of Object.entries(tabSpecs)) specs[commandName] = spec;
 // PivotTable UI commands (TASK 47): insert button, contextual Analyze/Design tabs.
 for (const [commandName, spec] of Object.entries(pivotCommandSpecs)) specs[commandName] = spec;
+// TASK 74: Table Design / Chart Design / Sparkline commands and the re-grouped
+// Shape Format tab's command ids (insertShapeList, shapeCommandGroup, ...).
+for (const [commandName, spec] of Object.entries(contextualCommandSpecs)) specs[commandName] = spec;
+for (const [commandName, spec] of Object.entries(shapeDesignCommandSpecs)) specs[commandName] = spec;

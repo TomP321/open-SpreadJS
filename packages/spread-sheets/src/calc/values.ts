@@ -184,16 +184,6 @@ export function isReference(value: unknown): value is ReferenceValue {
 export function isArray(value: unknown): value is CalcArray {
   return value instanceof CalcArray;
 }
-export function isScalar(value: unknown): value is ScalarValue {
-  return (
-    value === null ||
-    typeof value === 'number' ||
-    typeof value === 'string' ||
-    typeof value === 'boolean' ||
-    value instanceof Date ||
-    value instanceof CalcError
-  );
-}
 export function isMissing(value: unknown): value is MissingValue {
   return value instanceof MissingValue;
 }
@@ -309,46 +299,4 @@ export function compareText(a: string, b: string): number {
   if (left < right) return -1;
   if (left > right) return 1;
   return 0;
-}
-
-/** Coerces a scalar to its text representation. Raises on errors. */
-export function scalarToText(value: Value): string {
-  if (value === null) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
-  if (typeof value === 'number') return numberToText(value);
-  if (value instanceof Date) return numberToText(dateToSerial(value));
-  if (value instanceof CalcError) raiseError(value);
-  return '';
-}
-
-// ---------------------------------------------------------------------------
-// Cell values from the worksheet
-// ---------------------------------------------------------------------------
-
-/** Normalises a value read from a cell into an engine value. */
-export function fromCell(value: unknown): Value {
-  if (value === undefined) return null;
-  if (value === null) return null;
-  if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') return value;
-  if (value instanceof Date) return isNaN(value.getTime()) ? error(ErrorCode.value) : value;
-  if (value instanceof CalcError) return value;
-  if (value && typeof value === 'object') {
-    if ('error' in value && typeof (value as { error: unknown }).error === 'string')
-      return new CalcError(String((value as { error: unknown }).error));
-    if (value instanceof CalcArray || value instanceof ReferenceValue) return value;
-  }
-  return String(value);
-}
-
-/** Converts an engine value to the value stored in a worksheet cell. */
-export function toCellValue(value: Value): unknown {
-  if (value === null) return null;
-  if (value instanceof CalcError) return value;
-  if (value instanceof ReferenceValue) {
-    return null;
-  }
-  if (value instanceof CalcArray) return value;
-  if (typeof value === 'number') return normalizeNumber(value);
-  return value;
 }

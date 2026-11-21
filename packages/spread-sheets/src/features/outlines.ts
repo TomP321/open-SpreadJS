@@ -12,6 +12,7 @@
  * after every mutation, so repeated `find` calls return the same object.
  */
 import type { Worksheet } from '../worksheet.js';
+import { _setColumnVisible, _setRowVisible } from '../sheet-layout.js';
 import { instanceProperties } from '../not-implemented.js';
 import { deserializeValue, type JsonRecord } from '../serialization.js';
 import { GC } from '../generated/enums.js';
@@ -77,8 +78,10 @@ export class Outline {
   }
   private setVisible(index: number, visible: boolean): void {
     if (!this.sheet) return;
-    if (this.axis === 'row') this.sheet.setRowVisible(index, visible);
-    else this.sheet.setColumnVisible(index, visible);
+    // TASK 75 (Show/Hide Detail probes): outline mechanics change visibility without
+    // materialising a `visible` record — only an explicit user show/hide serialises one.
+    if (this.axis === 'row') _setRowVisible(this.sheet, index, visible, undefined, false);
+    else _setColumnVisible(this.sheet, index, visible, undefined, false);
   }
   direction(direction?: number): number | this {
     if (direction === undefined) return this.directionValue;
@@ -255,6 +258,23 @@ export class Outline {
       starts.push(i);
     }
     for (const index of starts) this.applySpan(this.span(index) ?? { start: index, end: index, level }, expand, level);
+    this.invalidateTree();
+    this.sheet?.invalidateLayout();
+  }
+  /**
+   * @internal Designer Show-Detail semantics (TASK 75 r3 probe): expanding through the
+   * ribbon also materialises the summary-side marker (`level: -1`, `collapsed: false`)
+   * even when the group was never collapsed. The public `expand`/`expandGroup` keep the
+   * trial's no-new-entry behaviour, so the designer calls this on top of them.
+   */
+  _touchSummaryMarker(index: number): void {
+    const group = this.span(index);
+    if (!group) return;
+    const marker = this.markerIndex(group);
+    if (marker < 0) return;
+    const item = this.items[marker];
+    if (!item) Object.assign(this.ensure(marker), { level: -1, collapsed: false, viewCollapsed: false });
+    else item.collapsed = false;
     this.invalidateTree();
     this.sheet?.invalidateLayout();
   }

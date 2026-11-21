@@ -6,9 +6,10 @@ import type {
 import type {
   CommentUiFacade, ContextMenuState, DialogData, DialogErrorCallback, DialogState, DialogSuccessCallback,
   DialogValidCallback, DrawTool, MessageBoxCallback, MessageBoxState, DesignerApi, DesignerEventHandler,
-  DesignerEvents, ClipboardData, RibbonMenuState,
+  DesignerEvents, ClipboardData, RibbonMenuState, DockPane,
 } from './designer-api.js';
 import { CommandNames, TemplateNames } from './names-generated.js';
+import { activateDockPane as activateDockPaneHelper, dockPaneVisible, dockStackOpen, setDockPane as setDockPaneHelper } from './dock-panes.js';
 import { DefaultConfig, ToolBarModeConfig, resolveRibbon } from './config.js';
 import { deepClone, mergeConfig } from './config-merge.js';
 import { defaultTheme } from './theme-default.js';
@@ -55,23 +56,27 @@ import {
 import {
   applyFocusCellColor, ensureStructureEditable, showBuiltInFileIcons, showConfirmPassword, showDefaultDimensionDialog, showDimensionDialog, showFormatComment,
   showMoveOrCopySheet, showProtectSheet, showProtectWorkbook, showSettings, showSheetSettings, showTabStyleSettings,
-  showUnhideSheet, showUnprotectSheet, toggleFocusCell, zoomToSelection, pickWorksheetBackground,
+  showUnhideSheet, showUnprotectSheet, toggleFocusCell, clearSelectionCellType, clearSelectionCellDropdown, applySelectionCellType, zoomToSelection, pickWorksheetBackground,
 } from './designer-sheet-dialogs.js';
 import {
   armDrawTool, beginShapeTextEdit, executeChartCommand, executeShapeCommand, finishDrawTool,
   pickImageFile, placePicture, saveChartAsPicture, saveShapeAsPicture, showBarcodeDialog, showCameraDialog,
   showChangeChartTypeDialog, showFormatChartAreaDialog, showMoveChartDialog, showSelectDataDialog,
   showChartCommandDialog,
-  showShapeLinkDialog, showShapeSizeDialog, showSparklineDialog,
+  showShapeLinkDialog, showShapeSizeDialog, showSparklineDialog, showChartAltTextDialog,
 } from './designer-shapes.js';
+import {
+  hasActiveFormulaSparkline, hasActiveSparkline, hasActiveTable, hasSelectedChart,
+} from './contextual-actions.js';
 import {
   applyThemeColors, applyThemeFonts, applyWorkbookTheme, openThemeMenu, printDesigner, showCustomHeaderFooter,
   showPageSetup, syncPageLayoutDefaults,
 } from './designer-print.js';
 import { applyUndoableAction, commitFormula, installFormulaCommit, installUndoBridge, restoreUndoable, runUndoable } from './designer-undo.js';
 import {
-  activePivot, hasActivePivot, showChangeDataSource, showInsertPivotTable, showMovePivotTable,
-  showPivotFieldSettings, showPivotTableOptions, showValueFieldSettings, type PivotTable as PivotTableType,
+  activePivot, hasActivePivot, showCalcItemSolveOrder, showCalculatedField, showCalculatedItem,
+  showChangeDataSource, showInsertPivotTable, showMovePivotTable, showPivotFieldSettings,
+  showPivotTableOptions, showReportFilterPages, showValueFieldSettings, type PivotTable as PivotTableType,
 } from './pivot-designer.js';
 import { newWorkbook, openFile, saveFile } from './designer-file.js';
 
@@ -271,8 +276,8 @@ export class Designer implements DesignerApi {
   restoreUndoable(sheetJSON: string): void {
     restoreUndoable(this, sheetJSON);
   }
-  executeSpecial(name: string, value: unknown): boolean {
-    return executeDesignerSpecial(this, name, value);
+  executeSpecial(name: string, value: unknown, propertyName?: string): boolean {
+    return executeDesignerSpecial(this, name, value, propertyName);
   }
   getCommandState(commandName: string): CommandState {
     return computeCommandState(this, commandName);
@@ -337,6 +342,8 @@ export class Designer implements DesignerApi {
   _formulaEditorOpen = false;
   /** PivotTable docked field-list panel (TASK 47): open flag + shown pivot. */
   _pivotFieldListOpen = false;
+  /** TASK 77: the selection-follow rule is armed until a manual panel close (see DesignerApi). */
+  _pivotFieldListFollow = true;
   /** Trial keeps the panel mounted after the first open (hidden while closed). */
   _pivotFieldListMounted = false;
   _pivotFieldListName: string | null = null;
@@ -347,9 +354,29 @@ export class Designer implements DesignerApi {
   _formulaInsertion: { text: string; nonce: number } | null = null;
   _commentIndex = 0;
   _showComments = false;
+  /**
+   * TASK 77 dock stack (trial-measured layout, probed live on the running trial): the Selection
+   * pane, the threaded comments panel and the PivotTable field list share one right dock — a
+   * 315px active pane flush right (grid viewport 263 on the 640px compare frame), and when two or
+   * more panes are open the pane keeps 315px and a further 39px tab rail appears right of it
+   * (stack 354, viewport 224). `_dockPanes` keeps the open panes in mount order; `_dockActive` is
+   * the visible one; opening a pane activates it, closing the active one falls back to the
+   * previous pane of the stack. Before this layout two open panes each took their own dock slot
+   * and crushed the sheet viewport (the TASK 75 zoomSelection harness artifact).
+   */
+  _dockPanes: DockPane[] = [];
+  _dockActive: DockPane | null = null;
 
   /** True while the Selection dock panel is visible. */
   get selectionPaneOpen(): boolean { return this._selectionPaneOpen; }
+  /** Open/close a dock pane slot; see `dock-panes.ts` for the trial-measured layout. */
+  setDockPane(pane: DockPane, open: boolean): void { setDockPaneHelper(this, pane, open); }
+  /** True when `pane` is the visible pane of the dock stack. */
+  dockPaneVisible(pane: DockPane): boolean { return dockPaneVisible(this, pane); }
+  /** Show an already open pane (the tab rail click). */
+  activateDockPane(pane: DockPane): void { activateDockPaneHelper(this, pane); }
+  /** True while any dock pane is open (the stack container is mounted). */
+  get dockStackOpen(): boolean { return dockStackOpen(this); }
   /** True while the PivotTable field-list dock panel is visible. */
   get pivotFieldListOpen(): boolean { return this._pivotFieldListOpen; }
   /** True after the field-list panel was opened once (trial keeps it in the DOM, hidden). */
@@ -511,6 +538,18 @@ export class Designer implements DesignerApi {
   /** Number of selected shapes (the trial enables Group only for a selection of two or more). */
   selectedShapeCount(): number { return insertSelectedShapes(this).length; }
 
+  /* Contextual-tab triggers (TASK 74): Table Design / Chart Design / Sparkline. */
+  /** True while the active cell lies inside a table (trial's `TableSelected`). */
+  hasActiveTable(): boolean { return hasActiveTable(this); }
+  /** True while a floating chart is selected (trial's `CanFormatChart`). */
+  hasSelectedChart(): boolean { return hasSelectedChart(this); }
+  /** True while the active cell holds a cell sparkline (trial's `SparklineSelected`). */
+  hasActiveSparkline(): boolean { return hasActiveSparkline(this); }
+  /** True while the active cell holds a sparkline formula (trial's `FormulaSparklineSelected`). */
+  hasActiveFormulaSparkline(): boolean { return hasActiveFormulaSparkline(this); }
+  /** Chart Design tab: the trial's Alt Text dialog for the selected chart. */
+  showChartAltTextDialog(): void { showChartAltTextDialog(this); }
+
   showFormatCells(tab?: string): void { showFormatCells(this, tab); }
   insertFunctionText(name: string, suffix = '('): void {
     this._formulaInsertion = { text: `=${name}${suffix}`, nonce: Date.now() };
@@ -528,6 +567,11 @@ export class Designer implements DesignerApi {
   showPivotFieldSettings(fieldName: string): void { showPivotFieldSettings(this, fieldName); }
   showValueFieldSettings(fieldName: string): void { showValueFieldSettings(this, fieldName); }
   showPivotTableOptions(): void { showPivotTableOptions(this); }
+  /* TASK 77: the Fields, Items & Sets dialogs + Show Report Filter Pages. */
+  showCalculatedField(): void { showCalculatedField(this); }
+  showCalculatedItem(): void { showCalculatedItem(this); }
+  showCalcItemSolveOrder(): void { showCalcItemSolveOrder(this); }
+  showReportFilterPages(): void { showReportFilterPages(this); }
   showHyperlink(): void { showHyperlink(this); }
   /** Formulas ▸ Insert Function: search, category gallery and function gallery. */
   showInsertFunction(): void { showInsertFunction(this); }
@@ -575,6 +619,9 @@ export class Designer implements DesignerApi {
   showZoom(): void { showZoom(this); }
   /** Toggle the workbook-level Focus Cell highlight (active row/column tint). */
   toggleFocusCell(): void { toggleFocusCell(this); }
+  clearSelectionCellType(): void { clearSelectionCellType(this); }
+  applySelectionCellType(commandName: string): void { applySelectionCellType(this, commandName); }
+  clearSelectionCellDropdown(): void { clearSelectionCellDropdown(this); }
   /** Set the Focus Cell tint colour (implies enabling the highlight). */
   applyFocusCellColor(color: string): void { applyFocusCellColor(this, color); }
   zoomToSelection(): void { zoomToSelection(this); }

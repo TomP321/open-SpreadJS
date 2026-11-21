@@ -199,21 +199,23 @@ describe('page breaks, print line and background', () => {
     sheet.setRowPageBreak(2, false);
     expect(sheet.getRowPageBreak(2)).toBe(false);
   });
-  it('isPrintLineVisible toggles and persists', () => {
+  it('isPrintLineVisible toggles the runtime view state (view-only, not serialised)', () => {
     const sheet = sheetWith([['a']]);
     expect(sheet.isPrintLineVisible()).toBe(false);
     sheet.isPrintLineVisible(true);
+    expect(sheet.isPrintLineVisible()).toBe(true);
+    // Trial (TASK 75 sweep): the runtime toggle drives the on-screen page-break lines
+    // but is not written to the JSON; only the sheet option persists (next test).
+    expect(sheet.toJSON().printLineVisible).toBeUndefined();
+  });
+  it('honours the sheet option printLineVisible and round-trips it', () => {
+    const sheet = sheetWith([['a']]);
+    sheet.options.printLineVisible = true;
     expect(sheet.isPrintLineVisible()).toBe(true);
     expect(sheet.toJSON().printLineVisible).toBe(true);
     const other = new WorksheetClass();
     other.fromJSON(sheet.toJSON());
     expect(other.isPrintLineVisible()).toBe(true);
-  });
-  it('honours the sheet option printLineVisible', () => {
-    const sheet = sheetWith([['a']]);
-    sheet.options.printLineVisible = true;
-    expect(sheet.isPrintLineVisible()).toBe(true);
-    expect(sheet.toJSON().printLineVisible).toBe(true);
   });
   it('stores the background image with its layout options', () => {
     const sheet = sheetWith([['a']]);

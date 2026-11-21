@@ -1,6 +1,6 @@
-import { CalcError, BarcodeExValue, ImageExValue, SparklineExValue, isErrorString } from './calc/values.js';
+import { CalcError, BarcodeExValue, ErrorCodeValueMap, ImageExValue, SparklineExValue, isErrorString } from './calc/values.js';
 import { GeneralFormatter, dateToSerial, serialToDate } from './formatter.js';
-import { LineBorder, Style, styleProperties } from './primitives.js';
+import { LineBorder, Style, getFont, styleProperties } from './primitives.js';
 export type JsonRecord = Record<string, unknown>;
 export function object(value: unknown): JsonRecord {
   return value && typeof value === 'object' ? (value as JsonRecord) : {};
@@ -10,6 +10,10 @@ export function list(value: unknown): unknown[] {
 }
 export function serializeValue(value: unknown): unknown {
   if (value instanceof Date) return `/OADate(${dateToSerial(value)})/`;
+  // TASK 75: a cached calculation error serialises with the trial's error identity
+  // (`{_calcError, _code}`), not with our internal `{error}` property.
+  if (value instanceof CalcError)
+    return { _calcError: value.error, _code: ErrorCodeValueMap[value.error] ?? 0 };
   if (Array.isArray(value))
     return Array.from(value, (item) => serializeValue(item === undefined ? null : item));
   if (value && typeof value === 'object')
@@ -37,6 +41,7 @@ export function deserializeValue(value: unknown): unknown {
     }
     if (record.typeName === 'BarcodeExValue' && typeof record.name === 'string') return new BarcodeExValue(record.name, object(deserializeValue(record.value)));
     if (record.typeName === 'ImageExValue') return new ImageExValue(object(deserializeValue(record.value)));
+    if (typeof record._calcError === 'string' && isErrorString(record._calcError)) return new CalcError(record._calcError);
     if (typeof record.error === 'string' && isErrorString(record.error)) return new CalcError(record.error);
   }
   if (value && typeof value === 'object')
@@ -54,10 +59,13 @@ export function styleToJSON(style: Style | string | null | undefined): unknown {
           : style[key] && typeof (style[key] as { toJSON?: unknown }).toJSON === 'function'
             ? (style[key] as { toJSON(): unknown }).toJSON()
             : serializeValue(style[key]);
-  if (result.cellType !== undefined) {
-    if (result.name === undefined) result.name = null;
-    if (result.fontForColumnWidth === undefined) result.fontForColumnWidth = null;
-  }
+  // Trial (TASK 75 sweep): a serialized cellType carries no `name`/`fontForColumnWidth`
+  // null-fillers.
+  // TASK 79: `font` is a prototype accessor, so the own-enumerable loop above never sees it —
+  // emit the shorthand like the trial's toJSON does whenever the style carries a font
+  // (official-model.json's named style keeps both the composed `font` and the parsed parts).
+  const shorthand = getFont(style);
+  if (shorthand !== undefined) result.font = serializeValue(shorthand);
   if (typeof style.font === 'string') {
     const font = style.font.match(/^(.*?)\s*(\d+(?:\.\d+)?(?:px|pt|em|rem|%))(?:\/[\d.]+)?\s+(.+)$/);
     if (font) {

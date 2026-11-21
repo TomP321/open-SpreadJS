@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * TASK 52 drop-in check (item 4): build and run the five sample applications from freshly
- * packed tarballs, the way an application switches to OpenSheets:
+ * TASK 52 drop-in check (item 4): build and run the sample applications from freshly
+ * packed tarballs, the way an application switches to OpenSheets (TASK 73 added (g), the
+ * barcode add-in scenario, and its official black-box twin; TASK 76 added (h), the
+ * all-add-ins scenario, and its official twin):
  *
  *   "@mescius/spread-sheets": "npm:@opensheets/spread-sheets@^0.1.0"   (registry alias recipe)
  *   "@mescius/spread-sheets": "file:<tarball>"                         (local tarball recipe)
@@ -223,6 +225,86 @@ const APPS_SPEC = [
     positive: { 'dom.canvasCount': 1, 'dom.sheetHosts': 1 },
     mustResolveTo: '@mescius only',
   },
+  {
+    // TASK 73: the barcode add-in package is a real install. An app that aliases
+    // `@mescius/spread-sheets-barcode` to us must keep getting `BC_*` (the core-only answer is
+    // `#NAME?`, like the trial; after the add-in loads, the formula evaluates the barcode record).
+    id: 'g-vite-barcode',
+    template: 'g-vite-barcode',
+    kind: 'vite',
+    title: '(g) barcode add-in app: aliased core + @mescius/spread-sheets-barcode, =BC_QRCODE("x") evaluates the barcode record',
+    aliases: ['spread-sheets', 'spread-sheets-barcode'],
+    build: true,
+    serve: VITE_SERVE,
+    required: {
+      sheetName: 'Barcode',
+      // `getFormula` returns the formula text without the leading `=` — measured identical on
+      // the official twin (g-vite-barcode-official), like every other SpreadJS scenario here.
+      formulaText: 'BC_QRCODE("Drop In")',
+      displayText: '',
+      barcodeName: 'BC_QRCODE',
+      recordText: 'Drop In',
+      recordIsBarcode: true,
+      findControlIsWorkbook: true,
+    },
+    positive: { 'dom.canvasCount': 1, 'dom.sheetHosts': 1 },
+    mustResolveTo: '@mescius only',
+  },
+  {
+    // TASK 76: EVERY official add-in aliased to our package of the same name, imported by one
+    // app. The build must resolve all thirteen @mescius/* names to our tarballs, and the page
+    // must show a chart, a shape, a slicer, a pivot table and a paginated print preview
+    // (plus the barcode/IO features and the tablesheet/gantt/report/language-packages hosts).
+    id: 'h-vite-addons',
+    template: 'h-vite-addons',
+    kind: 'vite',
+    title: '(h) all add-ins app: core + 12 aliased add-in packages; chart, shape, slicer, pivot and print preview all work',
+    aliases: [
+      'spread-sheets',
+      'spread-sheets-io',
+      'spread-sheets-barcode',
+      'spread-sheets-charts',
+      'spread-sheets-shapes',
+      'spread-sheets-print',
+      'spread-sheets-pdf',
+      'spread-sheets-languagepackages',
+      'spread-sheets-ganttsheet',
+      'spread-sheets-pivot-addon',
+      'spread-sheets-reportsheet-addon',
+      'spread-sheets-slicers',
+      'spread-sheets-tablesheet',
+    ],
+    build: true,
+    serve: VITE_SERVE,
+    viewport: { width: 1280, height: 760 },
+    required: {
+      sheetName: 'Addons',
+      formulaValue: 2100,
+      chartCount: 1,
+      chartName: 'UnitsChart',
+      shapeCount: 1,
+      shapeName: 'Box',
+      pivotCount: 1,
+      slicerCount: 1,
+      slicerField: 'Region',
+      printApi: true,
+      printShowGridLine: true,
+      // The manual row page break at row 8 must split the sheet into two print-preview pages
+      // (our core's paginator; the official trial bundle answers null — recorded, not gated).
+      printPageCount: 2,
+      pdfApi: true,
+      barcodeName: 'BC_QRCODE',
+      recordIsBarcode: true,
+      ioMethods: ['function', 'function', 'function', 'function'],
+      tableSheetApi: true,
+      ganttApi: true,
+      reportApi: true,
+      languagePackagesApi: true,
+      findControlIsWorkbook: true,
+    },
+    positive: { 'dom.canvasCount': 1, 'dom.sheetHosts': 1 },
+    mustResolveTo: '@mescius only',
+  },
 ];
 
 /** Black-box twins: the same page scripts against the official trial packages. */
@@ -343,6 +425,27 @@ const TWINS = [
     compareWith: 'c-vite-designer',
     viewport: { width: 1280, height: 800 },
     fullPage: true,
+  },
+  {
+    id: 'g-vite-barcode-official',
+    fromTemplate: 'z-official-barcode',
+    title: '(g) the same barcode app built against the official trial core + barcode add-in (black-box reference)',
+    install: true,
+    build: true,
+    serve: VITE_SERVE,
+    gated: false,
+    compareWith: 'g-vite-barcode',
+  },
+  {
+    id: 'h-vite-addons-official',
+    fromTemplate: 'z-official-addons',
+    title: '(h) the same all-add-ins app built against the official trial packages (black-box reference)',
+    install: true,
+    build: true,
+    serve: VITE_SERVE,
+    gated: false,
+    compareWith: 'h-vite-addons',
+    viewport: { width: 1280, height: 760 },
   },
 ];
 

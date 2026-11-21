@@ -10,7 +10,8 @@
  * working.
  */
 import type { DesignerApi as Designer } from './designer-api.js';
-import { pivotInternals, recordView } from './core-internals.js';
+import { pivotInternals, rangeWriter, recordView } from './core-internals.js';
+import { setDockPane } from './dock-panes.js';
 import type { Worksheet } from './core-internals.js';
 import type GC from '@mescius/spread-sheets';
 import { activeSheet, topCell } from './commands/base.js';
@@ -195,6 +196,13 @@ const pivotCommandNames = new Set<string>([
   CommandNames.PivotTableBandedRows, CommandNames.PivotTableBandedColumns,
   CommandNames.PivotTableStyle, CommandNames.PivotTableAutoFitColumn,
   CommandNames.NewPivotTableStyle, CommandNames.ClearPivotTableStyle,
+  /* TASK 77 (probes 3/9/10-14 in .probe/t77/run/): the Fields, Items & Sets family and the two
+   * Options/Report dropdown entries. Every one of them opens a dialog on the trial (List Formulas
+   * writes a report sheet instead); the trial registers `pivotTableOptionsSub` as the Options
+   * dropdown entry that opens the very same PivotTable Options dialog as `pivotTableOptions`. */
+  CommandNames.PivotTableCalculatedField, CommandNames.PivotTableCalculatedItem,
+  CommandNames.PivotTableSolveOrder, CommandNames.PivotTableListFormulas,
+  CommandNames.PivotTableOptionsSub, CommandNames.PivotTableShowReportFilterPages,
   // Layout dropdown menu items.
   CommandNames.PivotTableSubtotalsNotShow, CommandNames.PivotTableSubtotalsAtBottom, CommandNames.PivotTableSubtotalsAtTop,
   CommandNames.PivotTableGrandTotalsOffRowColumn, CommandNames.PivotTableGrandTotalsOnRowColumn,
@@ -253,12 +261,26 @@ export function executePivotCommand(d: Designer, name: string, value: unknown): 
     case CommandNames.InsertPivotTableFromDataTable:
       d.showInsertPivotTable();
       return true;
-    case CommandNames.PivotTableFieldList:
-      d._pivotFieldListOpen = !d._pivotFieldListOpen;
-      if (d._pivotFieldListOpen) d._pivotFieldListMounted = true;
-      d._pivotFieldListName = d._pivotFieldListOpen ? pivotPanelTable(d)?.name() ?? activePivot(d)?.name() ?? null : null;
+    case CommandNames.PivotTableFieldList: {
+      /* TASK 77 trial rule (probes t77-manualclose/t77-reopen): with no active pivot while the
+       * panel is closed the execution is a no-op AND counts as a manual close — the panel stops
+       * following the selection. A toggle on an active pivot opens (re-arming the follow) or
+       * closes (disarming) the panel. */
+      if (!d._pivotFieldListOpen && !activePivot(d)) {
+        d._pivotFieldListFollow = false;
+        return true;
+      }
+      setDockPane(d, 'pivot', !d._pivotFieldListOpen);
+      d._pivotFieldListFollow = d._pivotFieldListOpen;
+      if (d._pivotFieldListOpen) {
+        d._pivotFieldListMounted = true;
+        d._pivotFieldListName = pivotPanelTable(d)?.name() ?? activePivot(d)?.name() ?? null;
+      } else {
+        d._pivotFieldListName = null;
+      }
       d.invalidate();
       return true;
+    }
     case CommandNames.PivotTableRefresh:
     case CommandNames.PivotTableRibbonRefresh:
       return withPivot(d, (pivot) => pivot.refresh());
@@ -335,6 +357,25 @@ export function executePivotCommand(d: Designer, name: string, value: unknown): 
       return true;
     case CommandNames.PivotTableOptions:
       d.showPivotTableOptions();
+      return true;
+    /* TASK 77: the trial's Options dropdown entry opens the same dialog (measured identical
+     * title/buttons/size — .probe/t77/run/t77-pivot-probe3.json). */
+    case CommandNames.PivotTableOptionsSub:
+      d.showPivotTableOptions();
+      return true;
+    case CommandNames.PivotTableCalculatedField:
+      d.showCalculatedField();
+      return true;
+    case CommandNames.PivotTableCalculatedItem:
+      d.showCalculatedItem();
+      return true;
+    case CommandNames.PivotTableSolveOrder:
+      d.showCalcItemSolveOrder();
+      return true;
+    case CommandNames.PivotTableListFormulas:
+      return listPivotFormulas(d);
+    case CommandNames.PivotTableShowReportFilterPages:
+      d.showReportFilterPages();
       return true;
     case CommandNames.PivotTableGroupSelection:
     case CommandNames.PivotTableGroupField:
@@ -506,11 +547,33 @@ export function createPivot(d: Designer, data: { source: string; placement: stri
   wb.setActiveSheet(sheet.name());
   // The trial leaves the selection on the pivot's top-left cell (contextual tabs appear).
   sheet.setActiveCell(row, col);
-  // The trial opens the field list of the freshly created pivot.
-  d._pivotFieldListOpen = true;
+  // The trial opens the field list of the freshly created pivot (and arms the selection-follow
+  // rule) and activates `PivotTable Analyze` — the trial's only automatic pivot-tab activation:
+  // re-entering the pivot by selection later shows the tabs WITHOUT leaving the current tab
+  // (probes t77-follow / t77-manualclose; see contextualTabsWithoutActivation).
   d._pivotFieldListMounted = true;
+  setDockPane(d, 'pivot', true);
+  d._pivotFieldListFollow = true;
   d._pivotFieldListName = name;
+  d.activeTab = 'pivotTableAnalyze';
   d.invalidate();
+}
+
+/**
+ * TASK 77 (probes t77-item2 / t77-reopen): a field-list drag/drop ACTIVATES the pivot in the
+ * trial — the grid selection jumps to the pivot's top-left cell after every successful drop
+ * (the follow rule then re-opens a hidden panel while follow mode is armed; with follow disarmed
+ * the selection still jumps but the panel stays closed). Runs on the panel's `drop` event after
+ * the core panel's own drop handlers (bubbling), so the field update is already applied.
+ */
+export function activatePivotAtPanelDrop(d: Designer, pivot: PivotTable): void {
+  const pos = pivot.position();
+  if (!pos) return;
+  const wb = d.getWorkbook();
+  const sheet = wb.getSheetFromName(pos.sheetName ?? '') ?? activeSheet(d);
+  if (wb.getActiveSheet() !== sheet) wb.setActiveSheet(sheet.name());
+  sheet.setActiveCell(pos.row, pos.col);
+  sheet.setSelection(pos.row, pos.col, 1, 1);
 }
 
 /** Move the active pivot per the Move PivotTable dialog payload. */
@@ -763,4 +826,312 @@ export function pivotCommandState(d: Designer, name: string): { checked?: boolea
     case CommandNames.PivotTableActiveField: return { value: pivotActiveFieldName(d) };
     default: return undefined;
   }
+}
+
+/* =========== TASK 77: calculated fields/items, solve order, list formulas ===========
+ * Measured on the trial through the live Designer (apps/designer-compare, server 5188;
+ * .probe/t77/run/t77-pivot-probe3.json, t77-pivot-dialogs.json, t77-pivot-semantics.json,
+ * t77-calc-open.json and probes 9-14):
+ *  - every Fields/Items & Sets entry opens a dialog; List Formulas writes a report sheet;
+ *  - the dialogs apply their model change when the inner Add/Modify/Delete is clicked and
+ *    OK/Cancel only close them (Cancel does NOT undo an earlier Add — measured);
+ *  - the calculated-field Add is reproduced by the two public calls
+ *      pivotTable.addCalcField(name, formula)
+ *      pivotTable.add(name, 'Sum of ' + name, PivotTableFieldType.valueField, SubtotalType.sum)
+ *    which give byte-identical `getCalcFields()`, `getFieldsByArea()` and pivot cell values on
+ *    both sides (.probe/t77/run/t77-pivot-semantics.json, probe 8);
+ *  - the solve-order list shows one `source[item] = formula` row per calculated item ordered by
+ *    priority, Move Up/Move Down swaps the priorities, Delete drops the item. Our core keeps the
+ *    priority on `updateCalcItem` (a core-model gap, out of the designer's scope), so the designer
+ *    re-orders through the public remove/add API: re-adding writes the items in the new order and
+ *    assigns 1..n — the state the trial's own remove/re-add measurement produces
+ *    (.probe/t77/run/t77-pivot-semantics.json, probe 5D).
+ */
+
+/** The pivots of the sheet that hosts `pivot` (List Formulas works per pivot table). */
+export function pivotsOfSheet(d: Designer, pivot: PivotTable): PivotTable[] {
+  const wb = d.getWorkbook();
+  for (let i = 0; i < wb.getSheetCount(); i++) {
+    const pivots = wb.getSheet(i).pivotTables.all();
+    if (pivots.some((item) => item.name() === pivot.name())) return pivots;
+  }
+  return [pivot];
+}
+
+/** The pivot the TASK 77 dialogs target: the panel pivot, else the one under the active cell. */
+export function dialogPivot(d: Designer): PivotTable | null {
+  return pivotPanelTable(d) ?? activePivot(d);
+}
+
+/** Calculated fields as the trial lists them: `getCalcFields()` answers the display name. */
+export function calcFieldEntries(pivot: PivotTable): { name: string; formula: string }[] {
+  return pivot.getCalcFields().map((field) => ({ name: String(field.fieldName), formula: String(field.formula ?? '') }));
+}
+
+/** Source fields (Insert Calculated Field's Fields list — measured: source names). */
+export function sourceFieldNames(pivot: PivotTable): string[] {
+  return pivot.getSourceFields().map((field) => String(field.name));
+}
+
+/** Pivot fields (Insert Calculated Item's Fields list — measured: display names). */
+export function pivotFieldNames(pivot: PivotTable): string[] {
+  return pivot.getFieldsByArea().map((field) => String(field.fieldName));
+}
+
+/** The items of one pivot field (Insert Calculated Item's Items list). */
+export function pivotItemNames(pivot: PivotTable, fieldName: string): string[] {
+  try {
+    const items = pivot.getItemsByField(fieldName);
+    return Array.isArray(items) ? items.map((item) => String(item)) : [];
+  } catch {
+    return [];
+  }
+}
+
+const sumSubtotal = (d: Designer): number => d.gc.Pivot.SubtotalType.sum;
+const valueArea = (d: Designer): number => d.gc.Spread.Pivot.PivotTableFieldType.valueField;
+
+/** Trial: Add creates the calculated value field; returns the display name it materialised. */
+export function applyCalcFieldAdd(d: Designer, name: string, formula: string): string | null {
+  const pivot = dialogPivot(d);
+  const field = String(name ?? '').trim();
+  const src = String(formula ?? '').trim();
+  if (!pivot || !field || !src) return null;
+  if (calcFieldEntries(pivot).some((item) => item.name === field || item.name === `Sum of ${field}`)) {
+    d.showMessageBox(`Calculated item or field could not be created because another calculated item or field with the same name already exists: "${field}".`, 'Insert Calculated Field', 2);
+    return null;
+  }
+  d.getWorkbook().suspendPaint();
+  try {
+    pivot.addCalcField(field, src);
+    pivot.add(field, `Sum of ${field}`, valueArea(d) as never, sumSubtotal(d) as never);
+  } finally {
+    d.getWorkbook().resumePaint();
+  }
+  d.invalidate();
+  return `Sum of ${field}`;
+}
+
+/** Trial: Modify replaces the formula of an existing calculated field (remove + re-add). */
+export function applyCalcFieldModify(d: Designer, name: string, formula: string): string | null {
+  const pivot = dialogPivot(d);
+  const field = String(name ?? '').trim();
+  if (!pivot || !field) return null;
+  const src = String(formula ?? '').trim();
+  d.getWorkbook().suspendPaint();
+  try {
+    pivot.removeCalcField(field);
+    pivot.removeCalcField(`Sum of ${field}`);
+    pivot.addCalcField(field, src);
+    pivot.add(field, `Sum of ${field}`, valueArea(d) as never, sumSubtotal(d) as never);
+  } finally {
+    d.getWorkbook().resumePaint();
+  }
+  d.invalidate();
+  return `Sum of ${field}`;
+}
+
+/** Trial: Delete drops the calculated field from the report and the cache. */
+export function applyCalcFieldDelete(d: Designer, name: string): void {
+  const pivot = dialogPivot(d);
+  const field = String(name ?? '').trim();
+  if (!pivot || !field) return;
+  d.getWorkbook().suspendPaint();
+  try {
+    pivot.removeCalcField(field);
+    pivot.removeCalcField(`Sum of ${field}`);
+  } finally {
+    d.getWorkbook().resumePaint();
+  }
+  d.invalidate();
+}
+
+/** Trial: Add creates a calculated item in the field the dialog is bound to. */
+export function applyCalcItemAdd(d: Designer, sourceName: string, name: string, formula: string): string | null {
+  const pivot = dialogPivot(d);
+  const source = String(sourceName ?? '').trim();
+  const item = String(name ?? '').trim();
+  const src = String(formula ?? '').trim();
+  if (!pivot || !source || !item || !src) return null;
+  if (pivot.getCalcItems(source).some((entry) => String(entry.calcItemName) === item)) {
+    d.showMessageBox(`Calculated item or field could not be created because another calculated item or field with the same name already exists: "${item}".`, 'Insert Calculated Item', 2);
+    return null;
+  }
+  d.getWorkbook().suspendPaint();
+  try {
+    pivot.addCalcItem(source, item, src);
+  } finally {
+    d.getWorkbook().resumePaint();
+  }
+  d.invalidate();
+  return item;
+}
+
+/** Trial: Delete drops one calculated item. */
+export function applyCalcItemDelete(d: Designer, sourceName: string, name: string): void {
+  const pivot = dialogPivot(d);
+  if (!pivot) return;
+  d.getWorkbook().suspendPaint();
+  try {
+    pivot.removeCalcItem(String(sourceName), String(name));
+    reapply(pivot);
+  } finally {
+    d.getWorkbook().resumePaint();
+  }
+  d.invalidate();
+}
+
+/** One solve-order entry: `source[item] = formula`, in the trial's priority order. */
+export function solveOrderEntries(pivot: PivotTable): { sourceName: string; calcItemName: string; formula: string; priority: number }[] {
+  return pivot.getCalcItems()
+    .map((item) => ({
+      sourceName: String(item.sourceName),
+      calcItemName: String(item.calcItemName),
+      formula: String(item.formula ?? ''),
+      priority: Number(item.priority) || 0,
+    }))
+    .sort((a, b) => a.priority - b.priority || a.calcItemName.localeCompare(b.calcItemName));
+}
+
+/**
+ * Move Up/Move Down of the Solve Order dialog. The trial swaps the priorities (measured probe 9:
+ * after Move Up of the second entry `getCalcItems()` answers `[ItemA priority 2, ItemB priority 1]`
+ * and its report serialises the items in the new order). Our core's `updateCalcItem` keeps the
+ * stored priority, so the designer rewrites the item list through the public API — the same
+ * remove/re-add sequence the trial's own public API accepts (probe 5D) — which lands the items in
+ * the new order with priorities 1..n.
+ */
+export function moveCalcItem(d: Designer, entry: { sourceName: string; calcItemName: string; formula: string }, direction: 'up' | 'down'): void {
+  const pivot = dialogPivot(d);
+  if (!pivot) return;
+  const items = solveOrderEntries(pivot);
+  const index = items.findIndex((item) => item.sourceName === entry.sourceName && item.calcItemName === entry.calcItemName);
+  if (index < 0) return;
+  const swap = direction === 'up' ? index - 1 : index + 1;
+  if (swap < 0 || swap >= items.length) return;
+  const next = items.slice();
+  const tmp = next[index];
+  next[index] = next[swap];
+  next[swap] = tmp;
+  d.getWorkbook().suspendPaint();
+  try {
+    for (const item of items) pivot.removeCalcItem(item.sourceName, item.calcItemName);
+    for (const item of next) pivot.addCalcItem(item.sourceName, item.calcItemName, item.formula);
+    reapply(pivot);
+  } finally {
+    d.getWorkbook().resumePaint();
+  }
+  d.invalidate();
+}
+
+/** PivotTable Analyze ▸ Fields, Items & Sets ▸ List Formulas (measured layout, probe 12). */
+const LIST_FORMULA_NOTES: [row: number, col: number, text: string][] = [
+  [0, 0, 'Note:'],
+  [0, 1, 'When a cell is updated by more than one formula,'],
+  [1, 1, 'the value is set by the formula with the last solve order.'],
+  [3, 1, 'To change the solve order for multiple calculated items or fields,'],
+  [4, 1, 'on the Options tab, in the Calculations group, click Fields, Items, & Sets, and then click Solve Order.'],
+];
+
+export function listPivotFormulas(d: Designer): boolean {
+  const target = dialogPivot(d);
+  if (!target) return true;
+  const fields: { name: string; formula: string }[] = [];
+  const items: { label: string; formula: string; order: number }[] = [];
+  for (const pivot of pivotsOfSheet(d, target)) {
+    for (const field of calcFieldEntries(pivot)) fields.push(field);
+    /* The trial numbers the field block 0..n-1 and the item block by the item's priority
+     * (1-based, probe 12: fields 0,1 and items 1,2); our core's priority bookkeeping is a
+     * core-model gap, so the rank in the trial's own priority order is used. */
+    solveOrderEntries(pivot).forEach((item, index) => {
+      const formula = item.formula.startsWith('=') ? item.formula : `=${item.formula}`;
+      items.push({ label: `${item.sourceName}[${item.calcItemName}]`, formula, order: index + 1 });
+    });
+  }
+  const wb = d.getWorkbook();
+  const index = wb.getSheetCount();
+  wb.addSheet(index);
+  const sheet = wb.getSheet(index);
+  const set = (row: number, col: number, value: string | number): void => sheet.setValue(row, col, value);
+  let row = 0;
+  set(row++, 0, 'Calculated Field');
+  /* Trial: only the calculated-FIELD header row carries the thin bottom border (probe 12:
+   * `style: {borderBottom: {style: 1}}` on 1,0/1,1/1,2; the item header row has none). */
+  for (const [col, text] of [[0, 'Solve Order'], [1, 'Field'], [2, 'Formula']] as [number, string][]) {
+    set(row, col, text);
+    rangeWriter(sheet.getRange(row, col, 1, 1)).setBorder({ style: 1 }, { bottom: true });
+  }
+  row++;
+  fields.forEach((field, i) => { set(row, 0, i); set(row, 1, field.name); set(row, 2, field.formula); row++; });
+  row++;
+  set(row++, 0, 'Calculated Item');
+  for (const [col, text] of [[0, 'Solve Order'], [1, 'Item'], [2, 'Formula']] as [number, string][]) set(row, col, text);
+  row++;
+  items.forEach((item) => { set(row, 0, item.order); set(row, 1, item.label); set(row, 2, item.formula); row++; });
+  row += 2;
+  for (const [offset, col, text] of LIST_FORMULA_NOTES) set(row + offset, col, text);
+  /* Trial geometry (probe 12): column A 100 px, column B 596 px, column C auto-fitted to the
+   * longest formula (205 px for `=GetPivotData("Region","North")`, 221 px for `…)+1`). */
+  sheet.setColumnWidth(0, 100);
+  sheet.setColumnWidth(1, 596);
+  sheet.autoFitColumn(2);
+  wb.setActiveSheetIndex(index);
+  d.invalidate();
+  return true;
+}
+
+/** PivotTable Analyze ▸ Options ▸ PivotTable Options dropdown entry + Show Report Filter Pages. */
+export function showReportFilterPages(d: Designer): void {
+  const pivot = dialogPivot(d);
+  if (!pivot) return;
+  const filterFields = pivot.getFieldsByArea(d.gc.Spread.Pivot.PivotTableFieldType.filterField as never);
+  /* Trial (probe 3 vs probe 11): with a report-filter field the command opens its confirmation
+   * dialog; a pivot without one changes nothing on either side and no dialog appears. */
+  if (!filterFields.length) return;
+  d.showDialog(TemplateNames.PivotShowReportFilterDialogTemplate ?? 'pivotShowReportFilterDialogTemplate', {
+    dialogTitle: 'Show Report Filter Pages',
+    filterFields: filterFields.map((field) => String(field.fieldName)),
+  }, () => {
+    /* Trial (measured, probe 11): with the report filter at (All) the confirmed dialog leaves the
+     * workbook untouched — producing one filtered copy per page item needs a page-filter selection
+     * the public contract does not expose (recorded in docs/STATUS.md, TASK 77). */
+  });
+}
+
+/** Insert Calculated Field (trial title/defaults, probes 4/13/14). */
+export function showCalculatedField(d: Designer): void {
+  const pivot = dialogPivot(d);
+  if (!pivot) return;
+  d.showDialog(TemplateNames.CalculatedFieldsDialogTemplate ?? 'calculatedFieldsDialogTemplate', {
+    dialogTitle: 'Insert Calculated Field',
+    name: 'Field1',
+    formula: '= 0',
+    sourceFields: sourceFieldNames(pivot),
+    calcFields: calcFieldEntries(pivot).map((field) => field.name),
+  }, () => undefined);
+}
+
+/** Insert Calculated Item in "<active field>" (trial title/defaults, probes 4/14). */
+export function showCalculatedItem(d: Designer): void {
+  const pivot = dialogPivot(d);
+  if (!pivot) return;
+  const field = pivotActiveFieldName(d) || pivotFieldNames(pivot)[0] || '';
+  d.showDialog(TemplateNames.CalculatedItemsDialogTemplate ?? 'calculatedItemsDialogTemplate', {
+    dialogTitle: `Insert Calculated Item in "${field}"`,
+    sourceName: field,
+    name: 'Formula1',
+    formula: '= 0',
+    pivotFields: pivotFieldNames(pivot),
+    items: pivotItemNames(pivot, field),
+  }, () => undefined);
+}
+
+/** Calculated Item Solve Order (trial title/list/buttons/note, probe 9). */
+export function showCalcItemSolveOrder(d: Designer): void {
+  const pivot = dialogPivot(d);
+  if (!pivot) return;
+  d.showDialog(TemplateNames.CalculatedItemSolveOrderDialogTemplate ?? 'calculatedItemSolveOrderDialogTemplate', {
+    dialogTitle: 'Calculated Item Solve Order',
+    entries: solveOrderEntries(pivot),
+  }, () => undefined);
 }

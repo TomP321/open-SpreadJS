@@ -26,6 +26,11 @@ Every package installs under the official name through the `npm:` alias, keeps t
 implemented (see the status table below). This recipe is verified end-to-end from packed
 tarballs by `pnpm dropin:check` (apps/dropin-check).
 
+**Full migration guide:** [docs/MIGRATION.md](docs/MIGRATION.md) — the alias block for all
+17 packages, bundler/CJS/script-tag notes, license-key behaviour, theme CSS names and the
+known deviations. **Runnable apps:** [`examples/`](examples) (`vite-core`, `vite-react`,
+`vite-designer`, `script-tag-umd`).
+
 Requires Node.js 20.19+ and pnpm 10.
 
 ## Using the core
@@ -114,6 +119,53 @@ verified. Details and evidence: [docs/STATUS.md](docs/STATUS.md),
 Unsupported declared API members exist for type compatibility and throw/warn
 `NotImplemented` in dev builds; they are listed in the coverage report — nothing is silently stubbed.
 
+## Packages
+
+All packages are version `0.1.0` and alias one-to-one (see
+[docs/MIGRATION.md](docs/MIGRATION.md) § 1 for the full alias block):
+
+| npm name (`@opensheets/…`) | aliased official name | contents |
+| --- | --- | --- |
+| `spread-sheets` | `@mescius/spread-sheets` | core: model, sparse storage, canvas renderer, formula engine (494 built-ins), events, undo |
+| `spread-sheets-react` | `@mescius/spread-sheets-react` | `<SpreadSheets>`, `<Worksheet>`, `<Column>` wrapper (official props) + script-tag UMD |
+| `spread-sheets-io` | `@mescius/spread-sheets-io` | XLSX / CSV / SSJSON import & export plugin |
+| `spread-sheets-barcode` | `@mescius/spread-sheets-barcode` | `BC_*` barcode formulas + cell types (EAN/UPC/QR/…) |
+| `spread-sheets-charts` | `@mescius/spread-sheets-charts` | chart add-in surface (core also paints charts itself) |
+| `spread-sheets-shapes` | `@mescius/spread-sheets-shapes` | shapes add-in surface (core also draws shapes) |
+| `spread-sheets-print` | `@mescius/spread-sheets-print` | paginator / print model + preview |
+| `spread-sheets-pdf` | `@mescius/spread-sheets-pdf` | `savePDF` with embedded TrueType subsets |
+| `spread-sheets-languagepackages` | `@mescius/spread-sheets-languagepackages` | localized formula/language resources |
+| `spread-sheets-ganttsheet` | `@mescius/spread-sheets-ganttsheet` | Gantt sheet add-in |
+| `spread-sheets-pivot-addon` | `@mescius/spread-sheets-pivot-addon` | pivot engine + field-list panel add-in surface |
+| `spread-sheets-reportsheet-addon` | `@mescius/spread-sheets-reportsheet-addon` | report sheet add-in |
+| `spread-sheets-slicers` | `@mescius/spread-sheets-slicers` | slicers + timeline add-in surface |
+| `spread-sheets-tablesheet` | `@mescius/spread-sheets-tablesheet` | `GC.Data` TableSheet add-in |
+| `spread-sheets-designer` | `@mescius/spread-sheets-designer` | Designer component (ribbon, dialogs, status bar, commands) |
+| `spread-sheets-designer-react` | `@mescius/spread-sheets-designer-react` | `<Designer>` React wrapper (official props) + script-tag UMD |
+| `spread-sheets-designer-resources-en` | `@mescius/spread-sheets-designer-resources-en` | English UI strings (side-effect import) |
+
+## Performance
+
+Measured against the official trial on the same machine/headless browser, our
+production `dist` builds — full tables in [docs/PERFORMANCE.md](docs/PERFORMANCE.md):
+
+| | @opensheets | official trial 19.2.5 |
+| --- | ---: | ---: |
+| Open a 1,000,000 x 16,384 virtual sheet | **0.3 ms** | 1,164 ms |
+| `setArray` 200,000 x 20 values | **6.9 s** | 230 s (33x) |
+| `setValue` 100k cells (suspendPaint) | **309 ms** | 6,633 ms |
+| Write + recalc a 100k-deep formula chain | **1.1 s** | 8.0 s (7x) |
+| 100k pairwise-distinct `Style` objects + paint | **0.6 s** | ~15 s (24x) |
+| Scroll 1000 rows (p95 per step) | **19.0 ms** | 34.4 ms |
+| JS heap after full benchmark | **131 MiB** | 246 MiB |
+| Core all-in bundle (min/gzip) | **559 KiB gz** | 1.86 MiB gz |
+| Designer bundle (min/gzip) | **819 KiB gz** | 1.96 MiB gz |
+
+Sparse chunked storage with Fenwick prefix sums (O(log n) hit-testing), viewport-only
+canvas painting batched in `requestAnimationFrame`, and a parse-once dependency-graph
+calculation service. `Workbook`/`Designer` create/destroy cycles leak nothing (WeakRef +
+heap-snapshot verified).
+
 ## Development
 
 ```sh
@@ -126,7 +178,8 @@ pnpm compare           # playground/compare apps (see apps/*/README)
 
 `apps/compare` and `apps/designer-compare` render the official trial package side by side
 with ours in the same browser for black-box pixel/behaviour diffing; the Playwright specs in
-those apps are the visual parity gates.
+those apps are the visual parity gates. The `examples/` apps are workspace members, so
+`pnpm -r build` typechecks and builds them together with the packages.
 
 ## Clean-room
 

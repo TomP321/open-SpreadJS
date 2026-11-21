@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenSheets — script tags / window.GC</title>
+    <link rel="stylesheet" href="./node_modules/@mescius/spread-sheets/styles/gc.spread.sheets.css" />
+    <link rel="stylesheet" href="./node_modules/@mescius/spread-sheets/styles/gc.spread.sheets.excel2013white.css" />
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #sheet { width: calc(100vw - 24px); height: calc(100vh - 90px); margin: 0 12px; }
+      .bar { display: flex; gap: 8px; align-items: center; height: 44px; padding: 0 12px; }
+      button { padding: 6px 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <strong>OpenSheets, script tags only</strong>
+      <button id="export" type="button">Export .xlsx</button>
+      <label>Import <input id="import" type="file" accept=".xlsx,.csv" /></label>
+      <span id="status"></span>
+    </div>
+    <div id="sheet"></div>
+
+    <!-- No bundler: the official UMD file names, window.GC global. -->
+    <script src="./node_modules/@mescius/spread-sheets/dist/gc.spread.sheets.all.min.js"></script>
+    <script src="./node_modules/@mescius/spread-sheets-io/dist/gc.spread.sheets.io.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

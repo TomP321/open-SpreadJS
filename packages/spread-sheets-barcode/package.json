@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-barcode",
+  "version": "0.1.0",
+  "description": "OpenSheets barcode (BC_*) formula add-in for the spreadsheet workbook, drop-in for the SpreadJS barcode plugin.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.barcode.cjs",
+  "module": "./dist/gc.spread.sheets.barcode.esm.js",
+  "types": "./dist/gc.spread.sheets.barcode.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-barcode",
+    "opensheets-barcode",
+    "barcode",
+    "qrcode",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.barcode.d.ts",
+        "default": "./dist/gc.spread.sheets.barcode.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.barcode.d.cts",
+        "default": "./dist/gc.spread.sheets.barcode.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

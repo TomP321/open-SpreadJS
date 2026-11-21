@@ -31,8 +31,20 @@ import type { CalcValue } from './calc.js';
 import { buildDateGroups, buildNumberGroups, buildTextGroups, dateGroupName } from './grouping.js';
 import type { DerivedColumn } from './grouping.js';
 import { PivotTableViewManager } from './views.js';
+import { asRecord } from '../object-access.js';
 
 /** Worksheet surface the pivot needs (structural typing avoids the import cycle). */
+/** The slicer members the pivot side uses (implemented by `GC.Spread.Sheets.Slicers.Slicer`). */
+/** The pivot-side slicer members (`PivotTableItemSlicer` adds them at runtime). */
+export interface SlicerLike {
+  _connectPivot?(pivot: object): void;
+  _disconnectPivot?(pivot: object): void;
+  _connectedPivots?(): object[];
+  _connectedPivotNames?(): string[];
+  _refreshFromPivot?(): void;
+  _resyncFromPivot?(): void;
+}
+
 export interface PivotSheet {
   name(): string;
   parent?: { getSheetFromName(name: string): unknown; customPivotTableThemes?: CustomPivotTableThemeManager } & object;
@@ -45,6 +57,13 @@ export interface PivotSheet {
   suspendPaint?(): void;
   resumePaint?(): void;
   tables?: { findByName(name: string): { range(): { row: number; col: number; rowCount: number; colCount: number } } | null | undefined };
+  /** The sheet's pivot manager (`worksheet.pivotTables`) once the sheet is attached to a workbook. */
+  pivotTables?: { _rename(oldName: string, newName: string): void; _attach(p: PivotTable): void; _detach(p: PivotTable): void };
+  /** The sheet's slicer collection (`worksheet.slicers`), structurally typed here. */
+  slicers?: {
+    all(): SlicerLike[];
+    get(name: string): SlicerLike | undefined;
+  };
   getColumnWidth?(col: number): number | undefined;
   setColumnWidth?(col: number, width: number): void;
 }
@@ -296,7 +315,7 @@ export class PivotTable {
 
   name(name?: string): string | void {
     if (name === undefined) return this.pivotName;
-    const manager = (this.sheet as unknown as { pivotTables?: { _rename(oldName: string, newName: string): void } }).pivotTables;
+    const manager = this.sheet.pivotTables;
     manager?._rename?.(this.pivotName, String(name));
     this.pivotName = String(name);
   }
@@ -310,10 +329,10 @@ export class PivotTable {
     if (sheetName && this.sheet.parent?.getSheetFromName) {
       const target = this.sheet.parent.getSheetFromName(sheetName) as PivotSheet | null;
       if (target && target !== this.sheet) {
-        const manager = (this.sheet as unknown as { pivotTables?: { _detach(p: PivotTable): void } }).pivotTables;
+        const manager = this.sheet.pivotTables;
         manager?._detach?.(this);
         this.sheet = target;
-        (target as unknown as { pivotTables?: { _attach(p: PivotTable): void } }).pivotTables?._attach?.(this);
+        target.pivotTables?._attach?.(this);
       }
     }
     if (typeof row === 'number') this.row = row;
@@ -574,40 +593,31 @@ export class PivotTable {
 
   /** Slicer members of the `PivotTable` contract: sheet slicers bound to this table. */
   connectSlicer(name: string): void {
-    this._sheetSlicer(name)?._connectPivot(this as unknown as object);
+    this._sheetSlicer(name)?._connectPivot?.(this);
   }
 
   disconnectSlicer(name: string): void {
-    this._sheetSlicer(name)?._disconnectPivot(this as unknown as object);
+    this._sheetSlicer(name)?._disconnectPivot?.(this);
   }
 
   isConnectedSlicer(name: string): boolean {
     const slicer = this._sheetSlicer(name);
-    return !!slicer && slicer._connectedPivotNames().includes(String(this.pivotName));
+    return !!slicer && (slicer._connectedPivotNames?.() ?? []).includes(String(this.pivotName));
   }
 
   getAllSlicers(): unknown[] {
-    const holder = this.sheet as unknown as { slicers?: { all(): unknown[] } };
     const out: unknown[] = [];
-    for (const slicer of holder.slicers?.all() ?? [])
+    for (const slicer of this.sheet.slicers?.all() ?? [])
       if (this._connectedPivots(slicer).some(pivot => pivot === this)) out.push(slicer);
     return out;
   }
 
-  private _sheetSlicer(name: string): {
-    _connectPivot(pivot: object): void; _disconnectPivot(pivot: object): void;
-    _connectedPivots(): object[]; _connectedPivotNames(): string[];
-  } | undefined {
-    const holder = this.sheet as unknown as {
-      slicers?: { get(n: string): {
-        _connectPivot(pivot: object): void; _disconnectPivot(pivot: object): void;
-        _connectedPivots(): object[]; _connectedPivotNames(): string[];
-      } | undefined } };
-    return holder.slicers?.get(String(name));
+  private _sheetSlicer(name: string): SlicerLike | undefined {
+    return this.sheet.slicers?.get(String(name));
   }
 
-  private _connectedPivots(slicer: unknown): object[] {
-    const get = (slicer as { _connectedPivots?: () => object[] })._connectedPivots;
+  private _connectedPivots(slicer: SlicerLike): object[] {
+    const get = slicer._connectedPivots;
     return typeof get === 'function' ? get.call(slicer) : [];
   }
 
@@ -697,8 +707,8 @@ export class PivotTable {
   autoSortState(fieldName: string, enabled?: boolean): boolean | void {
     const model = this.fieldFor(fieldName);
     if (!model) return undefined;
-    if (enabled === undefined) return (model as unknown as { autoSort?: boolean }).autoSort ?? false;
-    (model as unknown as { autoSort?: boolean }).autoSort = enabled;
+    if (enabled === undefined) return Boolean(asRecord(model).autoSort ?? false);
+    asRecord(model).autoSort = enabled;
   }
 
   // ------------------------------------------------------------ subtotals
@@ -755,7 +765,7 @@ export class PivotTable {
     const model = this.fieldFor(fieldName);
     if (!model) return undefined;
     if (showDataAsInfo === undefined) return model.showDataAsInfo as never ?? { showDataAs: 0 };
-    (model as unknown as { showDataAsInfo?: unknown }).showDataAsInfo = showDataAsInfo;
+    asRecord(model).showDataAsInfo = showDataAsInfo;
     this._showDataAsList = this._showDataAsList.filter(entry => entry.valueFieldName !== fieldName);
     this._showDataAsList.push({ valueFieldName: fieldName, showDataAsInfo });
     this._apply();
@@ -771,11 +781,11 @@ export class PivotTable {
   _fieldFormatter(fieldName: string, formatter?: string | null): string | undefined {
     const model = this.fieldFor(fieldName);
     if (!model) return undefined;
-    const store = model as unknown as { formatter?: string | null };
-    if (formatter === undefined) return store.formatter ?? undefined;
+    const store = asRecord(model);
+    if (formatter === undefined) return (store.formatter as string | null | undefined) ?? undefined;
     store.formatter = formatter && formatter !== 'General' ? formatter : null;
     this._apply();
-    return store.formatter ?? undefined;
+    return (store.formatter as string | null | undefined) ?? undefined;
   }
 
   /** @internal formatter of the value field a layout node shows (name + subtotal match). */
@@ -784,7 +794,7 @@ export class PivotTable {
     for (const model of this.models) {
       if (model.area === PivotTableFieldType.valueField && model.subtotal === valueInfo.subtotalType
         && (model.sourceName === valueInfo.sourceName || model.displayName === valueInfo.sourceName)) {
-        return (model as unknown as { formatter?: string | undefined }).formatter ?? undefined;
+        return asRecord(model).formatter as string | undefined;
       }
     }
     return undefined;
@@ -794,7 +804,7 @@ export class PivotTable {
   private formatterForLabel(fieldInfos?: { fieldName: string }[]): string | undefined {
     for (const info of fieldInfos ?? []) {
       const model = this.models.find((candidate) => candidate.displayName === info.fieldName || candidate.sourceName === info.fieldName);
-      const fmt = model && (model as unknown as { formatter?: string | undefined }).formatter;
+      const fmt = model && (asRecord(model).formatter as string | undefined);
       if (fmt) return fmt;
     }
     return undefined;
@@ -1088,8 +1098,8 @@ export class PivotTable {
     for (const entry of this.customStyles)
       if (entry.style && entry.pivotArea && this.matchesArea(cell, entry.pivotArea)) {
         style = style ?? new PivotTableStyle();
-        const source = entry.style as unknown as Record<string, unknown>;
-        const target = style as unknown as Record<string, unknown>;
+        const source = asRecord(entry.style);
+        const target = asRecord(style);
         for (const key of Object.keys(source)) if (source[key] !== undefined) target[key] = source[key];
       }
     // TASK 46: pivot conditional rules paint the rule style over matching cells.
@@ -1100,8 +1110,8 @@ export class PivotTable {
       const ruleStyle = entry.rule.evaluate(this.sheet, cellRow, cellCol, this.sheet.getValue(cellRow, cellCol));
       if (!ruleStyle) continue;
       style = style ?? new PivotTableStyle();
-      const source = ruleStyle as unknown as Record<string, unknown>;
-      const target = style as unknown as Record<string, unknown>;
+      const source = asRecord(ruleStyle);
+      const target = asRecord(style);
       for (const key of ['backColor', 'foreColor', 'borderLeft', 'borderTop', 'borderRight', 'borderBottom',
         'borderHorizontal', 'borderVertical', 'textDecoration', 'font', 'fontStyle', 'fontWeight', 'fontSize', 'fontFamily'])
         if (source[key] !== undefined) target[key] = source[key];
@@ -1237,15 +1247,15 @@ export class PivotTable {
       for (const spec of info.dateGroups) {
         const name = dateGroupName(Number(spec.by), origin);
         this.groups = this.groups.filter(g => !(g.kind === 'date' && g.origin === origin && g.name === name));
-        this.groups.unshift({ name, kind: 'date', origin, spec: { ...spec } as unknown as Record<string, unknown> });
+        this.groups.unshift({ name, kind: 'date', origin, spec: asRecord({ ...spec }) });
       }
     } else if (info.numberGroup) {
       this.groups = this.groups.filter(g => !(g.kind === 'number' && g.origin === origin));
-      this.groups.push({ name: origin, kind: 'number', origin, spec: { ...info.numberGroup } as unknown as Record<string, unknown> });
+      this.groups.push({ name: origin, kind: 'number', origin, spec: asRecord({ ...info.numberGroup }) });
     } else if (info.textGroup) {
       const name = String(info.textGroup.fieldName);
       this.groups = this.groups.filter(g => g.name !== name);
-      this.groups.push({ name, kind: 'text', origin, spec: { ...info.textGroup } as unknown as Record<string, unknown> });
+      this.groups.push({ name, kind: 'text', origin, spec: asRecord({ ...info.textGroup }) });
     } else {
       return;
     }
@@ -2155,9 +2165,7 @@ export class PivotTable {
 
   /** Slicers bound to this pivot adopt new/removed field items after a relayout. */
   private _refreshSheetSlicers(): void {
-    const holder = this.sheet as unknown as {
-      slicers?: { all(): { _refreshFromPivot?(): void; _connectedPivots?(): object[] }[] } };
-    for (const slicer of holder.slicers?.all() ?? []) {
+    for (const slicer of this.sheet.slicers?.all() ?? []) {
       if (!slicer._refreshFromPivot) continue;
       if ((slicer._connectedPivots?.() ?? []).some(pivot => pivot === this)) slicer._refreshFromPivot();
     }
@@ -2165,9 +2173,7 @@ export class PivotTable {
 
   /** @internal after a JSON restore (slicers load before pivots): adopt their selections. */
   _resyncSlicers(): void {
-    const holder = this.sheet as unknown as {
-      slicers?: { all(): { _connectedPivotNames?(): string[]; _resyncFromPivot?(): void }[] } };
-    for (const slicer of holder.slicers?.all() ?? []) {
+    for (const slicer of this.sheet.slicers?.all() ?? []) {
       if (slicer._resyncFromPivot && (slicer._connectedPivotNames?.() ?? []).includes(String(this.pivotName)))
         slicer._resyncFromPivot();
     }
@@ -2884,8 +2890,8 @@ function mergePivotStyle(base: PivotTableStyle | undefined, top: PivotTableStyle
   const out = new PivotTableStyle();
   for (const source of [base, top])
     for (const key of PIVOT_STYLE_KEYS) {
-      const value = (source as unknown as Record<string, unknown>)[key];
-      if (value !== undefined) (out as unknown as Record<string, unknown>)[key] = value;
+      const value = (asRecord(source))[key];
+      if (value !== undefined) (asRecord(out))[key] = value;
     }
   return out;
 }
@@ -2894,7 +2900,7 @@ export function resolveTheme(style: string | PivotTableTheme | undefined, sheet:
   if (!style) return undefined;
   if (style instanceof PivotTableTheme) return style;
   const name = String(style).toLowerCase().replace(/\s+/g, '');
-  const builtIn = (PivotTableThemes as unknown as Record<string, PivotTableTheme>)[name];
+  const builtIn = asRecord(PivotTableThemes)[name] as PivotTableTheme | undefined;
   if (builtIn) return builtIn;
   const custom = sheet?.parent?.customPivotTableThemes;
   return custom?.get(name) ?? custom?.get(String(style));
@@ -2902,18 +2908,18 @@ export function resolveTheme(style: string | PivotTableTheme | undefined, sheet:
 
 export function themeKeyOf(theme: PivotTableTheme): string {
   const name = String(theme.name() ?? '').toLowerCase();
-  const entries = PivotTableThemes as unknown as Record<string, PivotTableTheme>;
+  const entries = asRecord(PivotTableThemes) as Record<string, PivotTableTheme | undefined>;
   for (const key of Object.keys(entries))
     if (key !== 'prototype' && key !== 'name' && key !== 'length' && entries[key] === theme) return key;
   return name;
 }
 
 export function getBuiltInTheme(key: string): PivotTableTheme | undefined {
-  return (PivotTableThemes as unknown as Record<string, PivotTableTheme>)[String(key).toLowerCase()];
+  return asRecord(PivotTableThemes)[String(key).toLowerCase()] as PivotTableTheme | undefined;
 }
 
 function paletteOf(sheet: PivotSheet): { getColor(name: string): string } | undefined {
-  const host = sheet as unknown as { _themeValue?: () => unknown };
+  const host = asRecord(sheet) as { _themeValue?: () => unknown };
   if (typeof host._themeValue !== 'function') return undefined;
   try {
     return themeFromValue(host._themeValue() as never)._colorsValue();

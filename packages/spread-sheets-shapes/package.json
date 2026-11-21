@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-shapes",
+  "version": "0.1.0",
+  "description": "OpenSheets Auto Shapes add-in for the spreadsheet workbook, drop-in for the SpreadJS shapes add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.shapes.cjs",
+  "module": "./dist/gc.spread.sheets.shapes.esm.js",
+  "types": "./dist/gc.spread.sheets.shapes.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-shapes",
+    "opensheets-shapes",
+    "shapes",
+    "autoshapes",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.shapes.d.ts",
+        "default": "./dist/gc.spread.sheets.shapes.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.shapes.d.cts",
+        "default": "./dist/gc.spread.sheets.shapes.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

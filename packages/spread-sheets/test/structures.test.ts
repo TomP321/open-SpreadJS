@@ -17,6 +17,50 @@ describe('sparse structures', () => {
     grid.clear();
     expect([...grid.entries()]).toEqual([]);
   });
+  it('TASK 79 sorted-array rows: iteration is column-ordered, reverse works, mutation mid-iteration is safe', () => {
+    const grid = new SparseGrid<number>();
+    // Non-monotonic insertion order within one row and across rows of a chunk.
+    grid.set(1, 9, 90);
+    grid.set(1, 2, 20);
+    grid.set(0, 5, 50);
+    grid.set(1, 2, 21); // overwrite keeps position
+    // `entries()` walks chunks/rows in insertion order (row 1 was created first)
+    // but columns are stored sorted (TASK 79).
+    expect([...grid.entries()]).toEqual([
+      [1, 2, 21],
+      [1, 9, 90],
+      [0, 5, 50],
+    ]);
+    expect([...grid.orderedEntries()]).toEqual([
+      [0, 5, 50],
+      [1, 2, 21],
+      [1, 9, 90],
+    ]);
+    expect([...grid.orderedEntries(true)]).toEqual([
+      [1, 9, 90],
+      [1, 2, 21],
+      [0, 5, 50],
+    ]);
+    // Deleting entries while iterating keeps Map-like semantics (visited later
+    // entries still come out; the loop never skips or repeats because of a splice).
+    const seen: [number, number, number][] = [];
+    for (const entry of grid.entries()) {
+      seen.push(entry);
+      if (entry[1] === 2) grid.set(1, 9, undefined);
+      if (entry[0] === 0) grid.set(0, 5, undefined);
+    }
+    expect(seen).toEqual([
+      [1, 2, 21],
+      [1, 9, 90],
+      [0, 5, 50],
+    ]);
+    expect(grid.size).toBe(1);
+    expect(grid.get(1, 2)).toBe(21);
+    // Deleting a missing column is a no-op that must not create rows.
+    grid.set(77, 3, undefined);
+    expect(grid.size).toBe(1);
+    expect([...grid.entries()].length).toBe(1);
+  });
   it('handles a million uniform rows without dense allocations', () => {
     const axis = new AxisLayout(1_000_000, 20);
     expect(axis.prefixSum(1_000_000)).toBe(20_000_000);

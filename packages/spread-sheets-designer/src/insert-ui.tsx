@@ -466,10 +466,11 @@ export function ShapeFormatPanel(): React.ReactElement | null {
   const name = d._formatShapePanel;
   if (!name) return null;
   const sheet = d.getWorkbook().getActiveSheet();
-  const shape = shapesOf(sheet).get(name) as (DesignerShape & { isCamera?(): boolean; isPicture?(): boolean }) | undefined;
+  const shape = shapesOf(sheet).get(name) as (DesignerShape & { isCamera?(): boolean; isPicture?(): boolean; fill?(): Record<string, unknown>; line?(): Record<string, unknown> }) | undefined;
   if (!shape) return null;
-  const fill = shape.fill();
-  const line = shape.line();
+  // TASK 81: a group handle (and the trial classes it mirrors) answers no fill()/line() accessor.
+  const fill = (typeof shape.fill === 'function' ? shape.fill() : { visible: false }) as Record<string, unknown>;
+  const line = (typeof shape.line === 'function' ? shape.line() : { visible: false }) as Record<string, unknown>;
   const apply = (patch: Record<string, unknown>): void => d.runUndoable('applyShapeStyle', { data: { name, ...patch } });
   const row = (label: string, node: React.ReactNode): React.ReactElement => (
     <div className="gc-format-shape-row"><span className="gc-format-shape-label">{label}</span><span className="gc-format-shape-field">{node}</span></div>

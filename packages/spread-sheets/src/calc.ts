@@ -19,6 +19,8 @@ export interface ICalcEngine {
     knownUnregistered?: boolean,
   ): void;
   valueChanged?(sheet: Worksheet, row: number, col: number, value: unknown): void;
+  /** Releases a cell's spill ownership when a plain value overwrites it. */
+  detachSpillCell?(sheet: Worksheet, row: number, col: number, keepValue: boolean): void;
   cellWriting?(sheet: Worksheet, row: number, col: number): void;
   recalculate(sheet: Worksheet, all: boolean): void;
   /** `true` when the engine still has queued work from a suspended period. */

@@ -115,7 +115,9 @@ export function autoFitRow(sheet: Worksheet, row: number): void {
       const lines = style.wordWrap ? text.split('\n').reduce((sum, line) => sum + Math.max(1, Math.ceil(ctx.measureText(line).width / width)), 0) : text.split('\n').length;
       height = Math.max(height, Math.ceil(lines * size * 1.2 + 2));
     }
-    sheet.setRowHeight(row, height);
+    // Trial (TASK 75 r3): a fitted height equal to the current one is not recorded —
+    // a default-height row keeps no explicit size after AutoFit Row Height.
+    if (sheet.getRowHeight(row) !== height) sheet.setRowHeight(row, height);
 }
 
 export function autoFitColumn(sheet: Worksheet, col: number): void {
@@ -123,9 +125,13 @@ export function autoFitColumn(sheet: Worksheet, col: number): void {
     const ctx = sheet.measureContext(); let width = 0;
     for (const [row, c] of sheet.area().cells.entries()) if (c === col && !sheet.getSpan(row, col)) {
       const style = sheet.getActualStyle(row, col); ctx.font = String(style.font);
-      width = Math.max(width, ...sheet.getText(row, col).split('\n').map(text => ctx.measureText(text).width + 8 + Number(style.textIndent ?? 0) * 8));
+      // Trial (TASK 75 r4, side-by-side canvas probe): the fitted width is the measured
+      // text plus 3 px (not 8), and empty text lines do not participate.
+      for (const text of sheet.getText(row, col).split('\n'))
+        if (text) width = Math.max(width, ctx.measureText(text).width + 3 + Number(style.textIndent ?? 0) * 8);
     }
-    sheet.setColumnWidth(col, Math.ceil(width || sheet.defaults.colWidth));
+    // A column without measurable content keeps its current width (trial).
+    if (width) sheet.setColumnWidth(col, Math.ceil(width));
 }
 
 export function measureContext(sheet: Worksheet, ): CanvasRenderingContext2D {
@@ -137,17 +143,17 @@ export function measureContext(sheet: Worksheet, ): CanvasRenderingContext2D {
 /* ---- More `Worksheet` method bodies (moved out unchanged; `this` renamed
    to the `sheet` parameter). ---- */
 
-export function _setRowVisible(sheet: Worksheet, row: number, value: boolean, area = VIEW): void {
+export function _setRowVisible(sheet: Worksheet, row: number, value: boolean, area = VIEW, record = true): void {
     const layout = sheet._rowLayout(area),
       old = layout.isVisible(row);
-    layout.setVisible(row, value);
+    layout.setVisible(row, value, record);
     sheet.axisChanged('row', row, area, 'isVisible', old, value);
 }
 
-export function _setColumnVisible(sheet: Worksheet, col: number, value: boolean, area = VIEW): void {
+export function _setColumnVisible(sheet: Worksheet, col: number, value: boolean, area = VIEW, record = true): void {
     const layout = sheet._columnLayout(area),
       old = layout.isVisible(col);
-    layout.setVisible(col, value);
+    layout.setVisible(col, value, record);
     sheet.axisChanged('col', col, area, 'isVisible', old, value);
 }
 

@@ -29,6 +29,9 @@ packages always come from the local tarballs in `.probe/t52/tarballs`.
 | `d-cjs-node` | CommonJS: `require('@mescius/spread-sheets')` run under Node, and the same entry bundled for the browser | yes |
 | `e-umd-script` | `<script src="./node_modules/@mescius/spread-sheets/dist/gc.spread.sheets.all.min.js">`, `window.GC`, plus the IO plugin | yes |
 | `c-umd-ours` | our designer browser bundle through script tags (`window.GC`) | yes |
+| `g-vite-barcode` | barcode add-in: aliased core + `@mescius/spread-sheets-barcode`, `=BC_QRCODE("x")` evaluates the barcode record | yes |
+| `h-vite-addons` | all add-ins (TASK 76): core + io + barcode + charts + shapes + print + pdf + languagepackages + ganttsheet + pivot + reportsheet + slicers + tablesheet, all aliased to our packages; chart, shape, slicer, pivot and print preview asserted | yes |
+| `g-vite-barcode-official`, `h-vite-addons-official` | the same app code against the official trial packages | reference only |
 | `e-umd-official`, `b-vite-react-official`, `c-vite-designer-official`, `c-umd-official` | the same page/app code against the official trial packages | reference only (the trial is watermarked and unlicensed) |
 
 Every gated run asserts a sheet with values, a computed formula, a chart, painted canvas pixels, and
@@ -105,3 +108,15 @@ trial base package has no `sheet.charts` (its `-charts` add-on, which itself nee
 is required) while our core provides charts itself. Because of the first point every page here is
 addressed as `http://127.0.0.1:5189/...` and answered through `page.route()` interception - no server
 binds that port.
+
+Three more trial behaviours were measured for the (h) all-add-ins reference twin (TASK 76, triage
+scripts `.probe/t76/bisect*.mjs`): under **bundler** loading (the identical `main.ts` built with the
+official packages via npm aliases) the official trial's `Print.WorksheetPaginator.paginate()` throws
+(`…e2 is not a function`), `sheet.slicers.add(...)` registers nothing (`slicers.all()` stays empty),
+and `=BC_QRCODE("Drop In")` yields no barcode record (`getValue(...).name` is null) — although the
+same formula works with only the barcode add-in loaded ((g) twin, gated green) and even with all
+twelve add-ins in a plain esbuild bundle: the trial's calc-function wiring depends on the bundler's
+CJS interop details. The root `GC.Pivot` namespace (`SubtotalType`) exists only in the trial's
+script-tag bundles, not in the bundler-resolved module, so the sample keeps the default subtotal.
+These affect only the reference run (never gated); our aliased packages answer the same script with
+a working slicer, paginator (2 pages across the manual row break) and barcode.

@@ -177,6 +177,14 @@ export class CalcEngine implements EvalHost {
   readonly singleRowRanges = new Map<number, Map<number, Set<RangeEntry>>>();
   readonly formulaRows = new Map<number, Map<number, string | Set<string>>>();
   graphVersion = 0;
+  /**
+   * Memo of `formulasInRange` results keyed by the range dep, valid only while
+   * `rangeMemoVersion === graphVersion`. Bulk-loaded sheets repeat identical
+   * wide deps (e.g. 16k formulas all reading one $W$1:$X$500 table); without
+   * the memo every topo build re-scans the full row span of each occurrence.
+   */
+  readonly rangeDepMemo = new Map<string, FormulaCell[]>();
+  rangeMemoVersion = -1;
   /** findCycles scratch: token of the newest Tarjan scan and the graph version it fully covered. */
   cycleScanToken = 0;
   cycleScanVersion = -1;
@@ -438,8 +446,19 @@ export class CalcEngine implements EvalHost {
   valueChanged(sheet: Worksheet, row: number, col: number): void {
     this.detachSpillCell(sheet, row, col, true);
     const key = this.key(sheet, row, col);
+    const storeFormula = sheet.getFormula(row, col);
     // A plain value write over a formula cell removes its registration.
-    if (this.formulas.has(key) && sheet.getFormula(row, col) === null) this.removeFormula(key);
+    if (this.formulas.has(key)) {
+      if (storeFormula === null) this.removeFormula(key);
+    } else if (storeFormula && !sheet._arrayFormula(row, col)) {
+      // While the calculation service is suspended the write queue keeps one
+      // notification per cell (latest wins), so a `setFormula` + `setValue`
+      // pair on the same cell arrives here as a value notification only - the
+      // formula text is already in the store but was never registered.
+      // Register it now; the evaluation pass below overwrites the plain value
+      // with the formula result, matching the un-suspended behaviour.
+      this.formulaChanged(sheet, row, col, storeFormula);
+    }
     this.pending.push({ sheet, row, col, key });
   }
 

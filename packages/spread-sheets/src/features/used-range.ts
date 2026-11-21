@@ -10,7 +10,7 @@
  * `threadedComment`, `conditionFormat`) answer `null`; see docs/STATUS.md.
  */
 import { GC } from '../generated/enums.js';
-import { Range } from '../primitives.js';
+import { Range, Style, getFont } from '../primitives.js';
 import type { Worksheet } from '../worksheet.js';
 
 const USED = GC.Spread.Sheets.UsedRangeType;
@@ -61,7 +61,7 @@ export function usedRange(sheet: Worksheet, type: number | undefined): Range | n
         if (has(USED.data) && (cell.value !== undefined && cell.value !== null || cell.formula || cell.defaultValue !== undefined))
           boxes.push({ row, col, rowCount: 1, colCount: 1 });
         else if (has(USED.formula) && cell.formula) boxes.push({ row, col, rowCount: 1, colCount: 1 });
-        else if (has(USED.style) && cell.style && (typeof cell.style === 'string' || Object.keys(cell.style).length))
+        else if (has(USED.style) && cell.style && (typeof cell.style === 'string' || Object.keys(cell.style).length || (cell.style instanceof Style && getFont(cell.style) !== undefined)))
           boxes.push({ row, col, rowCount: 1, colCount: 1 });
         else if (has(USED.tag) && cell.tag !== undefined) boxes.push({ row, col, rowCount: 1, colCount: 1 });
         else if (has(USED.dataValidation) && cell.validator) boxes.push({ row, col, rowCount: 1, colCount: 1 });

@@ -7,7 +7,7 @@
  */
 import React, { useState } from 'react';
 import type { DesignerApi as Designer, DialogData } from './designer-api.js';
-import { SUBTOTAL_ITEMS, SHOW_DATA_AS_ITEMS } from './pivot-designer.js';
+import { SUBTOTAL_ITEMS, SHOW_DATA_AS_ITEMS, applyCalcFieldAdd, applyCalcFieldDelete, applyCalcFieldModify, applyCalcItemAdd, applyCalcItemDelete, calcFieldEntries, moveCalcItem, pivotItemNames, solveOrderEntries } from './pivot-designer.js';
 import type { PivotTable } from './pivot-designer.js';
 import { FormatDialogContent } from './dialogs/FormatDialog.js';
 import { numberFormatterFor } from './dialogs/number-format.js';
@@ -261,4 +261,156 @@ export function PivotTableOptionsBody({ data, update }: { data: DialogData; upda
 
 function activePivotOf(designer: Designer): PivotTable | null {
   return designer.activePivot();
+}
+
+/* ============ TASK 77: Insert Calculated Field / Item, Solve Order, Report Filter Pages ============
+ * Reproduced from the trial's dialogs measured on apps/designer-compare (`.probe/t77/run/
+ * t77-pivot-dialogs.json`, `t77-calc-open.json`, probes 9-14): the Name/Formula rows with the
+ * Add(Modify)/Delete buttons, the Fields list with Insert Field, the Items list with Insert Item,
+ * the solve-order list with Move Up/Move Down/Delete/Close and the report-filter confirmation.
+ * The trial applies the model change on the inner button (OK/Cancel only close — measured), so
+ * these bodies call the pivot API directly through the helpers of `pivot-designer.ts`. */
+
+/** A field name as the trial writes it into a formula (quoted when it contains a space). */
+function formulaReference(name: string): string {
+  return /\s/.test(name) ? `'${name}'` : name;
+}
+
+function CalcFieldList({ items, selected, onSelect, label }: { items: string[]; selected: number; onSelect: (index: number) => void; label: string }): React.ReactElement {
+  return <div className="gc-calc-list" role="listbox" aria-label={label}>
+    {items.map((name, index) => (
+      <div key={`${name}-${index}`} role="option" aria-selected={index === selected} className={`gc-calc-list-item${index === selected ? ' selected' : ''}`} onClick={() => onSelect(index)}>{name}</div>
+    ))}
+  </div>;
+}
+
+export function CalculatedFieldBody({ designer, data, update }: { designer: Designer; data: DialogData; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
+  const [name, setName] = useState(String(data.name ?? 'Field1'));
+  const [formula, setFormula] = useState(String(data.formula ?? '= 0'));
+  const [created, setCreated] = useState<string[]>(() => Array.isArray(data.calcFields) ? [...(data.calcFields as string[])] : []);
+  const [selected, setSelected] = useState(0);
+  const fields = [...(Array.isArray(data.sourceFields) ? (data.sourceFields as string[]) : []), ...created];
+  const exists = created.includes(name) || created.includes(`Sum of ${name}`);
+  const refresh = (): void => {
+    const pivot = designer.activePivot();
+    setCreated(pivot ? calcFieldEntries(pivot).map((field) => field.name) : []);
+  };
+  return <div className="gc-calc-dialog gc-calc-field-dialog">
+    <FieldRow label="Name:">
+      <input className="gc-dialog-input gc-calc-name" value={name} onChange={(event) => setName(event.target.value)} aria-label="Name" />
+      <input type="button" className="gc-calc-btn gc-calc-add" value={exists ? 'Modify' : 'Add'} onClick={() => {
+        if (exists) applyCalcFieldModify(designer, name, formula);
+        else applyCalcFieldAdd(designer, name, formula);
+        refresh();
+      }} />
+    </FieldRow>
+    <FieldRow label="Formula:">
+      <input className="gc-dialog-input gc-calc-formula" value={formula} onChange={(event) => setFormula(event.target.value)} aria-label="Formula" />
+      <input type="button" className="gc-calc-btn gc-calc-delete" value="Delete" onClick={() => { applyCalcFieldDelete(designer, name); refresh(); }} />
+    </FieldRow>
+    <div className="gc-calc-label gc-calc-fields-label">Fields:</div>
+    <CalcFieldList items={fields} selected={selected} onSelect={setSelected} label="Fields" />
+    <input type="button" className="gc-calc-btn gc-calc-insert-field" value="Insert Field" onClick={() => {
+      const field = fields[selected];
+      if (!field) return;
+      update('formula', formula ? `${formula} ${formulaReference(field)}` : `=${formulaReference(field)}`);
+      setFormula(formula ? `${formula} ${formulaReference(field)}` : `=${formulaReference(field)}`);
+    }} />
+  </div>;
+}
+
+export function CalculatedItemBody({ designer, data, update }: { designer: Designer; data: DialogData; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
+  const [name, setName] = useState(String(data.name ?? 'Formula1'));
+  const [formula, setFormula] = useState(String(data.formula ?? '= 0'));
+  const [fieldIndex, setFieldIndex] = useState(0);
+  const [itemIndex, setItemIndex] = useState(0);
+  const [added, setAdded] = useState<string[]>([]);
+  const pivot = designer.activePivot();
+  const sourceName = String(data.sourceName ?? '');
+  const fields = Array.isArray(data.pivotFields) ? (data.pivotFields as string[]) : [];
+  const items = [...(Array.isArray(data.items) ? (data.items as string[]) : []), ...added.filter((item) => !((Array.isArray(data.items) ? (data.items as string[]) : []).includes(item)))];
+  const created = pivot ? pivot.getCalcItems(sourceName).map((item) => String(item.calcItemName)) : [];
+  const exists = created.includes(name);
+  const refresh = (): void => setAdded(pivot ? pivotItemNames(pivot, sourceName) : []);
+  return <div className="gc-calc-dialog gc-calc-item-dialog">
+    <FieldRow label="Name:">
+      <input className="gc-dialog-input gc-calc-name" value={name} onChange={(event) => setName(event.target.value)} aria-label="Name" />
+      <input type="button" className="gc-calc-btn gc-calc-add" value={exists ? 'Modify' : 'Add'} onClick={() => { applyCalcItemAdd(designer, sourceName, name, formula); refresh(); }} />
+    </FieldRow>
+    <FieldRow label="Formula:">
+      <input className="gc-dialog-input gc-calc-formula" value={formula} onChange={(event) => setFormula(event.target.value)} aria-label="Formula" />
+      <input type="button" className="gc-calc-btn gc-calc-delete" value="Delete" onClick={() => { applyCalcItemDelete(designer, sourceName, name); refresh(); }} />
+    </FieldRow>
+    <div className="gc-calc-columns">
+      <div className="gc-calc-column">
+        <div className="gc-calc-label gc-calc-fields-label">Fields:</div>
+        <CalcFieldList items={fields} selected={fieldIndex} onSelect={(index) => { setFieldIndex(index); setItemIndex(0); update('sourceName', fields[index] ?? ''); }} label="Fields" />
+        <input type="button" className="gc-calc-btn gc-calc-insert-field" value="Insert Field" onClick={() => {
+          const field = fields[fieldIndex];
+          if (!field) return;
+          const next = formula ? `${formula} ${formulaReference(field)}` : `=${formulaReference(field)}`;
+          update('formula', next); setFormula(next);
+        }} />
+      </div>
+      <div className="gc-calc-column">
+        <div className="gc-calc-label gc-calc-items-label">Items:</div>
+        <CalcFieldList items={items} selected={itemIndex} onSelect={setItemIndex} label="Items" />
+        <input type="button" className="gc-calc-btn gc-calc-insert-item" value="Insert Item" onClick={() => {
+          const item = items[itemIndex];
+          if (!item) return;
+          const label = `${sourceName}[${item}]`;
+          const next = formula ? `${formula} ${formulaReference(label)}` : `=${formulaReference(label)}`;
+          update('formula', next); setFormula(next);
+        }} />
+      </div>
+    </div>
+  </div>;
+}
+
+export function SolveOrderBody({ designer, data, update: _update }: { designer: Designer; data: DialogData; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
+  const [selected, setSelected] = useState(0);
+  const [, bumped] = useState(0);
+  const pivot = designer.activePivot();
+  const entries = pivot ? solveOrderEntries(pivot) : (Array.isArray(data.entries) ? (data.entries as { sourceName: string; calcItemName: string; formula: string }[]) : []);
+  const name = designer.dialog?.name ?? 'calculatedItemSolveOrderDialogTemplate';
+  const clamp = (): number => Math.min(selected, Math.max(0, entries.length - 1));
+  const move = (direction: 'up' | 'down'): void => {
+    const index = clamp();
+    const entry = entries[index];
+    if (!entry) return;
+    moveCalcItem(designer, entry, direction);
+    setSelected(direction === 'up' ? index - 1 : index + 1);
+    bumped((value) => value + 1);
+  };
+  return <div className="gc-calc-dialog gc-solve-order-dialog">
+    <div className="gc-calc-label gc-solve-head">Solve order:</div>
+    <div className="gc-calc-list gc-solve-list" role="listbox" aria-label="Solve order">
+      {entries.map((entry, index) => (
+        <div key={`${entry.sourceName}-${entry.calcItemName}`} role="option" aria-selected={index === clamp()} className={`gc-calc-list-item${index === clamp() ? ' selected' : ''}`} onClick={() => setSelected(index)}>{`${entry.sourceName}[${entry.calcItemName}] = ${entry.formula}`}</div>
+      ))}
+    </div>
+    <div className="gc-solve-note">if the value in a PivotTable cell is affected by two or more calculated items, the value is determined by the last formula in the solve order.</div>
+    <div className="gc-solve-buttons">
+      <input type="button" className="gc-calc-btn gc-solve-up" value="Move Up" onClick={() => move('up')} />
+      <input type="button" className="gc-calc-btn gc-solve-down" value="Move Down" onClick={() => move('down')} />
+      <input type="button" className="gc-calc-btn gc-solve-delete" value="Delete" onClick={() => {
+        const entry = entries[clamp()];
+        if (!entry) return;
+        applyCalcItemDelete(designer, entry.sourceName, entry.calcItemName);
+        setSelected(0);
+        bumped((value) => value + 1);
+      }} />
+      <input type="button" className="gc-calc-btn gc-solve-close" value="Close" onClick={() => designer.closeDialog(name, false)} />
+    </div>
+  </div>;
+}
+
+export function ReportFilterPagesBody({ data }: { data: DialogData }): React.ReactElement {
+  const fields = Array.isArray(data.filterFields) ? (data.filterFields as string[]) : [];
+  return <div className="gc-calc-dialog gc-report-filter-dialog">
+    <div className="gc-calc-label gc-report-filter-label">Show all report filter pages of:</div>
+    <div className="gc-report-filter-list">
+      {fields.map((name) => <span key={name} className="gc-report-filter-field">{name}</span>)}
+    </div>
+  </div>;
 }

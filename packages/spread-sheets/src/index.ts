@@ -46,6 +46,7 @@ import { CultureInfo, CultureManager } from './culture.js';
 import { UserManager } from './user-manager.js';
 import { CommandManager, UndoManager } from './commands.js';
 import { Comment, CommentDeleteUndoAction, CommentManager, CommentPropertyUndoAction, Padding } from './comments.js';
+import { asRecord } from './object-access.js';
 import {
   ContentType,
   ThreadedComment,
@@ -136,6 +137,8 @@ import { WorkbookRenderer } from './rendering.js';
 import { Interaction } from './interaction.js';
 import { bindSlicerHosts } from './features/slicers/install.js';
 import { CalcEngineApi, GlobalCalcEngineApi } from './calc/api.js';
+import { registerBarcodeFunctions } from './calc/functions/barcodes.js';
+import { setDesignerSerializationMode } from './serialization-mode.js';
 import { PDFFontsManager } from './pdf/fonts-manager.js';
 import { DataManager, Table as DataTable, View as DataView } from './data/index.js';
 import { DataChart, DataChartManager, DataChartConfigPanel } from './datacharts/index.js';
@@ -154,7 +157,7 @@ const PivotNamespace: Record<string, unknown> = {
   PivotTableTimelineSlicer,
 };
 // The declared `GC.Spread.Pivot.PivotTable.PivotTableViewManager` (views, TASK 42).
-(PivotTable as unknown as Record<string, unknown>).PivotTableViewManager = PivotTableViewManager;
+(asRecord(PivotTable)).PivotTableViewManager = PivotTableViewManager;
 
 export const Spread = {
   ...Enums.Spread,
@@ -332,5 +335,28 @@ installFallbacks(GC);
 for (const method of ['import', 'export', 'open', 'save'])
   Object.defineProperty(Workbook.prototype, method, { value: undefined, writable: true, configurable: true });
 export const Data = GC.Data;
+export { designerSerializationMode } from './serialization-mode.js';
 export { userColor, blocksToText } from './threaded-comments.js';
+// The `BC_*` barcode formula layer ships as an add-in feature: the trial registers it when the
+// separate package `@mescius/spread-sheets-barcode` loads, never from the core (core-only builds
+// answer `#NAME?`, TASK 72). It is NOT part of the declared public surface, so the add-in reaches
+// this hidden, non-enumerable hook on whatever core namespace it finds — the ESM import, the CJS
+// require or `window.GC` for the UMD page. Idempotent; consumers that bundle the barcode feature
+// (our Designer, the `@opensheets/spread-sheets-barcode` add-in) call it once at load.
+Object.defineProperty(Spread.Sheets, '_registerBarcodeFunctions', {
+  value: registerBarcodeFunctions,
+  enumerable: false,
+  configurable: true,
+  writable: true,
+});
+// The trial ships a second core build inside the Designer bundle whose serialiser is more
+// eager (default printInfo, empty pivotCaches, shared-formula coalescing, materialised
+// allowCellOverflow — TASK 75). Our single core switches to that behaviour while the
+// Designer package is installed, through this hidden hook (same pattern as the barcode one).
+Object.defineProperty(Spread.Sheets, '_setDesignerSerialization', {
+  value: setDesignerSerializationMode,
+  enumerable: false,
+  configurable: true,
+  writable: true,
+});
 export default GC;

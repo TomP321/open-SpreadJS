@@ -95,11 +95,6 @@ function deserializeReply(raw: JsonRecord): IReply {
   };
 }
 
-/** True when the message mentions `userId`; used for @mentions events. */
-export function mentionsUser(blocks: IContentBlock[], userId: string): boolean {
-  return (blocks ?? []).some((block) => block.type === ContentType.mention && block.userId === userId);
-}
-
 function newAuthorId(): string {
   return `{${(
     globalThis.crypto?.randomUUID?.() ??
@@ -145,30 +140,41 @@ export class Reply {
   }
 }
 
+/** Loose view of a serialized block: every field is optional until validated. */
+type ContentBlockSource = {
+  type?: number;
+  value?: unknown;
+  userId?: unknown;
+  href?: unknown;
+  text?: unknown;
+};
+
 /**
  * Clones a content block keeping only the fields valid for its type
  * (trial probe `tc:conv`: `{type:0,value:'v'}` stays complete, the unknown
- * `text` field on a type-1 block is dropped).
+ * `text` field on a type-1 block is dropped). Blocks missing their payload
+ * fields keep the partial shape, exactly like the trial round-trip.
  */
 export function cloneContentBlock(block: IContentBlock): IContentBlock {
   if (!block || typeof block !== 'object') return block;
-  const kind = Number((block as { type?: number }).type);
+  const src: ContentBlockSource = block;
+  const kind = Number(src.type);
   switch (kind) {
-    case ContentType.text: {
-      const value = (block as ITextBlock).value;
-      return value !== undefined ? { type: ContentType.text, value: String(value) } : { type: ContentType.text } as unknown as IContentBlock;
-    }
-    case ContentType.mention: {
-      const userId = (block as IMentionBlock).userId;
-      return userId !== undefined ? { type: ContentType.mention, userId: String(userId) } : { type: ContentType.mention } as unknown as IContentBlock;
-    }
+    case ContentType.text:
+      return src.value !== undefined
+        ? { type: ContentType.text, value: String(src.value) }
+        : { type: ContentType.text } as IContentBlock; // partial block, trial-faithful (probe `tc:conv`)
+    case ContentType.mention:
+      return src.userId !== undefined
+        ? { type: ContentType.mention, userId: String(src.userId) }
+        : { type: ContentType.mention } as IContentBlock;
     case ContentType.link: {
-      const out: { type: ContentType.link; href?: string; text?: string } = { type: ContentType.link };
-      if ((block as ILinkBlock).href !== undefined) out.href = String((block as ILinkBlock).href);
-      if ((block as ILinkBlock).text !== undefined) out.text = String((block as ILinkBlock).text);
-      return out as unknown as IContentBlock;
+      const out: Partial<ILinkBlock> & { type: ContentType.link } = { type: ContentType.link };
+      if (src.href !== undefined) out.href = String(src.href);
+      if (src.text !== undefined) out.text = String(src.text);
+      return out as IContentBlock;
     }
-    default: return { type: kind } as unknown as IContentBlock;
+    default: return { type: kind as ContentType } as IContentBlock; // unknown kind: shape preserved
   }
 }
 
@@ -429,7 +435,6 @@ export class ThreadedCommentManager {
     }
     return out;
   }
-
 
   /** Serialize in the official row/col nested shape. */
   toJSON(): JsonRecord {

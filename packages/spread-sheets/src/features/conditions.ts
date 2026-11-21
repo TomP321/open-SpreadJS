@@ -497,4 +497,3 @@ export function flattenValues(value: unknown): unknown[] {
   }
   return [value];
 }
-export const conditionEnums = { ConditionType, Compare, TextCompare, DateCompare };

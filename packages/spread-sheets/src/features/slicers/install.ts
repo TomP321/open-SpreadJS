@@ -21,9 +21,10 @@ import { SlicerBorder, SlicerStyle, SlicerStyleInfo, SlicerStyles, TimelineStyle
 import { CustomSlicerThemeManager, CustomTimelineThemeManager } from './themes-manager.js';
 import type { JsonRecord } from '../../serialization.js';
 import type { Worksheet } from '../../worksheet.js';
+import { asRecord } from '../../object-access.js';
 
-const sheetsNamespace = GC.Spread.Sheets as unknown as Record<string, Record<string, unknown>>;
-const topNamespace = GC.Spread as unknown as Record<string, Record<string, unknown>>;
+const sheetsNamespace = GC.Spread.Sheets as Record<string, Record<string, unknown>>;
+const topNamespace = GC.Spread as Record<string, Record<string, unknown>>;
 const slicersNamespace = (sheetsNamespace.Slicers ??= {});
 const topSlicersNamespace = (topNamespace.Slicers ??= {});
 
@@ -85,14 +86,14 @@ function installWorkbookMembers(): void {
   if (workbookInstalled) return;
   if (!WorkbookClass) return; // bound later by index.ts
   workbookInstalled = true;
-  const workbookProto = WorkbookClass.prototype as unknown as Record<string, unknown>;
+  const workbookProto = asRecord(WorkbookClass.prototype);
   if (workbookProto.__slicersInstalled) return;
   workbookProto.__slicersInstalled = true;
   for (const [key, Ctor] of [['customSlicerThemes', CustomSlicerThemeManager], ['customTimelineThemes', CustomTimelineThemeManager]] as const)
     Object.defineProperty(workbookProto, key, {
       configurable: true,
       get(this: Workbook): unknown {
-        const holder = this as unknown as Record<string, unknown>;
+        const holder = asRecord(this);
         if (!holder[`__${key}`]) holder[`__${key}`] = new Ctor(this);
         return holder[`__${key}`];
       },
@@ -118,7 +119,7 @@ function applySlicerCaches(workbook: Workbook, json: JsonRecord | undefined): vo
   const caches = Array.isArray(json?.tableSlicerCaches) ? (json.tableSlicerCaches as JsonRecord[]) : [];
   if (!caches.length) return;
   const byCacheName = new Map(caches.map(cache => [String(cache.name ?? ''), cache]));
-  const sheets = (workbook as unknown as { sheets?: Worksheet[] }).sheets ?? [];
+  const sheets = asRecord(workbook).sheets as Worksheet[] | undefined ?? [];
   for (const sheet of sheets) {
     for (const slicer of (sheet?.slicers?.all() ?? [])) {
       const cache = byCacheName.get(slicer.nameInFormula());
@@ -152,7 +153,7 @@ function slicerTableId(table: object): string {
 function collectSlicerCaches(workbook: Workbook): JsonRecord[] {
   const out: JsonRecord[] = [];
   const seen = new Set<string>();
-  const sheets = (workbook as unknown as { sheets?: Worksheet[] }).sheets ?? [];
+  const sheets = asRecord(workbook).sheets as Worksheet[] | undefined ?? [];
   for (const sheet of sheets) {
     if (!sheet) continue;
     for (const slicer of (sheet.slicers?.all() ?? [])) {

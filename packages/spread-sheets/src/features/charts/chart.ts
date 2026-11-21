@@ -15,9 +15,10 @@ import { buildChartSpace, buildSeries, refsFor, rebuildRefs, autoOrientation } f
 import { parseRanges } from './refs.js';
 import { getAxes, getLegend, getTitle, setAxes, setLegend, setTitle } from './accessors.js';
 import { buildDataLabelEntry, refreshPlotAreaSpPr, typeDefaultLabelPosition } from './dlabels.js';
+import { ACCENT_SOLID } from './defaults.js';
 import { resolveRefText } from './data.js';
 import { SeriesCollection, flattenSeries, groupPublicType, seriesGetter } from './series.js';
-import { LAYOUT_PUBLIC_TYPE } from './data-charts.js';
+import { LAYOUT_PUBLIC_TYPE, isDataChartType } from './data-charts.js';
 import { paintChart } from './paint.js';
 
 const ChartType = ApiEnums.Spread.Sheets.Charts.ChartType;
@@ -68,13 +69,18 @@ export class Chart extends FloatingObject {
     this._rebuildSpace(colorScheme as [number, string[]] | undefined);
     // The trial runs a deferred initial layout pass a moment after creation;
     // that pass stamps plotArea.spPr.ln (visible from the next snapshot on).
+    // TASK 75 r5: a DataChart's pass already happened on the NEXT tick — the Designer sweep
+    // sees `plotAreaRegion.plotSurface.spPr.ln` ~250 ms after the gallery insert, while the
+    // TASK 39 synchronous `chart.toJSON()` measurement does not, so the two trial answers are
+    // reconciled by a per-family deferral instead of a different model.
     if (typeof setTimeout === 'function') {
+      const dataChart = isDataChartType(Number(this.props.chartType));
       this._lnTimer = setTimeout(() => {
         this._lnTimer = undefined;
         this._lnReady = true;
         refreshPlotAreaSpPr(this._space);
         this._sheet?._view()?.schedule();
-      }, 2000);
+      }, dataChart ? 0 : 2000);
       (this._lnTimer as { unref?: () => void }).unref?.();
     }
     if (typeof document !== 'undefined') {
@@ -114,6 +120,38 @@ export class Chart extends FloatingObject {
     this._rebuildSpace(scheme);
     this._changed();
     return this;
+  }
+
+  /**
+   * @internal Materialises the series styles the trial's chart-gallery COMBO presets carry
+   * (TASK 75 r5 probes `.probe/t75r5/p2.json` for the three presets and `p3.json` proving the
+   * public `series().add()` path does NOT do this): every series gets its accent fill, bar
+   * series an explicit zero-width black line plus the `extLst` dataObject (white fill, no
+   * line), area series only that line, line series keep their `ln {w:2}`; the chart's blank
+   * policy becomes `dispBlanksAs: 1`.
+   */
+  _applyGalleryComboStyle(): void {
+    const groups = (this._space.chart?.plotArea?.chartGroups ?? []) as JsonRecord[];
+    for (const group of groups) {
+      const kind = Number(group.chartType);
+      for (const ser of (group.ser ?? []) as JsonRecord[]) {
+        const spPr = (ser.spPr = ser.spPr ?? {}) as JsonRecord;
+        if (spPr.solidFill === undefined) spPr.solidFill = ACCENT_SOLID(Number(ser.idx ?? 0) + 1);
+        if (kind === GroupType.bar) {
+          spPr.ln = { solidFill: { srgbClr: { val: [0, 0, 0] } }, w: 0, prstDash: 0 };
+          ser.extLst = {
+            ext: [{
+              uri: '{6F2FDCE9-48DA-4B69-8628-5D25D57E5C99}',
+              dataObject: { extDataType: 0, spPr: { solidFill: { srgbClr: { val: [255, 255, 255] } }, ln: { noFill: true } } },
+            }],
+          };
+        } else if (kind === GroupType.area) {
+          spPr.ln = { solidFill: { srgbClr: { val: [0, 0, 0] } }, w: 0, prstDash: 0 };
+        }
+      }
+    }
+    this._space.chart.dispBlanksAs = 1;
+    this._changed();
   }
 
   dataRange(value?: string): string | this {
@@ -163,6 +201,15 @@ export class Chart extends FloatingObject {
   /** @internal */ _changed(): void {
     if (this._lnReady) refreshPlotAreaSpPr(this._space);
     this._sheet?._view()?.schedule();
+  }
+  /**
+   * Trial (TASK 75 r3 probe): selecting a chart re-lays-it-out, which stamps
+   * `plotArea.spPr.ln = {noFill:true}` permanently (deselecting keeps it).
+   */
+  override isSelected(value?: boolean): unknown {
+    const result = super.isSelected(value);
+    if (value === true) refreshPlotAreaSpPr(this._space);
+    return result;
   }
 
   private _lnReady = false;

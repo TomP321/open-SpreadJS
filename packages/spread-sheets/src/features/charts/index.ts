@@ -8,10 +8,11 @@ import { Chart } from './chart.js';
 import { ChartCollection } from './collection.js';
 import { SeriesCollection } from './series.js';
 import { ColorSchemes, getColor } from './color-schemes.js';
+import { asRecord } from '../../object-access.js';
 
 export { Chart, ChartCollection, SeriesCollection, ColorSchemes, getColor };
 
-const chartsNamespace = GC.Spread.Sheets.Charts as unknown as Record<string, unknown>;
+const chartsNamespace = asRecord(GC.Spread.Sheets.Charts);
 chartsNamespace.Chart = Chart;
 chartsNamespace.ChartCollection = ChartCollection;
 chartsNamespace.SeriesCollection = SeriesCollection;

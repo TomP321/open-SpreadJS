@@ -6,6 +6,12 @@ export function clone<T>(value: T): T {
   if (value && typeof value === 'object') {
     const result = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>;
     for (const [key, item] of Object.entries(value)) result[key] = clone(item);
+    // A Style's `font` shorthand lives on the prototype (TASK 79): carry its composed/raw value
+    // across explicitly so clones keep the exact shorthand the source reports.
+    if (value instanceof Style) {
+      const font = getFont(value);
+      if (font !== undefined) (result as unknown as Style).font = font;
+    }
     return result as T;
   }
   return value;
@@ -185,42 +191,66 @@ export const styleProperties = [
   'quotePrefix',
 ] as const;
 export type StyleProperty = (typeof styleProperties)[number];
+// Shorthand-font bookkeeping (TASK 79): `font` is a *prototype* accessor (like the trial's, so
+// assigned styles stay in V8 fast mode — the per-instance accessor we used to define forced every
+// Style into dictionary mode and cost ~3 extra objects per styled cell). The WeakMap only remembers
+// the original string when re-composing it from the parsed parts would not reproduce it exactly
+// (unparseable values or unusual part order); the canonical `style<weight><size> <family>` order
+// round-trips, so those styles get no WeakMap entry at all.
 const fonts = new WeakMap<Style, { value: unknown; parts?: Record<string, unknown> }>();
+// TASK 79: the regex results are slices of the user's font string, so without interning every
+// styled cell pins its own copy of 'bold'/'Calibri'/... (V8 cons-string, ~20 B) plus the source
+// string. The part vocabulary is tiny and bounded, so a small cache turns them into shared strings.
+const FONT_PART_CACHE_LIMIT = 4096;
+const fontParts = new Map<string, string>();
+function internFontPart(value: string | undefined): string | undefined {
+  if (value === undefined) return value;
+  const cached = fontParts.get(value);
+  if (cached !== undefined) return cached;
+  if (fontParts.size < FONT_PART_CACHE_LIMIT) fontParts.set(value, value);
+  return value;
+}
+function fontPartsOf(style: Style): string | undefined {
+  const parts = [style.fontStyle, style.fontWeight, style.fontSize, style.fontFamily].filter(Boolean);
+  return parts.length ? parts.join(' ') : undefined;
+}
 function setFont(style: Style, value: unknown): void {
   const match =
     typeof value === 'string'
       ? value.match(/^(.*?)\s*(\d+(?:\.\d+)?(?:px|pt|em|rem|%))(?:\/[\d.]+)?\s+(.+)$/)
       : null;
-  const parts: Record<string, unknown> = {};
-  if (match) {
-    parts.fontSize = match[2];
-    parts.fontFamily = match[3];
-    parts.fontStyle = match[1].match(/italic|oblique/)?.[0];
-    parts.fontWeight = match[1].match(/bold|[1-9]00/)?.[0];
-    Object.assign(style, parts);
+  if (!match) {
+    // Unparseable: remembered verbatim, `getFont` hands it back unchanged. An
+    // explicit `undefined` is remembered too (not dropped): like before TASK 79,
+    // clearing the font keeps the getter reporting `undefined` even while the
+    // previously parsed parts are still carried.
+    fonts.set(style, { value });
+    return;
   }
-  fonts.set(style, { value, parts: match ? parts : undefined });
-  if (!Object.hasOwn(style, 'font'))
-    Object.defineProperty(style, 'font', {
-      get() {
-        return getFont(this as Style);
-      },
-      set(value: unknown) {
-        setFont(this as Style, value);
-      },
-      enumerable: true,
-      configurable: true,
-    });
+  const parts: Record<string, unknown> = {
+    fontSize: internFontPart(match[2]),
+    fontFamily: internFontPart(match[3]),
+  };
+  const fontStyle = internFontPart(match[1].match(/italic|oblique/)?.[0]);
+  const fontWeight = internFontPart(match[1].match(/bold|[1-9]00/)?.[0]);
+  // TASK 79: a shorthand without italic/bold only clears parts the style actually carries (own
+  // properties), so a plain `font = '12px Arial'` leaves the shape at the members it sets instead
+  // of materialising two undefined slots per style.
+  if (fontStyle !== undefined || Object.hasOwn(style, 'fontStyle')) parts.fontStyle = fontStyle;
+  if (fontWeight !== undefined || Object.hasOwn(style, 'fontWeight')) parts.fontWeight = fontWeight;
+  Object.assign(style, parts);
+  const composed = [fontStyle, fontWeight, parts.fontSize, parts.fontFamily].filter(Boolean).join(' ');
+  if (composed === value) fonts.delete(style);
+  else fonts.set(style, { value, parts });
 }
-function getFont(style: Style): unknown {
+export function getFont(style: Style): unknown {
   const cached = fonts.get(style);
   if (cached && (!cached.parts || Object.entries(cached.parts).every(([key, value]) => style[key] === value)))
     return cached.value;
   // The trial composes the shorthand from any subset of the font parts (TASK 46 probe:
   // size only -> "11pt", family only -> "Georgia", full combo -> "italic bold 11pt Calibri").
-  const parts = [style.fontStyle, style.fontWeight, style.fontSize, style.fontFamily].filter(Boolean);
-  if (parts.length) return parts.join(' ');
-  return cached?.value;
+  const composed = fontPartsOf(style);
+  return composed !== undefined ? composed : cached?.value;
 }
 const styleArguments: StyleProperty[] = [
   'backColor',

@@ -7,8 +7,9 @@
  */
 import { PivotTableTheme, PivotThemeJSON } from './theme.js';
 import themesJson from './themes-data.json';
+import { asRecord } from '../object-access.js';
 
-const THEMES = themesJson as unknown as Record<string, PivotThemeJSON>;
+const THEMES = themesJson as Record<string, PivotThemeJSON>;
 
 export class PivotTableThemes {
   constructor() { /* static-only container, like the trial */ }
@@ -22,5 +23,5 @@ for (const key of Object.keys(THEMES)) if (!keys.includes(key)) keys.push(key);
 for (const key of keys) {
   const theme = new PivotTableTheme();
   theme.fromJSON(THEMES[key] ?? { name: key });
-  (PivotTableThemes as unknown as Record<string, unknown>)[key] = theme;
+  (asRecord(PivotTableThemes))[key] = theme;
 }

@@ -4,7 +4,7 @@
  * HideRowFilter, so the slicer hides table rows exactly like the trial's
  * filter menu does (and stays consistent with it).
  */
-import { Range } from '../../primitives.js';
+import {} from '../../primitives.js';
 import { Condition } from '../conditions.js';
 import { GeneralSlicerData, shortDate } from './general-data.js';
 import { SLICER_BLANK_TEXT, type ISlicerConditional, type SlicerCell } from './types.js';
@@ -183,9 +183,4 @@ function conditionFor(text: string): Condition {
     useWildCards: false,
     ignoreCase: true,
   });
-}
-
-/** The filter range of the table (exported for tests / serialisation). */
-export function tableDataRowRange(table: Table): Range {
-  return table.dataRange();
 }

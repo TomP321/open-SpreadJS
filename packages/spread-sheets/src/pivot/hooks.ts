@@ -7,11 +7,11 @@
  */
 import type { WorkbookRenderer } from '../rendering.js';
 import type { Worksheet } from '../worksheet.js';
-import type { PivotTable } from './pivot-table.js';
+import type {} from './pivot-table.js';
 import type { LayoutCell } from './layout.js';
 
 interface PivotPatched {
-  sheet?: Worksheet & { pivotTables?: { _list(): PivotTable[] } };
+  sheet?: Worksheet;
   cellRect(row: number, col: number): { x: number; y: number; width: number; height: number };
   context: CanvasRenderingContext2D;
   rows: { index: number; position: number; size: number }[];
@@ -115,8 +115,7 @@ export function bindPivotHooks(WorkbookRendererCtor: { prototype: { paint(): voi
   const originalPaint = prototype.paint;
   prototype.paint = function (this: WorkbookRenderer): void {
     originalPaint.call(this);
-    const sheet = (this as unknown as { sheet?: Worksheet }).sheet;
-    const manager = (sheet as unknown as { pivotTables?: { _list(): PivotTable[] } } | undefined)?.pivotTables;
+    const manager = this.sheet?.pivotTables;
     if (manager?._list().length) drawPivotDecorations(this);
   };
 }

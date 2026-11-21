@@ -32,6 +32,17 @@ import {
   type Rect,
 } from './rendering-geometry.js';
 import type { WorkbookRenderer } from './rendering.js';
+import { asRecord } from './object-access.js';
+
+/** @internal Worksheet members the painter uses; mounted by the feature modules (TASK 80 seam). */
+interface WorksheetPaintHooks {
+  validationRecords: unknown[];
+  _renderValue(row: number, col: number): unknown;
+  _paintChart(renderer: unknown, ctx: CanvasRenderingContext2D): void;
+  _ganttTextNudge?(row: number): number;
+  _isGanttSheet?: boolean;
+}
+const paintHooks = (sheet: Worksheet): WorksheetPaintHooks => sheet as unknown as WorksheetPaintHooks;
 
 export function paint(renderer: WorkbookRenderer, ): void {
     const s = renderer.sheet;
@@ -70,7 +81,7 @@ export function paint(renderer: WorkbookRenderer, ): void {
     };
     const hasRules = s.conditionalFormats._hasRules();
     const hasComments = s.comments._hasAny() || s.threadedComments._hasAny();
-    const hasValidations = (s as unknown as { validationRecords: unknown[] }).validationRecords.length > 0;
+    const hasValidations = paintHooks(s).validationRecords.length > 0;
     // A ReportSheet in Preview/PaginatedPreview paints no cell gridlines (see src/sheet-chrome.ts).
     const chrome = sheetChrome(s);
     const showGridlines = chrome.gridlines;
@@ -147,13 +158,13 @@ export function paint(renderer: WorkbookRenderer, ): void {
         // Gantt sheets paint real Dates on their date columns (formatter text + `#####` overflow).
         const style = renderer.style(r, c);
         const value = '_renderValue' in s
-          ? (s as unknown as { _renderValue(row: number, col: number): unknown })._renderValue(r, c)
+          ? paintHooks(s)._renderValue(r, c)
           : s.getValue(r, c);
         // cellPadding insets the content box; cell buttons then claim the remaining edges.
         const content = applyInsets(rect, parseInsets(style.cellPadding), renderer.zoom);
         const isEditing = !span && !!renderer.interaction?.editingAt(r, c);
         const buttons = Array.isArray(style.cellButtons) && style.cellButtons.length
-          ? visibleButtons(style as unknown as Record<string, unknown>, { active: !span && s.getActiveRowIndex() === r && s.getActiveColumnIndex() === c, editing: isEditing })
+          ? visibleButtons(asRecord(style), { active: !span && s.getActiveRowIndex() === r && s.getActiveColumnIndex() === c, editing: isEditing })
           : [];
         const laid = buttons.length ? layoutButtons(buttons, content, renderer.font(style), renderer.zoom) : [];
         const bands = laid.length ? buttonBands(laid) : { left: 0, right: 0 };
@@ -193,13 +204,13 @@ export function paint(renderer: WorkbookRenderer, ): void {
             renderer.drawHyperlinkText(ctx, r, c, value, style, textRect, hyperlink);
           } else renderer.drawText(ctx, r, c, value, style, textRect, !span);
         }
-        if (style.watermark) drawWatermark(ctx, style as unknown as Record<string, unknown>, content, renderer.zoom, value != null, renderer.font(style));
+        if (style.watermark) drawWatermark(ctx, asRecord(style), content, renderer.zoom, value != null, renderer.font(style));
         if (!span) {
           if (hasComments) renderer.drawCommentIndicator(ctx, r, c, rect);
           if (hasValidations) renderer.drawValidationUI(ctx, r, c, value, rect);
         }
         renderer.drawBorders(ctx, r, c, style, rect, span);
-        if (style.decoration) drawDecoration(ctx, style as unknown as Record<string, unknown>, rect, renderer.zoom, () => renderer.schedule());
+        if (style.decoration) drawDecoration(ctx, asRecord(style), rect, renderer.zoom, () => renderer.schedule());
         for (const item of laid)
           drawButton(ctx, item, renderer.font(style), renderer.zoom, !!renderer.hoverButton && renderer.hoverButton.row === r && renderer.hoverButton.col === c && renderer.hoverButton.index === item.button.index);
       });
@@ -209,7 +220,7 @@ export function paint(renderer: WorkbookRenderer, ): void {
     if (bgOver && bgInfo.option.paintOrder === 'over-content') renderer._paintSheetBackground(ctx, bgOver, bgInfo.option, 0, 0, right, bottom);
     renderer.drawHeaders(ctx);
     if ('_isGanttSheet' in s)
-      (s as unknown as { _paintChart(r: unknown, c: CanvasRenderingContext2D): void })._paintChart(renderer, ctx);
+      paintHooks(s)._paintChart(renderer, ctx);
     if (s.tables.all().length || s.rowFilter()) renderer.drawFilterButtons(ctx);
     renderer.drawFreezeLines(ctx);
     ctx.restore();
@@ -396,7 +407,7 @@ export function cellButtons(renderer: WorkbookRenderer, row: number, col: number
     const span = s.getSpan(row, col);
     const rect = renderer.cellRect(row, col);
     const content = applyInsets(rect, parseInsets(style.cellPadding), renderer.zoom);
-    const buttons = visibleButtons(style as unknown as Record<string, unknown>, {
+    const buttons = visibleButtons(asRecord(style), {
       active: !span && s.getActiveRowIndex() === row && s.getActiveColumnIndex() === col,
       editing: !!renderer.interaction && renderer.interaction.editingAt(row, col),
     });
@@ -499,9 +510,9 @@ export function drawText(renderer: WorkbookRenderer, ctx: CanvasRenderingContext
     // The trial's Gantt grid sits its vertically-centred text one pixel lower than the plain
     // middle formula (measured: 'Design' ink spans y81-93 in the trial vs y80-92 without the nudge),
     // and summary rows four pixels above that (see GanttSheet._ganttTextNudge).
-    const ganttSheetForNudge = renderer.sheet as unknown as { _ganttTextNudge?: (row: number) => number };
-    const ganttRowNudge = ganttSheetForNudge._ganttTextNudge ? ganttSheetForNudge._ganttTextNudge.call(renderer.sheet, row) : 0;
-    const middleNudge = (renderer.sheet as unknown as { _isGanttSheet?: boolean })._isGanttSheet && style.vAlign === 1 ? 1 + ganttRowNudge : 0;
+    const ganttSheetForNudge = renderer.sheet ? paintHooks(renderer.sheet) : undefined;
+    const ganttRowNudge = ganttSheetForNudge?._ganttTextNudge ? ganttSheetForNudge._ganttTextNudge.call(renderer.sheet, row) : 0;
+    const middleNudge = (renderer.sheet && paintHooks(renderer.sheet)._isGanttSheet && style.vAlign === 1) ? 1 + ganttRowNudge : 0;
     const y = style.vAlign === 2 ? rect.y + rect.height - blockHeight - 3
       : style.vAlign === 1 ? rect.y + (rect.height - blockHeight - 3) / 2 + middleNudge : rect.y;
     ctx.textBaseline = 'alphabetic';
@@ -858,7 +869,7 @@ export function drawFilterButtons(renderer: WorkbookRenderer, ctx: CanvasRenderi
       for (const col of renderer.cols) {
         const index = col.index - range.col;
         if (index < 0 || index >= range.colCount) continue;
-        if (filter.filterButtonVisible(index) === false) continue;
+        if (filter.filterButtonVisible(col.index) === false) continue;
         draw(col.position, 0, col.size, renderer.headerHeight, {
           filtered: filter.isFiltered(index),
           sort: filter.getSortState(index),

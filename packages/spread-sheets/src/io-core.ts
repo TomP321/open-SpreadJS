@@ -47,11 +47,6 @@ export function registerFileParser(parser: IoFileParser): void {
   fileParsers.push(parser);
 }
 
-/** @internal Reads a seeded max-digit width (`undefined` when not registered). */
-export function lookupMaxDigitWidth(fontFamily: string, fontSize: number): number | undefined {
-  return maxDigitWidths.get(`${fontFamily}|${fontSize}`);
-}
-
 function errorFileResult(): { errorCode: number; errorMessage: string } {
   return { errorCode: 1, errorMessage: 'error file' };
 }

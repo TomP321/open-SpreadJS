@@ -7,13 +7,13 @@ import { Range } from '../primitives.js';
 import { GC } from '../generated/enums.js';
 import { Events } from '../events.js';
 import type { Worksheet } from '../worksheet.js';
+import type { CellData } from '../sheet-common.js';
+import { Comment } from '../comments.js';
 import { Condition } from './conditions.js';
 import { serializeValue, deserializeValue, type JsonRecord } from '../serialization.js';
 
 const SortState = GC.Spread.Sheets.SortState;
 const Filter = GC.Spread.Sheets.Filter;
-
-export const SortStateEnum = SortState;
 
 export interface SortInfo {
   index: number;
@@ -52,11 +52,11 @@ interface SortRangeOptions {
 }
 
 /**
- * Sorts a rectangle of cells by a list of columns (byRows=false: values down a
- * column order rows) or rows (byRows=true: values across a row order columns).
- * Cell styles, tags, validators, hyperlinks and comments move with their cell;
- * formulas do not move (matching the trial), and whole-row/column sizes are
- * unchanged.
+ * Sorts a rectangle of cells in the data model. Cell values, styles, tags,
+ * validators and hyperlinks move with their cell; formulas move too and their
+ * relative references shift by the same delta (19.2.5 trial probe, TASK 78).
+ * Whole-row/column sizes are unchanged. The operation reports one batched
+ * RangeChanged (action `sort`) instead of per-cell change events.
  */
 export function sortRange(
   sheet: Worksheet,
@@ -73,16 +73,6 @@ export function sortRange(
     sheet.getColumnCount(),
   );
   if (range.rowCount <= 0 || range.colCount <= 0 || !sortInfo?.length) return false;
-  const info = {
-    sheet,
-    sheetName: sheet.name(),
-    byRows,
-    range: new Range(range.row, range.col, range.rowCount, range.colCount),
-    sortInfo: sortInfo.map((item) => ({ ...item })),
-    cancel: false,
-  };
-  sheet._emit(Events.RangeSorting, info);
-  if (info.cancel) return false;
   // byRows=true reorders rows using the values of the columns named by
   // sortInfo.index; byRows=false reorders columns using the rows.
   const count = byRows ? range.rowCount : range.colCount;
@@ -109,74 +99,149 @@ export function sortRange(
     const value = style ? style[kind] : undefined;
     return typeof value === 'string' ? value : undefined;
   };
+  // Materialise every sort key once per position: the comparator then reads a
+  // cache instead of calling getValue/getStyle twice per comparison.
+  interface KeySpec {
+    item: SortRangeOptions['sortInfo'][number];
+    key: { index: number; ascending?: boolean };
+    kind: 'value' | 'backColor' | 'foreColor';
+  }
+  const keySpecs: KeySpec[] = [];
+  for (const item of sortInfo) for (const key of keysOf(item))
+    keySpecs.push({ item, key, kind: item.backColor !== undefined ? 'backColor' : item.fontColor !== undefined ? 'foreColor' : 'value' });
+  const keyCache = keySpecs.map(() => new Array<unknown>(count));
+  for (let position = 0; position < count; position++)
+    for (let ki = 0; ki < keySpecs.length; ki++) {
+      const spec = keySpecs[ki]!;
+      keyCache[ki]![position] = spec.kind === 'value' ? valueFor(position, spec.key) : colorFor(position, spec.kind, spec.key);
+    }
   const compare = (a: number, b: number): number => {
-    for (const item of sortInfo) {
-      for (const key of keysOf(item)) {
-        let result: number;
-        const fn = item.compare ?? item.compareFunction;
-        if (fn) result = fn(valueFor(a, key), valueFor(b, key));
-        else if (item.backColor !== undefined || item.fontColor !== undefined) {
-          const kind: 'backColor' | 'foreColor' = item.backColor !== undefined ? 'backColor' : 'foreColor';
-          const wanted = item.backColor ?? item.fontColor;
-          const colorA = colorFor(a, kind, key);
-          const colorB = colorFor(b, kind, key);
-          // An empty wanted color selects cells with no explicit fill/font color.
-          const matches = (color: string | undefined): boolean => color === wanted || (color === undefined && (wanted === '' || wanted === undefined));
-          result = matches(colorA) ? (matches(colorB) ? 0 : -1) : matches(colorB) ? 1 : 0;
-          if (item.order === 'bottom') result = -result;
-        } else result = compareValues(valueFor(a, key), valueFor(b, key));
-        if (result) return (key.ascending ?? item.ascending) === false ? -result : result;
-      }
+    for (let ki = 0; ki < keySpecs.length; ki++) {
+      const spec = keySpecs[ki]!;
+      const item = spec.item;
+      let result: number;
+      const fn = item.compare ?? item.compareFunction;
+      if (fn) result = fn(keyCache[ki]![a], keyCache[ki]![b]);
+      else if (spec.kind !== 'value') {
+        const wanted = item.backColor ?? item.fontColor;
+        const colorA = keyCache[ki]![a] as string | undefined;
+        const colorB = keyCache[ki]![b] as string | undefined;
+        // An empty wanted color selects cells with no explicit fill/font color.
+        const matches = (color: string | undefined): boolean => color === wanted || (color === undefined && (wanted === '' || wanted === undefined));
+        result = matches(colorA) ? (matches(colorB) ? 0 : -1) : matches(colorB) ? 1 : 0;
+        if (item.order === 'bottom') result = -result;
+      } else result = compareValues(keyCache[ki]![a], keyCache[ki]![b]);
+      if (result) return (spec.key.ascending ?? item.ascending) === false ? -result : result;
     }
     return 0;
   };
   order.sort(compare);
-  if (order.some((value, index) => value !== index)) {
-    const snapshot = (row: number, col: number) => ({
-      value: sheet.getValue(row, col),
-      style: sheet.getStyle(row, col),
-      tag: sheet.getTag(row, col),
-      validator: sheet.getDataValidator(row, col),
-      hyperlink: sheet.getHyperlink(row, col),
-      comment: sheet.comments.get(row, col),
-      span: sheet.getSpan(row, col),
-    });
-    type Snapshot = ReturnType<typeof snapshot>;
-    const apply = (row: number, col: number, data: Snapshot) => {
-      sheet.setValue(row, col, data.value);
-      sheet.setStyle(row, col, data.style ?? null);
-      sheet.setTag(row, col, data.tag);
-      sheet.setDataValidator(row, col, data.validator ?? null);
-      sheet.setHyperlink(row, col, (data.hyperlink ?? null) as JsonRecord | null);
-      if (data.comment) sheet.comments.set(row, col, data.comment);
-      else sheet.comments.remove(row, col);
-    };
-    sheet.suspendCalcService();
-    sheet.suspendPaint();
-    try {
-      const cells = new Map<string, Snapshot>();
-      if (byRows) {
-        for (let r = 0; r < range.rowCount; r++)
-          for (let c = 0; c < range.colCount; c++) cells.set(`${r}:${c}`, snapshot(range.row + r, range.col + c));
-        for (let r = 0; r < range.rowCount; r++) {
-          const source = order[r]!;
-          for (let c = 0; c < range.colCount; c++) apply(range.row + r, range.col + c, cells.get(`${source}:${c}`)!);
-        }
-      } else {
-        for (let r = 0; r < range.rowCount; r++)
-          for (let c = 0; c < range.colCount; c++) cells.set(`${r}:${c}`, snapshot(range.row + r, range.col + c));
-        for (let c = 0; c < range.colCount; c++) {
-          const source = order[c]!;
-          for (let r = 0; r < range.rowCount; r++) apply(range.row + r, range.col + c, cells.get(`${r}:${source}`)!);
-        }
+
+  // Move whole cell records through the store. The 19.2.5 probe (`.probe/t78/
+  // dbg-sort-events.mjs`) shows the trial carries formulas with their cells and
+  // shifts their relative references by the same delta, moves styles, tags,
+  // validators and hyperlinks, relocates comments, recalculates dependents and
+  // raises exactly one RangeChanged (action `sort`) — no RangeSorting/RangeSorted,
+  // no per-cell CellChanged/ValueChanged.
+  const VIEW = GC.Spread.Sheets.SheetArea.viewport;
+  const areaData = sheet.areas.get(VIEW);
+  const cellAt = (r: number, c: number): CellData | undefined => {
+    const meta = areaData?.cells.peek(r, c);
+    if (meta) return meta;
+    const numeric = areaData?.cells.getValue(r, c);
+    return numeric === undefined ? undefined : ({ value: numeric } as CellData);
+  };
+  const changedCells: { row: number; col: number }[] = [];
+  const inv = new Int32Array(count);
+  for (let target = 0; target < count; target++) inv[order[target]!] = target;
+
+  sheet.suspendCalcService();
+  sheet.suspendPaint();
+  try {
+    // Comments ride along with their cells: collect, drop and re-place them.
+    const notes: { row: number; col: number; json: JsonRecord }[] = [];
+    for (const comment of sheet.comments.all())
+      if (range.contains(comment.rowIndex(), comment.colIndex())) {
+        notes.push({ row: comment.rowIndex(), col: comment.colIndex(), json: comment.toJSON() });
+        sheet.comments.remove(comment.rowIndex(), comment.colIndex());
       }
-    } finally {
-      sheet.resumePaint();
-      sheet.resumeCalcService();
+    const movingColumns = !byRows;
+    const fixedCount = movingColumns ? range.rowCount : range.colCount;
+    for (let fixed = 0; fixed < fixedCount; fixed++) {
+      const at = (position: number): [number, number] =>
+        movingColumns ? [range.row + fixed, range.col + position] : [range.row + position, range.col + fixed];
+      const visited = new Uint8Array(count);
+      for (let start = 0; start < count; start++) {
+        if (visited[start] || order[start] === start) {
+          visited[start] = 1;
+          continue;
+        }
+        let carry = cellAt(at(start)[0], at(start)[1]);
+        const firstOld = carry;
+        let carrySource = start;
+        let target = inv[start]!;
+        const record = (position: number, oldCell: CellData | undefined, newCell: CellData | undefined): void => {
+          if (oldCell === newCell) return;
+          const [r, c] = at(position);
+          const oldValue = oldCell?.value;
+          const newValue = newCell?.value;
+          const oldFormula = oldCell?.formula;
+          const newFormula = newCell?.formula;
+          if (!Object.is(oldValue, newValue) || oldFormula !== newFormula) sheet.markDirty(r, c, oldValue, newValue);
+          changedCells.push({ row: r, col: c });
+          if (newFormula) sheet.queueCalc({ kind: 'formula', row: r, col: c, formula: newFormula });
+          else sheet.queueCalc({ kind: 'value', row: r, col: c, value: newValue });
+        };
+        while (target !== start) {
+          visited[target] = 1;
+          const [tr, tc] = at(target);
+          const occupant = cellAt(tr, tc);
+          if (carry?.formula) {
+            const delta = target - carrySource;
+            carry = { ...carry, formula: sheet._translateFormula(carry.formula, movingColumns ? 0 : delta, movingColumns ? delta : 0) };
+          }
+          areaData?.cells.set(tr, tc, carry);
+          record(target, occupant, carry);
+          carry = occupant;
+          carrySource = target;
+          target = inv[target]!;
+        }
+        if (carry?.formula) {
+          const delta = start - carrySource;
+          carry = { ...carry, formula: sheet._translateFormula(carry.formula, movingColumns ? 0 : delta, movingColumns ? delta : 0) };
+        }
+        {
+          const [sr, sc] = at(start);
+          areaData?.cells.set(sr, sc, carry);
+          record(start, firstOld, carry);
+        }
+        visited[start] = 1;
+      }
     }
+    for (const note of notes) {
+      const moved = byRows ? inv[note.row - range.row]! : note.row - range.row;
+      const cross = byRows ? note.col - range.col : inv[note.col - range.col]!;
+      const comment = new Comment();
+      comment.fromJSON(note.json);
+      sheet.comments.set(range.row + moved, range.col + cross, comment);
+    }
+    sheet.batch.invalidate();
+  } finally {
+    sheet.resumePaint();
+    sheet.resumeCalcService();
   }
   void sortOption;
-  sheet._emit(Events.RangeSorted, info);
+  sheet._emit(Events.RangeChanged, {
+    sheet,
+    sheetName: sheet.name(),
+    row: range.row,
+    col: range.col,
+    rowCount: range.rowCount,
+    colCount: range.colCount,
+    changedCells,
+    action: GC.Spread.Sheets.RangeChangedAction.sort,
+    isUndo: false,
+  });
   return true;
 }
 
@@ -218,6 +283,23 @@ export class RowFilterBase {
   private columnCount(): number {
     return this.range?.colCount ?? 0;
   }
+  /**
+   * TASK 75 (Set Filter probe + the published `filterButtonVisible(2, false)` example):
+   * the sheet-level filter addresses its buttons by the ABSOLUTE sheet column, a table
+   * filter by the table column index. Internally (and in the table JSON) the map stays
+   * range-relative; only the public index and the sheet JSON shift by `range.col`.
+   */
+  private buttonOffset(): number {
+    return this.tableName || !this.range || this.range.col < 0 ? 0 : this.range.col;
+  }
+  /** A public/serialised column -> the internal range-relative key. */
+  private buttonKey(col: number): number {
+    return col - this.buttonOffset();
+  }
+  /** The internal range-relative key -> the public/serialised column. */
+  private buttonColumn(key: number): number {
+    return key + this.buttonOffset();
+  }
   filterButtonVisible(col?: number | boolean, value?: boolean): boolean | this {
     if (col === undefined) {
       for (let c = 0; c < this.columnCount(); c++) if (this.buttons.get(c) !== false) return true;
@@ -228,10 +310,11 @@ export class RowFilterBase {
       this.showFilterButton = col;
       return this;
     }
-    if (value === undefined) return this.buttons.get(col) ?? true;
+    const key = this.buttonKey(col);
+    if (value === undefined) return this.buttons.get(key) ?? true;
     if (!this.buttons.size)
-      for (let c = 0; c <= col && c < this.columnCount(); c++) this.buttons.set(c, true);
-    this.buttons.set(col, value);
+      for (let c = 0; c <= key && c < this.columnCount(); c++) this.buttons.set(c, true);
+    this.buttons.set(key, value);
     return this;
   }
   addFilterItem(col: number, condition: Condition | Condition[]): void {
@@ -279,7 +362,10 @@ export class RowFilterBase {
     this.buttons.clear();
   }
   private setRowVisible(row: number, visible: boolean): void {
-    this.sheet?.setRowVisible(row, visible);
+    /* Trial (TASK 75 sweep): a filter shows/hides rows behind the scenes — the restore path
+     * leaves no `visible: true` record in the workbook, unlike the public setter. */
+    if (visible) this.sheet?._restoreRowVisibility(row);
+    else this.sheet?.setRowVisible(row, false);
   }
   filter(col?: number): void {
     const sheet = this.sheet;
@@ -348,7 +434,7 @@ export class RowFilterBase {
     this.dialogVisible = {};
     if (this.sheet && this.range)
       for (let row = this.range.row; row < this.range.row + this.range.rowCount; row++)
-        this.sheet.setRowVisible(row, true);
+        this.sheet._restoreRowVisibility(row);
   }
   sortColumn(col: number, ascending: boolean): void {
     if (!this.sheet || !this.range) return;
@@ -372,7 +458,10 @@ export class RowFilterBase {
       }));
     if (this.filteredColumns.size) result.filteredColumns = [...this.filteredColumns];
     if (this.sort) result.sortInfo = { ...this.sort };
-    if (this.buttons.size) result.filterButtonVisibleInfo = Object.fromEntries(this.buttons);
+    if (this.buttons.size)
+      result.filterButtonVisibleInfo = Object.fromEntries(
+        [...this.buttons].map(([key, value]) => [this.buttonColumn(key), value]),
+      );
     result.showFilterButton = this.showFilterButton;
     result.filteredOutRows = this.suppressFilteredOut ? [] : [...this.filtered];
     if (this.tableName) result.tableName = this.tableName;
@@ -393,7 +482,7 @@ export class RowFilterBase {
     this.filteredColumns = new Set((json.filteredColumns as number[] | undefined) ?? []);
     const buttons = json.filterButtonVisibleInfo as Record<string, boolean> | undefined;
     this.buttons.clear();
-    for (const [key, value] of Object.entries(buttons ?? {})) this.buttons.set(Number(key), value);
+    for (const [key, value] of Object.entries(buttons ?? {})) this.buttons.set(this.buttonKey(Number(key)), value);
     const sort = json.sortInfo as { index: number; ascending: boolean } | undefined;
     this.sort = sort ? { index: sort.index, ascending: sort.ascending, compareFunction: null } : null;
     this.dialogVisible = (json.dialogVisibleInfo as JsonRecord | undefined) ?? {};

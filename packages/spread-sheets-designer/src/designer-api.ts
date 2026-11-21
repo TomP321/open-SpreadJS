@@ -33,6 +33,9 @@ export type DialogValidCallback = (data: DialogData) => boolean | void;
 export type DialogErrorCallback = (error: unknown) => void;
 export type MessageBoxCallback = (result: number) => void;
 
+/** Right-dock stack panes (TASK 77): the Selection pane, the threaded comments panel and the PivotTable field list. */
+export type DockPane = 'threaded' | 'selection' | 'pivot';
+
 export interface DesignerEvents {
   [key: string]: ((...args: unknown[]) => void)[];
 }
@@ -193,6 +196,13 @@ export interface DesignerApi extends IDesignerCommandContext {
   /** True after the field-list panel has been opened once (stays mounted, hidden). */
   _pivotFieldListMounted: boolean;
   _pivotFieldListName: string | null;
+  /**
+   * TASK 77 (trial probes t77-follow/t77-manualclose/t77-reopen): while true the panel follows
+   * the selection into a pivot; a MANUAL close (Field List toggle, panel X button, or a Field
+   * List execution with no active pivot) switches the follow off until a pivot is created or the
+   * Field List command opens the panel on an active pivot again.
+   */
+  _pivotFieldListFollow: boolean;
   /** Open chevron menu of a field-list panel item (page pixel anchor). */
   _pivotItemMenu: { fieldName: string; x: number; y: number; nonce: number } | null;
   /** Command names recently run through executeCommand, most recent first (feeds the Command Palette). */
@@ -200,6 +210,9 @@ export interface DesignerApi extends IDesignerCommandContext {
   _formulaInsertion: { text: string; nonce: number } | null;
   _commentIndex: number;
   _showComments: boolean;
+  /** TASK 77: open dock panes in mount order and the visible one (see the trial-measured comment in designer.ts). */
+  _dockPanes: DockPane[];
+  _dockActive: DockPane | null;
   _settingsBefore: Record<string, SettingValue> | null;
   _rangePick: { index: number; done: (address: string) => void } | null;
   /** Undo-bridge bookkeeping (sheet registry keyed by the numbers sent with command payloads). */
@@ -299,6 +312,12 @@ export interface DesignerApi extends IDesignerCommandContext {
   showPivotFieldSettings(fieldName: string): void;
   showValueFieldSettings(fieldName: string): void;
   showPivotTableOptions(): void;
+  /* TASK 77: PivotTable Analyze ▸ Fields, Items & Sets dialogs (Calculated Field / Calculated
+   * Item / Solve Order) and the Show Report Filter Pages confirmation. */
+  showCalculatedField(): void;
+  showCalculatedItem(): void;
+  showCalcItemSolveOrder(): void;
+  showReportFilterPages(): void;
   showHyperlink(): void;
   showInsertFunction(): void;
   openFunctionArguments(name: string): void;
@@ -379,13 +398,37 @@ export interface DesignerApi extends IDesignerCommandContext {
   hasSelectedShapes(): boolean;
   selectedShapeCount(): number;
 
+  /* Contextual-tab triggers (TASK 74): which object the current selection names. */
+  hasActiveTable(): boolean;
+  hasSelectedChart(): boolean;
+  hasActiveSparkline(): boolean;
+  hasActiveFormulaSparkline(): boolean;
+  /** Opens the trial's chart "Alt Text" dialog for the selected chart. */
+  showChartAltTextDialog(): void;
+
   /* view & print */
   getSelectionInfo(): { reference: string; formula: string; value: unknown; canUndo: boolean; canRedo: boolean };
   commitFormula(text: string): void;
   commitReference(reference: string): boolean;
   toggleFocusCell(): void;
+  clearSelectionCellType(): void;
+  applySelectionCellType(commandName: string): void;
+  clearSelectionCellDropdown(): void;
   applyFocusCellColor(color: string): void;
   zoomToSelection(): void;
+  /**
+   * Open/close a pane slot of the shared right dock (TASK 77): keeps the mount order, hands
+   * activation to the newest open pane (closing the active one falls back to the previous pane,
+   * trial-measured) and syncs the pane's own open flag (`_showComments`, `_selectionPaneOpen`,
+   * `_pivotFieldListOpen`).
+   */
+  setDockPane(pane: DockPane, open: boolean): void;
+  /** True when `pane` is the visible pane of the dock stack. */
+  dockPaneVisible(pane: DockPane): boolean;
+  /** Show an already open pane (tab rail click). */
+  activateDockPane(pane: DockPane): void;
+  /** True while any dock pane is open (the stack container is mounted). */
+  readonly dockStackOpen: boolean;
   print(): void;
   syncPageLayoutDefaults(sheet: Worksheet): void;
   pickWorksheetBackground(): void;

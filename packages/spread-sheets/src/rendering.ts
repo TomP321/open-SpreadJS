@@ -358,7 +358,7 @@ export class WorkbookRenderer {
   }
   font(style: Style): string {
     const sheet = this.sheet;
-    const fonts = sheet ? (sheet as unknown as { _themeFonts(): [string, string] })._themeFonts() : ['Calibri', 'Calibri'];
+    const fonts = sheet ? sheet._themeFonts() : ['Calibri', 'Calibri'];
     const base = String(style.font ?? `11pt ${style.themeFont === 'Heading' ? fonts[0] : fonts[1]}`);
     // Scale the numeric size without changing font family/fallback selection.
     return base.replace(/([\d.]+)(px|pt)/, (_, size: string, unit: string) => `${Number((Number((Number(size) * (unit === 'pt' ? 4 / 3 : 1)).toFixed(4)) * this.zoom).toFixed(4))}px`);
@@ -497,6 +497,11 @@ export class WorkbookRenderer {
     this.computeSlots(); this.updateScrollbars();
     const newTop = this.rows.find(r => r.index >= s.frozenRowCount())?.index ?? 0;
     const newLeft = this.cols.find(c => c.index >= s.frozenColumnCount())?.index ?? 0;
+    // Trial (TASK 75 r3): the serialised `topCellIndex`/`leftCellIndex` track the visible
+    // viewport origin, so keep `settings` in sync on every scroll (JSON after showCell
+    // or zoom-to-selection reports the scrolled cell, synchronously).
+    s.settings.topCellIndex = newTop;
+    s.settings.leftCellIndex = newLeft;
     if (newTop !== oldTop) s._emit(Events.TopRowChanged, { sheet: s, sheetName: s.name(), viewportIndex: 1, oldTopRow: oldTop, newTopRow: newTop });
     if (newLeft !== oldLeft) s._emit(Events.LeftColumnChanged, { sheet: s, sheetName: s.name(), viewportIndex: 1, oldLeftCol: oldLeft, newLeftCol: newLeft });
     this.fullDirty = true; this.schedule();

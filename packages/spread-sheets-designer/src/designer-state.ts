@@ -8,6 +8,7 @@ import type { Worksheet } from './core-internals.js';
 import { internals, printInfoInternals, printInfoOf } from './core-internals.js';
 import { activeSheet, commandEnabled, currentStyle, topCell } from './commands/actions.js';
 import { pivotCommandState } from './pivot-designer.js';
+import { contextualCommandState } from './contextual-actions.js';
 import { selectedShapes as insertSelectedShapes } from './commands/insert.js';
 import { fitPagesLabel, MARGIN_PRESETS, PAPER_ITEMS } from './page-setup.js';
 import { resolveText } from './resolve.js';
@@ -47,6 +48,9 @@ export function computeCommandState(d: Designer, commandName: string): CommandSt
   // PivotTable commands keep their state with the pivot module (TASK 47).
   const pivotState = pivotCommandState(d, commandName);
   if (pivotState) Object.assign(state, pivotState);
+  // Table/Chart/Sparkline contextual controls read their state from the model (TASK 74).
+  const contextualState = contextualCommandState(d, commandName);
+  if (contextualState) Object.assign(state, contextualState);
   if (command?.getState) {
     try {
       const custom = command.getState(d) ?? {};

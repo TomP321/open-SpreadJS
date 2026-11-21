@@ -1,6 +1,6 @@
 /** Lookup and reference functions. */
 import type { Worksheet } from '../../worksheet.js';
-import { Args, EvalContext, raiseError} from '../evaluate.js';
+import { Args, EvalContext, MAX_ARRAY_CELLS, raiseError } from '../evaluate.js';
 import {
   AreaRef,
   CalcArray,
@@ -241,15 +241,45 @@ function columnIndex(letters: string): number {
 function lookupValue(args: Args, ctx: EvalContext): Value {
   const lookup = args.scalar(0);
   if (isError(lookup)) return lookup;
-  const table = matrixOf(args, ctx, 1);
-  const rowCount = table.rowCount;
-  const colCount = table.colCount;
+  const table = args.value(1);
+  // A plain single-area table reference never needs full materialisation: the
+  // scan reads the first column only (and stops at the first exact hit), then
+  // reads the one result cell. Same values and error order as the generic
+  // path below, minus the per-call rowCount*colCount reads and array churn -
+  // bulk VLOOKUPs against a shared table (16k x 500 rows here) are all waste.
+  if (table instanceof ReferenceValue && table.areas.length === 1) {
+    const area = table.areas[0]!;
+    const rowCount = Math.max(0, area.r2 - area.r1 + 1);
+    const colCount = Math.max(0, area.c2 - area.c1 + 1);
+    if (rowCount === 0 || colCount === 0) return error(ErrorCode.na);
+    if (rowCount * colCount > MAX_ARRAY_CELLS) return error(ErrorCode.value);
+    const columnIndexValue = args.isMissing(2) ? 1 : Math.trunc(args.number(2));
+    if (columnIndexValue < 1) return error(ErrorCode.value);
+    const approximate = args.isMissing(3) ? true : args.boolean(3);
+    if (!approximate) {
+      for (let row = area.r1; row <= area.r2; row++) {
+        if (!exactMatch(ctx.host.getCellValue(area.sheet, row, area.c1), lookup, true)) continue;
+        if (columnIndexValue > colCount) return error(ErrorCode.ref);
+        return ctx.host.getCellValue(area.sheet, row, area.c1 + columnIndexValue - 1);
+      }
+      return error(ErrorCode.na);
+    }
+    const firstColumn: ScalarValue[] = new Array(rowCount);
+    for (let row = 0; row < rowCount; row++) firstColumn[row] = ctx.host.getCellValue(area.sheet, area.r1 + row, area.c1);
+    const found = approximateIndex(firstColumn, lookup, 'ascending');
+    if (found < 0) return error(ErrorCode.na);
+    if (columnIndexValue > colCount) return error(ErrorCode.ref);
+    return ctx.host.getCellValue(area.sheet, area.r1 + found, area.c1 + columnIndexValue - 1);
+  }
+  const matrix = matrixOf(args, ctx, 1);
+  const rowCount = matrix.rowCount;
+  const colCount = matrix.colCount;
   if (rowCount === 0 || colCount === 0) return error(ErrorCode.na);
   const columnIndexValue = args.isMissing(2) ? 1 : Math.trunc(args.number(2));
   if (columnIndexValue < 1) return error(ErrorCode.value);
   const approximate = args.isMissing(3) ? true : args.boolean(3);
   const firstColumn: ScalarValue[] = [];
-  for (let row = 0; row < rowCount; row++) firstColumn.push(table.at(row, 0));
+  for (let row = 0; row < rowCount; row++) firstColumn.push(matrix.at(row, 0));
   let found = -1;
   if (approximate) found = approximateIndex(firstColumn, lookup, 'ascending');
   else {
@@ -262,7 +292,7 @@ function lookupValue(args: Args, ctx: EvalContext): Value {
   }
   if (found < 0) return error(ErrorCode.na);
   if (columnIndexValue > colCount) return error(ErrorCode.ref);
-  return table.at(found, columnIndexValue - 1);
+  return matrix.at(found, columnIndexValue - 1);
 }
 
 function hlookupValue(args: Args, ctx: EvalContext): Value {

@@ -6,8 +6,7 @@
  */
 import {
   PivotDataType, PivotTableFieldType, SubtotalType, SortType,
-  IPivotViewSortInfo, PivotShowDataAs,
-} from './types.js';
+  IPivotViewSortInfo} from './types.js';
 import type {
   IPivotTextFilterInfo, IPivotConditionFilterInfo, IDimensionSubtotalsInfo,
 } from './types.js';
@@ -261,26 +260,6 @@ export class Aggregator {
 }
 
 /**
- * Group rows by the item index of a field, restricted to the given source
- * rows, and aggregate. Returns one accumulator per cache item.
- */
-export function aggregateField(cache: PivotCache, field: string, sourceName: string, rowRows: number[]): (Aggregator | null)[] {
-  const index = cache.fieldIndex.get(field);
-  const out: (Aggregator | null)[] = index === undefined ? [] : cache.fields[index]!.items.map(() => null);
-  if (index === undefined) return out;
-  const values = cache.rows.map((_, r) => cache.displayValue(r, index));
-  for (const r of rowRows) {
-    const value = values[r];
-    if (value == null || value === '') continue;
-    const key = value instanceof Date ? String(value.getTime()) : typeof value === 'number' ? String(value) : String(value);
-    const item = cache.fields[index]!.itemIndex.get(key);
-    if (item === undefined) continue;
-    (out[item] ??= new Aggregator()).add(cache.numeric(r, sourceName) ?? cache.rawText(r, sourceName));
-  }
-  return out;
-}
-
-/**
  * Rows matching every (field, item) constraint given as a path of
  * [fieldName, itemText] pairs (null item = any).
  */
@@ -447,5 +426,3 @@ export function sortItems(cache: PivotCache, field: PivotFieldModel, items: stri
   if (descending) out.reverse();
   return out;
 }
-
-export const showDataAsNormal = PivotShowDataAs.normal;

@@ -36,6 +36,8 @@ export interface CellData {
   value?: unknown;
   formula?: string;
   arrayFormula?: { rowCount: number; colCount: number };
+  /** Per-cell style record: a named-style string, or the compacted/frozen internal
+   *  style record (TASK 79) handed to the public API as a fresh `Style` view on read. */
   style?: Style | string;
   tag?: unknown;
   bindingPath?: string;
@@ -89,6 +91,14 @@ export class Batching {
   ) {}
   paint = 0;
   calc = 0;
+  /**
+   * Set while the calc service is suspended once more value-change
+   * notifications than `CALC_QUEUE_BULK_THRESHOLD` have arrived: the flush
+   * then recomputes every registered formula (a superset of the dependents of
+   * all dropped cells) instead of walking the reverse edges per cell.
+   */
+  calcBulk = false;
+  calcBulkCount = 0;
   dirty = false;
   layoutDirty = false;
   onInvalidate?: (layout: boolean) => void;

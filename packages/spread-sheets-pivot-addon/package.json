@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-pivot-addon",
+  "version": "0.1.0",
+  "description": "OpenSheets pivot tables add-in for the spreadsheet workbook, drop-in for the SpreadJS pivot-addon add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.pivot.pivottables.cjs",
+  "module": "./dist/gc.spread.pivot.pivottables.esm.js",
+  "types": "./dist/gc.spread.pivot.pivottables.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-pivot-addon",
+    "opensheets-pivot-addon",
+    "pivot",
+    "pivottables",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.pivot.pivottables.d.ts",
+        "default": "./dist/gc.spread.pivot.pivottables.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.pivot.pivottables.d.cts",
+        "default": "./dist/gc.spread.pivot.pivottables.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

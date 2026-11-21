@@ -312,6 +312,22 @@ export function showChartCommandDialog(d: Designer, kind: 'changeChartType' | 's
   if (kind === 'selectData') { if (chart) showSelectDataDialog(d, chart); return; }
   showMoveChartDialog(d, chart);
 }
+/** Chart Design ▸ Accessibility ▸ Alt Text: the trial's description dialog. */
+export function showChartAltTextDialog(d: Designer): void {
+  const chart = selectedChartsOf(d)[0];
+  if (!chart) return;
+  const current = String((chart as { alt(value?: string): unknown }).alt() ?? '');
+  d.showDialog('chartAltTextDialogTemplate', { alt: current }, (submitted) => {
+    (chart as { alt(value?: string): unknown }).alt(String(submitted.alt ?? ''));
+    d.invalidate();
+  }, (error) => { void error; });
+}
+
+/** Charts the Chart Design tab acts on (trial: the selected floating chart). */
+function selectedChartsOf(d: Designer): Array<GC.Spread.Sheets.Charts.Chart> {
+  return chartsOf(activeSheet(d)).all().filter((chart) => chart.isSelected?.() === true);
+}
+
 export function showFormatChartAreaDialog(d: Designer, chart: GC.Spread.Sheets.Charts.Chart): void {
   const style = (chartInternals(chart)?.chartAreaStyle?.() ?? {}) as Record<string, string>;
   d.showDialog('formatChartAreaDialogTemplate', { fill: String(style.fill ?? '#ffffff'), stroke: String(style.stroke ?? '#d9d9d9') }, (data) => {
@@ -322,7 +338,9 @@ export function showFormatChartAreaDialog(d: Designer, chart: GC.Spread.Sheets.C
 /** Inline text editing of a shape: a contentEditable overlay positioned over it. */
 export function beginShapeTextEdit(d: Designer): void {
   const shape = insertSelectedShapes(d)[0];
-  if (!shape || shape.lockText()) return;
+  // TASK 81: only text-bearing shapes edit inline (trial: PictureShape/CameraShape carry no text
+  // accessor, and a group handle carries none either).
+  if (!shape || typeof shape.text !== 'function' || typeof shape.lockText !== 'function' || shape.lockText()) return;
   const host = d.sheetHost;
   const objectElement = shape.getHost()[0];
   if (!objectElement) return;
@@ -383,7 +401,7 @@ export function executeShapeCommand(d: Designer, name: string, value?: unknown):
     case 'saveAsPicture': saveShapeAsPicture(d); break;
     /* Shape Format ribbon tab (task 8). */
     case 'shapeFormatInsertShapes': armDrawTool(d, { kind: 'shape', galleryId: 'rectangle' }); break;
-    case 'changeShape': if (value !== undefined) for (const shape of selected) shape.shapeType(Number(value)); break;
+    case 'changeShape': if (value !== undefined) for (const shape of selected) if (typeof shape.shapeType === 'function') shape.shapeType(Number(value)); break;
     case 'shapeRotate': {
       for (const shape of selected) {
         const current = Number(shape.rotation() ?? 0);
@@ -394,6 +412,27 @@ export function executeShapeCommand(d: Designer, name: string, value?: unknown):
     }
     case 'shapeAlign': alignSelectedShapes(selected, String(value ?? 'left')); break;
     case 'shapeSize': showShapeSizeDialog(d, selected[0]); break;
+    /* TASK 74: the trial's Shape Format command ids. The split-button parents
+     * (`shapeCommandGroup`, `bringShapeForwardGroup`, ...) run their default
+     * action on the main click, exactly like the trial's ribbon. */
+    case 'insertShapeList': armDrawTool(d, { kind: 'shape', galleryId: 'rectangle' }); break;
+    case 'shapeCommandGroup': shapes.group(selected); break;
+    case 'shapeRightRotate90': rotateSelected(selected, 90); break;
+    case 'shapeLeftRotate': rotateSelected(selected, -90); break;
+    case 'shapeAlignLeft': alignSelectedShapes(selected, 'left'); break;
+    case 'shapeAlignCenter': alignSelectedShapes(selected, 'center'); break;
+    case 'shapeAlignRight': alignSelectedShapes(selected, 'right'); break;
+    case 'shapeAlignTop': alignSelectedShapes(selected, 'top'); break;
+    case 'shapeAlignMiddle': alignSelectedShapes(selected, 'middle'); break;
+    case 'shapeAlignBottom': alignSelectedShapes(selected, 'bottom'); break;
+    case 'shapeHorizontalDistribute': distributeSelected(selected, 'horizontal'); break;
+    case 'shapeShapeVerticalDistribute': distributeSelected(selected, 'vertical'); break;
+    case 'shapeSnapToGrid': snapSelectedToGrid(d, selected); break;
+    case 'shapeSnapToShape': snapSelectedToShapes(selected); break;
+    case 'shapeSizeHeight': { const height = Number(value); if (Number.isFinite(height) && height > 0) for (const shape of selected) shape.height(height); break; }
+    case 'shapeSizeWidth': { const width = Number(value); if (Number.isFinite(width) && width > 0) for (const shape of selected) shape.width(width); break; }
+    case 'bringShapeForwardGroup': for (const shape of selected) shapes.bringForward(String(shape.name())); break;
+    case 'sendShapeBackwardGroup': for (const shape of selected) shapes.sendBackward(String(shape.name())); break;
     case 'shapeStyle1': case 'shapeStyle2': case 'shapeStyle3': case 'shapeStyle4': case 'shapeStyle5': case 'shapeStyle6': case 'shapeStyle7': {
       // Preset order follows the tile frame colors (TASK 55): black-outline, blue, orange, gray, yellow, light blue, green.
       const palette: Record<string, { fill: string; line: string } | null> = {
@@ -412,6 +451,90 @@ export function executeShapeCommand(d: Designer, name: string, value?: unknown):
     default: break;
   }
   d.invalidate();
+}
+
+/** Turn the selected shapes by a quarter turn (trial: Rotate Right/Left 90°). */
+function rotateSelected(selected: DesignerShape[], delta: number): void {
+  for (const shape of selected) {
+    const next = (Number(shape.rotation() ?? 0) + delta) % 360;
+    shape.rotation(((next % 360) + 360) % 360);
+  }
+}
+
+/**
+ * Distribute the selected shapes evenly inside their bounding box
+ * (Shape Format ▸ Align ▸ Distribute Horizontally / Vertically).
+ */
+function distributeSelected(selected: DesignerShape[], axis: 'horizontal' | 'vertical'): void {
+  if (selected.length < 3) return;
+  const box = selected.map((shape) => ({ shape, x: Number(shape.x()), y: Number(shape.y()), w: Number(shape.width()), h: Number(shape.height()) }));
+  const start = axis === 'horizontal' ? Math.min(...box.map((b) => b.x)) : Math.min(...box.map((b) => b.y));
+  const end = axis === 'horizontal' ? Math.max(...box.map((b) => b.x + b.w)) : Math.max(...box.map((b) => b.y + b.h));
+  const size = axis === 'horizontal' ? (b: { w: number; h: number }) => b.w : (b: { w: number; h: number }) => b.h;
+  const total = box.reduce((sum, b) => sum + size(b), 0);
+  const gap = (end - start - total) / (box.length - 1);
+  box.sort((a, b) => (axis === 'horizontal' ? a.x - b.x : a.y - b.y));
+  let cursor = start;
+  for (const item of box) {
+    if (axis === 'horizontal') item.shape.x(Math.round(cursor));
+    else item.shape.y(Math.round(cursor));
+    cursor += size(item) + gap;
+  }
+}
+
+/** Sheet-area pixel offsets of the row/column boundaries the grid snapping aligns to. */
+function gridBoundaries(sheet: ReturnType<typeof activeSheet>, axis: 'row' | 'col', limit: number): number[] {
+  const out: number[] = [0];
+  const count = axis === 'row' ? sheet.getRowCount() : sheet.getColumnCount();
+  let pixels = 0;
+  for (let index = 0; index < count; index++) {
+    pixels += axis === 'row' ? Number(sheet.getRowHeight(index)) : Number(sheet.getColumnWidth(index));
+    out.push(pixels);
+    if (pixels > limit) break;
+  }
+  return out;
+}
+
+function nearestBoundary(boundaries: number[], value: number): number {
+  let best = boundaries[0] ?? 0;
+  for (const boundary of boundaries) if (Math.abs(boundary - value) < Math.abs(best - value)) best = boundary;
+  return best;
+}
+
+/** Shape Format ▸ Align ▸ Snap to Grid: snap the shape edges to the nearest cell line. */
+function snapSelectedToGrid(d: Designer, selected: DesignerShape[]): void {
+  const sheet = activeSheet(d);
+  for (const shape of selected) {
+    const x = Number(shape.x()), y = Number(shape.y());
+    const w = Number(shape.width()), h = Number(shape.height());
+    shape.x(nearestBoundary(gridBoundaries(sheet, 'col', x + w + 200), x));
+    shape.y(nearestBoundary(gridBoundaries(sheet, 'row', y + h + 200), y));
+  }
+}
+
+/** Shape Format ▸ Align ▸ Snap to Shape: snap onto the nearest edge of the other shapes. */
+function snapSelectedToShapes(selected: DesignerShape[]): void {
+  if (selected.length < 2) return;
+  const edges = selected.flatMap((shape) => [
+    { axis: 'x' as const, value: Number(shape.x()) },
+    { axis: 'x' as const, value: Number(shape.x()) + Number(shape.width()) },
+    { axis: 'y' as const, value: Number(shape.y()) },
+    { axis: 'y' as const, value: Number(shape.y()) + Number(shape.height()) },
+  ]);
+  for (const shape of selected) {
+    const x = Number(shape.x()), y = Number(shape.y()), w = Number(shape.width()), h = Number(shape.height());
+    for (const axis of ['x', 'y'] as const) {
+      const own = axis === 'x' ? [x, x + w] : [y, y + h];
+      const size = axis === 'x' ? w : h;
+      const candidates = edges.filter((edge) => edge.axis === axis && own.every((value) => value !== edge.value));
+      if (!candidates.length) continue;
+      const targets = own.map((value) => nearestBoundary(candidates.map((candidate) => candidate.value), value));
+      const moved = targets.reduce((sum, value) => sum + value, 0) / targets.length;
+      if (axis === 'x') shape.x(Math.round(moved));
+      else shape.y(Math.round(moved));
+      void size;
+    }
+  }
 }
 
 /** Align the selected shapes along an axis of their common bounding box. */

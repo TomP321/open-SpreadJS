@@ -15,11 +15,6 @@ export const GroupType = {
   stock: 0, bar: 6, line: 8, pie: 10, doughnut: 12, area: 4, scatter: 1, radar: 2, bubble: 3,
 } as const;
 
-/** Internal `seriesType` per group (trial-observed). */
-export const SeriesTypeCode = {
-  bar: 0, area: 1, line: 2, pie: 3, radar: 4, bubble: 6, scatter: 5,
-} as const;
-
 /** Chart-type -> group metadata. `axes`: [category axisType, value axisType]. */
 export interface TypeMeta {
   group: number;
@@ -86,14 +81,6 @@ export const TYPE_META: Record<number, TypeMeta> = {
 export function metaFor(chartType: number): TypeMeta {
   return TYPE_META[Number(chartType)] ?? TYPE_META[12];
 }
-
-export function isBarFamily(chartType: number): boolean { return metaFor(chartType).group === 6; }
-export function isScatterFamily(chartType: number): boolean { return metaFor(chartType).group === 1; }
-export function isRadarFamily(chartType: number): boolean { return metaFor(chartType).group === 2; }
-export function isBubbleFamily(chartType: number): boolean { return metaFor(chartType).group === 3; }
-export function isStockFamily(chartType: number): boolean { return metaFor(chartType).group === 0 && Number(chartType) !== 0; }
-export function isStacked(chartType: number): boolean { return [13, 14, 19, 20, 24, 25, 27, 28, 37, 38].includes(Number(chartType)); }
-export function isPercentStacked(chartType: number): boolean { return [14, 20, 25, 28, 38].includes(Number(chartType)); }
 
 /**
  * Stacking state from a serialised group (trial-observed internal codes):

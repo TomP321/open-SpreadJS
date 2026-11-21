@@ -10,6 +10,7 @@ import type { PivotTable } from './pivot-table.js';
 import type { LayoutCell } from './layout.js';
 import { PivotTableFieldType } from './types.js';
 import type { PivotCaptionFilterOperator, PivotValueFilterOperator } from './types.js';
+import { asRecord } from '../object-access.js';
 
 interface Rect { x: number; y: number; width: number; height: number }
 
@@ -348,7 +349,7 @@ let installed = false;
 export function installPivotInteraction(InteractionClass: { prototype: Record<string, unknown> }): void {
   if (installed) return;
   installed = true;
-  const proto = InteractionClass.prototype as unknown as Record<string, unknown>;
+  const proto = asRecord(InteractionClass.prototype);
   const originalPointerDown = proto.pointerDown as (event: Event) => void;
   const originalDoubleClick = proto.doubleClick as (event: Event) => void;
   proto.pointerDown = function (this: InteractionPatched, event: Event): void {

@@ -3024,3 +3024,117 @@ label.gc-fs-check input { margin: 0; width: 13px; height: 13px; }
 .gc-designer-dialog[data-template="pasteSpecialDialogTemplate"] .gc-dialog-footer { flex-basis: 44px; padding-bottom: 6px; }
 .gc-designer-dialog[data-template="pasteSpecialDialogTemplate"] .gc-custom-radio { display: flex; height: 19px; min-height: 0; margin-left: 9px; }
 .gc-designer-dialog[data-template="pasteSpecialDialogTemplate"] .gc-custom-checkbox { height: 19px; margin-left: 8px; }
+
+/* TASK 69 — ribbon/menu icon pass: Size menu shows proportional page outlines;
+   Margins menu thumbnails carry the trial's page frame + margin guide rules;
+   Orientation menu rows use the trial's 24px fold-corner glyphs at 40px rows. */
+.sd-orientation-item { min-height: 40px; }
+.sd-orientation-item .gc-designer-ribbon-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.sd-orientation-item .gc-designer-ribbon-icon svg { width: 24px; height: 24px; }
+.sd-margins-thumb .sd-margins-svg { display: block; margin: 4px auto; }
+.sd-paper-item .sd-paper-check { width: 24px; height: 40px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+/* TASK 74 */
+/* Contextual tabs (Table Design / Chart Design / Sparkline / Shape Design):
+   the trial wraps the big-button captions inside the button box (2-3 lines),
+   unlike the Home captions; scoped to the TASK 74 groups so the existing tabs
+   keep their single-line captions. */
+.rb-chart-layouts .gc-designer-fixed-caption, .rb-chart-styles .gc-designer-fixed-caption,
+.rb-chart-data .gc-designer-fixed-caption, .rb-chart-type .gc-designer-fixed-caption,
+.rb-chart-location .gc-designer-fixed-caption, .rb-chart-accessibility .gc-designer-fixed-caption,
+.rb-chart-format-pane .gc-designer-fixed-caption { white-space: normal; text-align: center; }
+/* Sparkline ▸ Style: the colour rows are 24px icon+label+swatch rows (trial geometry). */
+.gc-designer-ribbon-colorPicker-labeled { height: 24px; }
+.gc-designer-ribbon-colorPicker-labeled .gc-designer-color-picker-button { display: flex; align-items: center; gap: 5px; flex: 1 1 auto; min-width: 0; }
+.gc-designer-ribbon-colorPicker-labeled .gc-designer-ribbon-text { white-space: nowrap; overflow: hidden; }
+.gc-designer-ribbon-colorPicker-labeled .gc-designer-color-preview { width: 13px; height: 13px; flex: 0 0 auto; align-self: center; }
+/* Sparkline ▸ Style ▸ weight combo: the trial shows a static "¾ pt" label (no editor). */
+.gc-designer-ribbon-combo-static { height: 22px; line-height: 22px; padding-left: 4px; white-space: nowrap; overflow: hidden; cursor: default; }
+/* Chart Design galleries — popup geometry measured on the trial (measure29-official.json):
+   quick layout 61×54 tiles in rows of 3; color rows 224×38; style tiles 216×136 ×4/row. */
+.gc-quick-layout-gallery { width: 190px; display: flex; flex-wrap: wrap; padding: 6px 0 0 0; }
+.gc-quick-layout-gallery .gc-quick-layout-tile { width: 61px; height: 54px; padding: 2px; margin: 0; box-sizing: border-box; }
+.gc-quick-layout-tile svg { display: block; }
+.gc-change-colors-gallery { width: 225px; }
+.gc-change-colors-gallery .gc-designer-gallery-section { width: 225px; }
+.gc-change-colors-gallery .gc-designer-gallery-title { height: 19px; line-height: 19px; }
+/* The trial row is 224×38 with six stacked color bands filling it (measure29-official.json). */
+.gc-color-items-container { display: flex; flex-direction: column; }
+.gc-designer-color-palette-row { width: 224px; height: 38px; padding: 0; border: 1px solid transparent; cursor: default; margin: 1px 0; box-sizing: border-box; }
+.gc-designer-color-palette-row:hover { border-color: var(--sjs-color-brand-background); }
+.gc-color-item { flex: 1 1 0; min-height: 0; }
+.gc-chart-style-gallery { width: 910px; display: flex; flex-wrap: wrap; padding: 11px 0 0 5px; }
+.gc-chart-style-gallery .gc-chart-style-tile { width: 216px; height: 136px; padding: 0; margin: 0 10px 10px 0; box-sizing: border-box; }
+.gc-chart-style-tile svg { display: block; }
+/* Sparkline ▸ Clear split button: the trial row is 86px wide (icon + "Clear" + caret). */
+.gc-designer-ribbon-list[data-command="ribbon.clearSparkline"] { width: 86px; max-width: 86px; }
+.gc-designer-ribbon-list[data-command="ribbon.clearSparkline"] .ribbon-split-btn { flex: 1 1 auto; min-width: 0; }
+/* The Resize Table + Alt Text dialogs reuse the shared dialog widgets (TASK 74 templates). */
+.gc-designer-dialog[data-template="resizeTableDialogTemplate"] .gc-resize-table-question { padding-bottom: 6px; }
+.gc-designer-dialog[data-template="resizeTableDialogTemplate"] .gc-resize-table-note { font-size: 11px; color: #666; padding-top: 10px; }
+.gc-designer-dialog[data-template="chartAltTextDialogTemplate"] .gc-alt-text-question { max-width: 320px; }
+/* TASK 69 — ribbon/menu icon pass: Size menu shows proportional page outlines;
+   Margins menu thumbnails carry the trial's page frame + margin guide rules;
+   Orientation menu rows use the trial's 24px fold-corner glyphs at 40px rows. */
+.sd-orientation-item { min-height: 40px; }
+.sd-orientation-item .gc-designer-ribbon-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.sd-orientation-item .gc-designer-ribbon-icon svg { width: 24px; height: 24px; }
+.sd-margins-thumb .sd-margins-svg { display: block; margin: 4px auto; }
+.sd-paper-item .sd-paper-check { width: 24px; height: 40px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+
+/* TASK 77: PivotTable Analyze ▸ Fields, Items & Sets dialogs and the Show Report Filter Pages
+ * confirmation. Dialog boxes sized to the trial's measured geometry (measured on the running
+ * trial: Insert Calculated Field 451x357, Insert Calculated Item 538x341, Calculated Item Solve
+ * Order 458x393, Show Report Filter Pages 378x252 — probe .probe/t77/run/t77-dialog-geometry.json);
+ * the label/input/list/button layout is our own markup and CSS. */
+.gc-designer-dialog[data-template="calculatedFieldsDialogTemplate"] { width: 451px; height: 357px; min-height: 357px; margin-top: 181px; }
+.gc-designer-dialog[data-template="calculatedItemsDialogTemplate"] { width: 538px; height: 341px; min-height: 341px; margin-top: 189px; }
+.gc-designer-dialog[data-template="calculatedItemSolveOrderDialogTemplate"] { width: 458px; height: 393px; min-height: 393px; margin-top: 163px; }
+.gc-designer-dialog[data-template="pivotShowReportFilterDialogTemplate"] { width: 378px; height: 252px; min-height: 252px; margin-top: 234px; }
+.gc-calc-dialog { display: flex; flex-direction: column; padding: 4px 14px 0; font-size: 12px; }
+.gc-calc-dialog .gc-pivot-dialog-row { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
+.gc-calc-dialog .gc-pivot-dialog-label { flex: 0 0 auto; width: 56px; min-width: 56px; }
+.gc-calc-dialog .gc-dialog-input { height: 24px; border: 1px solid #d1d1d1; font-size: 12px; padding: 0 6px; }
+.gc-calc-field-dialog .gc-calc-name { width: 289px; }
+.gc-calc-field-dialog .gc-calc-formula { width: 310px; }
+.gc-calc-item-dialog .gc-calc-name { width: 299px; }
+.gc-calc-item-dialog .gc-calc-formula { width: 320px; }
+.gc-calc-btn { position: static; border: 1px solid #d1d1d1; background: #fff; font-size: 12px; cursor: default; padding: 0; }
+.gc-calc-dialog .gc-calc-add, .gc-calc-dialog .gc-calc-delete { flex: 0 0 auto; width: 74px; height: 24px; }
+.gc-calc-field-dialog .gc-calc-add, .gc-calc-field-dialog .gc-calc-delete { margin-left: 8px; }
+.gc-calc-label { font-size: 12px; }
+.gc-calc-fields-label, .gc-calc-items-label { margin-bottom: 4px; }
+.gc-calc-list { border: 1px solid #d1d1d1; overflow: auto; }
+.gc-calc-field-dialog .gc-calc-list { height: 160px; }
+.gc-calc-item-dialog .gc-calc-list { height: 112px; width: 250px; }
+.gc-calc-item-dialog .gc-calc-columns { display: flex; gap: 10px; }
+.gc-calc-column { display: flex; flex-direction: column; }
+.gc-calc-list-item { padding: 5px 6px; min-height: 18px; cursor: default; }
+.gc-calc-list-item.selected { background: #e4e4e4; }
+.gc-calc-insert-field, .gc-calc-insert-item { position: static; width: 102px; height: 24px; margin-top: 4px; }
+.gc-calc-item-dialog .gc-calc-insert-row { display: flex; gap: 10px; }
+.gc-solve-head { margin-bottom: 4px; }
+.gc-solve-list { height: 220px; }
+.gc-solve-note { margin-top: 8px; line-height: 18px; }
+.gc-solve-up, .gc-solve-down, .gc-solve-delete, .gc-solve-close { position: static; width: 86px; height: 24px; }
+.gc-solve-order-dialog .gc-solve-buttons { display: flex; gap: 10px; margin-top: 10px; }
+.gc-report-filter-label { margin-bottom: 6px; }
+.gc-report-filter-list { border: 1px solid #d1d1d1; height: 120px; padding: 4px 6px; }
+.gc-report-filter-field { display: block; padding: 5px 6px; }
+
+/* TASK 77 (dock stack): the Selection pane, the threaded comments panel and the pivot field list
+ * share one right dock, reproducing the layout measured on the running trial: one open pane keeps
+ * its 315px flush right (compare frame: sheet host 325, grid viewport 263); with two or more open
+ * panes the visible pane keeps 315px and a 39px vertical tab rail sits right of it (stack 354,
+ * sheet host 286, grid viewport 224). Rail tabs are 40x40 with a 20x20 icon top-down; the visible
+ * pane's tab carries the trial's 3px green left bar. Before this layout two open panels each took
+ * their own dock slot and crushed the sheet viewport (the TASK 75 zoomSelection artifact). The
+ * Formula Editor panel floats over the sheet area instead: the trial's toggle leaves the grid
+ * viewport untouched (measured: viewport height unchanged, no dock row appears). */
+.gc-designer-dv-stack-container { display: flex; flex-direction: row; flex: 0 0 auto; min-width: 0; min-height: 0; }
+.gc-designer-dv-stack-tab-container { width: 39px; flex: 0 0 39px; background: #fff; display: flex; flex-direction: column; }
+.gc-designer-dv-stack-tab { width: 39px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: default; }
+.gc-designer-dv-stack-tab:hover { background: #f5f5f5; }
+.gc-designer-dv-stack-tab-selected { box-shadow: inset 3px 0 0 #107c41; }
+.gc-designer-dv-stack-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+.gc-designer-dv-stack-icon svg { width: 20px; height: 20px; }
+.gc-designer-formula-editor-panel { position: absolute; left: 0; right: 0; bottom: 22px; z-index: 40; flex: 0 0 auto; border: 1px solid #d4d4d4; border-bottom: none; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08); }

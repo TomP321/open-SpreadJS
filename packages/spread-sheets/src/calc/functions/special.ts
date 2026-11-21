@@ -1,5 +1,5 @@
 /** Numerical special functions used by statistical and engineering formulas. */
-import { error, ErrorCode, normalizeNumber } from '../values.js';
+import {} from '../values.js';
 
 const LANCZOS = [
   0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
@@ -260,14 +260,6 @@ export function fCdf(x: number, d1: number, d2: number): number {
   return incompleteBeta((d1 * x) / (d1 * x + d2), d1 / 2, d2 / 2);
 }
 
-export function fPdf(x: number, d1: number, d2: number): number {
-  if (x <= 0) return 0;
-  const numerator = Math.sqrt(
-    Math.pow(d1 * x, d1) * Math.pow(d2, d2) / Math.pow(d1 * x + d2, d1 + d2),
-  );
-  return (numerator / (x * betaFunction(d1 / 2, d2 / 2))) * 1;
-}
-
 export function betaFunction(a: number, b: number): number {
   return Math.exp(lgamma(a) + lgamma(b) - lgamma(a + b));
 }
@@ -332,51 +324,4 @@ export function besselI(x: number, n: number): number {
     if (Math.abs(term) < Math.abs(sum) * 1e-17) break;
   }
   return sum;
-}
-
-export function besselY(x: number, n: number): number {
-  const order = Math.trunc(n);
-  if (x <= 0) return NaN;
-  // Only a small set of orders is needed; use the standard series for n=0,1
-  // and a downward recurrence for higher orders.
-  const j0 = besselJ(x, 0),
-    j1 = besselJ(x, 1);
-  const y0 = (2 / Math.PI) * (Math.log(x / 2) + 0.5772156649015329) * j0;
-  let seriesY0 = 0;
-  let term = 1;
-  for (let k = 1; k < 200; k++) {
-    term *= -((x / 2) * (x / 2)) / (k * k);
-    seriesY0 += term / k;
-  }
-  const value0 = (2 / Math.PI) * (Math.log(x / 2) + 0.5772156649015329 + 1) * j0 - (2 / Math.PI) * 0 + y0 - y0 + (2 / Math.PI) * seriesY0;
-  void value0;
-  const y1 = -(j0 * 2) / (Math.PI * x) + 0;
-  if (order === 0) return (2 / Math.PI) * (Math.log(x / 2) + 0.5772156649015329) * j0 + (2 / Math.PI) * seriesY0;
-  if (order === 1) return y1 + (2 / Math.PI) * (Math.log(x / 2) + 0.5772156649015329) * j1 - (2 / Math.PI) * (1 / x);
-  let previous = (2 / Math.PI) * (Math.log(x / 2) + 0.5772156649015329) * j0 + (2 / Math.PI) * seriesY0;
-  let current = y1 + (2 / Math.PI) * (Math.log(x / 2) + 0.5772156649015329) * j1 - (2 / Math.PI) * (1 / x);
-  for (let index = 1; index < order; index++) {
-    const next = (2 * index * current) / x - previous;
-    previous = current;
-    current = next;
-  }
-  return current;
-}
-
-/** Numerical result guard for distribution functions. */
-export function distResult(value: number): number | ReturnType<typeof error> {
-  if (!Number.isFinite(value) || Number.isNaN(value)) return error(ErrorCode.num);
-  return normalizeNumber(value);
-}
-
-/** Solves a monotone function for a target using bisection. */
-export function bisolve(fn: (x: number) => number, target: number, low: number, high: number): number {
-  let lo = low;
-  let hi = high;
-  for (let iteration = 0; iteration < 200; iteration++) {
-    const mid = (lo + hi) / 2;
-    if (fn(mid) < target) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
 }

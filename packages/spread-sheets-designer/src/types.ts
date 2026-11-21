@@ -359,7 +359,7 @@ export interface IDesignerCommandContext {
   getCommand(commandName?: string): ICommand | Record<string, ICommand> | undefined;
   executeCommand(commandName: string, propertyName?: string, value?: unknown): boolean;
   executeBuiltin(commandName: string, propertyName?: string, value?: unknown): void;
-  executeSpecial(name: string, value: unknown): boolean;
+  executeSpecial(name: string, value: unknown, propertyName?: string): boolean;
   runUndoable(commandName: string, args: Record<string, unknown>): void;
   getCommandState(commandName: string): CommandState;
   setCommandState(commandName: string, state: CommandState): void;

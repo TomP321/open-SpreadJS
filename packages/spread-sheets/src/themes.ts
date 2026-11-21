@@ -514,8 +514,6 @@ const THEME_SCHEMES: [string, string, string][] = [
   ['Opulent', 'Opulent', 'TrebuchetMS'],
 ];
 
-const FONT_SCHEME_BY_THEME: Record<string, string> = Object.fromEntries(THEME_SCHEMES.map(([theme, , font]) => [theme, font]));
-
 /** Static name order of the colour schemes, exactly as the trial declares them. */
 const COLOR_SCHEME_ORDER = [
   'Default', 'Office2007', 'Office', 'Apex', 'Aspect', 'Concourse', 'Civic', 'Oriel', 'Origin',
@@ -588,14 +586,6 @@ export function themeColorName(theme: ThemeValue | undefined | null): string {
   return String(colors?.name ?? theme.name ?? 'Office');
 }
 
-/** The font-scheme name of a serialised theme value. */
-export function themeFontName(theme: ThemeValue | undefined | null): string {
-  if (!theme) return 'Office';
-  if (typeof theme === 'string') return FONT_SCHEME_BY_THEME[theme] ?? theme;
-  const font = theme.font as { name?: unknown } | undefined;
-  return String(font?.name ?? theme.name ?? 'Office');
-}
-
 /** Resolves a theme value to a `Theme`; built-in names give the shared instance. */
 export function themeFromValue(theme: ThemeValue | undefined | null): Theme {
   if (typeof theme === 'string' || theme === undefined || theme === null) {
@@ -620,16 +610,4 @@ export function themePalette(theme: ThemeValue | undefined | null): Record<strin
   const palette: Record<string, string> = {};
   for (const key of COLOR_KEYS) palette[THEME_COLOR_NAMES[key].toLowerCase()] = colors.css(key).toLowerCase();
   return palette;
-}
-
-/**
- * The custom theme the designer writes when the user picks colours or fonts that
- * no built-in theme combines: the current theme with one part replaced.
- */
-export function customTheme(base: ThemeValue | undefined | null, patch: { colors?: ColorScheme; font?: ThemeFont }): Theme {
-  const current = themeFromValue(base).clone();
-  if (patch.colors) current.colors(patch.colors);
-  if (patch.font) current.font(patch.font);
-  current.name('custom-theme');
-  return current;
 }

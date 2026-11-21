@@ -71,9 +71,11 @@ export function printDesigner(d: Designer): void {
 }
 export function showPageSetup(d: Designer, initialTab: 'page' | 'margins' | 'header' | 'print' = 'page'): void {
   const sheet = activeSheet(d);
-  syncPageLayoutDefaults(d, sheet);
   const draft = pageSetupDraft(sheet);
   d.showDialog('pageSetupDialog', { draft, kind: initialTab }, (data) => {
+    // Trial (TASK 75 sweep): the seeding of the header-visibility/first-page defaults
+    // happens when the dialog commits, not while it is open.
+    syncPageLayoutDefaults(d, sheet);
     applyPageSetupDraft(sheet, (data.draft as PageSetupDraft) ?? draft);
     d.invalidate();
   });

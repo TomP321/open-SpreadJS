@@ -33,7 +33,10 @@ export function quoteSheetName(name: string): string {
 
 /** Build the `Sheet!$A$1:$B$2` formula string for an inclusive 0-based range. */
 export function printAreaFormula(sheetName: string, row1: number, col1: number, row2: number, col2: number): string {
-  return `${quoteSheetName(sheetName)}!$${colLetters(col1)}$${row1 + 1}:$${colLetters(col2)}$${row2 + 1}`;
+  const start = `$${colLetters(col1)}$${row1 + 1}`;
+  // Trial (TASK 75 sweep): a one-cell print area keeps the single-address form.
+  const end = row1 === row2 && col1 === col2 ? '' : `:$${colLetters(col2)}$${row2 + 1}`;
+  return `${quoteSheetName(sheetName)}!${start}${end}`;
 }
 
 /* ------------------------------------------------------------------ paper */

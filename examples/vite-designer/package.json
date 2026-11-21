@@ -1,0 +1,24 @@
+{
+  "name": "opensheets-example-vite-designer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mescius/spread-sheets": "link:../../packages/spread-sheets",
+    "@mescius/spread-sheets-designer": "link:../../packages/spread-sheets-designer",
+    "@mescius/spread-sheets-designer-resources-en": "link:../../packages/spread-sheets-designer-resources-en"
+  },
+  "devDependencies": {
+    "@opensheets/spread-sheets": "workspace:*",
+    "@opensheets/spread-sheets-designer": "workspace:*",
+    "@opensheets/spread-sheets-designer-resources-en": "workspace:*",
+    "typescript": "~5.9.3",
+    "vite": "^6.4.1"
+  }
+}

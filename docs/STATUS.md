@@ -5912,3 +5912,1499 @@ compat 255, io 24, react 8, res-en 2, compare 4 — all green) · `pnpm lint` �
 
 Only source change of TASK 71: `apps/compare/src/probe.ts` (removed the unused IO-plugin import so
 /probe.html really is a plugin-less core page; the spec asserting exactly that now passes).
+
+## TASK 72 — Fix the pre-existing behaviour gaps found by TASK 71 (core, black-box vs the trial) (2026-11-19)
+
+All seven items fixed in product code; no spec, threshold or mask was touched; no official
+minified source or CSS was read (black-box probes only, recorded under `.probe/t72-*.json`).
+
+### 1. Delete after resize to 1,000,000 x 16,384 (interaction.spec.ts:119)
+
+- Before: the select-all selection is the sentinel range `{-1,-1,-1,-1}`; the `clearValues`
+  command fed it straight to a dense rectangle loop → `r < -2` → nothing was visited (values
+  survived, and the undo snapshot captured nothing). Whole-row/column band selections (`-1`
+  counts) behaved the same.
+- Fix (`packages/spread-sheets/src/command-constants.ts`): `expandRects` expands the `-1`
+  row/col/count sentinels to concrete bounds before the undo snapshot (`withUndoSnapshot` →
+  `captureRect` now records the real cells), and `forEachCell` iterates the sparse viewport
+  store (existing cells only) instead of the dense row×col product — the million-row clear-all
+  stays O(non-empty cells).
+- After: test green, including Ctrl+Z restoring `source` after the whole-sheet clear.
+
+### 2. Cancelled `EditStarting` must block `sheet.startEdit()` (interaction.spec.ts:144)
+
+- Before: `Worksheet.startEdit()` always set `editorStatusValue = enter` after delegating to
+  the interaction layer, so an `EditStarting` handler setting `info.cancel = true` still left
+  `isEditing()` true (trial: false).
+- Fix (`packages/spread-sheets/src/worksheet.ts`): with a view, only report the `enter` status
+  when the editor actually opened; model-only (no view) keeps the previous behaviour.
+
+### 3. `isEditing()` false after Enter commits a pointed range from the formula bar (m5e-point.spec.ts:73)
+
+- Before: the formula-bar path opened editing through `sheet.startEdit()` (status `enter`), but
+  the grid commit (Enter/Tab keydown, `commitFromFormulaBar`) closed the editor without going
+  through `sheet.endEdit()`, leaving `editorStatusValue` at `enter` → `isEditing()` stayed true.
+- Fix (`packages/spread-sheets/src/interaction.ts`): `Interaction.endEdit` returns the sheet's
+  editor status to `ready` when the editor closes (a listener cancelling `EditEnding` returns
+  earlier and keeps the editing status).
+- After: m5e-point 7/7.
+
+### 4. `BC_*` barcode functions belong to the add-in load, not the core (m5-interaction:101, m5c-formula:31)
+
+- Measurement (`.probe/t72-barcode-registration.json`, black-box): on the core-only trial page
+  `GC.Spread.Sheets.Barcode` is `undefined` and `BC_QRCODE("hello")` evaluates to `#NAME?`;
+  after the official `@mescius/spread-sheets-barcode` dist is loaded as a plain script against
+  the same core namespace, the namespace appears and a workbook evaluates `BC_QRCODE` to the
+  add-in's `SparklineExValue` record (a workbook created *after* the load; the trial binds the
+  function set per workbook). The official Designer page (add-ins + designer loaded) works the
+  same. Conclusion: the barcode **add-in package at its load** registers the `BC_*` formulas;
+  the Designer ships that add-in.
+- Ours: `calc/functions/index.ts` no longer registers `BARCODE_FUNCTIONS`; the idempotent
+  `registerBarcodeFunctions()` lives in `calc/functions/barcodes.ts`, re-exported from the core
+  entry (named ESM export; `scripts/finalize.ts` adds it to the generated d.ts/d.cts and keeps
+  CJS named exports alongside the `module.exports = GC` interop). Our Designer — which bundles
+  the barcode feature — calls it once from `core-internals.ts` (the module every designer path
+  loads), the same position the add-in occupies in the official install. Core-only pages now
+  answer `#NAME?` and autocomplete no longer lists `BC_*` (hints are registry-driven; the
+  `functionCatalog` metadata entries stay for the Designer function dialog, which matches the
+  official Designer context where the add-in is loaded). `GC.Spread.Sheets.Barcode` classes stay
+  attached by the core entry because the official core d.ts declares them and the coverage gate
+  probes them from the core bundle (recorded deviation: the trial ships the namespace with the
+  add-in). Deviation noted: our registry is late-bound, so workbooks created before a
+  registration also see the functions (unobservable in script installs where load order matches).
+- Kept green by construction: `barcode46.test.ts` and `m5.test.ts` now load the add-in layer
+  explicitly (one setup call each; every assertion untouched); designer `insert-actions` /
+  `page-layout` unit tests and `apps/designer-compare` `barcode-shape-namespec` stay green
+  (registration arrives with the designer import).
+
+### 5. `sheet.options.printLineVisible` is never exposed by the trial (m1-fixtures:60)
+
+- Probes (`.probe/t72-printline-probe.json`): the core-only trial **and** the official designer
+  page expose no `printLineVisible` own key and no `print*` key in `sheet.options`. The official
+  core d.ts declares no such option; the designer d.ts declares only the ribbon command-name
+  constant `Designer.CommandNames.PrintLineVisible`.
+- The recorded probes prove the fixture value wrong (the d.ts does not declare it), so per the
+  task rule the fixture was corrected: `"printLineVisible": false` removed from
+  `packages/spread-sheets/src/worksheet-defaults.json`. It only ever seeded `sheet.options`; the
+  live print-line state is `sheet._printLineVisible` (`isPrintLineVisible()` /
+  `togglePrintLineVisible()`, serialized as the sheet-level `printLineVisible` key by
+  `sheet-serialization.ts`) — untouched, so `print.test.ts` (incl. the option fallback case) and
+  the designer page-layout tests keep passing; the fallback read in `sheet-print.ts` stays for
+  files that saved `options.printLineVisible` before.
+- Consequence noted: the core unit count moved 2322 → 2321 because `test/worksheet.test.ts:7`
+  generates one dynamic case per default key; the dropped case tested an option the trial does
+  not have (no coverage weakened — the m1 browser spec now enforces the exact trial key set).
+- After: m1-fixtures 3/3 (option defaults + event constants match the trial).
+
+### 6. m7-io four-way XLSX needs TZ=UTC (config, documented)
+
+- `apps/compare/playwright.config.ts` now sets `process.env.TZ = 'UTC'` (the package `test`
+  scripts are the unit suites, already `TZ=UTC`; the Playwright browser pages inherit the TZ from
+  the runner environment; commented in the config). m7-io: 24/24 including the four-way
+  import/export/open/save date round-trips.
+
+### 7. Verification (this tree)
+
+- apps/compare Playwright full suite (all 13 spec files, TZ=UTC): **245 passed, 0 failed** —
+  all seven fixed tests green plus the whole pixel/visual suite; no spec/threshold/mask edits.
+- Gates: `pnpm -r build` ✓ · `pnpm coverage:api` ✓ (207/207 classes, 1796/1796 methods,
+  252/252 enums, 1369/1369 declarations) · `pnpm -r typecheck` ✓ · `pnpm -r test` ✓ (core 2321,
+  designer 259, compat 255, io 24, react 8, res-en 2, compare 4) · `pnpm lint` ✓.
+
+## TASK 69 — Designer: ribbon icons of every non-Home tab + their dropdown menus (2026-11-19)
+
+All artwork is our own vector SVG drawn from **measured** positions/sizes/colours (black-box
+probe: per-command DPR4 crops of official vs ours on the 5188 compare page + 2u-block unit
+colour maps; probe tooling under `.probe/t69/`: shoot1.mjs, shoot_ctx_ours.mjs, cmap_ctx.py,
+colormap.py, pair_icon.py/pair_main.py, rescore.py, build_ctx.py; scores = mean |ΔL| on 48x48
+normalisations, 0-100). Icon box sizes (16/24/32) already matched everywhere; every score below
+is artwork. Before = first TASK 69 measurement (round 0, `.probe/t69/list.txt`), After = final
+measurement of this round; main-tab contact sheets `sheet-<tab>.png`, per-icon crops `d4/`,
+whole-tab pairs `pair-<tab>.png`, contextual pairs `pair-ctx-*.png`.
+
+### Page Layout — `sheet-page_layout.png`, `pair-page_layout.png`
+margins 16→3.9, worksheetbackground 15.5→6.3, paperSize 15.1→6.2, orientation 14.8→8.2,
+printTitles 14.2→4.6, printArea 12.2→7.5, scale-to-fit text combos 10-11 (see gaps), breaks
+4.0→4.8, checkbox rows 2.6-4.6. Menus: Margins thumbnails use the redrawn page-frame glyph;
+PaperSize menu shows proportional thumbnails + pressed current row; Orientation menu rows use
+24px fold-corner glyphs at 40px rows (`/* TASK 69 */` CSS block).
+
+### Formulas — `sheet-formulas.png`, `pair-formulas.png`
+showFormulaEditorPanel 20.6→9.4, calculateSheet 15.3→5.9, showFormulas 14.8→11.8,
+calculationOptions 14.7→8.0, nameManager 14.0→12.1, calculateNow 12.6→9.1,
+function books (MathTrig/Text/Financial/Logical/DateTime/Lookup/More) 11-12→5.2-8.8,
+AutoSum Σ 10.2→6.1 (menu Sum row shares the glyph), insertFunction 8.6→9.3 (see gaps).
+Calculation Options menu (Manual/Automatic + green check) matches; AutoSum menu Σ inherited.
+
+### Data — `sheet-data.png`, `pair-data.png`
+Group 20.9→10.5, Custom Sort 20.4→7.6, Subtotal 19.9→11.9, Ungroup 18.7→9.6,
+What-If 16.0→6.7 (menu: text-only rows ✓), Text to Columns 14.2→12.4, Remove Duplicates
+13.6→6.0, Sort A→Z 13.2→4.9, Sort Z→A 12.4→7.9, Edit Links 11.8→9.7 (now a big-fold document
+with two tilted hollow chain links), Data Validation 11.4→8.2 (menu row shares the glyph),
+Template Design Mode 10.4→9.8, Clear Filter 9.6→8.3, Show/Hide Detail 6.7-7.1 (unchanged,
+near-match). Group/Ungroup/Subtotal menus inherit the Data-tab medallion/table glyphs; the
+medallion is a black concave four-point star with a white core (r4 measurement corrected an
+interim circle reading; the circle variant scored worse).
+
+### Review — `sheet-review.png`, `pair-review.png`
+New Comment 11.1→8.5 (long thin green + straddling the bubble corner), Show Panel 10.3→7.5,
+Delete/Previous/Next 5.4-5.6→below 4 (thin pale corner accents, open-V arrows).
+
+### View — `sheet-view.png`, `pair-view.png`
+Zoom to Selection 16.5→8.2 (2x2 medium/pale blue checker + thin magnifier), Unfreeze 14.6→7.3
+(whole-sheet pale diagonal hatch + one filled cell, no red X), Selection Pane 14.4→9.5 (shared
+with Shape Format), Command Palette 13.5→6.5 (no gear halo), Freeze Panes 13.2→9.0 (hatched
+frozen bands), 100% Zoom 11.2→5.4, Focus Cell 9.1→7.2, Zoom/checkbox rows 4.4-4.6.
+Freeze Panes + Focus Cell menus: text rows + inherited glyphs ✓.
+
+### Insert — `sheet-insert.png`, `pair-insert.png`
+Chart gallery previews 8-20→8.0-10.9 (repainted to the official pastel style: thin grey 'L'
+axis, grey+pale-blue marks; scatter/plus markers, doughnut mostly white, outlined stock bars),
+Charts big button 8.1→3.1 (pastel bars), PivotTable 14.9→7.2, Text Box 14.2→3.5, Camera
+14.1→7.2, Controls 13.9→4.5, Picture 13.7→11.5, Scatter/Bubble 13.4→8.9, Barcode 13.1→7.2,
+Column/Bar preview 12.9→8.0, Table 12.9→9.4, Shapes 10.7→9.6, Sparklines 10.6→10.1, CheckBox
+10→6.4, Hyperlink 8.5→4.8. Picture/Controls/Sparklines/Shape gallery items inherit these
+glyphs; sizes verified equal on both sides.
+
+### Settings — `sheet-settings.png`, `pair-settings.png`
+Redrawn to the official family motif (peeled-foot grid document + gear): calculation 19→11.4
+(document + blue calculator tile, orange key column), gridlines 17.3→8.6, headers 15.6→9.2
+(yellow header band + column), scrollbar 13.9→7.1, general 13.3→6.8, spread-general 12.9→7.0,
+tabstrip 12.7→9.8.
+
+### Contextual: PivotTable Analyze — `sheet-pivot-analyze.png`, `pair-ctx-analyze.png`
+R4 measured the Analyze "pivot document" motif (pale header bars with grey outlines + blue
+2x2 tile for Options): options 23.4→14.7, showHeaders 15.5→10.2, groupField (calendar '7')
+15→6.4, fieldList 13.9→10.5, fieldsItemsSets 13.9→13.0, move 13.7→10.7, filterConnections
+12.3→5.8 (light grid + pale blue gear), changeDataSource 11.8→12.0, ungroup 11.6→10.9,
+clear 11.1→9.4 (salmon 45° eraser), refresh 10.6→8.6, buttons 9.4→5.7 (two white cards, thin
+blue +/−), fieldSetting 10.1→7.2, groupSelection 6.1→2.6 (long thin pale-blue arrow),
+expand/collapse 4.8/4.7→3.9/3.7. Pivot Group/Ungroup + Fields,Items,& Sets menu rows inherit
+these glyphs.
+
+### Contextual: Pivot Design — `sheet-pivot-design.png`, `pair-ctx-design.png`
+pivotTableStyle 17.3→12.2 (4x4 pale grid + medium-blue 2x2 block + grey paintbrush; the same
+glyph is used by Data ▸ Format as Table), subtotals 11.9→9.3, grandTotals 13.5→9.3, blankRows
+13.8→9.0, reportLayout 12.8→8.6 (measured row-card patterns: exact per-icon segment counts,
+lengths, indents and grey/blue colours from the DPR4 unit maps). Style-options checkboxes ✓.
+
+### Contextual: Shape Format — `sheet-shape-format.png`, `pair-ctx-shape.png`
+altText 17.6→11.0 (picture + thin blue tag card with grey text rules), selectionPane 14→10.0,
+rotate 11.9→10.8, changeShape 11.2→7.3 (thin lighter-blue outlined cluster). Bring
+Forward/Send Backward now use the official pale-yellow/outlined-square z-order pair (no
+arrows); Align/Group/Format Pane already match the measured motifs (TASK 63/67 era) unchanged.
+
+### Remaining differences (honest, measured)
+
+* Insert ▸ chart gallery previews still 8-11: 16px pastel artwork differs in AA weight and
+  exact mark placement; the official chart flyout items could not be captured directly (the
+  gallery closes on hover — ours-only crops kept in `d4/insert-*-ours.png`); the big flyout
+  preview panels (32px) match in motif.
+* Formulas ▸ Insert Function 9.3 / Show Formulas 11.8: the official 'fx' is a serif-italic
+  glyph with ball terminals and a differently-curlled f tail; our single stroke-based fx69
+  approximates it (the curly-x variant is used only on the flag glyph where the official
+  measures curly). Name Manager 12.1: open-drawer perspective/side-wall shading differs.
+* Data ▸ Text to Columns 12.4: official loop-arrow curvature and dash lengths only
+  approximately reproduced; Subtotal 11.9 vs Group 10.5 — official medallion/star AA at 16px;
+  Template Design Mode 9.8: official brush is lighter/softer.
+* View Selection Pane 9.5: official cursor is slightly larger relative to the panes;
+  Freeze/Unfreeze hatch pitch differs by ~1u. Page Layout fit-width/fit-height/scale text
+  combos 9.7-11.3: probe crops the whole label+spin combo (official 'Width:'/'Height:'/'Scale:'
+  text included), so part of that score is text rendering, not icon.
+* Pivot options 14.7 / fieldsItemsSets 13.0 / changeDataSource 12.0: 16px AA-level diffs and
+  the serif fx; official options blue 2x2 squares appear staggered by ~2u in the DPR4 colour
+  map (an exact stagger reproduction scored *worse*, kept the aligned grid).
+* STRUCTURAL (reported, not icon work): official exposes contextual tabs Table Design, Chart
+  Design (+Chart Format) and Sparkline; our ribbon defines only Shape Format and PivotTable
+  Analyze/Design (evidence `d4/ctx-table-design-official.png`, `d4/ctx-chart-design-official.png`).
+  Official Shape Format uses grouped dropdown buttons (bringShapeForwardGroup/sendShapeBackward-
+  Group, shapeCommandAlign, shapeCommandGroup, formatPane), a 60px changeShapeStyle tile gallery
+  (ours: shapeStyle1-7 at 42px) and Height/Width labelled number spinners (ours: one Size
+  button); the official Ribbon ▸ Themes combo has no data-command for Colors/Fonts (their
+  'ribbon.undefined' quirk) while ours registers ribbon.ThemeSetting/Colors/Fonts. Slicer
+  contextual tab: the trial build here lacks the slicer runtime ('Add-ons Not Enabled' banner;
+  `sheet.slicers` undefined), so no official reference exists in this pair.
+* Default-state note (not forced): official 'Repeat' print-titles checkbox renders checked by
+  default in this document; ours unchecked.
+
+### Gates (TASK 69)
+`pnpm -r build`, `pnpm coverage:api` (207/207 classes, 1796/1796 methods — 100%),
+`pnpm -r typecheck`, `pnpm -r test` (spread-sheets 2318, designer 240, compat 255, io 24,
+react 8, apps 6 — all green) and `pnpm lint` all pass at task close. One honest caveat: the
+core `test/calc/performance.test.ts` regression guards (untouched by TASK 69 — the core is off-
+limits here) flaked twice mid-task under a machine load average of 16-22 while this and another
+session were building/testing in parallel on the same box (measured 523 ms vs the 500 ms guard,
+125 ms vs 120 ms); both the file alone and the full suite passed once the machine calmed down
+(load ≤ 16). Thresholds were not changed.
+Probe artifacts: `.probe/t69/list.txt` (phase-1 diff inventory), `diff-scores.json` (final per-
+icon scores), `sheet-<tab>.png` contact sheets, `pair-<tab>.png` / `pair-ctx-*.png` whole-tab
+official-over-ours pairs (DPR2), `d4/` DPR4 crops + rect inventories, `menu/mp-*.png` dropdown
+menu pairs.
+
+## TASK 73 — Ship the barcode add-in package so BC_* stays drop-in after TASK 72 (2026-11-20)
+
+TASK 72 moved `BC_*` registration out of the core (trial: core-only answers `#NAME?`; the layer
+arrives with the separate `@mescius/spread-sheets-barcode` add-in) and let the Designer register
+it. Missing half: we did not ship that add-in, so an app aliasing `@mescius/spread-sheets-barcode`
+to us would have lost `BC_*`. This task closes that hole the way the supervisor decided.
+
+### 1. New package `packages/spread-sheets-barcode` = `@opensheets/spread-sheets-barcode` 0.1.0 (MIT)
+
+- Mirrors `packages/spread-sheets-io`'s layout exactly (ESM + CJS + script-tag build through
+  `exports`, `tsup` two-entry config, `scripts/finalize.ts` typings shim, `prepack`/`postpack`
+  workspace-spec rewriting, README + LICENSE). The official package's `dist/` holds one file
+  (`ls` names only, never opened); we publish the same name `dist/gc.spread.sheets.barcode.min.js`
+  so pages that copied the official `<script>` paths resolve the same URL, and the `index.js`
+  root entry of the official manifest is covered by our `exports` map.
+- The add-in is a pure side-effect installer (all barcode machinery stays in the core from
+  TASK 46): `src/install.ts` finds the hidden hook on the core namespace it is handed and calls
+  it once. Three load paths, one handshake: ESM `import '@mescius/spread-sheets-barcode'`
+  (`src/index.ts` imports the core and installs on it), CJS `require` (dist cjs does the same),
+  and the script-tag build (`src/browser.ts`: `module`/`require` first, then AMD, then
+  `window.GC` — the IO add-on's established shape). A foreign/missing core only warns; the page
+  keeps working.
+- Install recipe unchanged: `"@mescius/spread-sheets-barcode": "npm:@opensheets/spread-sheets-barcode@^0.1.0"`.
+  Peer: `@mescius/spread-sheets` (rewritten to the `npm:` alias by prepack, like the other packages).
+
+### 2. The core's registration entry is now private (public surface = d.ts)
+
+- `registerBarcodeFunctions` is no longer a **named export** of the core (it was never in the
+  vendor d.ts, so it counted as an extra declared member). The core now publishes it as a
+  non-enumerable, undeclared `_registerBarcodeFunctions` property on `GC.Spread.Sheets`
+  (`Object.defineProperty` in `src/index.ts`); the generated `dist/*.d.ts` / `*.d.cts` mention it
+  nowhere. `pnpm coverage:api` stays 100% on all four dimensions with no extras.
+- The Designer (which bundles the feature, so `BC_*` works in it, as TASK 72 established) calls
+  the same hook through `sheetsNamespace(core)._registerBarcodeFunctions` — one guarded call site
+  in `packages/spread-sheets-designer/src/core-internals.ts`, no behaviour change.
+- The core's own `barcode46.test.ts` / `m5.test.ts` (which exercise the layer directly) now import
+  `registerBarcodeFunctions` from the internal module instead of the package entry; assertions
+  untouched.
+
+### 3. dropin-check: gated scenario `g-vite-barcode` + official twin
+
+- `apps/dropin-check/templates/g-vite-barcode` (gated): Vite app installing the packed **aliased**
+  core + our barcode tarball, `import '@mescius/spread-sheets-barcode'`, sheet `Barcode` with
+  `=BC_QRCODE("Drop In")`; reports sheet name, formula text, display text, the `BC_QRCODE` value
+  record (`name`/`text`/`isBarcode`) and `findControl`, plus 1 canvas / 1 sheet host, everything
+  resolving to `@mescius/*` only.
+- `apps/dropin-check/templates/z-official-barcode` (black-box reference twin): the byte-identical
+  page script against the official trial core + trial barcode add-in from the workspace store.
+- `pnpm dropin:check -- --pack`: **8 gated runs green** (0 failures, 0 recorded gaps) + 6
+  black-box reference runs; `g-vite-barcode-official` REF matches (the `c-umd-official` `ref~`
+  timeout is the pre-existing GAP-52-4, reference-only, non-gated).
+
+### 4. Unit tests (new package, 6 tests / 2 files)
+
+- `test/addon.test.ts`: CJS `require` of the built dist registers `BC_*` (before: `#NAME?`; after:
+  QRCode + Code128 records evaluate, unencodable payload `#VALUE!`) and stays a no-op when the
+  hook or the add-in is called twice (exactly-once, idempotent); ESM `import` of the dist registers
+  on the very core instance the app imported (module-registry identity), re-import cached;
+  script-tag build evaluated in a `node:vm` realm against the real browser bundle: loads the core,
+  `#NAME?` before, the plugin loaded **twice**, `BC_QRCODE` record after, and asserts
+  `_registerBarcodeFunctions` is not enumerable; foreign-core case warns once instead of throwing.
+- `test/core-only.test.ts`: core-only (add-in never loaded) answers `#NAME?` for all eleven
+  `BC_*` names while normal formulas still evaluate; the public namespace has no
+  `registerBarcodeFunctions`/`_registerBarcodeFunctions` key (and `'registerBarcodeFunctions' in
+  Sheets === false`), the hook exists only as a non-enumerable own property.
+
+### 5. Lockfile note
+
+- `pnpm install --offline` worked in this workspace and committed the 6-line workspace-importer
+  entry for the new package; the supervisor regenerates `pnpm-lock.yaml` at merge anyway.
+
+### 6. Verification (this tree)
+
+- Gates: `pnpm -r build` ✓ · `pnpm coverage:api` ✓ (207/207 classes, 1796/1796 methods,
+  252/252 enums, 1369/1369 declarations) · `pnpm -r typecheck` ✓ · `pnpm -r test` ✓ (core 2321,
+  barcode 6, designer 259, compat 255, io 24, react 8, res-en 2, compare 4) · `pnpm lint` ✓ ·
+  `pnpm dropin:check -- --pack` ✓ 8/8 gated green.
+- Clean-room: the official barcode package was only `ls`-listed (file names) and its public
+  `package.json` read as metadata; no official `*.min.js`/CSS was opened; the add-in draws nothing
+  (the painters live in the core) and contains no embedded pixels.
+
+## TASK 75 — Designer ribbon command behaviour parity sweep
+
+**Goal:** execute every Designer ribbon command on both sides of `apps/designer-compare`
+(`?side=official` vs `?side=ours`, server 5186) and compare the resulting workbook.
+
+**Command inventory.** `.probe/t75/commands.txt` holds the 624 names reachable from the ribbon:
+every `c(...)`/`g(...)` entry of the tab config (all tabs, split buttons, dropdown and gallery
+children, contextual-tab commands) plus the trial's own `Designer.getCommand` names, unioned with
+our `builtinCommandSpecs`. Of those, **41 exist only in our registry** (the trial builds them
+internally or names them differently — e.g. `PasteGroup`, `sum`, `formulaStatistical`,
+`marginNormal`, `paperA4`, `insertShapeRectangle`, `shapeStyle1`…`shapeStyle7`,
+`pivotTableNameLabel`) and **1 exists on neither side** (`contextMenuPasteSpecial`: the trial's
+context menu opens Paste Special through `openPasteSpecialDialog`, ours through the same id; the
+bare `contextMenuPasteSpecial` name is not a registry entry on either side — kept in the list as a
+guard).
+
+**Harness** (`.probe/t75/inject.js` + `opts.js`, driven by `run5.js`, results
+`/probe/t75r5/sweep-*.jsonl`, summary `python3 .probe/t75r5/report.py .probe/t75r5/finalN`).
+Per command, both sides: reset to the same baseline workbook → apply a fixture (data grid, table,
+chart, shape, hidden rows/columns, outline, filter, comment, threaded comment, validation, pivot
+table) → pin selection + active cell → optionally pre-run commands (`do`) or a copy — then
+`getCommand(name).execute(designer)` and compare `spread.toJSON()`, the sheet list, the active
+sheet, `getSelections()` and the active cell. Normalised volatile values: `docProps`, user ids,
+threaded-comment author/date ids, OOXML `cNvPr.id`, chart axis ids (canonicalised by first
+appearance). Fixture content exists only to exercise the command under test.
+Where the fixture itself cannot serialise identically (shape geometry, pivot caches) the run is
+repeated and compared through the **public accessors** instead (`name/x/y/width/height/rotate/…`,
+chart `chartType/source/title/legend`, table and pivot state) — recorded as `skew-same`/`skew-diff`.
+
+**Dialog-only commands are excluded from the model-change expectation and listed separately.**
+78 sweep names open a dialog/panel in the trial (`formatCells`, `cellsFormat`, `insertCells`,
+`deleteCells`, `rowHeight`, `columnWidth`, `defaultRowHeight`, `defaultColumnWidth`, `defineName`,
+`nameManager`, `newName`, `dataValidation`, `goalSeek`, `zoom`, `goto`, `gotoSpecial`, `find`,
+`replace`, `openPasteSpecialDialog`, `series`, `headers`, `subtotal`, `textToColumn`,
+`removeDuplicates`, `customSortData`, `autoOutline`, `newCellStyle`, `newTableStyle`,
+`newPivotTableStyle`, `insertTable`, `insertPivotTable`, `insertBarCode`, `insertCameraShape`,
+`barCodeSetting`, `protectSheet`, `unprotectSheet`, `protectWorkbook`, `unprotectWorkbook`,
+`manageCellState`, `formatComment`, `worksheetBackground`, `insertFunction`, `moreFunctions`,
+`editLinks`, `insertHyperLink`, `editHyperlink`, `ThemeSetting`, `ThemeColors`, `ThemeFonts`,
+`insertSlicer`, `cellDropdowns`, `cellEditors`, `margins`, `printArea`, `breaks`, `paperSize`,
+`orientation`, `customMargins`, `printTitles`, `formatPainter`, `templateDesignMode`,
+`showFormatCells`, `cellsFormat`, `fileMenuPanel`, `formulaBarPanel`, `statusBarPanel`,
+`calculationOptionsPanel`, `showScenarioPanel`, `showFormulaEditorPanel`, `whatIfAnalysis`,
+`loadSchema`, `saveSchema`, `bindDataManager`, `dataValidationInReportSheet`,
+`cellFormatRowHeight`, `cellFormatColumnWidth`, `cellFormatProtectSheet`,
+`dropdownDataValidation`, `formatCellAlignment`, `formatMore`, `editingFind`, `findCommand`,
+`replaceCommand`, `contextMenuPasteSpecial`, `customSortEditing`, `insertTableFromDataTable`,
+`insertPivotTableFromDataTable`) — every one of them was still executed on both sides and compared:
+all match (model-neutral on both sides). Note the harness cannot prove "a dialog opened": the
+first check used `offsetParent`, which is always null for the `position: fixed` overlays, and a
+class-name scan could not separate real dialogs from the permanent ribbon panels, so dialogs are
+classified from the trial's registry shape (below) and from the paired Playwright specs, not from
+the sweep flags.
+
+**Trial-registry shapes proven this round** (`.probe/t75r5/p9.json`): 45 registry names the trial
+registers **without any `execute`** — context-menu actions whose work is done by internal code
+(`contextMenuPaste`, `gc.spread.contextMenu.*`), the Pivot-tab dropdown hosts
+(`pivotTableGrandTotals`, `pivotTableSubtotals`, `pivotTableReportLayout`, `pivotTableBlankRows`,
+`pivotTableClearList`, `pivotTableFieldsItemsSets`) and the ribbon parents whose children do the
+work (`cellStyles`, `cellsFormat`, `cellsInsert`, `cellsDelete`, `conditionFormat`, `formatTable2`,
+the seven `*ChartPreview` split buttons, `pageLayoutGridlinesText`, `scaleToFitScaleText`, …).
+A bare `getCommand(name).execute()` on those used to throw `NotImplemented` on our side; they are
+now inert in `INERT_COMMAND_NAMES` (packages/spread-sheets-designer/src/designer-commands.ts),
+while the commands that genuinely do change the model (`mergeCenterButton`, `mergeCells`,
+`mergeAcross`, `marginNormal`, the gallery tiles) keep their handlers.
+
+**Fixes landed by the sweep** (each with a unit test; the probe files in `.probe/t75r5/` are the
+evidence):
+
+- *Command semantics* (`commands/style-actions.ts`, `sheet-actions.ts`, `actions.ts`,
+  `page-layout-actions.ts`): ribbon setters apply the value the control passes and a bare execute
+  is ignored (font family/size, colour pickers, Wrap Text, the number-format combo, Focus Cell
+  colour, Show Formulas, the Page-Layout combos); trial number formats (currency, accounting, long
+  date, time, the quick `%` as `0%`, General as an empty formatter, Decrease Decimals on a General
+  cell); the border matrix (thin 1 / thick 5 / double 6, No Border materialising the diagonals);
+  Orientation writing `textIndent`/`isVerticalText`; Cell Styles applying the named style;
+  `fontWeight` materialising; merges and the AutoSum family over true multi-selections; Fill
+  (single *and* multi cell) copying the source's materialised style record; the Editing ▸ Clear
+  commands materialising "empty"; Remove Hyperlink materialising the cell style; the Filter button
+  expanding a 1-cell selection to the contiguous data region with one visible button per column;
+  `sortState` recorded even for a 1-row selection; `insertSheet` tab placement; `formatPainter`;
+  thread/comment bare executes; `removeDuplicates`, Circle Invalid Data, CheckBox gallery.
+- *Command registry* (`commands/index.ts`, `designer-commands.ts`): the trial's own names are
+  registered — `contextMenu*`, `gc.spread.contextMenu.*`, `designerPaste*`/`link`/`editHyperlink`
+  aliases, `pasteFormula` (singular) and `paste` (the big Paste button), the gallery group captions
+  — and the 45 execute-less names made inert.
+- *Core serialization* (`serialization-mode.ts`, `sheet-serialization.ts`, `serialization.ts`,
+  `workbook.ts`, `sheet-shared-formulas.ts`): a Designer serialization mode (eager `printInfo`,
+  `pivotCaches`, `sharedFormulas`, `allowCellOverflow`), shared-formula coalescing, and the trial's
+  cached-error identity `{_calcError, _code}`.
+- *Core model*: `sheet-styles.ts` fill/actual style materialisation; `filters.ts` `sortState` +
+  `filterButtonVisibleInfo` keyed by absolute column + (r5) clearing a filter restores its rows
+  **without** a `visible:true` record (`AxisLayout.unrecordVisible`, `Worksheet._restoreRowVisibility`);
+  `outlines.ts` outline-collapsed rows not serialised and the Show-Detail summary marker;
+  `sheet-layout.ts` Unhide materialising `visible:true` while AutoFit leaves default-sized lines
+  unrecorded; `rendering-draw.ts`/`rendering.ts` filter buttons keyed by absolute column.
+- *Charts*: stock families validate the exact series count (HLC 3, OHLC/VHLC 4, VOHLC 5) with the
+  trial's error text (r5 — the HLC case was unchecked, so a 1-cell selection built a chart the
+  trial refuses to build); a one-cell bubble selection gets one series and no `xVal` (r5); the
+  gallery combo presets materialise their series styles — accent fill, the bar series' black
+  zero-width line plus the `{6F2FDCE9-…}` dataObject `extLst`, area series the line only, and
+  `dispBlanksAs: 1` (`Chart._applyGalleryComboStyle`, r5; the public `series().add()` path
+  deliberately does none of this, proven in `p3.json`); DataChart series references rebuilt on the
+  trial's header-edge rule (a blank corner makes both edges headers — this restores the TASK 39
+  `A1:D4` model the earlier round had broken) with the plot-surface no-line marker arriving on the
+  first layout pass like every other `ln` stamp; combo `tx`/`cat` no longer materialised from empty
+  strings.
+- *Designer inserts*: the chart name counter, the silent gallery refusal (no dialog, no toast, no
+  exception — the trial's behaviour for stock data that does not fit), and `applyInsertAction`
+  reporting a known gallery name as handled so a skipped insert cannot fall through to
+  `NotImplemented`.
+- *Paste family (r5)*: the sweep's own clipboard was broken (the copy command got the compare
+  bundle instead of the Designer), so all 24 paste commands had only ever measured as no-ops. With
+  a working clipboard, 14 real diffs appeared and are fixed: every Paste Options mode now writes
+  the **materialised computed style** of the source cell (`hAlign:3, vAlign:0, themeFont:"Body",
+  imeMode:1` plus the source's own properties) instead of the raw style clone; "Keep Source
+  Formatting" keeps the explicit `font`/`locked`/`hidden` instead of `themeFont`; number-format-only
+  modes leave no style record when the source has no format; "Keep Source Formatting"/"No
+  Borders"/"Keep Source Column Widths" paste the whole block (they were style/width-only);
+  Transpose ends with the transposed block selected.
+
+**Totals (final run `.probe/t75r5/final3`, 624 commands).** 526 `same` (workbook JSON, sheet list,
+active sheet, selections and active cell all equal), 38 `noop` (the command changes nothing on
+either side — the 26 sparkline-gallery entries, `calculateNow`/`calculateSheet`,
+`calculationOptionAutomatic`, `calculationOptionsPanel`, `clearComments`, `DeleteThreadedComment`,
+the two context-menu comment names: all of them open a dialog/panel or need a ribbon property),
+14 `skew-same` (shape commands compared through the public accessors), 41 names only our registry
+has, 1 name neither side has, 3 `diff` and 1 `skew-diff` — i.e. **4 honest remaining differences**
+(below) after 5 sessions; 10 registry names still throw `NotImplemented` on our side, 7 of them the
+pivot features listed below, plus `insertChart`, `mergeCenter` and `formatTableListContent` (the
+latter two are inert in the trial and were made inert in ours with the same fix round).
+Before this round's fixes the same harness measured 73 non-clean rows (20 JSON diffs, 56 pivot
+commands whose fixture the trial ignored, 1 pivot-shape skew, plus the paste family that could not
+run at all); the sweep results of the previous session were also invalid for 19 commands because a
+`rectToString` import was missing (the funnel/treemap/sunburst/waterfall inserts threw) and the
+gates had not been run — caught and fixed here.
+
+**Remaining differences (with evidence and reason).**
+
+1. `shapeGroup` — *real gap, group-shape model.* The trial wraps the selected shapes into one
+   nested `GroupShape N` entry (`shapeData.grpSp` with `nvGrpSpPr`/`grpSpPr.xfrm` + the children
+   inside, and `shapes.all()` answers the group only); our core groups logically
+   (`Shape.groupId` + `Shapes.groups`, `shapes.all()` keeps answering the members) and has no
+   `grpSp` serialization at all (`grep grpSp packages/spread-sheets/src` → nothing). The command
+   itself works (`.probe/t75r5/p5.json`: after `shapeGroup` our two rects carry
+   `groupId: "GroupShape 1"`). Matching the trial needs a nested-shape model in the core
+   (serialization, `all()`, hit-testing, paint) — a task of its own, deliberately not faked here.
+   `shapeUnGroup` and the other 13 shape commands match through the public accessors.
+2. `pasteLink` / `pasteLinkedPicture` — *never-enabled buttons, different feature.* The trial's
+   Paste Link rewrites the pasted formulas as shared references into the source block and writes
+   no styles; Linked Picture leaves the cells alone. Ours maps both to the plain all-paste. The
+   trial never enables these two buttons (TASK 60, `PERMANENTLY_DISABLED_PASTE`), so the only way
+   to reach them is a programmatic execute; proper support belongs with a Data-Link feature.
+3. `zoomSelection` — *harness artifact, not a product diff.* A four-selection probe
+   (`.probe/t75r5/p2.json`) gives byte-identical factors on both sides (`3.76829268293`,
+   `1.26639344262`, `4`, `2.23181818182`) plus matching `leftCellIndex`/`topCellIndex`, and the
+   formula is unit-tested. It appears as a diff only when it runs dead last in a 624-command
+   session, where our grid reported a non-positive viewport (our `zoomToSelection` returns early on
+   a zero-sized viewport instead of dividing by it); the trial's frame still had ~264 px there, so
+   the two sides were simply not in the same layout state.
+4. *Seven pivot commands stay `NotImplemented`* (`PivotTableCalculatedItem`, `PivotTableSolveOrder`,
+   `pivotTableCalculatedField`, `pivotTableListFormulas`, `pivotTableOptionsSub`,
+   `pivotTableShowReportFilterPages`, `pivotTableStyleListContent`). The trial has an `execute` for
+   them but changes nothing for a programmatically created pivot (`.probe/t75r5/p6.json`), so the
+   sweep cannot prove their behaviour; they stay visible in the API coverage report instead of being
+   stubbed silently. The other 48 pivot commands (including every report-layout, subtotal,
+   grand-total, grouping, style and data-source command) now match on the real v19 pivot fixture —
+   the previous fixture used a pre-v19 `pivotTables.add(range, aggregates)` form the trial silently
+   ignores, which had silently disabled all 57 pivot measurements.
+5. *41 names only our registry has, 1 name neither side has, 14 shape commands compared through the
+   public accessors* — listed above; no action.
+6. *Follow-up found while fixing the paste family:* `applyTable` (used by the Table Styles gallery
+   value path, `formatTableListContent` with a theme value) throws `The tables cannot be
+   intersected.` when the selection lies inside an existing table. The sweep executes the command
+   without a value (both sides inert → matched), and the gallery path is covered by the paired
+   Playwright specs, so it is left as a separate bug rather than changed unmeasured.
+
+**Gates** at task close: `pnpm -r build`, `pnpm coverage:api` (classes 207/207, methods 1796/1796,
+enums 252/252, declarations 1369/1369), `pnpm -r typecheck`, `pnpm -r test` and `pnpm lint` all
+pass. New tests: `packages/spread-sheets/test/task75-behaviour.test.ts` (9),
+`packages/spread-sheets/test/task75-serialization.test.ts`,
+`packages/spread-sheets-designer/test/task75-command-parity.test.ts` (15). Two earlier expectations
+were corrected against fresh trial measurements rather than relaxed: the DataChart header-edge rule
+(`charts-family-data.test.ts` stays as TASK 39 measured it) and the "Keep Source Column Widths"
+paste (TASK 61 read it as widths-only; the live trial pastes the block as well).
+
+## TASK 74 — Designer contextual ribbon tabs the trial shows and ours lacked (2026-11-20)
+
+All five contextual tabs now exist in ours with the trial's groups, ids, control types,
+selection rules and behaviour. Nothing was measured from official minified source or CSS:
+the structures come from the public contract (`DefaultConfig.ribbon` through
+`Designer.getConfig()`, `Designer.getCommand()`) and from black-box probes of the running
+trial on `apps/designer-compare` :5188 (`Designer.executeCommand` / the public core API /
+DOM geometry + visible labels), recorded under `.probe/t74/`.
+
+### 1. The tabs (ours = trial, measured group by group)
+
+| tab (trial id) | trigger | groups (trial captions, in trial order) |
+| --- | --- | --- |
+| Table Design (`tableDesign`) | active cell inside a table (`TableSelected`) | Properties, Tools, Table Style Options, Table Styles, Table Binding |
+| Chart Design (`chartDesign`) | a chart is selected (`CanFormatChart`) | Chart Layouts, Chart Styles, Data, Type, Location, Accessibility, Format Pane |
+| Sparkline (`sparkLineDesign`) | the active cell holds a cell sparkline (`SparklineSelected`) | Type, Show, Style, Group |
+| Sparkline (`formulaSparkLineDesign`) | the active cell holds a `*SPARKLINE()` formula (`FormulaSparklineSelected`) | Argument |
+| Shape Format (`shapeDesign`) | a shape or chart is selected | Insert Shapes, Shape Styles, Accessibility, Rotate, Group, Align, Arrange, Size, Selection Pane, Format Pane — the trial's ten groups in its order (`.probe/t74/measure9-official.json` shape dump); ours had eight groups and carried Size + Selection Pane inside Arrange |
+
+- Tab ids, group captions/order, command nesting, control types and the measured control
+  boxes (`ribbon.tsx`/`controls.tsx` widths) were read from `Designer.getConfig()` and the
+  live DOM geometry (`.probe/t74/measure2*-official.json`, `measure9`, `measure29`).
+- Every glyph on these tabs is our own vector SVG in `src/icons.tsx` (no official sprite,
+  no sampled pixels); the labels are the trial's `res.*` resource paths resolved through our
+  own resources package, with our own fallback strings.
+- Selection rules act on the ACTIVE cell like the trial's triggers, and the contextual tab
+  only takes the ribbon selection where the trial does it: the chart/shape and table tabs
+  activate themselves, the Sparkline tabs appear with Home still selected
+  (`contextualTabsWithoutActivation`, `.probe/t74/measure9-official.json`).
+- Mixed selections: selecting a chart closes Table Design and lands on Chart Design with
+  Shape Format present; selecting the shape lands on Shape Format; clicking back inside the
+  table returns Table Design — asserted against the trial in the paired spec.
+
+### 2. Table Design behaviour (all through the public core API)
+
+- `tableName` combo renames (duplicate names answer the trial's "This name already exists.
+  Names should be unique." box), `resizeTable` opens the Resize Table dialog prefilled with
+  the table range (`$A$1:$F$5`) and enforces the dialog's two trial notes, `convertToRange`
+  reuses the existing Convert-to-Range confirm, `tableAllowAutoExpand` + the eight style
+  option checkboxes + Total Row write the table flags through an undoable action,
+  `tableStyleTotalRowList` toggles `useFooterDropDownList`, Table Styles keeps the existing
+  gallery (TASK 40).
+- Table Binding — the part the earlier rounds got wrong, fixed against a fresh probe
+  (`.probe/t74/convert42.mjs` → `convert42-{official,ours}.json`):
+  * a regular table shows Convert-To (154 px trial / 155 px ours) and no Convert-From, with
+    an empty Binding Source combo;
+  * the trial's own command asks "Do you want to convert the regular table to a data
+    table?" (warning icon, **OK + Cancel**), converts the table to a NAMED binding source
+    with an EMPTY `bindingPath()`, then shows "Convert from Data Table" (168 px) and the combo
+    reads "Table1";
+  * `ConvertFromDataTable` confirms with "Do you want to convert the data table to a regular
+    table?" and returns to the regular state (combo empty, `isBinding()` false);
+  * a table the APPLICATION bound through `Table.bind(columns,'SalesData',{SalesData:…})`
+    is NOT such a data table for the trial: `isBinding()` is true, `bindingPath()` reads
+    'SalesData' and `getBindingSource()` returns the records, yet the ribbon still shows
+    Convert-To with an empty combo, and the command answers the ERROR box
+    "Can't convert a binding table" (error icon, OK + Cancel) and changes nothing
+    (`binding38.mjs`, `binding39.mjs`, `convert42-official.json`).
+  Ours reproduces every step: the converted state is a per-designer record
+  (`isDataTable`/`markDataTable` in `contextual-actions.ts`, keyed by sheet+table name so a
+  rename follows the table), the confirm/error boxes use the trial's sentences, warning/error
+  icons and OK+Cancel buttons, and the convert binds with
+  `table.bind(columns, undefined, records)` so `bindingPath()` reads back empty like the trial.
+- Noted deviation (outside this task's allowed files): the trial re-creates the converted
+  table's binding from the workbook after `fromJSON` (its `getBindingSource()` still returns
+  the named source, `.probe/t74/reload44.mjs`), while our core serializes only a non-empty
+  `bindingPath`, so ours keeps the ribbon state from the designer's own record and
+  `getBindingSource()` reads null after such a reload. Closing this needs the core's GC.Data
+  data-manager binding — recorded for the core owner, not faked in the designer.
+
+### 3. Chart Design behaviour
+
+- `addChartElement` nests one flyout per element in the trial's row order (Axes, Axis Titles,
+  Chart Title, GridLines, Data Labels, Legend, Error Bars, Trendline — DOM order measured in
+  `flyout14-official.json`); the element rows are checkable menu items that write the OPPOSITE
+  of the current model state (a fresh chart has the vertical axis and its major horizontal
+  gridlines on, so clicking either row removes it — `measure24-official.json` flyout section),
+  the "More…" rows open the existing Format Chart Area / chart dialogs.
+- Quick Layout (10), Change Colors (17: 4 colorful + 13 monochromatic) and Chart Styles (6)
+  are real galleries: their thumbnails are our own vector previews composed from the same
+  preset tables the commands apply, and the popup geometry matches the trial (61×54 tiles in
+  rows of 3 / 224×38 color rows / 216×136 style tiles in rows of 4, identical x/y on both
+  products — `.probe/t74/measure43.mjs`).
+- Gallery item labels are the trial's (`ribbon.quickLayoutListContent`→"Layout1\nChart Title
+  \nLegend(Right)\n…", chart styles → "style1"…"style6", palettes → "Colorful Palette 4\n…"),
+  and every item carries its own `data-value` plus the launcher's `data-command`, exactly like
+  the trial's DOM; the palette hint line names the bands our own palette tokens resolve to.
+- Model writes verified live against the trial in the paired spec: axes rows, gridline rows,
+  `dataLabelsCenter`/`dataLabelsNone` (None clears only the show flag and keeps the position),
+  `legendLeft`/`legendNone`, Quick Layout 4, Chart Styles 3 and 4 (dark chart area
+  `rgb(93,93,93)`, legend to top), Change Colors → `chart.colorScheme()`;
+  `switchRowColumn`, `selectData`/`changeChartType`/`moveChart` (existing chart dialogs),
+  `chartAltText`, `FormatPane` (Format Chart Area dialog).
+
+### 4. Sparkline tabs
+
+- Cell tab: Type (line/column/win-loss, each reporting the current type as checked), Show
+  (six markers), Style (series + marker color pickers, the static "¾ pt" weight combo that
+  writes POINTS through the trial's 0.75 px↔pt rule and the Custom… dialog), Group
+  (group needs >1 selected sparkline, ungroup needs a real group, Clear split rows) — all
+  writing `SparklineSetting`/group state through the public API.
+- Formula tab: a single Argument group with `formulaSparklineSetting`, triggered by a
+  `*SPARKLINE()` formula in the active cell (verified on both products with a real click).
+- Visibility follows the ACTIVE cell, including the trial's multi-range quirk: a selection
+  that covers sparkline cells closes the tab when the active cell has none.
+
+### 5. Shape Format
+
+- Re-grouped to the trial's ten groups with the trial's ids (inline galleries
+  `insertShapeList`/`changeShapeStyle`, split buttons `shapeCommandGroup`,
+  `shapeCommandAlign`, `bringShapeForwardGroup`, `sendShapeBackwardGroup`, `shapeSize`
+  launcher, `selectionPaneButton`, `FormatPane`), the split-button ids routed to the existing
+  shape operations in `designer-shapes.ts` (align/distribute/snap/rotate/arrange/alt text)
+  so they act on the real shape selection; `FormatPane` opens the Format Shape panel for
+  shapes and the Format Chart Area dialog for charts.
+
+### 6. Tests written for this task
+
+- Unit: `packages/spread-sheets-designer/test/contextual-tabs.test.ts` — 33 tests
+  (tab structure per tab, active-cell/object trigger rules incl. the sparkline multi-range
+  quirk, activation vs non-activation, table conversion round trip + the binding-table refusal
+  + the rename keeps the converted state, chart element/gallery model writes, sparkline
+  commands, the three gallery label tables, enablement without a selection).
+- Paired (both products, same script, :5188): `apps/designer-compare/test/contextual.spec.ts`
+  — 4 tests: Table Design (rail/active/groups/checkbox identities/table-name combo/Banded
+  Rows both ways/convert+convert-from+binding-table refusal with the trial's message texts and
+  buttons/closing), Chart Design (rail/groups/element rows/galleries model writes/closing),
+  Sparkline cell + formula tabs (visibility without stealing the selection, trial single
+  Argument group, High Point + Column writes), mixed selections (object tabs replace the cell
+  tabs, Home regains them in the trial order).
+- Harness fixes inside that spec, each justified by a committed or fresh trial probe and none
+  of them loosening a comparison: the Sparkline-tab locator (`^Sparkline$` can never match —
+  both products duplicate the caption in `.sd-text-placeholer`, `measure36.mjs` tab dump; the
+  click now uses the same visible caption `rail()` reads); the gallery-item filter (it dropped
+  every item that shares the launcher's `data-command`, which the trial's own items do);
+  `ours.band.bindingBefore` (property path typo: the value is recorded at the top level); and
+  the old unit-test expectation that a raw `Table.bind()` makes a designer data table, which
+  the trial disproves (`convert42-official.json`) — it now asserts the trial's rule instead.
+
+### 7. Gates (TASK 74, this tree)
+
+- `pnpm -r build` ✓ · `pnpm coverage:api` ✓ (207/207 classes, 1796/1796 methods, 252/252
+  enums, 1369/1369 declarations) · `pnpm -r typecheck` ✓ · `pnpm -r test` ✓ (core 2321,
+  designer 292, compat 255, io 24, react 8, res-en 2, compare 4) · `pnpm lint` ✓ (0 problems).
+- Paired Playwright: `contextual.spec.ts` 4/4 · plus the neighbours the task touches
+  `shape-format.spec.ts` 1/1, `icon-menus.spec.ts` 23/23, `task68-dialogs.spec.ts` 1/1
+  (DESIGNER_URL http://127.0.0.1:5188).
+- No gate, threshold, mask or scenario content was changed; the only test edits are the four
+  harness/expectation fixes listed in §6, each backed by the probe evidence named there.
+- Known gaps after this task: the data-table persistence deviation in §2; the trial's
+  `Convert To Data Table` stores its source in the workbook's GC.Data section (core side);
+  the trial's error box renders a triangle/circle glyph set inside its own alert components,
+  ours uses the shared designer message-box markup (same text, same OK/Cancel, icon code
+  warning/error) — the shape of the glyph is a pre-existing message-box styling detail, not
+  changed here.
+
+## TASK 76 — Drop-in add-in packages for every official SpreadJS add-in (2026-11-20)
+
+The official trial ships its features as separate npm add-ins (`@mescius/spread-sheets-charts`,
+`-shapes`, `-print`, `-pdf`, `-languagepackages`, `-ganttsheet`, `-pivot-addon`,
+`-reportsheet-addon`, `-slicers`, `-tablesheet`, plus `-io` and `-barcode` which we already
+shipped). Our core contains all those features, but without packages of the same names an app
+could not alias them — not drop-in. This task adds the ten missing packages, each =
+`@opensheets/spread-sheets-<suffix>@0.1.0` (MIT, README, LICENSE), mirroring
+`packages/spread-sheets-barcode` (TASK 73).
+
+### 1. Ten new packages, one per official add-in
+
+- `packages/spread-sheets-{charts,shapes,print,pdf,languagepackages,ganttsheet,pivot-addon,reportsheet-addon,slicers,tablesheet}`
+  — 10 dirs × 8 files (`package.json`, `tsup.config.ts`, `tsconfig.json`, `README.md`, `LICENSE.md`,
+  `src/{index,install,browser}.ts`, `scripts/finalize.ts`, `test/addon.test.ts`).
+- Each publishes ESM + CJS + the script-tag build **under the official dist file name** (names
+  taken with `ls apps/designer-compare/node_modules/@mescius/spread-sheets-<name>/dist` only —
+  never opened): `gc.spread.sheets.charts.min.js`, `gc.spread.sheets.shapes.min.js`,
+  `gc.spread.sheets.print.min.js`, `gc.spread.sheets.pdf.min.js`,
+  `gc.spread.calcengine.languagepackages.min.js`, `gc.spread.sheets.ganttsheet.min.js`,
+  `gc.spread.pivot.pivottables.min.js`, `gc.spread.report.reportsheet.min.js`,
+  `gc.spread.sheets.slicers.min.js`, `gc.spread.sheets.tablesheet.min.js` (+ the `.esm.js`/`.cjs`
+  pair and side-effect `.d.ts`/`.d.cts`). No official package carries a `types` field (verified by
+  reading only the manifests as metadata), so the typings keep our established name convention;
+  they re-export nothing new (`import '@mescius/spread-sheets'; export {};`).
+- All three load paths land on one `install()` (`src/install.ts`): ESM entry imports the core peer,
+  CJS entry requires it, the script-tag build prefers `module/require`, then AMD, then `window.GC`.
+  Every feature these packages represent is already exposed by the core (unlike the barcode layer,
+  which the core keeps behind `_registerBarcodeFunctions`), so `install` is a **verified, documented
+  no-op**: it checks the found namespace (`GC.Spread.Sheets.Workbook` is a function) and warns —
+  never throws — when the host loaded no core (script order / missing alias). Loading twice, or from
+  two bundles, is idempotent. `install.ts` documents the single place a hidden activation hook
+  would be called if a future core build gated one of these features.
+- README "Install" section carries the **full alias list** (core + all 12 add-ins) so the copy-paste
+  recipe is complete in every package.
+- The tsup config runs its two builds concurrently, so `clean: true` once raced the IIFE output away
+  before `finalize` copied it (`ENOENT …umd.js` seen once under `pnpm -r build`); the new packages
+  omit `clean` and rewrite the fixed file set in place (comment in each `tsup.config.ts`).
+
+### 2. dropin-check: gated scenario `h-vite-addons` + official twin
+
+- `apps/dropin-check/templates/h-vite-addons` (gated): one Vite app whose `package.json` lists **all
+  thirteen** `@mescius/*` names mapped to our tarballs; `src/main.ts` imports every package (shapes
+  before charts, official order). Assertions (exact): sheet `Addons`, `=SUM(F2:F3)` → 2100, chart
+  `UnitsChart` (count 1), shape `Box` (count 1, filtered because the trial also lists charts inside
+  `shapes.all()`), pivot `pivotTable1` (count 1), pivot slicer `slicer1` (count 1, `columnName() ===
+  'Region'`), print preview — `printInfo().showGridLine(true)` round-trip **and** the paginator page
+  model `Print.WorksheetPaginator` reporting 2 pages across a manual `setRowPageBreak(8)`,
+  `workbook.print`/`savePDF` present, `=BC_QRCODE("Drop In")` → barcode record (`isBarcode`),
+  io-patched `Workbook.import/export/open/save` all functions, tablesheet/gantt/report/
+  language-packages namespaces present, `findControl(host) === workbook`, ≥ 1 canvas / 1 sheet host,
+  painted-pixels floor, every name resolving under `node_modules/@mescius/` with exactly **one**
+  core copy.
+- `apps/dropin-check/templates/z-official-addons` (black-box twin): byte-identical page script built
+  against the official trial packages from the workspace store. Reference run completes (REF, not
+  gated): 16/24 keys identical; the trial bundle answers `slicerCount 0`, `printPageCount null` and
+  no barcode record — measured, triaged with `.probe/t76/bisect{,2,3}.mjs` and documented in
+  `apps/dropin-check/README.md`: under bundler loading the trial's paginator throws inside
+  `paginate()`, its slicer add-in registers nothing, and its `BC_*` registration depends on the
+  bundler's CJS interop (all work in the script-tag bundles); the root `GC.Pivot` namespace exists
+  only there, so the sample keeps the default sum subtotal. No gate, threshold or scenario content
+  was weakened — these are the official build's own behaviours recorded as-is.
+- `pnpm dropin:check -- --pack` at task close: **9 gated runs green** (0 failures, 0 gaps) + 7
+  black-box reference runs (`c-umd-official` `ref~` timeout is the pre-existing GAP-52-4).
+
+### 3. Unit tests (10 × 4 = 40 new tests)
+
+- `test/addon.test.ts` per package: CJS `require` of the built dist twice → no error, no warning,
+  core still evaluates `=1+2`, and a feature probe exercises the layer end-to-end (chart added,
+  shape added, paginator 2 pages, PDF surface, `LanguagePackages.languagePackages` callable,
+  pivot created with row+value fields, report/gantt/tablesheet constructors, slicer bound to the
+  pivot); ESM `import` of the dist twice against the core instance the test itself imported; the
+  script-tag build evaluated **twice** in a `node:vm` realm on top of the real browser bundle →
+  formula still 3, no new enumerable keys on `GC.Spread.Sheets`, probe result unchanged; missing
+  core → exactly one warning naming the package (never a throw).
+
+### 4. Verification (this tree)
+
+- Gates: `pnpm -r build` ✓ · `pnpm coverage:api` ✓ (classes 207/207, methods 1796/1796, enums
+  252/252, declarations 1369/1369 — the new packages declare no public API, so nothing moved) ·
+  `pnpm -r typecheck` ✓ · `pnpm -r test` ✓ (core 2336, designer 275, compat 255, io 24, barcode 6,
+  **new add-ins 4 × 10**, react 8, designer-resources-en 2, compare 4) · `pnpm lint` ✓ ·
+  `pnpm dropin:check -- --pack` ✓ 9/9 gated green.
+- No existing test or gate was changed. `pnpm-workspace.yaml` (`packages/*`) picks the new packages
+  up automatically; `pnpm-lock.yaml` is untouched (the supervisor regenerates it at merge) — the
+  `@mescius/spread-sheets` workspace links the new packages need were created as pnpm would lay
+  them out.
+- Clean-room: official packages were only `ls`-listed and their `package.json` manifests read as
+  metadata (name/types/dist fields); no official `*.min.js`/CSS opened; nothing embedded from any
+  official rendering — these packages draw nothing at all (every painter lives in the core).
+
+## TASK 78 — Performance and memory under load vs the trial (2026-11-20)
+
+AGENTS.md "very fast" requirement, measured head-to-head against the official trial in
+the same headless Chromium on the same host page. Harness `.probe/t78/perf.mjs` (three
+phases x two rounds x both sides, interleaved), full tables + profiles + honest both-
+direction notes in `docs/PERFORMANCE.md` § "TASK 78". Only our build was ever profiled;
+the trial stayed a black box.
+
+### What was fixed (product code)
+
+1. **VLOOKUP over a reference table is scanned lazily** (`src/calc/functions/lookup.ts`):
+   no per-call `rowCount x colCount` materialisation; exact scans stop at the first hit
+   and read only the result cell. Same values/errors/order (7 contract tests,
+   `test/lookup-tables.test.ts`).
+2. **`formulasInRange` memoised per graph version** (`src/calc/engine.ts`,
+   `engine-deps.ts`): shared wide range-deps (16.6k formulas x $W$1:$X$500) are resolved
+   once per topo build instead of re-scanning 500 index rows each (8.3M Map lookups).
+   Together 1+2: full recalc of 200k rows + 50k mixed formulas **3.30 s -> 0.99 s**
+   (profile window; bench 1.09 s), now **1.71x faster** than the trial (1.87 s).
+3. **`sortRange` rebuilt as a store-level move** (`src/features/filters.ts` + ordered
+   traversals in `src/structures.ts`): whole cell records travel (values, styles, tags,
+   validators, hyperlinks, comments), formulas shift their relative refs by the move
+   delta, exactly one batched `RangeChanged (action sort)` — the trial's event contract,
+   probe `.probe/t78/dbg-sort-events.mjs`. 200k-row sort now 6.5 s vs the trial's
+   16.4 s (**2.5x**).
+4. **Search streams the sparse grid in scan order** (`src/search.ts` +
+   `orderedEntries`/`has`/`size` in `src/structures.ts`) with a dense-rectangle probe
+   mode, plus a formatter-epoch cache (`src/sheet-styles.ts`,
+   `src/features/conditional-formatting.ts`, `src/workbook.ts`): find-all 34 s ->
+   ~12 s vs the trial's ~20 s (**1.7x**).
+5. **Bulk calc coalescing** (`src/sheet-common.ts`, `src/sheet-cells.ts`): a suspended
+   write batch over `CALC_QUEUE_BULK_THRESHOLD = 8192` notifications flushes with one
+   whole-graph recalculation instead of per-cell reverse-edge walks; workbook- and
+   sheet-level suspends both counted. Full recalc 14 s -> 3.1 s (step 2 then -> 0.99 s).
+   Trial value-over-formula semantics preserved (probe `dbg-setvalue-formula.mjs`).
+6. **Suspended same-cell `setFormula` + `setValue` pairs keep the formula alive**
+   (`src/calc/engine.ts` `valueChanged`): the per-cell write queue is last-write-wins,
+   so the queued formula notification used to be replaced by the value one and the
+   engine never registered the formula (the store kept the plain value through every
+   recalculation). The value flush now registers a store formula the engine is missing
+   (plain formulas only; array-formula anchors untouched), restoring the un-suspended
+   behaviour exactly — found by the new bulk-semantics contract test, pinned below and
+   above the bulk threshold (`test/sort-search-perf-contract.test.ts`).
+
+### Memory (no leaks in ours)
+
+Workbook create+destroy x50 (500 live cells each) and Designer create+destroy x20: heap
+series flat across GC batches (62.4 -> 62.5 MiB workbook cycles; 62.5 -> 62.6 MiB
+designer cycles, both rounds), WeakRef survivors 0 (workbooks, hosts, designers), 0
+detached DOM nodes in a CDP heap snapshot, DOM node count stable. The official Designer
+keeps **one Workbook + one host element alive in total** across the 20 cycles
+(+1.8 MiB; `dgLiveWb: 1`, `dgLiveHosts: 1`, identical in both rounds — a global
+registry, not per-instance) — a trial-side retention we do not reproduce.
+
+### Verdict + one known gap
+
+After the fixes above, **every timed row in `docs/PERFORMANCE.md` § TASK 78 is a win or
+an rAF-quantization tie** (scroll, CF-active paint settle: both sides finish inside one
+frame, LoAF 0/0); the biggest margins are setArray 200k x 20 (33x) and 100k distinct
+styles + values (17.8x). ~~Known gap, documented not fixed: 100k *pairwise-distinct*
+`Style` objects cost ~127 MiB heap vs the trial's ~34 MiB because we store the user's
+`Style` by reference (the `getStyle()` mutation contract); stable, not a leak —
+closing it needs a copy-on-write style representation and was left out of this round.~~
+**→ Closed in TASK 79** (see § "TASK 79" below): the by-reference `Style` storage is
+what the trial itself does (black-box probe: `getStyle(r,c) === st` there too) and was
+kept; the gap came from per-instance font accessors + sliced strings + Map row stores,
+now 1.04x of the trial on the same benchmark (was 3.7x) and below it per-cell.
+
+### Gates
+
+- `pnpm -r build` — all packages built.
+- `pnpm coverage:api` — Classes 207/207, methods 1796/1796, enums 252/252,
+  declarations 1369/1369 (100.0% each).
+- `pnpm -r typecheck` — all workspaces Done.
+- `pnpm -r test` — 0 failures (spread-sheets 101 files / 2356 tests incl. the 13
+  TASK 78 contract tests in `sort-search-perf-contract.test.ts` and the 7
+  `lookup-tables.test.ts`; designer 32 files / 308; io, add-ins, compat all green).
+- `pnpm lint` — clean.
+
+All gates run against the final tree (after the `engine.valueChanged` same-cell fix).
+
+## TASK 79: style-heavy sheet memory — 100k pairwise-distinct Style objects (2026-11-20)
+
+Closed the one gap left by TASK 78 (ours +127 MiB vs the trial's +34 MiB on the styles
+phase). Full protocol, profile and tables: `docs/PERFORMANCE.md` § "TASK 79".
+
+**Profile first (mandated):** pre-fix CDP heap snapshot of the 100k-styles phase
+(2.27M nodes, dominator-tree retained sizes) — per Style: 224 B dictionary-mode
+`(object properties)` backing store (21.4 MiB) + a fresh `get`/`set` closure pair
+(5.4 MiB) from the per-instance `Object.defineProperty` the `font` setter installed,
+sliced font substrings (~5 MiB), and per-row `Map` cell stores (~1.1 KiB per
+20-column row). Black-box probe of the trial corrected TASK 78's root-cause note:
+the trial keeps `getStyle(r,c) === st` reference semantics too — the gap was
+allocation shape, not representation.
+
+**Fixes (public contract untouched, `packages/spread-sheets`):** `font` as a
+prototype accessor only (styles stay V8 fast-mode); bounded interning of font
+parts; lazy weight/style slots for plain shorthands; `SparseGrid` rows as sorted
+parallel arrays (`structures.ts` `SparseRow`) instead of per-row `Map`s;
+`setStyle` creates the record as `{ style }` directly; the exact shorthand is
+carried explicitly through `clone()`, `getActualStyle`, named-style resolution
+and serialization (`primitives.ts`, `sheet-styles.ts`, `serialization.ts`,
+`used-range.ts`).
+
+**Result (same harnesses, forced-gc heap deltas, ours before -> after vs trial):**
+styles-only 100k ladder 56.6 -> **17.7** vs 15.9 MiB; full T78 styles phase
+58.2 -> **20.1** vs 19.3 MiB (was 3.7x over the trial, now 1.04x — documented
+residual: the per-cell record + backing-store spill, ~2 MiB per 100k cells, vs
+the trial's denser cells); micro per-component slices all **below** the trial
+(100k user Styles 3.4 vs 4.3; kept by cells 6.9 vs 8.9). Fill speed improved in
+passage: T78-phase 100k setStyle 813-861 -> **591-603 ms**. Heap after `clear()`
+returns to baseline (63.4 vs 62.6 MiB) — no retention.
+
+### Gates (this round, all run on the final tree)
+
+- `pnpm -r build` — all packages built (apps/designer-compare included).
+- `pnpm coverage:api` — Classes 207/207, methods 1796/1796, enums 252/252,
+  declarations 1369/1369 (100.0% each).
+- `pnpm -r typecheck` — all workspaces Done.
+- `pnpm -r test` — 0 failures (spread-sheets 102 files / 2371 tests incl. the 14
+  new `task79-style-store.test.ts` and the new `structures.test.ts` `SparseRow`
+  case; designer 308; compat 255; io, add-ins, apps all green).
+- `pnpm lint` — clean.
+
+## TASK 77 — Finish the TASK 75 behaviour-parity sweep + designer cast cleanup
+
+**Goal.** Re-run the TASK 75 sweep (624 ribbon commands, both sides of `apps/designer-compare`
+through OUR dev server 5188) on this tree and decide every remaining row with evidence — product
+fix or recorded deviation; bring `packages/spread-sheets-designer/src` to 0 `as unknown as`
+double casts. Harness: the TASK 75 harness copied to `.probe/t77/t75` + `.probe/t77/t75r5`
+(the t77 variant adds the List Formulas report-sheet accessors), options `commands.txt` /
+`opts.js`, chunks of 25 POSTed to the probe sink (5193): runs `.probe/t77/run` (r2),
+`r3-sweep-*.jsonl` + `r3-DONE` and the confirming re-run `r4-sweep-*.jsonl` + `r4-DONE`
+(624/624, run against the shipped tree — the designer dist rebuilt 20:38 after the round-4
+pivot-behaviour edits, no shipped-src change since; per-command statuses identical to r3);
+probes `t77-dock.json`, `t77-picture-anchor.json`, `t77-sheetnames.json`,
+`t77-listformulas.json`, `t77-paste.json`, `t77-dialog-geometry.json`, `t77-follow.json`,
+`t77-reopen.json`, `t77-manualclose.json`, `t77-item2.json`, `t77-panel-activate.json`,
+`t77-official-labels.json`, `t77-merge-{official,ours}.json`, `t77-cf4.json`, `t77-cf5.json`
+(all under `.probe/t77/run/`).
+
+**Fixes landed (each with unit tests)**
+
+- *Paste family completion* (`commands/clipboard-actions.ts`, round 1 + this round):
+  `pasteLink` writes the trial's linked-formula block (every target cell becomes a reference to
+  its source cell; the shared-formula group coalesces byte-identically) — sweep `same`.
+  `pasteLinkedPicture` now reproduces the trial shape exactly: camera picture `Picture N` with
+  `cellRange` `=Sheet!$B$1:$E$2`, placed **20 px right and 20 px down from the paste target's
+  top-left cell** (a CONSTANT offset — proven by making the target row 30 px tall: the trial kept
+  y = target top + 20, probe `t77-picture-anchor.json`; the trial's own anchor JSON normalizes
+  the 20 px offset into `startPoint {row: at.row + 1, colOffset: 20}` at default heights) and
+  sized to the **source span + the 1 px right/bottom gridline** (248x40 → 249x41), with the
+  trial's numeric `allowResize: 0`. `shape.allowResize(0)` is written through the `DesignerShape`
+  view (core stores the value verbatim → accessors and JSON match).
+- *Shared right dock stack* (`dock-panes.ts`, `dock-stack.tsx`, `app.tsx`, `pivot-panel.tsx`,
+  designer.ts/api/commands/events, one TASK 77 CSS block): the Selection pane, the threaded
+  comments panel and the PivotTable field list dock in ONE stack, reproducing the trial layout
+  measured live (`t77-dock.json`): one open pane = 315 px flush right (grid viewport 263); two or
+  more open = the visible pane keeps 315 px and a 39 px tab rail (40x40 tabs, 20x20 icons — our
+  own vectors from icons.tsx — visible pane's tab with the trial's 3 px green left bar) sits
+  right of it (stack 354, viewport 224); opening a pane activates it, closing the visible pane
+  falls back to the previous pane, closing a pane removes its tab. Before this, two open panels
+  each took a dock slot and crushed our sheet viewport to **−40** — the root cause of the
+  TASK 75 `zoomSelection` "harness artifact"; the trial never lets the grid collapse. Our stack
+  geometry now equals the trial element-for-element (stack [286,179,354,519], rail
+  [601,179,39,519]). The Formula Editor panel (`showFormulaEditorPanel`) became an overlay above
+  the status bar: the trial's toggle changes neither the DOM layout nor the grid viewport
+  (measured; viewport height stays 471) while our dock row cost it 84 px.
+- *`rangeToPixels` latent bug* (`commands/insert.ts`): it passed `area=1` to getRowHeight /
+  getColumnWidth; 1 is `colHeader` in the core SheetArea enum, so row sums silently read the
+  constant 20 px header height (columns resolved to the viewport through the core fallback).
+  Now both use the viewport defaults (invisible in the compare workbook's uniform 20 px rows;
+  correct once rows have custom heights).
+- *Pivot command family* (round 2 — `pivot-designer.ts`, `pivot-dialogs.tsx`, `pivot-templates.ts`):
+  six of the seven TASK 75 `NotImplemented` pivot names implemented (calculated field/item
+  dialogs, solve-order list with move/delete, Options-sub, Show Report Filter Pages dialog,
+  style list content) and the List Formulas report sheet (trial-measured layout, byte-parity
+  proven in `t77-listformulas.json`); all seven now measure clean in the sweep.
+- *Pivot Field List follow mode + pivot tab activation* (round 4 — `designer-events.ts`,
+  `pivot-designer.ts`, `pivot-panel.tsx`, `designer-api.ts`/`designer.ts`
+  (`_pivotFieldListFollow`), `app-helpers.ts`, `contextual-ribbon.ts`): the trial rule measured
+  live (`t77-follow.json`, `t77-reopen.json`, `t77-manualclose.json`, `t77-item2.json`,
+  `t77-panel-activate.json`): (a) while follow mode is ARMED, a selection into a pivot opens the
+  panel (selection out closes, re-entering re-opens); (b) a MANUAL close disarms — the panel's X
+  button, the Field List toggle closing, or a Field List execution while NO pivot is active (that
+  last case is also a no-op on the trial: the guard opens nothing); (c) re-arming happens on pivot
+  creation or a Field List open on an active pivot; (d) every successful drag/drop ON the panel
+  ACTIVATES the pivot — the grid selection jumps to the pivot's top-left cell
+  (`activatePivotAtPanelDrop`, bubbling after the core panel's own drop handlers; armed → the
+  follow rule re-opens the panel, disarmed → selection jumps, panel stays closed); (e) the pivot
+  contextual tabs behave like the two Sparkline tabs — selection re-entry shows them WITHOUT
+  activating (`contextualTabsWithoutActivation`), only pivot creation activates, explicitly
+  `PivotTable Analyze` in `createPivot`; the ribbon's fresh-tab activation compares trigger
+  IDENTITY, so both pivot tabs now share ONE trigger function (`pivotTabTrigger`). Sweep
+  re-measured after these edits: 57 pivot-family rows = 54 `skew-same` + 2 `missing-official`
+  (palette-only labels) + 1 recorded `skew-diff` (item 3), per-command statuses unchanged.
+- *Command Palette protection labels* (`commands/index.ts`, `command-palette-groups.test.ts`):
+  the trial palette lists the resource texts `Protect Sheet...` / `Unprotect Sheet...`
+  (`t77-official-labels.json`); the Review ribbon caption is a separate
+  `cellFormatProtectSheet` name, so the palette specs now resolve through the resource table.
+- *`apps/designer-compare` home.spec coverage*: paired merge probes (`t77-merge-{official,ours}.json`)
+  showed the trial's `Merge Cells` menu writes a span only for a MULTI-cell selection (a 1x1
+  selection keeps `getSpan` null on both sides — the same rule the sweep measures as
+  `mergeCells: same`), so the spec now drives the dropdown with a 1x2 selection, asserts the span
+  `[1,1,1,2]` and unmerges through the same dropdown; the CF `Greater Than...` case asserts the
+  trial's dialog-confirm flow (`t77-cf4.json`/`t77-cf5.json`: dialog visible + 0 rules on click,
+  rules > 0 after OK; the bare command stays dialog-free on both sides).
+  Playwright `test/home.spec.ts` 4/4 green against 5188.
+- *Cast cleanup*: `git grep -c "as unknown as" packages/spread-sheets-designer/src` = **0**
+  (was 5 from TASK 75, +1 added by round 2). All routed through `core-internals.ts` typed views:
+  `_touchSummaryMarker` (OutlineInternals), getStyle/getActualStyle as records (recordView), the
+  `d.gc` Style constructor (`newStyle`/`createStyle` via `GCRoot`) and the List Formulas header
+  border (`BorderRecord` + `rangeWriter` relaxed-argument view — the core style layer stores a
+  plain `{style: 1}` border record verbatim, which is exactly the trial's serialized shape).
+
+**Final sweep totals (r4, 624 commands, 624/624 measured; per-command status identical to r3).**
+473 `same` (workbook JSON, sheet
+list, active sheet, selections and active cell all equal), 38 `noop`, **71 fixture-skew rows
+compared through the public accessors** (68 `skew-same` + 3 `skew-diff`), 41 names only our
+registry has, 1 name neither side has, **0 JSON `diff` rows** — the TASK 75 `zoomSelection` diff
+is gone: the whole viewport chain now tracks the trial (both sides 224x471 when Selection +
+threaded are open, 263 with a single pane, 578 closed), and the command gives the byte-identical
+`zoomFactor 1.60975609756` / `leftCellIndex 1` / `topCellIndex 1` in the sweep state (also 199x458
+scrollbar-clamped post-state on the trial side). 0 commands left our side with a non-positive
+viewport. `insertChart` (status `same`) still records a dev-side `NotImplemented` note — kept as
+the TASK 75 decision says (coverage-visible instead of silently inert; the trial's launcher has
+no model effect in the sweep context).
+
+**Remaining differences (reason + evidence).**
+1. `shapeGroup` — *recorded core gap* (unchanged from TASK 75): the trial answers `shapes.all()`
+   with one nested `GroupShape 1` entry (`grpSp` serialization); our core groups logically
+   (`Shape.groupId`) and keeps answering with the members. A fix needs the core nested-shape
+   model (serialization, `all()`, hit-testing, paint) — `packages/spread-sheets` is a forbidden
+   zone for this task; the command itself works (both sides group the two rects).
+2. `pasteLinkedPicture` — geometry + `allowResize` fixed above; the 1 remaining accessor diff is
+   API surface, and the contract check shows the TRIAL side is contract-conformant while OUR core
+   is the deviant: the official public d.ts declares `text()` only on `Shape`
+   (`Picture extends FloatingObject` and `PictureShape extends ShapeBase` carry no `text()`), so
+   the trial's linked-picture object answering `ABSENT` at accessor 11 is exactly its published
+   class. Our core declares `PictureShape extends Shape`
+   (`packages/spread-sheets/src/features/shapes.ts:866`), which hands linked pictures the
+   inherited `text()` (`''`). Re-parenting `PictureShape` is a core change (`packages/spread-sheets`
+   forbidden this task), and no designer-side route exists: the object is built by core
+   `shapes.addPictureShape`, and deleting a method off the core-built instance at runtime would
+   desync it from the typed contract on every other code path. Recorded; core follow-up:
+   re-parent `PictureShape` onto `ShapeBase` (keep the shared paint bits local).
+   Position/size/resize-semantics/JSON already match.
+3. `pivotTableListFormulas` — *recorded core gap*: the new report sheet's NAME differs (official
+   `Sheet2` vs ours `Sheet3`); the report CONTENT is identical. Probe `t77-sheetnames.json`: the
+   live-workbook counter rule matches the trial exactly (monotonic, names continue after
+   deletions on both sides) but the trial's `Workbook.fromJSON` rebases the counter to the loaded
+   sheets (next name `Sheet2` after loading a `[Data]` JSON) while our core keeps the session
+   counter (→ `Sheet6`). That is core Workbook behavior reached only through `wb.addSheet()`; no
+   designer-side public-API route reproduces the trial rule without breaking the trial's own
+   live rule: a designer-side name mirror seeded from a scan at load reproduces the load case,
+   but it cannot see the core's own naming (insertSheet/copy/`setSheetCount`-grown sheets keep
+   taking core-counter names), so a later mirror-chosen rename collides (fresh `[Data]` workbook:
+   insertSheet → core `Sheet2`, then a default-placement report → core names it `Sheet3` while a
+   load-seeded mirror would pick `Sheet2`), and rescan-based naming fails the afterDelete case
+   (probe: the trial continues `Sheet4`/`Sheet5` after deleting `Sheet2`/`Sheet3`). The report is
+   written onto a core-auto-named sheet (`wb.addSheet()` then `getSheet(i)` in `pivot-designer.ts`),
+   so only a core rebase reproduces the trial rule at every entry point. Follow-up recorded for
+   the core: rebase `nameCounter` on fromJSON.
+4. `contextMenuPasteSpecial` — guard row, `no-command-both`: the trial opens Paste Special through
+   `openPasteSpecialDialog`; the bare name is registered on neither side (kept in the list as a
+   guard) — no action.
+5. Viewport-model observations (all sweep rows still `same` — the models match byte-for-byte):
+   the trial's frozen-pane rows shrink `getViewportWidth/Height(1)` (it splits the viewport) while
+   ours reports the full viewport; hiding the sheet tab strip gains 6 px of grid height on our
+   side only; post-zoom our viewport keeps fractional scrollbar gutters (199.61 vs 199). Core
+   viewport/scrollbar metrics, model-neutral — recorded for the core follow-up list.
+
+**Tests / gates.** New `packages/spread-sheets-designer/test/task77-dock-panes.test.ts` (5 tests:
+open/activate/fallback/tab-activation/pivot-sync through the real command routing + the pure
+helpers); `task77-paste-parity.test.ts` picture expectations replaced by the trial-measured
+numbers plus a new discriminating case (3-row block, 34 px target row → constant offset);
+round 4 extended `task77-pivot-commands.test.ts` with the follow-mode rules (manual close —
+Field List toggle, panel X, no-active-pivot guard no-op — re-arming on create/open, drop
+activation jumping the selection to the pivot's top-left), `contextual-tabs.test.ts` (pivot tabs
+in the no-activation set + the shared-trigger identity) and `command-palette-groups.test.ts`
+(palette titles resolve through the real resource table); `apps/designer-compare/test/home.spec.ts`
+extended as described above and run green (Playwright 4/4 on 5188). Final gates re-run this round
+on the shipped tree: `pnpm -r build` (all packages), `pnpm coverage:api` (classes 207/207,
+methods 1796/1796, enums 252/252, declarations 1369/1369), `pnpm -r typecheck`, `pnpm -r test`
+(core 2336 / 99 files, designer 341 / 35, compat 255 / 4, io 24 / 5, barcode 6 / 2, react 8 / 1,
+resources 2 / 1, apps/compare 4 / 2 — 149 files, 2976 tests, all passing) and `pnpm lint` all
+green. Cast count: `git grep -c "as unknown as" packages/spread-sheets-designer/src` = **0**.
+Files touched: only `packages/spread-sheets-designer/**`, `apps/designer-compare/test/**` and
+`docs/STATUS.md` (forbidden zones untouched).
+
+## TASK 80 — Core code-quality sweep before the second release candidate (2026-11-21)
+
+No public API change, no behaviour change: coverage up, dead code out, casts
+down, the >3000-line data file split. All evidence under `.probe/t80/`.
+
+### 1. Unit-test coverage (packages/spread-sheets core src)
+
+Harness: v8 coverage was not installable offline (no downloads allowed), so the
+sweep uses our own per-line counter plugin (`.probe/t80/cov-plugin.mjs` +
+`cov-report.mjs`, `vitest.cov.config.mjs`): every statement/function/module-load
+point gets a mapped counter, worker flushes merged; declaration-only lines (types,
+data consts) are excluded from the denominator. The two timing-budget perf suites
+(`test/calc/performance.test.ts`, `test/performance.test.ts`) measure, not test,
+so they run uninstrumented in the normal suite and are excluded from this run
+(never masked: their pass/fail is verified in the regular gates below).
+
+| metric (instrumented TS lines) | before | after |
+|---|---|---|
+| total covered | 19412/38767 = **50.1%** | 28825/38603 = **74.7%** |
+| files under 60% | 65 | 43 |
+
+Full file list after the sweep: `.probe/t80/coverage.txt`. The remaining <60%
+files are dominated by (a) type/re-export modules whose lines erase at build
+(0%, annotation in the report), and (b) canvas-paint/geometry paths that are
+pinned by the Playwright pixel-parity gates and `apps/compare` galleries rather
+than jsdom unit tests.
+
+New tests (the 15 worst files + extra families, expectations recorded from the
+official trial by `apps/compare/scripts/oracle.mjs` under `TZ=UTC`, merged into
+`apps/compare/oracle/cases/97-t80-functions.json` and replayed in
+`test/calc-oracle-*.test.ts`): 16 new files, 578 new tests
+(`test/calc-oracle-{date,dynamic,engineering,extra,financial,logical,lookup,operators-math,stat,text}.test.ts`,
+`test/t80-{config-panel,datacharts-surface,filter-menu,gantt-arrows,glyphs,rendering-draw}.test.ts`).
+Suite grew 102 -> 118 files, 2371 -> 2949 tests. No existing test was weakened.
+
+### 2. Dead code
+
+Import-graph + declaration-reference analysis over core src (`.probe/t80/dead.mjs`,
+`deadcode.txt` / `deadcode-strong.txt`): **281 unused declarations** (functions,
+consts, re-exports) removed across 45 files — none reachable from the public `GC`
+namespace or any test (verified after the sweep: 0 of the 281 names remain
+declared; `deadcode-maybe.txt` keeps the borderline duck-typed cases we retained).
+
+### 3. Type safety (core `packages/spread-sheets/src`, add-ins checked too)
+
+| pattern | before sweep | after sweep |
+|---|---|---|
+| `as unknown as` (core) | 120 | **52** (-57%) |
+| `: any` type annotations (core) | 1 | **0** (one grep hit is comment prose) |
+| `@ts-ignore` / `@ts-expect-error` | 0 | 0 |
+| `eslint-disable` | 2 | 2 (both are the deliberate `Record<string, any>` JSON aliases in `features/charts/types.ts` + `datacharts/types.ts`) |
+
+The remaining 52 are documented seams: cross-feature duck typing where the
+official d.ts lies about runtime (setter-mode `undefined` returns through one
+`setModeResult = undefined as never` in `tablesheet/index.ts`), ES5 prototype
+wiring turned into constructors (`asCtor`/`asClass` in sparkline/barcode-ex,
+`commandTarget` in formula-panel, `staticThemeTable` in themes.ts — the bound
+function is constructible without a `prototype` own property, matching the
+trial), and read-only views onto other modules' internals
+(`rendering-draw.ts` `WorksheetPaintHooks`, `pivot/**` hosts). The add-ins are
+clean except `spread-sheets-react/src/props.ts`, whose four `any` props mirror
+`gc.spread.sheets.react.d.ts` verbatim (contract, kept), and two JSON-shape
+assertions in `spread-sheets-io` (kept; single-step assertions rejected by the
+checker, converting them would coerce values the reader must not change).
+
+### 4. Large files (> 3000 lines)
+
+- `features/table-theme-data.ts` 4876 -> split by style family along the natural
+  seam (pure const data moved, `table-theme-data.ts` re-exports): `table-theme-
+  {light,dark,medium,professional}.ts` + data 160 lines; largest part 2155.
+  Bundle unchanged: IIFE `gc.spread.sheets.all.min.js` 2.21 MB before and after
+  (`build.log` / `build-after.log`, delta 0.0%).
+- `pivot/pivot-table.ts` 2960 — under the threshold, left whole.
+- `generated/enums.ts` 3678 — tool-generated from the contract d.ts
+  (`packages/compat/scripts/generate.ts`); splitting it is a generator change
+  with no readability win, so it stays (documented exception).
+
+### 5. Gates (all run on the final tree, this round)
+
+- `pnpm -r build` — all packages built.
+- `pnpm coverage:api` — Classes 207/207, methods 1796/1796, enums 252/252,
+  declarations 1369/1369 (100.0% each).
+- `pnpm -r typecheck` — all workspaces Done.
+- `pnpm -r test` — 0 failures (spread-sheets 118 files / 2949 tests; designer
+  308; compat; io 24; add-ins and apps green). Instrumented coverage run:
+  116 files / 2941 tests green (the 2 excluded perf files pass in the regular
+  suite).
+- `pnpm lint` — clean.
+
+## TASK 82 — User documentation for the release (docs + runnable examples; no product change) (2026-11-21)
+
+Docs-only task: no file under `packages/*/src`, no CSS, no test or gate was
+touched (the concurrent designer work in strata2 untouched; forbidden zones and
+`pnpm-lock.yaml`/`package.json` files of existing packages untouched — the only
+package.json files written are the NEW ones under `examples/`, which the task
+allows, plus the `examples/*` line in `pnpm-workspace.yaml`).
+
+### 1. docs/MIGRATION.md (new)
+
+Switch guide for an existing SpreadJS 19.2.5 app: the `npm:` alias block for all
+**17** published packages (core, react, io, barcode, charts, shapes, print, pdf,
+languagepackages, ganttsheet, pivot-addon, reportsheet-addon, slicers, tablesheet,
+designer, designer-react, designer-resources-en; the task text said "13" — 17 is
+the actual published set), the one-core-copy rule (GAP-52-1/2 closed, no bridge
+needed), Vite / webpack / CommonJS-Node / script-tag notes (same dist file names,
+incl. our working React UMDs vs the official global-branch defect), the
+license-key section (`LicenseKey` is a writable never-read no-op; `SetLicenseKey`
+is not in the v19 public d.ts → remove or guard), the 7 core + 3 designer CSS
+theme file names (identical names, honest note that our themes are thin `@import`
+layers and all UI is vector-drawn), the **known deviations** list (DPR-2
+0.587–1.924 % masked-text residual with the TASK 57 root cause; open API gaps
+`shapeGroup`, `PictureShape.text()`, report-sheet name rebasing after `fromJSON`,
+viewport-metric edges; bounded modules IO/print/PDF/GC.Data/tablesheet/gantt/
+reportsheet/threaded-comments/chart-selection-frame), the **trial quirks we
+reproduce on purpose** (chart deferred-layout stamp, `dataRange()` throw +
+stale `chartType()` after series ops, legend node drop, CF `remove` last-rule
+quirk, sort-includes-header, 1900 date serial, hyperlink/slicer/PivotTableStyle
+behaviours) vs the trial-side defects we do **not** inherit, and a 6-step switch
+checklist. Every claim cites the STATUS.md/dropin-check section that measured it.
+
+### 2. examples/ (new; 4 minimal apps, each builds offline in the workspace)
+
+| App | Shape | Aliased packages (`link:` = the same keys as the registry `npm:` recipe) |
+| --- | --- | --- |
+| `vite-core` | Vite + TS, no framework | core |
+| `vite-react` | React 18 app | core, react wrapper (`<Worksheet dataSource>` + `<Column dataField headerText formatter width>` — exactly the official `ColumnProp`; `index`/`field` props do **not** exist in `gc.spread.sheets.react.d.ts`, the example follows the contract) |
+| `vite-designer` | Designer app | core, designer, designer-resources-en (`new Designer(host, undefined, seed.toJSON())`, `getWorkbook`/`activeRibbonTab`/`findControl`/`destroy` — the official designer d.ts exposes no public `execute()`, so none is shown) |
+| `script-tag-umd` | `<script>` tags only, no bundler | core `all.min.js` + io `min.js` (`window.GC`, XLSX export/import buttons, chart) |
+
+Each has a README with the exact registry alias block for real apps + the
+offline workspace recipe. Verified in this session (offline, packages built):
+`vite build` + `tsc --noEmit` green for the three Vite apps; `npm run build`
+(build.mjs) assembles a self-contained `dist/` for the script-tag app and
+`--check-only` verifies every referenced bundle/style file exists.
+`examples/*` was added to `pnpm-workspace.yaml`, so all four run inside
+`pnpm -r build`/`typecheck`; because pnpm does not topologically order `link:`
+specs, each example also lists the same packages as `workspace:*`
+**devDependencies** under their real `@opensheets/…` names (never imported —
+ordering only; the first concurrent run raced the core `clean.ts` and this
+fixes it deterministically). `pnpm -r test` skips them (no test scripts) and
+`pnpm lint` lints their TS sources clean.
+
+### 3. Root README
+
+Links to docs/MIGRATION.md + examples/; new **Packages** table (all 17
+`@opensheets/*` ↔ aliased official names, all version 0.1.0, one-line contents);
+new **Performance** table distilled from docs/PERFORMANCE.md (1M-row open 0.3 ms
+vs 1,164 ms; `setArray` 200k×20 33x; `setValue` 100k 309 vs 6,633 ms; formula
+chain 7x; 100k distinct styles ~24x; heap 131 vs 246 MiB; core 559 KiB gz vs
+1.86 MiB; designer 819 KiB gz vs 1.96 MiB) + the leak-verified note; Development
+notes that examples build with the packages.
+
+### Gates (all re-run on the final tree, this task)
+
+- `pnpm -r build` — all workspace members incl. the 4 examples: Done.
+- `pnpm coverage:api` — classes 207/207, methods 1796/1796, enums 252/252,
+  declarations 1369/1369 (100.0% each).
+- `pnpm -r typecheck` — all Done (examples included: 3× `tsc --noEmit` + the
+  script-tag `--check-only` check).
+- `pnpm -r test` — exit 0, no failures (core 118 files / 2949 tests re-verified
+  alone; designer 341, compat 255, io 24, react 8, barcode 6, res-en 2, compare 4,
+  the add-ins 4 each, designer-react green). No existing test or threshold
+  touched (docs + new example files only).
+- `pnpm lint` — clean.
+
+---
+
+## TASK 83 — Second release-candidate regression sweep (2026-11-21)
+
+No new features. Tree: `57e6f1f` (the F83 sync merge is empty — the F82 tree). Full paired
+Designer suite (`.probe/t83/designer.txt`, logs `.probe/t83/logs/{A..H}.log`, server 5186) and
+full apps/compare suite (`.probe/t83/compare.txt`, logs `.probe/t83/logs/cmp-*.log`, server 5190
+per `.probe/t70/run-compare.sh` — 5187 is the other flow's), chunk lists identical to TASK 70
+plus `contextual.spec.ts` (created by TASK 74) added to chunk C, so RC1's 272 designer tests are
+covered and 4 contextual tests are new coverage. No spec, threshold or mask was touched and no
+fixture regenerated anywhere in this task.
+
+### Paired Designer matrix vs RC1 (TASK 70)
+
+| chunk | specs | RC1 | this run |
+| --- | --- | --- | --- |
+| A | shell home panels precision file galleries menus data-regressions | 32 P, 1 S | 30 P, 1 S, **2 F (new)** |
+| B | adaptive barcode-shape-namespec context-* | 61 P, 21 F (DPR-2) | 59 P, **23 F** = 21 known DPR-2 + **2 new** |
+| C | context-entries context-dialogs contextual | 21 P | 25 P |
+| D | comments cell-styles-tiles context-tab-* context-tag | 25 P | 25 P |
+| E | dialogs format-cells-tabs | 58 P | 57 P, **1 F (new)** |
+| F | icon-menus | 23 P | 23 P |
+| G | page-layout-model shape-format pivot-designer | 10 P | 10 P |
+| H | chart-gallery group-flyout menus-dismiss task64/65/68 | 20 P | 20 P |
+| **total** | | 250 P, 1 S, 21 F | **249 P, 1 S, 26 F** |
+
+apps/compare: **245/245 green** (138/4/42/47/14) — identical to the TASK 72 baseline; zero core
+regressions. Drop-in: `pnpm dropin:check -- --pack` → **9 gated runs green, 0 failures, 0 gaps**
++ 5 black-box reference runs; `c-umd-official` again hits its 90 s trial-page ready timeout and
+gates nothing (reference-only, as recorded since TASK 58).
+
+### The 5 new failures = 3 regressions, all introduced after RC1, all in the DESIGNER package
+
+Every one reproduced deterministically (byte-identical percentages/messages on re-run); root
+causes are pinned by a worktree bisect (`node_modules` hard-linked, packages rebuilt per commit,
+the failing spec re-run against each server — `.probe/t83/wt-*`).
+
+**R1 — Remove Duplicates bare execute stopped opening the dialog** (data-regressions.spec.ts:5,
+45 s timeout on the OK click). Introduced by **F75 `5e14263`**: `designer-commands.ts` case
+`removeDuplicates` now runs `applyRemoveDuplicatesImmediate(d)` when `propertyName === undefined`
+("TASK 75 r3 probe: the trial de-duplicates right away, no dialog"). Live black-box re-probe on
+`?side=official` (2026-11-21, web-vision): a bare `getCommand('removeDuplicates').execute(designer)`
+with the spec's 4x2 selection **opens the "Remove Duplicates" dialog and changes no data** — the
+recorded probe no longer reproduces, and the paired spec (green through RC1) measures the same.
+Ours-side probe: command runs silently, no dialog. Suggested fix: drop the bare-immediate branch
+so every execute opens the dialog (re-measure first; if the trial really has a two-mode rule, it is
+not `propertyName === undefined` — the ribbon path must stay dialog too).
+
+**R2 — bare `executeCommand('fontWeight')` no longer bolds** (precision.spec.ts:71 and the
+format-cells-tabs.spec.ts:188 cell-button click, both `Expected: "bold", Received: "normal"`).
+Introduced by the same **F75 `5e14263`** change: `commands/actions.ts` `case 'fontWeight':
+setBold(d, args.value ?? false)` — a caller that passes no value now *writes* normal. Black-box
+facts measured today: the trial's `getCommand('fontWeight').execute(designer)` does materialise
+`{font:'normal',fontWeight:'normal'}` on a normal cell (consistent with F75's sweep and with the
+F75 designer unit test `test/commands.test.ts:30-37`, which stays green), **but the official
+Designer instance has no `executeCommand`/`execute` at all** (`typeof undefined` on
+`?side=official`) — so the bare `executeCommand` path is our own extension API (used by the cell
+button `ButtonClicked` handler, `designer-events.ts:85`) and its semantics are not constrained by
+the trial: RC1's toggle semantics (bold when the cell is not bold) are what both specs and the
+cell-button feature were built on. Suggested fix: when `executeCommand(name)` is called without
+propertyName/value for the font-family commands, compute the next state from the selection
+(currently effective weight) and pass it down; keep the bare `getCommand().execute` builtin path
+exactly as F75 measured. (The ribbon checkboxes already pass the explicit next value — they are
+unaffected; verified by the green shell/home/menus specs.)
+
+**R3 — adaptive Page Layout ribbon pixel gate regressed** (adaptive.spec.ts "Page Layout at 1280"
+0.193% → **0.612%**, "at 1024" 0.232% → **0.771%**, gate 0.5%; every DOM assertion passes; the
+DPR-2 variants worsened 1.469→1.655 / 1.597→1.837; 640 unchanged because the groups collapse).
+Bisect: clean at F71/F72/F73/**F75**, broken at **F74 `4696a6c`** (parent chain F73→F75→F74) and
+still broken at F77. Geometry is not the cause — ours' group/control boxes are pixel-identical
+between F71 and HEAD (diffed the `layout-and-pixels.json` attachments); it is paint: the Page
+Setup/Themes icon row, the Scale-to-Fit combos (spinner arrows, combo chrome) and the Sheet
+Options checkboxes changed rendering (diff maps `.probe/t83/page-layout-diff.png`,
+`.probe/t83/ours-f71-vs-head.png`; F74 is the icon-set task: +346 icons.tsx with new shared
+rect/path helpers, plus the `colorPicker-labeled`/`combo-static` classes, the CommandControl
+`visible === false` branch and the `contextualCommandState` merge in `designer-state.ts`). Fix is
+in the designer package (the designer coder's current area) — re-run
+`npx playwright test test/adaptive.spec.ts -g "Page Layout at (1280|1024):"` until back under the
+RC1 ~0.2% level; no threshold was touched here.
+
+### Examples (TASK 82) — all four built and opened once in the browser
+
+`vite-core` (formula chain paints, `=SUM(B2:B5)` → $726.13), `vite-react` (dataSource grid +
+currency formats), `script-tag-umd` (window.GC, chart, IO buttons) each show one painted canvas
+with an empty console/problems buffer. `vite-designer` **crashed** with
+`Cannot read properties of undefined (reading 'onOpenMenu')`: the example passed `seed.toJSON()`
+as the Designer's third constructor argument, but that parameter is a **Workbook instance** —
+probed on the trial: the official Designer *also* rejects a JSON third arg
+(`d.getHost is not a function`), so this was an example bug, not a product gap. Fixed the example
+to the official bind pattern (populate a Workbook on its own host, pass the instance; the Designer
+moves the host into the sheet area) — rebuilt dist, re-opened: full Designer with the seeded
+Forecast sheet (`=SUM` → 60750), painted canvas, empty problems buffer.
+Files: `examples/vite-designer/src/main.ts`, `examples/vite-designer/README.md` (no package touched).
+
+### Gates (this tree, after the example fix)
+
+`pnpm -r build` ✓ · `pnpm coverage:api` ✓ (classes 207/207, methods 1796/1796, enums 252/252,
+declarations 1369/1369) · `pnpm -r typecheck` ✓ (25 Done) · `pnpm -r test` ✓ (all packages Done,
+no failures) · `pnpm lint` ✓ clean. RC2 is blocked only on the three designer-package fixes above
+(R1, R2, R3), which are outside this task's allowed files.
+
+## TASK 84 — The three RC2 designer regressions fixed (2026-11-21)
+
+Product code only: `packages/spread-sheets-designer/src/{designer-commands.ts, ribbon/controls.tsx,
+dialogs/DataDialogs.tsx}` + one replaced and one new unit test in that package. No spec, threshold,
+mask or fixture was touched, nothing was skipped or weakened, and no gate number was relaxed.
+Tree at start: `e60066a`. Probes/scripts: `.probe/t84/` (`r1-r2-probe.json`, `r3-evidence.json`,
+`pl-gate.cjs`, `run-designer.sh`, counted-pixel maps, `logs/{A..H}.log`).
+
+### R1 — Remove Duplicates opens the dialog again (`designer-commands.ts`)
+
+TASK 75 (`5e14263`) had made a bare execute skip the dialog and de-duplicate the current region
+immediately ("TASK 75 r3 probe"). Live black-box re-probe today on `?side=official` (web-vision;
+evidence `.probe/t84/r1-r2-probe.json`): with the spec's fixture,
+`GC.Spread.Sheets.Designer.getCommand('removeDuplicates').execute(designer)` **opens the
+"Remove Duplicates" dialog and changes no data** (dialog title `Remove Duplicates`,
+`dataChanged: false`). TASK 75's own report already lists `removeDuplicates` among the 78
+dialog-opening sweep names, so the r3 exception contradicted the sweep it came out of. The bare
+branch and its helper (`applyRemoveDuplicatesImmediate` in `dialogs/DataDialogs.tsx`, plus the now
+unused `data-engine.removeDuplicateRows` import there) are removed: bare execute, ribbon execute and
+`executeCommand` all route to `showRemoveDuplicates()`.
+The TASK 75 unit test that pinned the immediate behaviour contradicted the live trial, so it was
+**replaced** with the trial behaviour (`test/task75-command-parity.test.ts`: bare + ribbon both open
+the dialog, workbook JSON unchanged). Paired spec `apps/designer-compare/test/data-regressions.spec.ts:5`
+green again: both sides open the dialog, OK yields
+`[['Name','Count'],['A',1],['B',2],[null,null],['Outside',3]]` and `D3='Keep'` survives.
+
+### R2 — bare `executeCommand('fontWeight')` toggles again (`designer-commands.ts`)
+
+Both trial facts hold and both are now respected: `getCommand('fontWeight').execute(designer)`
+materialises `fontWeight/font: 'normal'` on a normal cell (TASK 75 sweep, still pinned by
+`test/commands.test.ts:29-37`, unchanged and green), while the official Designer exposes **no**
+`executeCommand`/`Designer.execute` at all (`typeof undefined` on `?side=official`, TASK 83 and
+`.probe/t84/r1-r2-probe.json`) — so the bare `executeCommand` path is our own extension API (used by
+the `style.cellButtons` handler, `designer-events.ts:85`) and its RC1 contract is a toggle. TASK 75
+had applied the setter one layer too low (`commands/actions.ts`: `setBold(d, args.value ?? false)`)
+— the same layer the trial measures — so a value-less caller started *writing* normal. Fixed at the
+layer that is ours: `executeDesignerCommand` turns a call with neither `propertyName` nor `value`
+into exactly the shape the ribbon checkbox produces (property name + the NEXT state, computed by
+`nextFontToggle` with the same predicate that drives `checked`, `designer-state.ts:72`) before
+entering `command.execute`; `applyBuiltin` keeps the trial's setter semantics, so
+`executeBuiltin('fontWeight')` bare still writes normal. Verified live on `?side=ours` (weights
+`[null → bold → normal → normal]` for bare / bare / explicit-false).
+`precision.spec.ts:71` and `format-cells-tabs.spec.ts:188` (real click on a
+`command: 'fontWeight'` cell button) pass again; new `test/task84-command-paths.test.ts` (4 tests)
+pins bare-toggle, explicit-value-setter on both entry points, bare-builtin-still-writes-normal, and
+the R1 dialog routing. The ribbon checkboxes (which always pass the next value) are unaffected.
+
+### R3 — adaptive Page Layout pixel gate back to RC1 (`ribbon/controls.tsx`)
+
+Gate: `adaptive.spec.ts` "Page Layout at (1280|1024):", DPR 1, clip `0,0,W×142`, icon + licence boxes
+masked, threshold 0.5%. Reproduced with a standalone copy of `test/helpers.ts`'s capture/mask/compare
+maths (`.probe/t84/pl-gate.cjs`): **0.612% / 0.771%**, counted-pixel map
+`.probe/t84/r3-before-1280-counted.png`.
+Root cause (in the TASK 74 diff `4696a6c`; geometry was never involved): TASK 74 added the class
+`gc-designer-ribbon-combo-static` (`height:22px; line-height:22px; padding-left:4px`) for the new
+Sparkline **Weight** combo and applied it in `ComboBoxControl` to **every** static label
+(`printSize || name === 'sparklineWeight'`). The Page Layout Scale-to-Fit Width/Height combos
+(`fitPageWidth`/`fitPageTall`) had already been static labels before TASK 74, so they silently
+inherited the 4px left padding and their "Automatic" text sat 4px right of the trial's — doubled
+glyph ghosts in `.probe/t84/r3-before-1280-scalefit-3x.png`, invisible to every DOM assertion
+because the `data-command` box (the `.gc-designer-print-size` wrapper) did not move.
+Fix: the class is scoped to `sparklineWeight` again and the fit-pages labels render the plain
+`gc-designer-ribbon-text` as before TASK 74. Nothing was removed from the CSS and no TASK 74 feature
+was undone — the Sparkline tab keeps its static "¾ pt" label (`contextual.spec.ts` sparkline tests
+green, chunk C 25/25). Result **0.193% / 0.232%**, byte-identical to RC1 (`.probe/t83/wt-f73-pl.log`);
+DPR 2 returns to the RC1 levels **1.469% / 1.597%** (known-failing set, untouched). Full numbers and
+artifacts: `.probe/t84/r3-evidence.json`, `.probe/t84/r3-after-1280-counted.png`.
+
+### Full paired Designer suite after the fixes (A..H, TASK 83's chunk lists, `.probe/t84/run-designer.sh`, server 5186)
+
+| chunk | specs | RC1 (TASK 70) | TASK 83 | this run |
+| --- | --- | --- | --- | --- |
+| A | shell home panels precision file galleries menus data-regressions | 32 P, 1 S | 30 P, 1 S, 2 F | **32 P, 1 S** |
+| B | adaptive barcode-shape-namespec context-* | 61 P, 21 F (DPR-2) | 59 P, 23 F | **61 P, 21 F** = the 21 known DPR-2 |
+| C | context-entries context-dialogs contextual | 21 P | 25 P | **25 P** |
+| D | comments cell-styles-tiles context-tab-* context-tag | 25 P | 25 P | **25 P** |
+| E | dialogs format-cells-tabs | 58 P | 57 P, 1 F | **58 P** |
+| F | icon-menus | 23 P | 23 P | **23 P** |
+| G | page-layout-model shape-format pivot-designer | 10 P | 10 P | **10 P** |
+| H | chart-gallery group-flyout menus-dismiss task64/65/68 | 20 P | 20 P | **20 P** |
+| **total** | | 250 P, 1 S, 21 F | 249 P, 1 S, 26 F | **254 P, 1 S, 21 F** |
+
+All 21 remaining failures are the pre-existing DPR-2 pixel gates (chunk B); the three RC2
+regressions are gone. After the final source edits (the R2 layer move, the `editor` extraction and
+comment updates) `packages/spread-sheets-designer/dist` was rebuilt and the specs that cover the
+three fixes were re-run against the final build: `data-regressions` ✓, `precision` ✓,
+`format-cells-tabs -g "Cell Button"` 3/3 ✓, `contextual -g Sparkline` ✓, `adaptive -g "Page Layout"`
+DPR 1 3/3 ✓ (0.193 / 0.232 / 0.125%) with the DPR-2 trio unchanged at 1.469 / 1.597 / 1.159%.
+
+### Gates (final tree)
+
+`pnpm -r build` ✓ · `pnpm coverage:api` ✓ (classes 207/207, methods 1796/1796, enums 252/252,
+declarations 1369/1369) · `pnpm -r typecheck` ✓ (25 Done) · `pnpm -r test` ✓ (118+36 test files,
+2949 core + 345 designer tests, 0 failures) · `pnpm lint` ✓ clean.
+
+## TASK 81 — The three core-level parity gaps TASK 77 recorded
+
+TASK 77's 624-command behaviour sweep left exactly three rows whose root cause sat in the core
+(`packages/spread-sheets`): `shapeGroup`/`shapeUnGroup` (flat group model), `pasteLinkedPicture`
+(a `text()` accessor the official class never exposes) and `pivotTableListFormulas` (the report
+sheet NAME). All three are now fixed in the core, each rule measured on the live trial, each with
+unit tests; the whole sweep re-ran clean on the final tree.
+
+### 1. Nested shape groups — the trial's `grpSp` model (`features/shapes.ts`)
+
+The trial treats a group as a **first-class collection entry** (public d.ts:
+`GroupShape extends ShapeBase`). Our `GroupShape` now is one:
+
+- `shapes.all()` answers the group handle **instead of** its members (one entry `GroupShape 1`
+  after grouping two rects); `shapes.get(name)` still finds nested members (trial-probed);
+- grouping nests: `group([innerGroup, c])` keeps the inner group a group; ungrouping the outer
+  handle releases members into the group's old slot in member order, inner groups stay groups;
+- `group()` always creates a handle (empty selection -> empty group answering x/y/width/height
+  `-1`, rotate `0`; a single shape groups alone); a non-empty handle takes the slot of its
+  highest member minus the members left of it;
+- `group.add(shape)` moves a top-level shape in (the frame extends to cover it — probe
+  `t81-addmember`); `group.remove(shape)` detaches **and drops** the shape (neither `all()` nor
+  `get()` answers it afterwards — trial rule); deleting a group deletes its whole subtree;
+- **static frame geometry** (probe 2026-11-21, `shapeData.grpSp.grpSpPr.xfrm`): the group owns a
+  `chOff/chExt`-style layout snapshot taken at grouping time. `x()/y()` translate frame + members
+  together; `width()/height()` resize scales the frame and **re-derives every member from the
+  snapshot** — member moves since grouping are overwritten, unequal members scale by the same
+  factor, nested groups map recursively (probe `t81-movechain2`: a member moved to x=60 lands
+  back at x=25 after `outer.width(300)`, factor 300/230);
+- serialization: a group is ONE record — `{ typeName: '0', name, x, y, width, height,
+  shapeType: 3, children: [members…] }` (`shapeType: 3` is the group marker the trial's own
+  `grpSp` entry answers too); `fromJSON` rebuilds the nesting from `children` (nested handles,
+  loaded frames restored as-is) and folds the pre-TASK-81 flat `groupId` records back into
+  groups; round-trip is byte-stable;
+- names: `GroupShape N` follows the trial counter rules (constructor-made handles count as live;
+  `GroupShape 1` is retaken once freed; candidates after `#top-entries + 1`, probed `t81-groupnames2..5`).
+  Renaming a group re-keys the index and the members' membership key.
+- Rendering/painting: grouped members have no host of their own (`_dispose` on attach); the group
+  paints the composite from its static box, and the view schedule repaints the composite when a
+  member or the frame changes.
+
+New tests: `test/task81-nested-groups.test.ts` — **24 cases** (all()/get()/slot placement,
+nesting, add/remove/drop, move-chain + static-frame resize re-derivation, toJSON/fromJSON
+round-trip incl. nested and loaded frames, the `GroupShape N` name rules (10 probe-verified
+name cases), zIndex reorder, hit-test/paint at the handle, group-over-camera, legacy flat
+records).
+
+### 2. `PictureShape` no longer inherits `text()`
+
+Official d.ts: `text()` exists only on `Shape`; `PictureShape`/`CameraShape`/`ConnectorShape`/
+`GroupShape` extend `ShapeBase` directly and the trial confirms their `text`/`textColor` answer
+`undefined` (accessor 11 of the `pasteLinkedPicture` row). We re-parented the internal hierarchy
+(`ShapeBase -> ModelShape` carries the shared model machinery **without** the text accessors;
+`Shape` — and `FormControlShape` through it, as in the official d.ts — owns `text()`/`textColor()`;
+`PictureShape`/`CameraShape` hang directly off `ModelShape`) so a linked picture answers no
+`text()` and `pic instanceof Shapes.Shape === false` — matching the trial's accessor probe (our
+collection used to hand linked pictures the inherited `text()` -> `''`). Existing picture/camera
+behaviour tests stay green (`shapes.test.ts` adapted, not weakened). New test: `task81-shape-classes.test.ts` (5
+class-hierarchy/accessor cases). The designer-side completion of that row (camera shape pasted
+with the trial's exact anchor/`allowResize`) is in `commands/insert.ts` +
+`packages/spread-sheets-designer/test/task81-shape-parity.test.ts` (5 cases).
+
+### 3. Sheet-name counter rebased on `fromJSON` (pivot report sheet names)
+
+Probe evidence (re-probed 2026-11-21, `t77-sheetnames.json`): the trial restarts its generated
+`SheetN` counter on load at the number of loaded sheets (baseline 1) and then **skips numbers
+already taken** — after importing a `[Data]` workbook the next generated name is `Sheet2` — while
+the live monotonic rule (names continue after deletions) holds. `Workbook._rebaseSheetNameCounter()`
+now implements exactly that in `fromJSON`, and `addSheet`'s generation skips taken suffixes. The
+designer's List-Formulas report sheet (created core-side in `pivot-designer.ts`) therefore lands
+on the same sheet name as the trial: sweep row `pivotTableListFormulas` is clean (was: official
+`Sheet2` vs ours `Sheet3`). New test: `task81-sheet-names.test.ts` (4 cases) + designer
+`task77-pivot-commands.test.ts` gained the List-Formulas name assertion.
+
+### Full TASK 75 sweep re-run on the final tree (`.probe/t77`, round r85)
+
+624 commands, both sides live: **473 `same` + 71 `skew-same` + 38 `noop` + 41
+`missing-official` + 1 `no-command-both` -> 0 `diff`, 0 `sel-diff`, 0 `skew-diff`, 0 broken**
+(target hit). The three former gap rows — `shapeGroup`/`shapeUnGroup`, `pasteLinkedPicture` and
+`pivotTableListFormulas` — are now `skew-same` with `diffCount = 0`: their **public state**
+(every sheet name, active sheet, selection, and per `all()` entry the name/x/y/width/height/
+rotate/isVisible/isLocked/canPrint/dynamicMove/allowResize/text accessors — `text` answering
+ABSENT on pictures and groups on both sides) is identical to the trial, report-sheet name
+`Sheet2` included. What `skewPaths` records for them is serialization-representation only (the
+unchanged TASK 77-r2 classification: shape-JSON rows are compared through the public accessors):
+the official JSON stamps default shape flags (`isLocked: true`, `canPrint: true`, `dynamicMove`,
+`alt: ""`, …) plus a `shapeData` anchor blob while our serialization omits defaults and keeps
+the anchors as `startRow/…` fields (3–10 paths per row), and the pivot-fixture prep writes 3
+source-sheet cell styles on our side that the official JSON does not stamp.
+
+### Gates (this round, all run on the final tree)
+
+- `pnpm -r build` — all packages built (apps/designer-compare included).
+- `pnpm coverage:api` — Classes 207/207, methods 1796/1796, enums 252/252,
+  declarations 1369/1369 (100.0% each).
+- `pnpm -r typecheck` — all workspaces Done.
+- `pnpm -r test` — 0 failures, all 21 workspaces Done (spread-sheets 105 files / **2404** tests
+  incl. the new `task81-nested-groups` (24), `task81-shape-classes` (5), `task81-sheet-names` (4);
+  designer **347** incl. the new `task81-shape-parity` (5); compat, io, add-ins, apps all green).
+- `pnpm lint` — clean.
+- No designer CSS was needed (all three fixes are model-level); no `/* TASK 81 */` block exists
+  because none was added.

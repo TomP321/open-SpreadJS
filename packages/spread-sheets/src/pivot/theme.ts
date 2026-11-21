@@ -7,6 +7,7 @@
  */
 import type { Style, LineBorder } from '../primitives.js';
 import { instanceProperties } from '../not-implemented.js';
+import { asRecord } from '../object-access.js';
 
 /** Splits a CSS font shorthand into the parts the style object exposes. */
 function parseFont(value: string): { style?: string; weight?: string; size?: string; family?: string } {
@@ -117,7 +118,7 @@ export class PivotTableStyle {
     const out: Record<string, unknown> = {};
     for (const key of ['backColor', 'foreColor', 'borderLeft', 'borderTop', 'borderRight', 'borderBottom',
       'borderHorizontal', 'borderVertical', 'textDecoration', 'fontStyle', 'fontWeight', 'fontSize', 'fontFamily'] as const) {
-      const value = (this as unknown as Record<string, unknown>)[key];
+      const value = (asRecord(this))[key];
       if (value !== undefined) out[key] = value;
     }
     if (this.font !== undefined) out.font = this.font;
@@ -133,8 +134,8 @@ export class PivotTableStyle {
       else if (key === 'fontSize') this.fontSize = value as string;
       else if (key === 'fontFamily') this.fontFamily = value as string;
       else if (key === 'backColor' || key === 'foreColor' || key === 'textDecoration')
-        (this as unknown as Record<string, unknown>)[key] = value;
-      else if (key.startsWith('border')) (this as unknown as Record<string, unknown>)[key] = value;
+        (asRecord(this))[key] = value;
+      else if (key.startsWith('border')) (asRecord(this))[key] = value;
     }
   }
 
@@ -142,7 +143,7 @@ export class PivotTableStyle {
   _toJSON(): PivotStyleJSON {
     const out: Record<string, unknown> = {};
     for (const key of ['backColor', 'foreColor', 'borderHorizontal', 'borderVertical', 'borderLeft', 'borderTop', 'borderRight', 'borderBottom', 'fontFamily', 'fontSize', 'fontStyle', 'fontWeight', 'textDecoration'] as const) {
-      const value = (this as unknown as Record<string, unknown>)[key];
+      const value = (asRecord(this))[key];
       if (value !== undefined) out[key] = value;
     }
     if (this.font !== undefined) out.font = this.font;
@@ -162,9 +163,9 @@ export class PivotTableStyle {
     const color = (value: unknown): unknown =>
       typeof value === 'string' ? resolveThemeColor(value, scheme) : value;
     for (const key of ['backColor', 'foreColor'])
-      if ((this as unknown as Record<string, unknown>)[key] !== undefined) style[key] = color((this as unknown as Record<string, unknown>)[key]);
+      if ((asRecord(this))[key] !== undefined) style[key] = color((asRecord(this))[key]);
     for (const key of ['fontFamily', 'fontSize', 'fontStyle', 'fontWeight', 'font'])
-      if ((this as unknown as Record<string, unknown>)[key] !== undefined) style[key] = (this as unknown as Record<string, unknown>)[key];
+      if ((asRecord(this))[key] !== undefined) style[key] = (asRecord(this))[key];
     for (const key of ['borderLeft', 'borderTop', 'borderRight', 'borderBottom'] as const) {
       // `borderHorizontal`/`borderVertical` describe the grid lines between
       // cells; the trial paints them once, so they expand to one side only.

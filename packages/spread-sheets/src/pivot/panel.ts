@@ -147,7 +147,7 @@ export class PivotPanel {
     this.nameValue = String(name ?? '');
     this.pivot = pivotTable ?? null;
     this.host = host;
-    (pivotTable as unknown as { _panelInstances?: Set<PivotPanel> } | undefined)?._panelInstances?.add(this);
+    pivotTable?._panelInstances?.add(this);
     this.render();
   }
 
@@ -174,7 +174,7 @@ export class PivotPanel {
     this.pivot = pivotTable;
     // Keep a back-reference so the pivot re-renders the panel when its model
     // changes outside the panel (dialog renames, subtotal changes, ribbon commands).
-    (pivotTable as unknown as { _panelInstances?: Set<PivotPanel> })._panelInstances?.add(this);
+    pivotTable._panelInstances?.add(this);
     this.render();
   }
 
@@ -184,7 +184,7 @@ export class PivotPanel {
   }
 
   detach(): void {
-    (this.pivot as unknown as { _panelInstances?: Set<PivotPanel> } | null)?._panelInstances?.delete(this);
+    this.pivot?._panelInstances?.delete(this);
     this.root?.remove();
     this.root = null;
   }

@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-slicers",
+  "version": "0.1.0",
+  "description": "OpenSheets slicers add-in for the spreadsheet workbook, drop-in for the SpreadJS slicers add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.slicers.cjs",
+  "module": "./dist/gc.spread.sheets.slicers.esm.js",
+  "types": "./dist/gc.spread.sheets.slicers.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-slicers",
+    "opensheets-slicers",
+    "slicers",
+    "timeline",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.slicers.d.ts",
+        "default": "./dist/gc.spread.sheets.slicers.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.slicers.d.cts",
+        "default": "./dist/gc.spread.sheets.slicers.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

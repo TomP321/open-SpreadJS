@@ -15,6 +15,7 @@ import type { SlicerStyle, TimelineStyle } from './styles.js';
 import type { Worksheet } from '../../worksheet.js';
 import type { WorkbookRenderer } from '../../rendering.js';
 import type { JsonRecord } from '../../serialization.js';
+import { asRecord } from '../../object-access.js';
 
 const TimelineLevel = GC.Spread.Sheets.Slicers.TimelineLevel;
 
@@ -404,7 +405,7 @@ export class PivotTableTimelineSlicer extends PivotBoundSlicer {
     props.height = 145;
     // The trial timeline object does not expose the item-list members of the
     // base slicer; shadow them so the API surface matches.
-    const hidden = this as unknown as Record<string, unknown>;
+    const hidden = asRecord(this);
     for (const member of ['multiSelect', 'itemHeight', 'columnCount', 'sortState',
       'showNoDataItems', 'showNoDataItemsInLast', 'visuallyNoDataItems']) hidden[member] = undefined;
   }

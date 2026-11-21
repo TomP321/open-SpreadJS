@@ -17,7 +17,7 @@ import { rectToString, parseRanges } from './refs.js';
 import { groupPublicType } from './series.js';
 import { isDataChartType, buildDataChartSpace, rebuildDataRefs } from './data-charts.js';
 import { DEFAULT_COLOR_LIST } from './color-schemes.js';
-import { parseColor } from '../../colors.js';
+import {} from '../../colors.js';
 
 export interface BuildInput {
   chartType: number;
@@ -37,6 +37,11 @@ export interface BuildInput {
 function bubbleRefsFor(rect: RectLike, sheetName: string, orientation: number): JsonRecord[] {
   const out: JsonRecord[] = [];
   const rows = rect.rowCount, cols = rect.colCount;
+  /* Trial (TASK 75 sweep, `bubbleChart` over the single cell B2): a one-cell selection still
+   * gets ONE series — the cell is the y reference, there is no x reference at all and the
+   * bubble sizes fall back to the literal `1`. */
+  if (rows === 1 && cols === 1)
+    return [{ name: '', category: '', value: rectToString(rect, sheetName), size: null }];
   if (orientation === 1) {
     for (let j = 1; j < cols; j += 2) out.push({
       name: rectToString({ row: rect.row, col: rect.col + j, rowCount: 1, colCount: 1 }, sheetName),
@@ -87,7 +92,7 @@ export interface HeaderEdges {
   left: boolean;
 }
 
-function cellIsText(sheet: Worksheet, row: number, col: number): boolean {
+export function cellIsText(sheet: Worksheet, row: number, col: number): boolean {
   const value = sheet.getValue(row, col);
   return typeof value === 'string' && value.trim() !== '';
 }
@@ -183,7 +188,6 @@ function refsFor(rect: RectLike, sheetName: string, orientation: number, sheet?:
   );
 }
 
-
 /**
  * Orientation the trial picks on its own when `charts.add(...)` gets no `dataOrientation`
  * (TASK 53 `.probe/t53/probe-chart-bars.json`, TASK 54 `.probe/t54/probe-t54-chart-header.json`):
@@ -211,16 +215,6 @@ export function autoOrientation(dataRange: string, sheet?: Worksheet): number {
   if (!sheet) return rect.rowCount > rect.colCount ? 1 : 0;
   const data = regionOf(rect, headerEdgesOf(sheet, rect));
   return data.rowCount > data.colCount ? 1 : 0;
-}
-
-export function defaultColorFor(index: number, colorScheme?: [number, string[]]): JsonRecord {
-  const list = colorScheme?.[1]?.length ? colorScheme[1] : DEFAULT_COLOR_LIST;
-  const token = list[index % list.length];
-  const accent = /^accent (\d)(?: ([+-]?\d+(?:\.\d+)?))?$/i.exec(token);
-  if (accent && (accent[2] === undefined || accent[2] === '0')) return ACCENT_SOLID(Number(accent[1]));
-  const rgba = parseColor(token);
-  if (rgba) return { srgbClr: { val: [rgba[0], rgba[1], rgba[2]] } };
-  return ACCENT_SOLID((index % 6) + 1);
 }
 
 function seriesSpPr(chartType: number, index: number, withStyle: boolean): JsonRecord | null {
@@ -262,12 +256,14 @@ function buildSeries(chartType: number, refs: JsonRecord[], startIdx: number, wi
     const spPr = seriesSpPr(chartType, idx, withStyle);
     if (spPr) ser.spPr = spPr;
     if (meta.group === GroupType.scatter) {
-      ser.xVal = { numRef: { f: ref.category, numCache: { formatCode: 'General' } } };
+      // Trial (TASK 75): an empty category reference omits `xVal` entirely.
+      if (ref.category) ser.xVal = { numRef: { f: ref.category, numCache: { formatCode: 'General' } } };
       ser.yVal = { numRef: { f: ref.value, numCache: { formatCode: 'General' } } };
       if (meta.smooth !== undefined) ser.smooth = meta.smooth;
       if (meta.marker) ser.marker = { ...meta.marker };
     } else if (meta.group === GroupType.bubble) {
-      ser.xVal = { numRef: { f: ref.category, numCache: { formatCode: 'General' } } };
+      // Trial (TASK 75): like scatter, an empty category reference omits `xVal`.
+      if (ref.category) ser.xVal = { numRef: { f: ref.category, numCache: { formatCode: 'General' } } };
       ser.yVal = { numRef: { f: ref.value, numCache: { formatCode: 'General' } } };
       ser.bubbleSize = ref.size
         ? { numRef: { f: ref.size, numCache: { formatCode: 'General' } } }
@@ -339,7 +335,7 @@ function buildGroup(input: BuildInput, refs: JsonRecord[], axIds: number[], star
 /** Creates a full chartSpace model (trial default styles included). */
 export function buildChartSpace(input: BuildInput, colorScheme?: [number, string[]], sheet?: Worksheet): JsonRecord {
   if (isDataChartType(input.chartType)) {
-    return buildDataChartSpace({ ...input, colorSchemeList: colorScheme?.[1] });
+    return buildDataChartSpace({ ...input, colorSchemeList: colorScheme?.[1] }, sheet);
   }
   const space = chartSpaceDefaults();
   space.colorScheme = [0, [...DEFAULT_COLOR_LIST]];
@@ -372,14 +368,19 @@ export function buildChartSpace(input: BuildInput, colorScheme?: [number, string
   // volume BAR group (primary axis) + a stock group on a secondary pair.
   if (meta.group === GroupType.stock && rect) {
     const kind = Number(input.chartType);
+    /* Trial (TASK 75 r5 probe `.probe/t75r5/p4.json`, all four stock types over 1..5 data
+     * columns): the number of SERIES must match the stock family EXACTLY — HLC accepts 3,
+     * OHLC and VHLC 4, VOHLC 5; more or fewer columns all throw. */
     const need = kind === 49 ? 3 : kind === 50 ? 4 : kind === 51 ? 4 : 5;
-    if (kind !== 49 && refs.length < need) {
-      const order = kind === 50
-        ? 'opening price, high price, low price, closing price'
-        : kind === 51
-          ? 'volume traded, high price, low price, closing price'
-          : 'volume traded, opening price, high price, low price, closing price';
-      throw new Error(`To create this stock chart, arrange the data on your sheet in this order: ${order}. Use dates or stock names as label`);
+    if (refs.length !== need) {
+      const order = kind === 49
+        ? 'high price, low price, closing price'
+        : kind === 50
+          ? 'opening price, high price, low price, closing price'
+          : kind === 51
+            ? 'volume traded, high price, low price, closing price'
+            : 'volume traded, opening price, high price, low price, closing price';
+      throw new Error(`To create this stock chart, arrange the data on your sheet in this order: ${order}. Use dates or stock names as labels.`);
     }
     if (kind === 51 || kind === 52) {
       // The generic block above already pushed the primary cat+value pair;
@@ -412,6 +413,8 @@ export function buildChartSpace(input: BuildInput, colorScheme?: [number, string
   space.chart = {
     title: defaultTitle(),
     autoTitleDeleted: false,
+    // Freshly created charts answer `spPr: {noFill:true}` only (trial probe, TASK 75 r3):
+    // the `ln` marker comes from a deferred layout pass (or a reload), never at creation.
     plotArea: { ...(meta.hasAxes ? { axes } : {}), chartGroups: groups, spPr: { noFill: true } },
     legend: defaultLegend(meta.defaultLegendPos ?? 4),
     plotVisOnly: true,
@@ -427,7 +430,7 @@ export function rebuildRefs(space: JsonRecord, input: BuildInput, withStyle = tr
   const rect = parseRanges(input.dataRange)[0];
   if (!rect) return;
   if (space.chart.plotArea.plotAreaRegion) {
-    rebuildDataRefs(space, { ...input, colorSchemeList: space.colorScheme?.[1] as string[] | undefined });
+    rebuildDataRefs(space, { ...input, colorSchemeList: space.colorScheme?.[1] as string[] | undefined }, sheet);
     return;
   }
   const group = space.chart.plotArea.chartGroups[0];

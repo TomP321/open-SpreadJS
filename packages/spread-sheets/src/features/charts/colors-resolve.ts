@@ -8,12 +8,6 @@ import { tintColor } from '../../themes.js';
 import { colorObjectToGetter } from './tokens.js';
 import type { Worksheet } from '../../worksheet.js';
 
-const KEY_BY_VAL: Record<number, string> = {
-  0: 'background 1', 1: 'text 1', 2: 'background 2', 3: 'text 2',
-  4: 'accent 1', 5: 'accent 2', 6: 'accent 3', 7: 'accent 4', 8: 'accent 5', 9: 'accent 6',
-  10: 'hyperlink', 11: 'followed hyperlink',
-};
-
 /** Resolve a scheme token like `accent 2 -40` through the sheet theme. */
 export function resolveToken(sheet: Worksheet | undefined, token: string): string | null {
   const match = /^(background [12]|text [12]|accent [1-6]|followed hyperlink|hyperlink)(?: ([+-]?\d+(?:\.\d+)?))?$/i.exec(String(token ?? '').trim());
@@ -50,13 +44,4 @@ export function resolveChartColor(value: unknown, sheet: Worksheet | undefined, 
   const rgba = parseColor(text);
   if (rgba) return `rgb(${rgba[0]},${rgba[1]},${rgba[2]})`;
   return text === 'transparent' ? 'transparent' : fallback ?? null;
-}
-
-/** Theme colour object for a scheme index inside chartSpace JSON. */
-export function schemeColorCss(val: number, lumMod: number[] | undefined, lumOff: number[] | undefined, sheet: Worksheet | undefined): string | null {
-  const part = KEY_BY_VAL[val] ?? 'text 1';
-  const mod = (lumMod?.[0] ?? 100000) / 1000;
-  const off = (lumOff?.[0] ?? 0) / 1000;
-  const tint = off > 0 ? off : mod < 100 ? -(100 - mod) : 0;
-  return resolveToken(sheet, `${part} ${tint}`);
 }

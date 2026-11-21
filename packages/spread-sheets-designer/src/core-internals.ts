@@ -14,6 +14,19 @@ import core from '@mescius/spread-sheets';
 import type GC from '@mescius/spread-sheets';
 import type { CommentUiFacade } from './designer-api.js';
 
+// TASK 72: the trial registers the `BC_*` barcode formulas when the barcode add-in package
+// (`@mescius/spread-sheets-barcode`) loads, never from the core (black-box: core-only evaluates
+// `BC_QRCODE("x")` as `#NAME?`; after the add-in loads it evaluates the barcode record). Our
+// Designer bundles that add-in feature, so loading the Designer registers the formula layer on
+// the paired core — the same point the add-in occupies in the official install. TASK 73 moved
+// the registration behind the core's non-enumerable `_registerBarcodeFunctions` hook, which is
+// exactly what the published `@opensheets/spread-sheets-barcode` add-in calls.
+{
+  const register = sheetsNamespace(core)._registerBarcodeFunctions;
+  if (typeof register === 'function') register();
+  else console.warn('[OpenSheets Designer] the paired core exposes no _registerBarcodeFunctions hook; BC_* formulas stay #NAME?');
+}
+
 /* -------------------------------------------------------- contract types --- */
 
 export type Workbook = GC.Spread.Sheets.Workbook;
@@ -71,6 +84,12 @@ export function recordView<T extends object>(value: T): T & Record<string, unkno
 export interface SheetsNamespaceExtras {
   Designer?: unknown;
   DesignerResources?: Record<string, unknown>;
+  /** Hidden, non-enumerable barcode-layer hook of the core (TASK 73; the add-in package calls it the same way). */
+  _registerBarcodeFunctions?: () => void;
+  /** Hidden hook of the core that switches on the Designer serialization behaviour (eager printInfo,
+   *  shared-formula coalescing — TASK 75); `installDesigner()` calls it, tests use it to measure the
+   *  exact trial JSON shape without mounting a Designer. */
+  _setDesignerSerialization?: (on: boolean) => void;
 }
 export function sheetsNamespace(gc: GCRoot): SheetsNamespaceExtras & GCRoot['Spread']['Sheets'] {
   return extendView<SheetsNamespaceExtras, GCRoot['Spread']['Sheets']>(gc.Spread.Sheets);
@@ -104,6 +123,9 @@ export interface ClipboardSource { sheetName: string; row: number; col: number; 
 export interface SheetView {
   scrollX: number; scrollY: number; zoom: number;
   headerWidth: number; headerHeight: number; viewportX: number; viewportY: number;
+  /** Pixel width/height of the whole grid surface (canvas incl. the header strips) —
+   *  the fallback viewport the Zoom To Selection command measures on headless hosts (TASK 75). */
+  viewWidth?: number;
   /** Pixel height of the grid viewport (below it come the sheet tabs). */
   viewHeight?: number;
   /** Grid hit test for a pixel point (context-menu target resolution). */
@@ -124,12 +146,18 @@ export interface SheetInternals {
   _shiftColumnsInRows(col: number, count: number, rowStart: number, rowEnd: number, remove: boolean): void;
   /** Core clipboard state of the sheet (designer Paste / Insert Cut Cells menus read it). */
   _clipboardMode(): 'none' | 'copy' | 'cut';
+  /** Last `sortRange` result serialized as the sheet's `sortState` (trial parity, TASK 75). */
+  sortStateValue: Record<string, unknown> | null | undefined;
   _clipboardSource(): ClipboardSource | null;
   _clipboardClear(): void;
   /** Copy/cut the current selection through the interaction controller (ribbon Copy/Cut). */
   _clipboardCopy(cut: boolean): void;
   /** Last used-range cell, `{ row: -1, col: -1 }`-style when the sheet is empty. */
   _usedRange(): { row: number; col: number };
+  /** Fill-copy style record for a source cell (trial parity, TASK 75). */
+  _fillStyleRecord(row: number, col: number): Record<string, unknown>;
+  /** Re-base a formula's relative references by the given row/column delta. */
+  _translateFormula(formula: string, rows: number, columns: number): string;
   /** Row and column indexes with a manual page break. */
   _manualPageBreaks(): { rows: number[]; cols: number[] };
   /** Renderer view of the workbook (pixel scroll/zoom the draw overlay maps pointer events through). */
@@ -154,6 +182,9 @@ export interface SheetInternals {
   outlineColumnOptions?: Record<string, unknown>;
   /** Default row height of the sheet (Standard Height dialog reads it; the contract only lists the `defaults.rowHeight` record). */
   getDefaultRowHeight(): number;
+  /** Workbook the sheet belongs to (implemented by our core; the contract lists no such member).
+   *  Read for the workbook-default font when materialising the cleared-cell style record (TASK 75). */
+  parent?: Workbook;
 }
 
 /** Typed view of a worksheet's non-contract members (same object, broader type). */
@@ -187,12 +218,42 @@ export function printInfoOf(sheet: Worksheet): PrintInfo {
   return sheet.printInfo() as PrintInfo;
 }
 
+/* ------------------------------------------------------ outline internals --- */
+
+/**
+ * Row/column outline (`sheet.rowOutlines` / `sheet.columnOutlines`) as our core implements
+ * it: the ribbon Show Detail materialises the collapsed group's summary marker through this
+ * non-contract member (TASK 75 probe — the trial serialises the marker at the group start).
+ */
+export interface OutlineInternals {
+  _touchSummaryMarker?(index: number): void;
+}
+export function outlinesOf(outline: GC.Spread.Sheets.Outlines.Outline): OutlineInternals & GC.Spread.Sheets.Outlines.Outline {
+  return extendView<OutlineInternals, GC.Spread.Sheets.Outlines.Outline>(outline);
+}
+
+/** Table style record returned by `table.style()` / accepted by `table.style(value)`. */
+export type TableTheme = GC.Spread.Sheets.Tables.TableTheme;
+
+/**
+ * A nameless empty `TableTheme` — the "no table style" state the trial keeps after the Table
+ * Styles gallery Clear (TASK 77 probe: `table.style()` then answers a name-less theme and the
+ * serialized table omits the `style` key). Passing `null` instead would leave the core paint
+ * path a value without `_style` to dereference (the trial's own guard; our core has none yet),
+ * so the designer clears a table style by assigning this empty theme.
+ */
+export function emptyTableTheme(gc: GCRoot): TableTheme {
+  return new gc.Spread.Sheets.Tables.TableTheme();
+}
+
 /* ------------------------------------------------------ table internals --- */
 
 /** Internal table members the Table Rows/Columns insert/delete commands use. */
 export interface TableInternals {
   _growRowCount?(delta: number): void;
   _growColCount?(delta: number): void;
+  /** Rebuild the table around a new outer range (the "Resize Table" dialog). */
+  _resize?(range: { row: number; col: number; rowCount: number; colCount: number }): void;
 }
 
 export function tableInternals(table: Table): TableInternals & Table {
@@ -219,6 +280,12 @@ export interface DesignerShape {
   isSelected(value?: boolean): unknown;
   /** Shape visibility (the Selection pane eye toggle; the contract Shape inherits it from FloatingObject). */
   isVisible(value?: boolean): unknown;
+  /**
+   * Floating-object resize permission (core stores the value verbatim). The trial's Paste Linked
+   * Picture shape serializes the numeric `0` — not `false` — and answers `allowResize()` the same
+   * way, so the designer writes the trial's own value through this view (TASK 77 probe).
+   */
+  allowResize(value?: number | boolean): unknown;
   /** Floating-object kind tag ('0' shape, '1' picture, …). */
   typeName?: string;
   x(value?: number | string): unknown;
@@ -262,6 +329,8 @@ export interface ShapeCollectionInternals {
   addCameraShape(name: string, cellRange: string, x?: number, y?: number, width?: number, height?: number): DesignerShape;
   addFormControl(name: string, control: { objectType: string }, x?: number, y?: number, width?: number, height?: number): DesignerShape;
   addPictureShape(name: string, src: string, x?: number, y?: number, width?: number, height?: number): DesignerShape;
+  /** Core-only (like uniqueName/nextName): rebuild nested shape records (TASK 81 group paste). */
+  importShapes(records: Record<string, unknown>[]): unknown[];
 }
 
 export function shapesOf(sheet: Worksheet): ShapeCollectionInternals & Worksheet['shapes'] {
@@ -342,6 +411,23 @@ export function workbookInternals(workbook: Workbook): WorkbookInternals & Workb
   return extendView<WorkbookInternals, Workbook>(workbook);
 }
 
+/**
+ * `workbook.options` as the designer reads/writes it: the contract interface lists the
+ * documented flags only, while the trial keeps ribbon state in extra keys —
+ * `highlightInvalidData` (Circle Invalid Data / Clear Invalid Circles; the key exists only
+ * while the circles are shown, TASK 75 probe) and the workbook default `font` (the cleared
+ * cell style materialises it).
+ */
+export function workbookOptionsRecord(workbook: Workbook): Record<string, unknown> {
+  return recordView(workbook.options) as Record<string, unknown>;
+}
+
+/** The workbook default font string, when it carries one (cleared-style record, TASK 75). */
+export function workbookDefaultFont(workbook: Workbook | undefined): string | undefined {
+  const font = workbook === undefined ? undefined : workbookOptionsRecord(workbook).font;
+  return typeof font === 'string' ? font : undefined;
+}
+
 /* ---------------------------------------------- relaxed-argument views --- */
 
 /**
@@ -362,6 +448,25 @@ export interface HyperlinkWriter {
 }
 export function hyperlinkWriter(sheet: Worksheet): HyperlinkWriter & Worksheet {
   return extendView<HyperlinkWriter, Worksheet>(sheet);
+}
+
+/**
+ * A plain border record in the trial's serialized shape. `Range.setBorder` is contracted to take a
+ * `LineBorder` instance; the core style layer stores whatever value it is handed and serializes it
+ * verbatim, so the designer can write the trial's exact `borderBottom: {style: 1}` record
+ * (TASK 77 probe — the List Formulas report header border serializes no color).
+ */
+export interface BorderRecord { style?: number; color?: string; dashStyle?: number }
+export interface RangeWriter {
+  setBorder(value: BorderRecord | GC.Spread.Sheets.LineBorder, options: {
+    all?: boolean; outline?: boolean; inside?: boolean;
+    innerHorizontal?: boolean; innerVertical?: boolean;
+    top?: boolean; left?: boolean; right?: boolean; bottom?: boolean;
+  }): void;
+}
+/** Works on `Range` and on the `CellRange` the contract types `sheet.getRange` as returning. */
+export function rangeWriter<R extends object>(range: R): RangeWriter & R {
+  return extendView<RangeWriter, R>(range);
 }
 
 /** `Worksheet.rowFilter` viewed with the `null` our core accepts to remove the filter. */
@@ -398,12 +503,18 @@ export function conditionRulesOf(sheet: Worksheet): CellValueRuleWriter & Worksh
  */
 /** One rule as the manager reads it: `stopIfTrue` is the only member called directly. */
 export interface ConditionRuleView { stopIfTrue(value?: boolean): unknown }
+/**
+ * Data-bar rule as our core implements it: `gradient` is the solid-fill gallery marker the
+ * ribbon writes after `addDataBarRule` (TASK 75 probe; the contract's `ConditionRuleBase`
+ * return type declares no such member).
+ */
+export interface DataBarRuleView { gradient(value?: boolean): unknown }
 export interface ConditionalFormatsInternals {
   getRules(): unknown[];
   getRule(index: number): ConditionRuleView | undefined;
   removeRule(rule: unknown): void;
   addRule(rule: unknown): unknown;
-  addDataBarRule(minType: number, min: unknown, maxType: number, max: unknown, color: string, ranges: unknown[]): unknown;
+  addDataBarRule(minType: number, min: unknown, maxType: number, max: unknown, color: string, ranges: unknown[]): DataBarRuleView;
   add2ScaleRule(minType: number, min: unknown, minColor: string, maxType: number, max: unknown, maxColor: string, ranges: unknown[]): unknown;
   add3ScaleRule(minType: number, min: unknown, minColor: string, midType: number, mid: unknown, midColor: string, maxType: number, max: unknown, maxColor: string, ranges: unknown[]): unknown;
   addIconSetRule(iconSetType: number, ranges: unknown[]): unknown;
@@ -520,4 +631,20 @@ export function dataValidationFactory(gc: GCRoot): NumberValidatorFactory & GCRo
 export function createStyle(gc: GCRoot, options: Record<string, unknown>): Style {
   const Ctor = gc.Spread.Sheets.Style as (new (options: Record<string, unknown>) => Style) & typeof gc.Spread.Sheets.Style;
   return new Ctor(options);
+}
+
+/** A fresh empty `Style` from the core the designer runs against (the gallery/paste paths build one and assign the record onto it). */
+export function newStyle(gc: GCRoot): Style {
+  return createStyle(gc, {});
+}
+
+/**
+ * The `CellTypes` namespace viewed as a name -> constructor record: the Cell Types gallery
+ * resolves the built-in and add-in-registered types by their class name (the contract
+ * declares each class individually, which a dynamic lookup cannot index).
+ */
+export interface CellTypesRecord { [name: string]: (new () => unknown) | undefined }
+export function cellTypesNamespace(gc: GCRoot): CellTypesRecord {
+  const ns = gc.Spread?.Sheets?.CellTypes ?? {};
+  return extendView<CellTypesRecord, object>(ns);
 }

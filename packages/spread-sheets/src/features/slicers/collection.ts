@@ -52,8 +52,7 @@ export class SlicerCollection {
 
   private addPivot(slicerName: string, ptName: string, field: string,
     style: unknown, timeline: boolean): Slicer {
-    const holder = this.sheet as unknown as { pivotTables?: { get(n: string): unknown } };
-    if (!holder.pivotTables?.get(String(ptName)))
+    if (!this.sheet.pivotTables?.get(String(ptName)))
       throw new Error(`The pivot table ${ptName} does not exist.`);
     const existing = this.get(slicerName);
     const slicer = timeline
@@ -115,8 +114,7 @@ export class SlicerCollection {
       if (type === 'pivot' || type === 'timeline') {
         // The trial keeps the pivot binding + selection in the workbook-level
         // `slicerCaches` section; the sheet entry only carries geometry/state.
-        const caches = (this.sheet.parent as unknown as { _pendingPivotSlicerCaches?: JsonRecord[] })
-          ._pendingPivotSlicerCaches;
+        const caches = this.sheet.parent?._pendingPivotSlicerCaches as JsonRecord[] | undefined;
         const cache = Array.isArray(caches)
           ? caches.find(item => String(item.name) === String(json.slicerCacheName ?? ''))
           : undefined;
@@ -175,8 +173,7 @@ export class SlicerCollection {
   /** Trial shape: each pivot slicer also writes a workbook `slicerCaches` entry. */
   _toPivotCachesJSON(): JsonRecord[] {
     const out: JsonRecord[] = [];
-    const holder = this.sheet.parent as unknown as { getSheetIndex?(name: string): number } | undefined;
-    const tabId = (holder?.getSheetIndex ? holder.getSheetIndex(this.sheet.name()) : 0) + 1;
+    const tabId = (this.sheet.parent?.getSheetIndex?.(this.sheet.name()) ?? 0) + 1;
     for (const item of this.items) {
       const toCache = (item as { _toCacheJSON?(tabId: number): JsonRecord | null })._toCacheJSON;
       if (typeof toCache !== 'function') continue;

@@ -9,6 +9,7 @@ import type { IDataChartConfig, IPlotConfigTextOption, IPaletteItemOption, IForm
 import type { Row } from './binding.js';
 import { bindHierarchy, bindPlot, formatNumber, type BoundPlot } from './binding.js';
 import { paintPolar, paintTree, paintScatterMarks } from './paint-extra.js';
+import { asRecord } from '../object-access.js';
 
 export interface Rect { x: number; y: number; width: number; height: number }
 
@@ -236,10 +237,10 @@ function hookTableRepaint(table: object, workbook: TableWorkbook): void {
     owners.add(workbook);
     const schedule = (): void => { try { workbook._renderer?.()?.schedule?.(); } catch { /* headless */ } };
     for (const method of ['insertItem', 'updateItem', 'removeItems', 'saveItem', 'resetItem', 'fetch']) {
-        const original = (table as unknown as Record<string, unknown>)[method];
+        const original = (asRecord(table))[method];
         if (typeof original !== 'function') continue;
         const fn = original as (...args: unknown[]) => unknown;
-        (table as unknown as Record<string, unknown>)[method] = (...args: unknown[]): unknown => {
+        (asRecord(table))[method] = (...args: unknown[]): unknown => {
             const result = fn.apply(table, args);
             schedule();
             if (result && typeof (result as Promise<unknown>).then === 'function')
@@ -419,8 +420,6 @@ function cartesianValueExtent(bound: BoundPlot, type: string): { min: number; ma
 function isStack(type: string): boolean { return /stacked/i.test(type) && !/^(polar|radial)/i.test(type) && !/radar/i.test(type); }
 function isPercentStack(type: string): boolean { return /percentStacked/i.test(type); }
 function isHorizontal(type: string): boolean { return /^range?Bar$|^stackedBar$|^percentStackedBar$/i.test(type) || /^bar$/i.test(type); }
-
-export function categoryPitch(n: number): number { return n <= 0 ? 0 : 1 / n; }
 
 interface CartesianFrame { plot: Rect; scale: { min: number; max: number; ticks: number[] }; style: PlotStyle; axisFormat?: string }
 

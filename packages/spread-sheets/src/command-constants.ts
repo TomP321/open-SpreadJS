@@ -58,6 +58,18 @@ function selectionRects(sheet: Worksheet): [number, number, number, number][] {
   return sheet.getSelections().map((r) => [r.row, r.col, r.rowCount, r.colCount]);
 }
 
+/** Expands the `-1` whole-row/column/whole-sheet sentinels of selection ranges to concrete bounds. */
+function expandRects(sheet: Worksheet, rects: [number, number, number, number][]): [number, number, number, number][] {
+  return rects.map(([row, col, rowCount, colCount]) => {
+    const startRow = Math.max(0, row), startCol = Math.max(0, col);
+    return [
+      startRow, startCol,
+      rowCount < 0 ? sheet.getRowCount() - startRow : rowCount,
+      colCount < 0 ? sheet.getColumnCount() - startCol : colCount,
+    ];
+  });
+}
+
 interface UndoArea {
   sheetName: string;
   changes: CellChange[];
@@ -113,10 +125,23 @@ function withUndoSnapshot(
   return applied;
 }
 
+/**
+ * Visits every existing cell inside a rectangle. Selection sentinels (`-1`
+ * row/col means the whole row/column band, `-1` count means "to the end") are
+ * expanded, and only cells that actually exist are visited, so a Delete over
+ * the select-all range on a million-row sheet stays sparse.
+ */
 function forEachCell(sheet: Worksheet, row: number, col: number, rowCount: number, colCount: number, visit: (r: number, c: number) => void): void {
-  const lastRow = Math.min(row + rowCount, sheet.getRowCount());
-  const lastCol = Math.min(col + colCount, sheet.getColumnCount());
-  for (let r = Math.max(0, row); r < lastRow; r++) for (let c = Math.max(0, col); c < lastCol; c++) visit(r, c);
+  const startRow = Math.max(0, row), startCol = Math.max(0, col);
+  const lastRow = rowCount < 0 ? sheet.getRowCount() : Math.min(row + rowCount, sheet.getRowCount());
+  const lastCol = colCount < 0 ? sheet.getColumnCount() : Math.min(col + colCount, sheet.getColumnCount());
+  if (lastRow <= startRow || lastCol <= startCol) return;
+  const area = sheet.areas.get(GC.Spread.Sheets.SheetArea.viewport);
+  if (!area) return;
+  const hits: [number, number][] = [];
+  for (const [r, c] of area.cells.entries())
+    if (r >= startRow && r < lastRow && c >= startCol && c < lastCol) hits.push([r, c]);
+  for (const [r, c] of hits) visit(r, c);
 }
 
 function clearCell(sheet: Worksheet, row: number, col: number, values = true, styles = false): void {
@@ -278,9 +303,9 @@ export const commandConstants: Record<string, SweepCommand> = {
       const wb = context as Workbook, sheet = sheetAt(wb, options);
       if (!sheet) return false;
       const ranges = Array.isArray(options.ranges) ? (options.ranges as unknown[]).filter(isRange) : [];
-      const rects: [number, number, number, number][] = ranges.length
+      const rects: [number, number, number, number][] = expandRects(sheet, ranges.length
         ? ranges.map((r) => [r.row, r.col, r.rowCount, r.colCount])
-        : selectionRects(sheet);
+        : selectionRects(sheet));
       if (!rects.length) return false;
       return withUndoSnapshot(wb, options, isUndo, [sheet], rects, () => {
         for (const [row, col, rowCount, colCount] of rects)

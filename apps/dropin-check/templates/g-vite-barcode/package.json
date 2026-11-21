@@ -1,0 +1,15 @@
+{
+  "name": "dropin-g-vite-barcode",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "build": "vite build" },
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{TARBALLS}}/opensheets-spread-sheets-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-barcode": "file:{{TARBALLS}}/opensheets-spread-sheets-barcode-{{VERSION}}.tgz"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1",
+    "@types/node": "^22.0.0"
+  }
+}

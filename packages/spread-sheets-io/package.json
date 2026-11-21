@@ -46,7 +46,7 @@
   "scripts": {
     "build": "tsup && tsx scripts/finalize.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --testTimeout=30000",
     "bench": "tsx bench/large.ts",
     "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
     "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"

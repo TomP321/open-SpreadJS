@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-reportsheet-addon",
+  "version": "0.1.0",
+  "description": "OpenSheets report sheet add-in for the spreadsheet workbook, drop-in for the SpreadJS reportsheet-addon add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.report.reportsheet.cjs",
+  "module": "./dist/gc.spread.report.reportsheet.esm.js",
+  "types": "./dist/gc.spread.report.reportsheet.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-reportsheet-addon",
+    "opensheets-reportsheet-addon",
+    "report",
+    "reportsheet",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.report.reportsheet.d.ts",
+        "default": "./dist/gc.spread.report.reportsheet.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.report.reportsheet.d.cts",
+        "default": "./dist/gc.spread.report.reportsheet.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

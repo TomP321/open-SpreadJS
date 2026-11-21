@@ -24,6 +24,9 @@ export class DesignerEventsClass {
 export function installDesigner(gc?: GCRoot): GCRoot {
   const target = gc ?? designerCore();
   if (!target?.Spread?.Sheets) throw new Error('GC.Spread.Sheets is required to install the Designer');
+  // The trial's Designer embeds a core build whose serialiser is more eager; our shared core
+  // switches to that behaviour while the Designer is installed (TASK 75, hidden core hook).
+  (target.Spread.Sheets as { _setDesignerSerialization?: (on: boolean) => void })._setDesignerSerialization?.(true);
   const DesignerNamespace: Record<string, unknown> = {
     Designer,
     DefaultConfig,

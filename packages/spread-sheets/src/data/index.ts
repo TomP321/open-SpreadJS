@@ -2,7 +2,6 @@ import { notImplemented } from '../not-implemented.js';
 import { parseFormula, type AstNode } from '../calc/parser.js';
 import { Evaluator, type EvalHost } from '../calc/evaluate.js';
 import { CalcArray, type Value } from '../calc/values.js';
-import type { Worksheet } from '../worksheet.js';
 import { readRemote, sendRemote } from './transport.js';
 import { convertSchemaValue } from './schema.js';
 import { groupRows, type GroupDescription } from './group.js';
@@ -59,6 +58,10 @@ export class Table {
   columns: Record<string, Column> | undefined;
   views: Record<string, View> = {};
   private rows: Row[] | undefined;
+  /** @internal Live row array for the workbook JSON serializer (TASK 80). */
+  get _rowsValue(): Row[] | undefined { return this.rows; }
+  /** Trial JSON member: table-level primary key name ('' when unset). */
+  primaryKey?: string;
   private sourceRows: Row[] | undefined;
   private sourceItems = new Map<Row, Row>();
   private childParents = new Map<Row, Row>();
@@ -236,7 +239,7 @@ export class Table {
     return resolve(this, row, 0);
   }
   evaluateFormula(row: Row, formula: AstNode, evaluating: Set<string>, scope?: Row[]): unknown {
-    const host = {
+    const host: EvalHost = {
       resolveStructured: (tableName: string, spec: string) => {
         if (tableName) return notImplemented('GC.Data calculated column reference');
         const relative = /^\[@([+-]\d+)([^\]]+)\]$/.exec(spec);
@@ -294,9 +297,10 @@ export class Table {
       sheetCount: () => 0,
       isR1C1: () => false,
       allowDynamicArray: () => false,
-    } as unknown as EvalHost;
+    };
     const result = new Evaluator(host).evaluate(formula, {
-      host, sheet: undefined as unknown as Worksheet, row: 0, col: 0, arrayMode: false,
+      host, sheet: undefined as never /* standalone column formula: no owning sheet; the host callbacks above never read it */,
+      row: 0, col: 0, arrayMode: false,
     });
     return result instanceof CalcArray ? result.array[0]?.[0] : result;
   }
@@ -458,6 +462,11 @@ export class View {
   autoSort = true;
   private columnInfos: Column[];
   private pinnedColumns = new Set<Column>();
+  /** @internal Typed seams for the workbook JSON serializer (TASK 80); returns the live structures. */
+  get _columnInfos(): Column[] { return this.columnInfos; }
+  get _pinnedColumns(): Set<Column> { return this.pinnedColumns; }
+  get _pinnedRows(): Set<Row> { return this.pinnedRows; }
+  get _rows(): Row[] | undefined { return this.table?._rowsValue; }
   private explicitColumns: (string | Column)[] | undefined;
   private defaultColumns: boolean;
   private styleRules: Record<string, { style?: object; rule?: object }> = Object.fromEntries(

@@ -375,7 +375,7 @@ function startThumbDrag(slicer: Slicer, event: PointerEvent): void {
 function selectOnly(slicer: Slicer): void {
   const sheet = slicer._sheet;
   if (!sheet) return;
-  for (const other of sheet.slicers.all()) if (other !== slicer) (other as unknown as { isSelected(v: boolean): void }).isSelected(false);
+  for (const other of sheet.slicers.all()) if (other !== slicer) other.isSelected(false);
   for (const item of [...sheet.floatingObjects.all(), ...sheet.pictures.all(), ...sheet.shapes.all(), ...sheet.charts.all()])
     item.isSelected(false);
   slicer.isSelected(true);

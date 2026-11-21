@@ -210,11 +210,6 @@ export function toBoolean(ctx: EvalContext, value: Value | Missing): boolean {
   raise(ErrorCode.value);
 }
 
-/** Truncates a number the way Excel integer arguments are truncated. */
-export function toInteger(ctx: EvalContext, value: Value | Missing): number {
-  return Math.trunc(toNumber(ctx, value));
-}
-
 export type CompareResult = -1 | 0 | 1;
 
 function valueRank(value: ScalarValue): number {
@@ -1011,10 +1006,6 @@ export function getBuiltin(name: string): BuiltinFunction | undefined {
 }
 export function builtinNames(): string[] {
   return [...BUILTINS.keys()].sort();
-}
-export function isBuiltinVolatile(name: string): boolean {
-  const fn = BUILTINS.get(name.toUpperCase());
-  return Boolean(fn?.volatile);
 }
 
 // Re-export helpers used by function modules.

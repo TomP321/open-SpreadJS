@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-ganttsheet",
+  "version": "0.1.0",
+  "description": "OpenSheets Gantt sheet add-in for the spreadsheet workbook, drop-in for the SpreadJS ganttsheet add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.ganttsheet.cjs",
+  "module": "./dist/gc.spread.sheets.ganttsheet.esm.js",
+  "types": "./dist/gc.spread.sheets.ganttsheet.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-ganttsheet",
+    "opensheets-ganttsheet",
+    "gantt",
+    "project",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.ganttsheet.d.ts",
+        "default": "./dist/gc.spread.sheets.ganttsheet.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.ganttsheet.d.cts",
+        "default": "./dist/gc.spread.sheets.ganttsheet.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

@@ -110,7 +110,7 @@ export class Slicer extends FloatingObject {
   override name(value?: string, shouldCallback?: boolean): string | this {
     if (value === undefined) return super.name() as string;
     const previous = super.name() as string;
-    (this._sheet as unknown as { slicers?: { _rename(old: string, next: string): void } })?.slicers?._rename(previous, value);
+    this._sheet?.slicers._rename(previous, value);
     super.name(value);
     if (shouldCallback !== false) this.emit('name');
     return this;

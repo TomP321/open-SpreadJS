@@ -62,8 +62,6 @@ export const SLICER_HEADER_HEIGHT = 24;
 export const SLICER_LIST_TOP = 29;
 /** First item box top when the header is hidden. */
 export const SLICER_LIST_TOP_NO_HEADER = 4;
-/** Extra pixels added to `itemHeight()` for the button box and the row pitch. */
-export const SLICER_ITEM_INSET = 4;
 /** Row pitch = itemHeight + 7 (trial pixel scan: rows sit on 28px boundaries at itemHeight 21). */
 export const SLICER_ITEM_GAP = 7;
 /** Item button horizontal margins (trial: 9px left, 15px right at width 186). */
@@ -72,13 +70,7 @@ export const SLICER_ITEM_RIGHT = 15;
 /** Text inset inside the item button. */
 export const SLICER_TEXT_INSET = 5;
 export const SLICER_BUTTON_RADIUS = 3;
-/** Header icon boxes (16px), right-aligned: funnel, then sort glyph. */
-export const SLICER_ICON_SIZE = 16;
-export const SLICER_ICON_RIGHT = 13;
-export const SLICER_ICON_GAP = 6;
 export const SLICER_BLANK_TEXT = '(blank)';
-/** z-index of the slicer layer (above the floating-object layer). */
-export const SLICER_LAYER_Z_INDEX = 120;
 
 export interface SlicerItem {
   text: string;

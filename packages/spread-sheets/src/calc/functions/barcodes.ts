@@ -9,6 +9,7 @@
  * the measured ones, implemented in `features/barcode-args.ts`.
  */
 import type { Args, BuiltinFunction } from '../evaluate.js';
+import { registerFunctions } from '../evaluate.js';
 import { BarcodeExValue, ErrorCode, raise } from '../values.js';
 import type { BarcodePaintSpec } from '../../features/barcode.js';
 import { linearModuleString } from '../../features/barcode.js';
@@ -56,3 +57,19 @@ export const BARCODE_FUNCTIONS: BuiltinFunction[] = BARCODE_TYPES.map(symbology 
     return new BarcodeExValue(parsed.name, parsed.record);
   },
 }));
+
+/**
+ * TASK 72: register the `BC_*` formula layer with the calculation engine.
+ *
+ * Black-box measurement on the 19.2.5 trial (apps/compare core-only page +
+ * `@mescius/spread-sheets-barcode` loaded as a script): the core-only workbook evaluates
+ * `BC_QRCODE("hello")` to `#NAME?`, and after the barcode add-in package is loaded a
+ * workbook evaluates it to its `SparklineExValue` record. The functions therefore belong
+ * to the add-in's load, not to the core. Our core keeps the implementation bundled but
+ * no longer registers it from the engine entry; whoever ships the add-in feature (the
+ * Designer, and the unit tests that exercise `BC_*`) calls this once, which is our
+ * equivalent of loading `@mescius/spread-sheets-barcode`. Idempotent.
+ */
+export function registerBarcodeFunctions(): void {
+  registerFunctions(BARCODE_FUNCTIONS);
+}

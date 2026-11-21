@@ -15,7 +15,7 @@ import { FindOptions, FindOptionsToggle, FindResultsSection } from './FindDialog
 import { SettingsBody } from './SettingsDialog.js';
 import { BuiltInFileIconsEditor, TabStyleEditor } from './IconStyleEditors.js';
 import { RemoveDuplicatesBody, SortDialogBody, SubtotalDialogBody, TextToColumnsWizard, ValidationHighlightBody } from './DataDialogs.js';
-import { FieldSettingsBody, InsertPivotTableBody, MovePivotTableBody, PivotTableOptionsBody, ValueFieldSettingsBody } from '../pivot-dialogs.js';
+import { FieldSettingsBody, InsertPivotTableBody, MovePivotTableBody, PivotTableOptionsBody, ValueFieldSettingsBody, CalculatedFieldBody, CalculatedItemBody, ReportFilterPagesBody, SolveOrderBody } from '../pivot-dialogs.js';
 import { sheetSettingTabs, spreadSettingTabs } from '../settings-model.js';
 import { definedNameValue, matchNameFilter, nameFilterLabel, nameFilters, type DefinedNameEntry } from '../defined-names.js';
 import { CustomCheckbox, CustomRadio, CustomSelect } from './custom-widgets.js';
@@ -277,6 +277,15 @@ function ComponentRenderer({ component, data, ctx, update }: {
       return <FieldSettingsBody designer={ctx.designer} data={data} update={update} />;
     case 'PivotOptionsBody':
       return <PivotTableOptionsBody data={data} update={update} />;
+    /* TASK 77: Fields, Items & Sets dialogs + the report-filter confirmation. */
+    case 'PivotCalcFieldBody':
+      return <CalculatedFieldBody designer={ctx.designer} data={data} update={update} />;
+    case 'PivotCalcItemBody':
+      return <CalculatedItemBody designer={ctx.designer} data={data} update={update} />;
+    case 'PivotSolveOrderBody':
+      return <SolveOrderBody designer={ctx.designer} data={data} update={update} />;
+    case 'PivotReportFilterBody':
+      return <ReportFilterPagesBody data={data} />;
     case 'RemoveDuplicatesBody':
       return <RemoveDuplicatesBody designer={ctx.designer} data={data} update={update} />;
     case 'TextToColumnsWizard':

@@ -222,7 +222,7 @@ export function addTextBox(d: Designer, box: { x: number; y: number; width: numb
 export function addFormControl(d: Designer, control: { id: string; label: string; objectType: string; width: number; height: number }, box: { x: number; y: number; width?: number; height?: number }): DesignerShape {
   const sheet = activeSheet(d);
   const shapes = shapesOf(sheet);
-  const count = shapes.all().filter((shape) => shape.control()).length + 1;
+  const count = shapes.all().filter((shape) => typeof shape.control === 'function' && shape.control()).length + 1;
   const name = shapes.uniqueName(control.label);
   const shape = shapes.addFormControl(name, { objectType: control.objectType }, box.x, box.y, box.width ?? control.width, box.height ?? control.height);
   shape.text(`${control.objectType.replace(/([A-Z])/g, ' $1').trim().replace(/ /g, '')} ${count}`);
@@ -255,11 +255,14 @@ export function addCamera(d: Designer, reference: string): DesignerShape {
 /** Pixel bounds of a cell range (view-independent, zoom 1). */
 export function rangeToPixels(sheet: Worksheet, range: A1Range): { x: number; y: number; width: number; height: number } {
   let x = 0, y = 0;
-  for (let c = 0; c < range.col; c++) x += sheet.getColumnWidth(c, 1) ?? 75;
-  for (let r = 0; r < range.row; r++) y += sheet.getRowHeight(r, 1) ?? 22;
+  // Viewport band (the core default): an explicit area here would read the header strips instead
+  // (TASK 77: `1` is `colHeader` in the core's SheetArea enum — `getRowHeight(r, 1)` answered the
+  // constant header height instead of the sheet's own rows).
+  for (let c = 0; c < range.col; c++) x += sheet.getColumnWidth(c) ?? 75;
+  for (let r = 0; r < range.row; r++) y += sheet.getRowHeight(r) ?? 22;
   let width = 0, height = 0;
-  for (let c = range.col; c < range.col + range.colCount; c++) width += sheet.getColumnWidth(c, 1) ?? 75;
-  for (let r = range.row; r < range.row + range.rowCount; r++) height += sheet.getRowHeight(r, 1) ?? 22;
+  for (let c = range.col; c < range.col + range.colCount; c++) width += sheet.getColumnWidth(c) ?? 75;
+  for (let r = range.row; r < range.row + range.rowCount; r++) height += sheet.getRowHeight(r) ?? 22;
   return { x, y, width, height };
 }
 
@@ -416,7 +419,9 @@ export function invalidateChartLauncherState(d: Designer): void {
 
 const nextChartName = (sheet: Worksheet): string => {
   const charts = chartsOf(sheet);
-  let index = charts.all().length + 1;
+  // Trial (TASK 75 r3 probe): the counter starts at 1 and skips only real `Chart N`
+  // collisions — an existing API chart named `Chart1` does NOT push it to 2.
+  let index = 1;
   while (charts.get(`Chart ${index}`)) index++;
   return `Chart ${index}`;
 };
@@ -432,7 +437,16 @@ export function insertChartPreview(d: Designer, name: string): boolean {
   // Trial anchor: the row below the selection's first row, 20 px right of the selection.
   const below = rangeToPixels(sheet, { row: at.row + 1, col: 0, rowCount: 1, colCount: 0 });
   const charts = chartsOf(sheet);
-  const chart = charts.add(nextChartName(sheet), chartType, bounds.x + bounds.width + 20, below.y, 480, 300, toA1(at));
+  let chart: ReturnType<typeof charts.add>;
+  try {
+    chart = charts.add(nextChartName(sheet), chartType, bounds.x + bounds.width + 20, below.y, 480, 300, toA1(at));
+  } catch (error) {
+    /* Trial (TASK 75 r5 stock probe `.probe/t75r5/p4.json`): a gallery item whose data does not
+     * fit the type inserts NOTHING and says NOTHING — no dialog, no toast, no exception.
+     * (The core still throws the trial's stock-layout message on the public API path.) */
+    console.warn('[OpenSheets Designer] chart gallery item skipped:', (error as Error).message);
+    return false;
+  }
   charts.all().forEach((item) => item.isSelected(item === chart));
   return true;
 }
@@ -468,14 +482,21 @@ export function insertComboChart(d: Designer, name: string, plan?: { first: stri
     const extras = built.slice(2);
     for (let index = built.length - 1; index >= 2; index--) series.remove(index);
     for (const item of extras) {
+      /* TASK 75 r5: the trial's preset series carry NO name/category reference at all when the
+       * source grid has no headers — passing the empty strings here materialised `tx`/`cat`. */
+      const name = item.name === undefined || item.name === '' ? undefined : String(item.name);
+      const xValues = item.xValues === undefined || item.xValues === '' ? undefined : String(item.xValues);
       series.add({
-        name: item.name === undefined ? undefined : String(item.name),
-        xValues: item.xValues === undefined ? undefined : String(item.xValues),
+        name,
+        xValues,
         yValues: item.yValues === undefined ? undefined : String(item.yValues),
         chartType: second, axisGroup: spec.axisGroup,
       });
     }
   }
+  /* The preset's own materialised series styles (fill + zero-width black line + the bar
+   * series' dataObject extension) — measured in .probe/t75r5/p2.json, TASK 75 r5. */
+  extendView<{ _applyGalleryComboStyle(): void }, GC.Spread.Sheets.Charts.Chart>(chart)._applyGalleryComboStyle();
   // The trial builds gallery charts internally, so the series-cache corruption its
   // public `series()` API leaves behind (mirrored by the core) never applies here:
   // `dataRange()` keeps answering the full range, like the official insert.
@@ -548,8 +569,11 @@ export function barcodeFormula(data: Record<string, unknown>): string {
 export function applyInsertAction(d: Designer, name: string, args: Record<string, unknown>): boolean {
   const sheet = activeSheet(d);
   const data = (args.data ?? {}) as Record<string, unknown>;
-  if (CHART_PREVIEW_TYPE[name]) return insertChartPreview(d, name);
-  if (COMBO_CHART_PLAN[name]) return insertComboChart(d, name);
+  /* A known gallery name is always HANDLED here, even when the insert itself is skipped (the
+   * trial's silent stock refusal): returning false would let `applyBuiltin` fall through to its
+   * `NotImplemented` throw (TASK 75 r5). */
+  if (CHART_PREVIEW_TYPE[name]) { insertChartPreview(d, name); return true; }
+  if (COMBO_CHART_PLAN[name]) { insertComboChart(d, name); return true; }
   switch (name) {
     case 'addShape': {
       const entry = shapeGalleryById.get(String(args.galleryId));
@@ -568,17 +592,25 @@ export function applyInsertAction(d: Designer, name: string, args: Record<string
     }
     case 'pasteShapes': {
       const items = (args.items ?? []) as Record<string, unknown>[];
-      const GC = d.gc;
       const shapes = shapesOf(sheet);
-      for (const item of items) {
-        const copy = JSON.parse(JSON.stringify(item));
-        copy.name = shapes.uniqueName(String(item.name ?? 'rectangle'));
-        copy.x = Number(item.x ?? 0) + 10;
-        copy.y = Number(item.y ?? 0) + 10;
-        const shape: DesignerShape = new (shapeCtor(GC))(String(copy.name), Number(copy.shapeType ?? 1), Number(copy.x), Number(copy.y), Number(copy.width ?? 100), Number(copy.height ?? 100));
-        shape.fromJSON(copy);
-        if (shape.fromShapeJSON) shape.fromShapeJSON(copy);
-        shapes.add(shape);
+      if (items.length) {
+        /* TASK 81: paste through the core record builder so a copied GROUP keeps its nested
+         * members (the flat per-record `new Shape(...)` path dropped the group). Names become
+         * unique across the whole shape tree, plain shapes arrive shifted by 10 px. */
+        const prepared = JSON.parse(JSON.stringify(items)) as Record<string, unknown>[];
+        const prepare = (record: Record<string, unknown>): void => {
+          record.name = shapes.uniqueName(String(record.name ?? 'rectangle'));
+          if (Array.isArray(record.children)) {
+            // TASK 81: a group record keeps its serialized frame (x/y/width/height = the trial's
+            // grpSpPr off/ext); shift the frame together with its children so the pasted group
+            // arrives whole at +10 px.
+            if (record.x !== undefined) record.x = Number(record.x) + 10;
+            if (record.y !== undefined) record.y = Number(record.y) + 10;
+            (record.children as Record<string, unknown>[]).forEach(prepare);
+          } else { record.x = Number(record.x ?? 0) + 10; record.y = Number(record.y ?? 0) + 10; }
+        };
+        prepared.forEach(prepare);
+        shapes.importShapes(prepared);
       }
       shapes.all().forEach((shape) => shape.isSelected(false));
       return true;
@@ -603,7 +635,7 @@ export function applyInsertAction(d: Designer, name: string, args: Record<string
     case 'applyShapeText': {
       const shapes = shapesOf(sheet);
       const shape = d._editingShapeName ? shapes.get(d._editingShapeName) : selectedShapes(d)[0];
-      if (shape) shape.text(String(data.text ?? ''));
+      if (shape && typeof shape.text === 'function') shape.text(String(data.text ?? '')); // TASK 81: picture/camera/group carry no text accessor
       d._editingShapeName = null;
       return true;
     }
@@ -637,8 +669,10 @@ export function applyInsertAction(d: Designer, name: string, args: Record<string
       const shapes = shapesOf(sheet);
       const shape = shapes.get(String(data.name ?? '')) ?? selectedShapes(d)[0];
       if (!shape) return true;
-      if (data.fill !== undefined) shape.fill(data.fill);
-      if (data.line !== undefined) shape.line(data.line);
+      // TASK 81: a group handle (and the trial's picture/camera classes) answers no fill/line/text
+      // accessor — style edits apply only where the accessor exists.
+      if (data.fill !== undefined && typeof shape.fill === 'function') shape.fill(data.fill);
+      if (data.line !== undefined && typeof shape.line === 'function') shape.line(data.line);
       if (data.position !== undefined) {
         const p = data.position as Record<string, unknown>;
         if (p.x !== undefined) shape.x(Math.max(0, Number(p.x)));
@@ -646,8 +680,8 @@ export function applyInsertAction(d: Designer, name: string, args: Record<string
         if (p.width !== undefined) shape.width(Math.max(1, Number(p.width)));
         if (p.height !== undefined) shape.height(Math.max(1, Number(p.height)));
       }
-      if (data.rotation !== undefined) shape.rotation(Number(data.rotation));
-      if (data.text !== undefined) shape.text(String(data.text));
+      if (data.rotation !== undefined && typeof shape.rotation === 'function') shape.rotation(Number(data.rotation));
+      if (data.text !== undefined && typeof shape.text === 'function') shape.text(String(data.text));
       return true;
     }
     default: return false;

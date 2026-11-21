@@ -16,7 +16,6 @@ import {
 } from './cf-base.js';
 export { Condition, ConditionRuleBase } from './cf-base.js';
 
-
 export class NormalConditionRule extends ConditionRuleBase {
   operatorValue?: number;
   textValue = '';
@@ -279,19 +278,27 @@ export class ScaleRule extends ConditionRuleBase {
   ) {
     super(ruleType, undefined, ranges);
     if (minType !== undefined) this.minTypeValue = minType;
-    if (minValue !== undefined) this.minValueValue = minValue;
+    if (minValue !== undefined) { this.minValueValue = minValue; this._minValueSet = true; }
     if (minColor !== undefined) this.minColorValue = minColor;
     if (midType !== undefined) this.midTypeValue = midType;
-    if (midValue !== undefined) this.midValueValue = midValue;
+    if (midValue !== undefined) { this.midValueValue = midValue; this._midValueSet = true; }
     if (midColor !== undefined) this.midColorValue = midColor;
     if (maxType !== undefined) this.maxTypeValue = maxType;
-    if (maxValue !== undefined) this.maxValueValue = maxValue;
+    if (maxValue !== undefined) { this.maxValueValue = maxValue; this._maxValueSet = true; }
     if (maxColor !== undefined) this.maxColorValue = maxColor;
   }
+  /* Trial (TASK 75 sweep): the scale `*Value` fields serialize only when explicitly
+   * assigned — a preset created with automatic types carries types + colours alone. */
+  private _minValueSet = false;
+  private _midValueSet = false;
+  private _maxValueSet = false;
   /** Read or write one of the nine scale values (typed instead of a dynamic `this[key]` poke). */
   private prop<K extends ScaleRuleField>(this: ScaleRule, key: K, value?: ScaleRule[K]): unknown {
     if (value === undefined) return this[key];
     this[key] = value;
+    if (key === 'minValueValue') this._minValueSet = true;
+    if (key === 'midValueValue') this._midValueSet = true;
+    if (key === 'maxValueValue') this._maxValueSet = true;
     return this;
   }
   override createCondition(): Condition { return super.createCondition(); }
@@ -311,13 +318,14 @@ export class ScaleRule extends ConditionRuleBase {
   override toJSON(): JsonRecord {
     const result = super.toJSON();
     result.minType = this.minTypeValue;
-    result.minValue = this.minValueValue;
+    if (this._minValueSet) result.minValue = this.minValueValue;
     result.minColor = this.minColorValue;
     result.maxType = this.maxTypeValue;
-    result.maxValue = this.maxValueValue;
+    if (this._maxValueSet) result.maxValue = this.maxValueValue;
     result.maxColor = this.maxColorValue;
     if (this.ruleTypeValue === RuleType.threeScaleRule) {
       result.midType = this.midTypeValue;
+      if (this._midValueSet) result.midValue = this.midValueValue;
       result.midColor = this.midColorValue;
     }
     delete result.style;
@@ -326,13 +334,13 @@ export class ScaleRule extends ConditionRuleBase {
   override readJSON(json: JsonRecord): void {
     super.readJSON(json);
     if (json.minType !== undefined) this.minTypeValue = Number(json.minType);
-    if (json.minValue !== undefined) this.minValueValue = json.minValue as number | string;
+    if (json.minValue !== undefined) { this.minValueValue = json.minValue as number | string; this._minValueSet = true; }
     if (json.minColor !== undefined) this.minColorValue = String(json.minColor);
     if (json.midType !== undefined) this.midTypeValue = Number(json.midType);
-    if (json.midValue !== undefined) this.midValueValue = json.midValue as number | string;
+    if (json.midValue !== undefined) { this.midValueValue = json.midValue as number | string; this._midValueSet = true; }
     if (json.midColor !== undefined) this.midColorValue = String(json.midColor);
     if (json.maxType !== undefined) this.maxTypeValue = Number(json.maxType);
-    if (json.maxValue !== undefined) this.maxValueValue = json.maxValue as number | string;
+    if (json.maxValue !== undefined) { this.maxValueValue = json.maxValue as number | string; this._maxValueSet = true; }
     if (json.maxColor !== undefined) this.maxColorValue = String(json.maxColor);
   }
 }
@@ -615,7 +623,6 @@ export class SparklineRule extends ConditionRuleBase {
   }
 }
 
-
 export interface CFRuleVisual {
   backColor?: string;
   bar?: {
@@ -766,9 +773,14 @@ export class ConditionalFormats {
     rule._setPriority(1);
     rule._resetPriorityExplicit();
   }
+  /** Invalidates the sheet-level formatter cache (rules may carry formatters). */
+  private _epochBump(): void {
+    (this.sheet as { _formatterEpoch?: number })._formatterEpoch = ((this.sheet as { _formatterEpoch?: number })._formatterEpoch ?? 0) + 1;
+  }
   addRule(rule: ConditionRuleBase): ConditionRuleBase {
     this.assignPriority(rule);
     this.rules.push(rule);
+    this._epochBump();
     (this.sheet as { invalidateLayout?: () => void }).invalidateLayout?.();
     return rule;
   }
@@ -862,6 +874,7 @@ export class ConditionalFormats {
   }
   clearRule(): void {
     this.rules = [];
+    this._epochBump();
     (this.sheet as { invalidateLayout?: () => void }).invalidateLayout?.();
   }
   containsRule(rule: ConditionRuleBase, row: number, column: number): boolean {
@@ -882,7 +895,9 @@ export class ConditionalFormats {
     const index = this.rules.indexOf(rule);
     if (index < 0) return;
     this.rules.splice(index, 1);
+    this._epochBump();
     this.rules.forEach((item, i) => item._setPriority(i + 1));
+    this._epochBump();
     (this.sheet as { invalidateLayout?: () => void }).invalidateLayout?.();
   }
   removeRuleByRange(row: number, column: number, rowCount: number, columnCount: number): void {
@@ -891,6 +906,7 @@ export class ConditionalFormats {
       (rule) => !rule.ranges().every((range) => target.containsRange(range)),
     );
     this.rules.forEach((item, i) => item._setPriority(i + 1));
+    this._epochBump();
     (this.sheet as { invalidateLayout?: () => void }).invalidateLayout?.();
   }
   /** Adjusts rule ranges after inserted/removed rows or columns. */
@@ -1017,6 +1033,7 @@ export class ConditionalFormats {
       const rule = ruleFromJSON(raw as JsonRecord);
       if (rule) this.rules.push(rule);
     }
+    this._epochBump();
   }
 }
 
@@ -1042,8 +1059,6 @@ export function ruleFromJSON(json: JsonRecord): ConditionRuleBase | null {
   rule.readJSON(json);
   return rule;
 }
-
-export const conditionalFormattingEnums = { RuleType, ScaleType, CF };
 
 /* ------------------------------------------------------------------------
  * Trial-exposed sparkline/collaboration helpers (TASK 44, probe `cf:extras`,

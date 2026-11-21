@@ -5,8 +5,7 @@
  * followed by negation, percent, exponentiation, multiplication, addition,
  * concatenation and comparisons. `-2^2` therefore parses as `(-2)^2`.
  */
-import { isErrorString } from './values.js';
-
+import {} from './values.js';
 
 import {
   Lexer,
@@ -803,16 +802,7 @@ export function moveRefsForRange(
   return walk(node);
 }
 
-/** Text of a static range reference. */
-export function refToText(r1: number, c1: number, r2: number, c2: number, abs = false): string {
-  const cell = (row: number, col: number) => `${abs ? '$' : ''}${columnLabel(col)}${abs ? '$' : ''}${row + 1}`;
-  return r1 === r2 && c1 === c2 ? cell(r1, c1) : `${cell(r1, c1)}:${cell(r2, c2)}`;
-}
-
 export { columnIndex };
-export function isErrorLiteral(value: string): boolean {
-  return isErrorString(value);
-}
 
 /** Merges two static references into a single reference when possible. */
 function mergeRange(left: AstNode, right: AstNode): AstNode {

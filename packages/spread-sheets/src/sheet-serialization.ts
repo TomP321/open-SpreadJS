@@ -8,6 +8,8 @@ import { Sparkline, SparklineGroup, SparklineSetting } from './features/sparklin
 import { AxisLayout } from './structures.js';
 import { clone, Range, Style } from './primitives.js';
 import { autoMergeInfosFromJSON, autoMergeInfosToJSON } from './auto-merge.js';
+import { coalesceSharedFormulas, expandSharedFormula } from './sheet-shared-formulas.js';
+import { designerSerializationMode } from './serialization-mode.js';
 import { Comment } from './comments.js';
 import { rangeToAddress, validatorFromJSON } from './features/data-validation.js';
 import { filterFromJSON } from './features/filters.js';
@@ -65,6 +67,7 @@ export function worksheetToJSON(sheet: Worksheet, options: SerializationOptions 
     // Like the trial, it is only serialised once it differs from the default `true`.
     put('frozenTrailingRowStickToEdge', sheet.settings.frozenTrailingRowStickToEdge ?? true, true);
     put('frozenTrailingColumnStickToEdge', sheet.settings.frozenTrailingColumnStickToEdge ?? true, true);
+    let sharedFormulas: JsonRecord | undefined;
     for (const [area, key] of [
       [VIEW, 'data'],
       [SheetArea.rowHeader, 'rowHeaderData'],
@@ -72,8 +75,7 @@ export function worksheetToJSON(sheet: Worksheet, options: SerializationOptions 
     ] as const) {
       const data = sheet.area(area),
         serialized: JsonRecord = {},
-        table: JsonRecord = {};
-      for (const [r, c, cell] of data.cells.entries()) {
+        table: JsonRecord = {};      for (const [r, c, cell] of data.cells.entries()) {
         const node: JsonRecord = {};
         for (const [property, value] of Object.entries(cell)) {
           if (property === 'style') {
@@ -95,7 +97,14 @@ export function worksheetToJSON(sheet: Worksheet, options: SerializationOptions 
           table[r] = row;
         }
       }
-      if (Object.keys(table).length) serialized.dataTable = table;
+      if (Object.keys(table).length) {
+        serialized.dataTable = table;
+        // Trial parity (TASK 75): equal relative formula patterns coalesce into
+        // sheet-level `sharedFormulas` groups, members serialise as `{si: n}`.
+        if (area === VIEW && !options.ignoreFormula && designerSerializationMode()) {
+          sharedFormulas = coalesceSharedFormulas(table);
+        }
+      }
       if (!options.ignoreStyle) {
         for (const [styles, name] of [
           [data.rowStyles, 'rowDataArray'],
@@ -122,6 +131,18 @@ export function worksheetToJSON(sheet: Worksheet, options: SerializationOptions 
       const entries = new Map<number, JsonRecord>(axis.entries()),
         meta = sheet.metadata.get(axis);
       if (meta) for (const [i, value] of meta) entries.set(i, { ...entries.get(i), ...value });
+      /* Trial (TASK 75 r3 probe): rows/columns hidden by an outline collapse are NOT
+       * serialised as `visible: false` — the outline entry's `viewCollapsed` restores the
+       * hidden state on load (see Outline.fromJSON). */
+      if (key === 'rows' || key === 'columns') {
+        const outline = key === 'rows' ? sheet.rowOutlines : sheet.columnOutlines;
+        for (const [i, v] of [...entries]) {
+          if (v.visible === false && outline.isCollapsed(i)) {
+            delete v.visible;
+            if (!Object.keys(v).length) entries.delete(i);
+          }
+        }
+      }
       if (entries.size) {
         const array: unknown[] = [];
         for (const [i, v] of entries) array[i] = v;
@@ -200,13 +221,17 @@ export function worksheetToJSON(sheet: Worksheet, options: SerializationOptions 
       rowHeaderColWidth: 40,
     });
     if (Object.keys(defaults).length) result.defaults = defaults;
-    // The reference core serialises print settings only once they exist (the
-    // designer touches them when the Page Layout tab is shown).
-    if (sheet._printInfo !== undefined || sheet._printInfoJSON !== undefined)
+    // Designer-build parity (TASK 75): the Designer core always serialises print
+    // settings with the default paper size; the plain build stays lazy.
+    if (sheet._printInfo !== undefined || sheet._printInfoJSON !== undefined || designerSerializationMode())
       result.printInfo = sheet.printInfo()._toJSON();
     const backgroundImage = sheet._backgroundImageJSON();
     if (backgroundImage) result.backgroundImage = backgroundImage;
-    if (sheet._printLineVisible) result.printLineVisible = true;
+    // Trial (TASK 75 sweep): only the sheet option `printLineVisible` persists (through
+    // the options diff above); the runtime `isPrintLineVisible()` toggle (the ribbon
+    // command) is view-only and must not appear in the JSON.
+    if (sheet.sortStateValue) result.sortState = { ...sheet.sortStateValue };
+    if (sharedFormulas) result.sharedFormulas = sharedFormulas;
     return serializeValue(result) as JsonRecord;
 }
 
@@ -215,7 +240,6 @@ export function worksheetFromJSON(sheet: Worksheet, settings: object): void {
     sheet._ioThemeColors = undefined;
     sheet._printInfo = undefined;
     sheet._printInfoJSON = json.printInfo ? { ...(json.printInfo as Record<string, unknown>) } : undefined;
-    sheet._printLineVisible = json.printLineVisible === true;
     autoMergeInfosFromJSON(sheet, json.autoMergeRangeInfos);
     const background = json.backgroundImage;
     sheet._backgroundImage =
@@ -252,6 +276,7 @@ export function worksheetFromJSON(sheet: Worksheet, settings: object): void {
     }
     sheet.activeRow = Number(json.activeRow ?? 0);
     sheet.activeCol = Number(json.activeCol ?? 0);
+    if (json.sortState) sheet.sortStateValue = { ...(json.sortState as Record<string, unknown>) } as never;
     sheet.settings = {
       visible: 1,
       zoomFactor: 1,
@@ -278,7 +303,18 @@ export function worksheetFromJSON(sheet: Worksheet, settings: object): void {
       'selectionBorderColor',
     ])
       if (json[key] !== undefined) mergeOptions(sheet.options, { [key]: json[key] });
+    /* Trial (TASK 75 sweep): the serialized flag corresponds to the sheet OPTION; load
+     * it AFTER the options rebuild above (the round-2 placement was wiped by the reset). */
+    if (json.printLineVisible === true) sheet.options.printLineVisible = true;
     sheet._passwordRequired = !!sheet.options.isProtected && isRealPasswordVerifier(sheet.options.protectionOptions as JsonRecord);
+    const sharedRecord = object(json.sharedFormulas);
+    const sharedGroups = new Map<string, { text: string; baseRow: number; baseColumn: number }>();
+    for (const [si, raw] of Object.entries(sharedRecord)) {
+      if (si === 'nextIndex') continue;
+      const g = object(raw);
+      if (typeof g.formula === 'string')
+        sharedGroups.set(si, { text: g.formula, baseRow: Number(g.baseRow ?? 0), baseColumn: Number(g.baseColumn ?? 0) });
+    }
     for (const [area, key] of [
       [VIEW, 'data'],
       [SheetArea.rowHeader, 'rowHeaderData'],
@@ -290,6 +326,12 @@ export function worksheetFromJSON(sheet: Worksheet, settings: object): void {
         for (const [c, node] of Object.entries(object(row))) {
           const cell = deserializeValue(node) as CellData;
           if (object(node).style !== undefined) cell.style = styleFromJSON(object(node).style);
+          if (cell.formula !== undefined && typeof cell.formula === 'object') {
+            const group = sharedGroups.get(String((cell.formula as JsonRecord).si));
+            const text = group && expandSharedFormula(group.text, group.baseRow, group.baseColumn, +r, +c);
+            if (text) cell.formula = text;
+            else delete cell.formula;
+          }
           data.cells.set(+r, +c, cell);
         }
       for (const [map, name] of [
@@ -317,6 +359,8 @@ export function worksheetFromJSON(sheet: Worksheet, settings: object): void {
         const node = object(raw);
         if (typeof node.size === 'number') axis.setSize(+i, node.size);
         if (node.visible === false) axis.setVisible(+i, false);
+        // Trial (TASK 75): an explicit `visible: true` record survives a load/save round-trip.
+        else if (node.visible === true) axis.setVisible(+i, true);
         const metadata = { ...node };
         delete metadata.size;
         delete metadata.visible;
@@ -442,6 +486,8 @@ export function worksheetFromJSON(sheet: Worksheet, settings: object): void {
       'order',
       'isSelected',
       'printInfo',
+      'sharedFormulas',
+      'sortState',
       'backgroundImage',
       'gantt',
       ...Object.keys(sheet.settings),

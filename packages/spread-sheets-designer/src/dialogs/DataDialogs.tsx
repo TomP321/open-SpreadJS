@@ -195,6 +195,9 @@ export function duplicateDataFromSelection(designer: Designer): DialogData {
   return { kind: 'dups', region, hasHeaders: false, checked: Array.from({ length: region.colCount }, () => true) };
 }
 
+/* TASK 84 R1: the "bare execute de-duplicates immediately" helper from TASK 75 is gone —
+ * a live re-probe of the trial showed every `removeDuplicates` execute opens the dialog. */
+
 /* ---------------------------------------------------- text to columns -- */
 
 const DATE_TYPES = ['MDY', 'DMY', 'YMD', 'MY', 'YM', 'MD', 'D', 'M', 'Y'];

@@ -10,7 +10,7 @@
  * pivot cache. `<`/`>` inside stored group labels are HTML-escaped, exactly
  * like the trial JSON.
  */
-import { PivotDataType } from './types.js';
+import {} from './types.js';
 
 export interface DateGroupSpec { by: number; groupInterval?: number; start?: Date; end?: Date }
 export interface NumberGroupSpec { by: number; start?: number; end?: number }
@@ -232,10 +232,4 @@ export function buildTextGroups(values: unknown[], spec: TextGroupSpec, baseItem
     discreteGroup: discrete,
   };
   return { column, items, fieldGroup };
-}
-
-export function groupDataType(kind: 'date' | 'number' | 'text'): PivotDataType {
-  if (kind === 'date') return PivotDataType.date;
-  if (kind === 'number') return PivotDataType.number;
-  return PivotDataType.string;
 }

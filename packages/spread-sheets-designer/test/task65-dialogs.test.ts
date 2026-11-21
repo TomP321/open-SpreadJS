@@ -124,7 +124,12 @@ describe('New Table Style (TASK 65 item 1)', () => {
     sheet.tables.add('Table1', 0, 0, 5, 6, 'Light1');
     const d = makeDesigner(workbook);
     clearTableStyleOfSelection(d);
-    expect(sheet.tables.findByName('Table1').style()).toBeNull();
+    /* Trial (TASK 77 probe `.probe/t77/run/t77-tablefixture.json`): the cleared table keeps a
+     * name-less theme object (not `null`) and the serialized table omits the `style` key; a bare
+     * `null` crashed the core style cascade for every later read (see task77-paste-parity.test.ts). */
+    const style: any = sheet.tables.findByName('Table1').style();
+    expect(style).toBeTruthy();
+    expect(!style.name()).toBe(true);
   });
 });
 

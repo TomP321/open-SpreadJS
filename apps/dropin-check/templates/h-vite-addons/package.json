@@ -1,0 +1,26 @@
+{
+  "name": "dropin-h-vite-addons",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "build": "vite build" },
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{TARBALLS}}/opensheets-spread-sheets-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-io": "file:{{TARBALLS}}/opensheets-spread-sheets-io-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-barcode": "file:{{TARBALLS}}/opensheets-spread-sheets-barcode-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-charts": "file:{{TARBALLS}}/opensheets-spread-sheets-charts-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-shapes": "file:{{TARBALLS}}/opensheets-spread-sheets-shapes-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-print": "file:{{TARBALLS}}/opensheets-spread-sheets-print-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-pdf": "file:{{TARBALLS}}/opensheets-spread-sheets-pdf-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-languagepackages": "file:{{TARBALLS}}/opensheets-spread-sheets-languagepackages-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-ganttsheet": "file:{{TARBALLS}}/opensheets-spread-sheets-ganttsheet-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-pivot-addon": "file:{{TARBALLS}}/opensheets-spread-sheets-pivot-addon-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-reportsheet-addon": "file:{{TARBALLS}}/opensheets-spread-sheets-reportsheet-addon-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-slicers": "file:{{TARBALLS}}/opensheets-spread-sheets-slicers-{{VERSION}}.tgz",
+    "@mescius/spread-sheets-tablesheet": "file:{{TARBALLS}}/opensheets-spread-sheets-tablesheet-{{VERSION}}.tgz"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1",
+    "@types/node": "^22.0.0"
+  }
+}

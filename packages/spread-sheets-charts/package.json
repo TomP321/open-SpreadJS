@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-charts",
+  "version": "0.1.0",
+  "description": "OpenSheets Charts add-in for the spreadsheet workbook, drop-in for the SpreadJS charts add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.charts.cjs",
+  "module": "./dist/gc.spread.sheets.charts.esm.js",
+  "types": "./dist/gc.spread.sheets.charts.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-charts",
+    "opensheets-charts",
+    "charts",
+    "graph",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.charts.d.ts",
+        "default": "./dist/gc.spread.sheets.charts.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.charts.d.cts",
+        "default": "./dist/gc.spread.sheets.charts.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

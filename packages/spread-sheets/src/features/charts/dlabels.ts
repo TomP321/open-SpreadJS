@@ -134,4 +134,8 @@ export function buildDataLabelEntry(w: DataLabelWrite): JsonRecord {
 export function refreshPlotAreaSpPr(space: JsonRecord): void {
   const spPr = space?.chart?.plotArea?.spPr;
   if (spPr && !spPr.ln) spPr.ln = { noFill: true };
+  /* TASK 75 r5: a DataChart's plot surface carries the same no-line marker once the chart has
+   * been laid out (the Designer sweep snapshots ~250 ms after the gallery insert). */
+  const surface = space?.chart?.plotArea?.plotAreaRegion?.plotSurface as JsonRecord | undefined;
+  if (surface?.spPr && !surface.spPr.ln) surface.spPr.ln = { noFill: true };
 }

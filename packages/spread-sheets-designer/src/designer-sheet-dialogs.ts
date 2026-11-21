@@ -6,7 +6,7 @@
 import type { DesignerApi as Designer } from './designer-api.js';
 import { TemplateNames } from './names-generated.js';
 import { activeRanges, activeSheet, topCell } from './commands/actions.js';
-import { internals } from './core-internals.js';
+import { cellTypesNamespace, internals } from './core-internals.js';
 import {
   applySettings, namedPatternEdits, readSettings, settingsTabForCommand, sheetSettingTabs, spreadSettingTabs,
   userCustomLists, workbookSettingsOwner, worksheetSettingsOwner, type SettingValue,
@@ -87,11 +87,54 @@ export function showProtectWorkbook(d: Designer): void {
     d.invalidate();
   });
 }
+/* TASK 75 (trial sweep): Clear Cell Type / Clear Cell Dropdowns write the cleared
+ * defaults onto every cell of the selection (`cellType: null` / `cellButtons: []`). */
+export function clearSelectionCellType(d: Designer): void {
+  const sheet = activeSheet(d);
+  for (const range of activeRanges(sheet))
+    for (let row = range.row; row < range.row + Math.max(1, range.rowCount); row++)
+      for (let col = range.col; col < range.col + Math.max(1, range.colCount); col++)
+        internals(sheet)._setStyleProperty(row, col, 'cellType', null);
+  d.invalidate();
+}
+/** Gallery names of the Cell Types dropdown that map to a core cell type (the rest of the
+ * trial's gallery lives in the cell-editors add-in). */
+const GALLERY_CELL_TYPES: Record<string, string> = {
+  checkboxCellType: 'CheckBox', ribbonButtonButtonCellType: 'Button', comboBoxCellType: 'ComboBox',
+  hyperlinkCellType: 'HyperLink', fileUploadCellType: 'FileName',
+};
+/** Ribbon path of the Cell Types gallery (TASK 75): inserts the type over the selection;
+ * types from the cell-editors add-in keep the M6b notice. */
+export function applySelectionCellType(d: Designer, commandName: string): void {
+  const className = GALLERY_CELL_TYPES[commandName];
+  const cellTypes = cellTypesNamespace(d.gc);
+  const CellTypeCtor = className ? cellTypes[className] : undefined;
+  if (typeof CellTypeCtor !== 'function') {
+    d.showMessageBox(`NotImplemented: ${commandName} requires the cell editors add-in.`, 'SpreadJS Designer', 1);
+    return;
+  }
+  const sheet = activeSheet(d);
+  for (const range of activeRanges(sheet))
+    for (let row = range.row; row < range.row + Math.max(1, range.rowCount); row++)
+      for (let col = range.col; col < range.col + Math.max(1, range.colCount); col++)
+        internals(sheet)._setStyleProperty(row, col, 'cellType', new CellTypeCtor());
+  d.invalidate();
+}
+export function clearSelectionCellDropdown(d: Designer): void {
+  const sheet = activeSheet(d);
+  for (const range of activeRanges(sheet))
+    for (let row = range.row; row < range.row + Math.max(1, range.rowCount); row++)
+      for (let col = range.col; col < range.col + Math.max(1, range.colCount); col++)
+        internals(sheet)._setStyleProperty(row, col, 'cellButtons', []);
+  d.invalidate();
+}
 /** Toggle the workbook-level Focus Cell highlight (active row/column tint). */
-export function toggleFocusCell(d: Designer): void {
-  const focus = (d.getWorkbook().options.focusCell ?? {}) as { enabled?: boolean; color?: string; opacity?: number };
-  d.getWorkbook().options.focusCell = { ...focus, enabled: !focus.enabled };
-  d._focusCell = !!d.getWorkbook().options.focusCell.enabled;
+export function toggleFocusCell(d: Designer): void {  const focus = (d.getWorkbook().options.focusCell ?? {}) as { enabled?: boolean; color?: string; opacity?: number };
+  // Trial (TASK 75 probe): enabling serialises the default green colour explicitly.
+  const next = { ...focus, enabled: !focus.enabled };
+  if (next.enabled && next.color === undefined) next.color = '#00b050';
+  d.getWorkbook().options.focusCell = next;
+  d._focusCell = !!next.enabled;
   d.invalidate();
 }
 /** Set the Focus Cell tint colour (implies enabling the highlight). */
@@ -104,19 +147,30 @@ export function applyFocusCellColor(d: Designer, color: string): void {
 export function zoomToSelection(d: Designer): void {
   const sheet = activeSheet(d);
   const range = activeRanges(sheet)[0];
-  const viewportWidth = sheet.getViewportWidth(1);
-  const viewportHeight = sheet.getViewportHeight(1);
-  if (!range || !viewportWidth || !viewportHeight) return;
+  if (!range) return;
   let width = 0, height = 0;
   for (let c = range.col; c < range.col + Math.max(1, range.colCount); c++) width += sheet.getColumnWidth(c) ?? 0;
   for (let r = range.row; r < range.row + Math.max(1, range.rowCount); r++) height += sheet.getRowHeight(r) ?? 0;
   if (width <= 0 || height <= 0) return;
-  // The trial measures the selection inside the full canvas, headers included:
-  // zoom = canvasWidth / (selectionWidth + rowHeaderWidth) (and the vertical twin).
-  const headerWidth = (sheet.options.rowHeaderVisible ?? true) ? sheet.defaults.rowHeaderColWidth as number : 0;
-  const headerHeight = (sheet.options.colHeaderVisible ?? true) ? sheet.defaults.colHeaderRowHeight as number : 0;
-  const zoom = Math.min((viewportWidth + headerWidth) / (width + headerWidth), (viewportHeight + headerHeight) / (height + headerHeight));
-  sheet.zoom(Math.min(4, Math.max(0.25, zoom)));
+  // Trial (TASK 75 r3, four-viewport probe): fit the whole selection into the viewport
+  // plus headers: z = min((vw+40)/(W+40), (vh+20)/(H+20)), clamped to [0.1, 4].
+  // `vw`/`vh` are the viewport rects *without* the row-/column-header strips; the
+  // constants 40/20 add the header strips back (both sides' header sizes).
+  let vw = sheet.getViewportWidth(1), vh = sheet.getViewportHeight(1);
+  if (!(vw > 0) || !(vh > 0)) {
+    // Narrow/headless hosts can report non-positive rects; fall back to the raw canvas
+    // rect (which already includes the header strips the constants below would add).
+    const view = internals(sheet)._view?.();
+    if (view?.viewWidth && view.viewWidth > 0) vw = view.viewWidth - (view.headerWidth ?? 0);
+    if (view?.viewHeight && view.viewHeight > 0) vh = view.viewHeight - (view.headerHeight ?? 0);
+    if (!(vw > 0) || !(vh > 0)) return;
+  }
+  const zoom = Math.min((vw + 40) / (width + 40), (vh + 20) / (height + 20));
+  // Trial (TASK 75 r4): the fitted factor is kept at 12 significant digits (its JSON shows
+  // 3.76829268293 for a 2x2 selection, not the full double).
+  sheet.zoom(Number(Math.min(4, Math.max(0.1, zoom)).toPrecision(12)));
+  // The trial also scrolls the selection to the viewport origin (leftCell/topCell = selection start).
+  sheet.showCell(range.row, range.col, 0, 0);
 }
 export function showMoveOrCopySheet(d: Designer): void {
   if (!d.ensureStructureEditable()) return;

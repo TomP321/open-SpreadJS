@@ -13,7 +13,6 @@
  * combinations observed on the trial (see docs/STATUS.md, TASK 46 item 3); they are
  * deliberately limited to what was measured.
  */
-import type { Args } from '../calc/evaluate.js';
 import type { BarcodePaintSpec } from './barcode.js';
 import { pdf417EcCodewordCount, pdf417HighLevel } from './barcode-pdf417.js';
 
@@ -95,8 +94,17 @@ export const LINEAR_SYMBOLOGIES = ['EAN13', 'EAN8', 'CODABAR', 'CODE39', 'CODE93
 
 
 
+/**
+ * The subset of the calc evaluator's `Args` the barcode argument layer reads.
+ * The real `Args` class satisfies it structurally; cell-type value lists build it directly.
+ */
+export interface BarcodeArgsSource {
+  readonly count: number;
+  safe(index: number): unknown;
+}
+
 /** Read one positional argument as the trial stores it (no coercion of the value type). */
-function argValue(args: Args, index: number): unknown {
+function argValue(args: BarcodeArgsSource, index: number): unknown {
   if (args.count <= index) return undefined;
   const raw = args.safe(index);
   if (raw === null || raw === undefined) return undefined;
@@ -121,7 +129,7 @@ const asText = (value: unknown): string => value === undefined || value === null
  * The trial's argument record: the passed properties keyed by the descriptor names, in
  * descriptor order, followed by `type` and `isBarcode`.
  */
-export function barcodeRecord(symbology: string, args: Args): Record<string, unknown> {
+export function barcodeRecord(symbology: string, args: BarcodeArgsSource): Record<string, unknown> {
   const info = infoForSymbology(symbology);
   if (!info) return { text: asText(argValue(args, 0)), isBarcode: true };
   const record: Record<string, unknown> = { text: asText(argValue(args, 0)) };
@@ -295,7 +303,7 @@ export function barcodePaintSpec(symbology: string, record: Record<string, unkno
 }
 
 /** The parse + validate + paint-spec pipeline used by both the formula and the classes. */
-export function barcodeSpecFromArgs(symbology: string, args: Args): { record: Record<string, unknown>; spec: BarcodePaintSpec } | null {
+export function barcodeSpecFromArgs(symbology: string, args: BarcodeArgsSource): { record: Record<string, unknown>; spec: BarcodePaintSpec } | null {
   const info = infoForSymbology(symbology);
   if (!info) return null;
   const record = barcodeRecord(info.type, args);

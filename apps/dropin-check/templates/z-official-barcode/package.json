@@ -1,0 +1,19 @@
+{
+  "name": "dropin-z-official-barcode",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@mescius/spread-sheets": "file:{{OFFICIAL_core}}",
+    "@mescius/spread-sheets-barcode": "file:{{OFFICIAL_barcode}}"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
+  },
+  "overrides": {
+    "@mescius/spread-sheets": "$@mescius/spread-sheets"
+  }
+}

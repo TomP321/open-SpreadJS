@@ -6,8 +6,9 @@
  * unchanged (`this` renamed to the `sheet` parameter); the class keeps thin
  * delegating methods.
  */
+import { asRecord } from './object-access.js';
 import { GC } from './generated/enums.js';
-import { Range, Style } from './primitives.js';
+import { Range, Style, getFont } from './primitives.js';
 import { GeneralFormatter } from './formatter.js';
 import { cellTypeFromJSON, defaultCellType } from './features/cell-types.js';
 import { DefaultDataValidator } from './features/data-validation.js';
@@ -38,7 +39,13 @@ export function getStyle(sheet: Worksheet, row: number, col: number, area = VIEW
       if (!named) {
         try { named = sheet.parent?.getNamedStyle(style); } catch { named = undefined; }
       }
-      return named ? Object.assign(new Style(), named) : Object.assign(new Style(), { parentName: style });
+      if (!named) return Object.assign(new Style(), { parentName: style });
+      const copy = Object.assign(new Style(), named);
+      // TASK 79: `font` lives on the prototype, so Object.entries above misses it — carry the
+      // exact composed/raw shorthand through the setter (last, so the parsed parts re-check).
+      const namedFont = getFont(named);
+      if (namedFont !== undefined) copy.font = namedFont;
+      return copy;
     }
     return style ?? null;
 }
@@ -55,10 +62,19 @@ export function setStyle(sheet: Worksheet, row: number, col: number, style: Styl
       if (style) map.set(index, style);
       else map.delete(index);
     } else {
-      const cell = sheet.ensure(row, col, area);
-      if (style) cell.style = style;
-      else delete cell.style;
-      sheet.prune(row, col, area);
+      if (style) {
+        // TASK 79: create the cell record already holding the style — a `{}` plus a
+        // later `cell.style =` add allocates a slackened backing store and an extra
+        // map transition per styled cell (the 100k-styles benchmark profiled it).
+        const store = area === VIEW && sheet.viewAreaCache ? sheet.viewAreaCache.cells : data.cells;
+        const cell = store.get(row, col);
+        if (cell) cell.style = style;
+        else store.set(row, col, { style });
+      } else {
+        const cell = sheet.ensure(row, col, area);
+        delete cell.style;
+        sheet.prune(row, col, area);
+      }
     }
     sheet.changed(row, col, area, '[styleinfo]', old ?? undefined, style ?? undefined);
 }
@@ -87,8 +103,7 @@ export function setDefaultStyle(sheet: Worksheet, style: Style, area = VIEW): vo
     sheet.setStyle(-1, -1, style, area);
 }
 
-export function getActualStyle(sheet: Worksheet, row: number, col: number, area = VIEW, _sheetStyleOnly = false): Style {
-    const data = sheet.area(area);
+export function getActualStyle(sheet: Worksheet, row: number, col: number, area = VIEW, _sheetStyleOnly = false): Style {    const data = sheet.area(area);
     // The trial centres header labels: its header areas resolve to hAlign/vAlign center.
     const header = area === SheetArea.rowHeader || area === SheetArea.colHeader;
     const result = Object.assign(new Style(), {
@@ -113,12 +128,16 @@ export function getActualStyle(sheet: Worksheet, row: number, col: number, area 
         seen.add(parentName.toLowerCase());
         parent = resolve(sheet.getNamedStyle(parentName) ?? sheet.parent?.getNamedStyle(parentName), seen);
       }
-      return {
-        ...parent,
-        ...(typeof style === 'string'
-          ? {}
-          : Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined))),
-      };
+      if (typeof style === 'string') return { ...parent };
+      // `font` is a prototype accessor (TASK 79), invisible to Object.entries: compose it
+      // explicitly so the resolved actual style keeps the shorthand like the trial. It goes
+      // FIRST: assigning the shorthand parses it into the result's parts, and the explicit
+      // long-hand members then overwrite those parsed slots (the reverse order would let the
+      // shorthand setter clear long-hand members like `fontStyle: 'normal'`).
+      const own = Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) as JsonRecord;
+      const font = getFont(style);
+      if (font !== undefined) return { ...parent, font, ...own };
+      return { ...parent, ...own };
     };
     for (const style of [data.defaultStyle, data.colStyles.get(col), data.rowStyles.get(row)])
       Object.assign(result, resolve(style));
@@ -134,8 +153,34 @@ export function getActualStyle(sheet: Worksheet, row: number, col: number, area 
     return result;
 }
 
-export function _tableStyleAt(sheet: Worksheet, row: number, col: number): Style | null {
-    for (const table of sheet.tables.all()) {
+/**
+ * The style record the reference product leaves behind when a FILL (Down/Up/Left/
+ * Right) copies a neighbouring cell into a single selected cell (TASK 75 sweep,
+ * black-box measured): the source cell's computed style, condensed — alignment and
+ * imeMode defaults always materialise, the font stays only when it differs from the
+ * sheet default (then `themeFont` goes), null-valued fields are dropped and
+ * `locked`/`hidden` never appear.
+ */
+export function fillStyleRecord(sheet: Worksheet, row: number, col: number): JsonRecord {
+  const computed = asRecord(getActualStyle(sheet, row, col)) as JsonRecord;
+  const defaultFont = sheet.parent?.options.font ?? '14.6667px Calibri';
+  const record: JsonRecord = {};
+  if (computed.backColor != null) record.backColor = computed.backColor;
+  if (computed.foreColor != null) record.foreColor = computed.foreColor;
+  record.hAlign = computed.hAlign ?? 3;
+  record.vAlign = computed.vAlign ?? 0;
+  if (computed.font != null && computed.font !== defaultFont) record.font = computed.font;
+  else if (computed.themeFont != null) record.themeFont = computed.themeFont;
+  record.imeMode = computed.imeMode ?? 1;
+  if (computed.formatter != null) record.formatter = computed.formatter;
+  for (const key of ['borderLeft', 'borderTop', 'borderRight', 'borderBottom', 'diagonalDown', 'diagonalUp',
+    'wordWrap', 'showEllipsis', 'shrinkToFit', 'textIndent', 'textDecoration', 'textOrientation', 'isVerticalText',
+    'cellType', 'cellButtons', 'watermark', 'cellPadding', 'quotePrefix'])
+    if (computed[key] != null) record[key] = computed[key];
+  return record;
+}
+
+export function _tableStyleAt(sheet: Worksheet, row: number, col: number): Style | null {    for (const table of sheet.tables.all()) {
       const style = table._styleFor(row, col);
       if (style) return style;
     }
@@ -146,6 +191,7 @@ export function setStyleName(sheet: Worksheet, row: number, col: number, name: s
     if (row === -1) sheet.area(area).colStyles.set(col, name);
     else if (col === -1) sheet.area(area).rowStyles.set(row, name);
     else sheet.ensure(row, col, area).style = name;
+    sheet._formatterEpoch++;
     sheet.changed(row, col, area, 'styleName', undefined, name);
 }
 
@@ -158,11 +204,38 @@ export function _setStyleProperty(sheet: Worksheet, row: number, col: number, pr
     else if (row === -1) data.colStyles.set(col, style);
     else if (col === -1) data.rowStyles.set(row, style);
     else sheet.ensure(row, col, area).style = style;
+    sheet._formatterEpoch++;
     sheet.changed(row, col, area, property, oldValue, value);
 }
 
+/** True when the style record can bring a formatter (directly or by name) into a cell's actual style. */
+function styleCanCarryFormatter(style: Style | string | undefined): boolean {
+    if (!style) return false;
+    if (typeof style === 'string') return true;
+    const record = asRecord(style);
+    return record.formatter !== undefined || typeof record.parentName === 'string';
+}
+
 export function getFormatter(sheet: Worksheet, row: number, col: number, area = VIEW): unknown {
-    return sheet.getActualStyle(row, col, area).formatter;
+    const data = sheet.area(area);
+    // Plain cell (nothing in its chain can carry a formatter, no tables, no
+    // conditional formats): the resolved formatter is the area's default and
+    // stable until a default/named/table/CF edit bumps the epoch. Bulk text
+    // reads (search) hit this path for every cell of a data sheet (TASK 78).
+    const cellStyle = row >= 0 && col >= 0 ? data.cells.peek(row, col)?.style : undefined;
+    const plain =
+        !styleCanCarryFormatter(cellStyle) &&
+        (row < 0 || !styleCanCarryFormatter(data.rowStyles.get(row))) &&
+        (col < 0 || !styleCanCarryFormatter(data.colStyles.get(col))) &&
+        (area !== SheetArea.viewport || !sheet.tables._hasAny()) &&
+        (area !== SheetArea.viewport || sheet.conditionalFormats.count() === 0);
+    if (!plain) return sheet.getActualStyle(row, col, area).formatter;
+    const cache = sheet._formatterCache;
+    if (cache && cache.epoch === sheet._formatterEpoch && cache.defaultStyle === data.defaultStyle && cache.area === area)
+        return cache.formatter;
+    const formatter = sheet.getActualStyle(-1, -1, area).formatter;
+    sheet._formatterCache = { epoch: sheet._formatterEpoch, defaultStyle: data.defaultStyle, area, formatter };
+    return formatter;
 }
 
 export function setFormatter(sheet: Worksheet, row: number, col: number, value: string | GeneralFormatter, area = VIEW): void {

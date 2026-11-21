@@ -78,7 +78,8 @@ export function mergeStyle(target: Style, source?: Style): void {
  */
 export class TableStyle {
   [key: string]: unknown;
-  private declare _fontSlots: Record<string, unknown>;
+  /** @internal Hidden per-instance storage for the five font keys (non-enumerable, probe f40b). */
+  declare _fontSlots: Record<string, unknown>;
   constructor(
     backColor?: unknown,
     foreColor?: string,
@@ -159,10 +160,10 @@ for (const key of FONT_KEYS)
     enumerable: true,
     configurable: true,
     get(this: TableStyle): unknown {
-      return (this as unknown as { _fontSlots: Record<string, unknown> })._fontSlots?.[key] ?? null;
+      return this._fontSlots?.[key] ?? null;
     },
     set(this: TableStyle, value: unknown): void {
-      (this as unknown as { _fontSlots: Record<string, unknown> })._fontSlots[key] = value;
+      this._fontSlots[key] = value;
     },
   });
 

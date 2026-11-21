@@ -1,0 +1,57 @@
+{
+  "name": "@opensheets/spread-sheets-print",
+  "version": "0.1.0",
+  "description": "OpenSheets Print add-in for the spreadsheet workbook, drop-in for the SpreadJS print add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.sheets.print.cjs",
+  "module": "./dist/gc.spread.sheets.print.esm.js",
+  "types": "./dist/gc.spread.sheets.print.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-print",
+    "opensheets-print",
+    "print",
+    "paging",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.sheets.print.d.ts",
+        "default": "./dist/gc.spread.sheets.print.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.sheets.print.d.cts",
+        "default": "./dist/gc.spread.sheets.print.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

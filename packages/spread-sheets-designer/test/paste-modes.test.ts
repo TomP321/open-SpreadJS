@@ -114,13 +114,17 @@ describe('context-menu paste modes', () => {
     expect(after.borderLeft.style).toBe(2);
   });
 
-  it('column widths copies the source widths', () => {
+  it('column widths copies the source widths and pastes the block', () => {
+    // TASK 75 r5 probe (.probe/t75r5/p10.json, live trial `pasteColumnWidth`): "Keep Source Column
+    // Widths" is a full paste PLUS the widths — the earlier widths-only reading came from the
+    // greyed-out context-menu button, which is a different question from the command's effect.
     const { designer, sheet } = setup();
     sheet.setColumnWidth(0, 123);
     select(sheet, 4);
     pasteClipboard(designer, 'column-widths');
     expect(sheet.getColumnWidth(4)).toBe(123);
-    expect(sheet.getValue(0, 4)).toBeNull();
+    expect(sheet.getValue(0, 4)).toBe(3);
+    expect(sheet.getFormula(0, 6)).toBe('A1+B1');
   });
 
   it('comments copies the note only', () => {

@@ -709,7 +709,4 @@ function rangeBlockAmounts(value: Record_, sheet: unknown): number[] {
     Array.isArray(item) ? item.flatMap(walk) : [typeof item === 'number' && Number.isFinite(item) ? item : 0];
   return walk(result);
 }
-
-/** Colour helpers shared with the formula sparkline painter. */
-export const sparklinePalette = { DEFAULT_SERIES, DEFAULT_NEGATIVE };
 export type { JsonRecord };

@@ -11,13 +11,12 @@ import { DrawOverlay, ShapeFormatPanel } from './insert-ui.js';
 import { Ribbon } from './ribbon/ribbon.js';
 import { RibbonMenu } from './ribbon/menus.js';
 import { DesignerContextMenu } from './context-menu.js';
-import { ThreadedCommentPanel } from './threaded-comments.js';
+import { DockStack } from './dock-stack.js';
 import { FormulaBar } from './formula-bar.js';
 import { SheetArea } from './sheet-area.js';
 import { StatusBar } from './status-bar.js';
 import { Backstage } from './backstage.js';
-import { SelectionPanePanel } from './selection-pane.js';
-import { PivotFieldListPanel, PivotItemMenu } from './pivot-panel.js';
+import { PivotItemMenu } from './pivot-panel.js';
 import { CommandPalette } from './command-palette.js';
 import { FormulaEditorPanel } from './formula-editor-panel.js';
 
@@ -64,9 +63,7 @@ function DesignerShell({ designer }: { designer: Designer }): React.ReactElement
       {!designer.collapsed && <FormulaBar />}
       <div className="gc-designer-dock-row">
         <SheetArea />
-        {designer.threadedPanelOpen && <ThreadedCommentPanel />}
-        {designer.selectionPaneOpen && <SelectionPanePanel />}
-        {designer.pivotFieldListMounted && <PivotFieldListPanel />}
+        <DockStack />
       </div>
       {designer.formulaEditorOpen && <FormulaEditorPanel />}
       <StatusBar />

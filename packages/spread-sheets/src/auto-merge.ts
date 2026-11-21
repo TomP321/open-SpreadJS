@@ -92,12 +92,3 @@ export function autoMergeInfosFromJSON(sheet: Worksheet, value: unknown): void {
     })
     : [];
 }
-
-/**
- * Ranges currently requested for auto-merging on a sheet area, in registration
- * order (used by serialization and selection; visual painting follows in a later
- * rendering task, see docs/STATUS.md).
- */
-export function autoMergeRanges(sheet: Worksheet, area: number): Range[] {
-  return sheet._autoMerges.filter(info => info.sheetArea === area).map(info => info.range);
-}

@@ -10,12 +10,29 @@ describe('designer config', () => {
       'Undo', 'Clipboard', 'Font', 'Alignment', 'Number', 'Styles', 'Cells', 'Editing',
     ]);
     // Contextual tabs are kept out of the main list and marked as such.
-    expect(contextualPanels.map((p) => p.id)).toEqual(['shapeFormat', 'pivotTableAnalyze', 'pivotTableDesign']);
-    expect(contextualPanels[0].text).toBe('Shape Format');
+    // TASK 74: the trial's contextual ribbon (its DefaultConfig order): Table Design,
+    // Shape Format (id `shapeDesign`), Chart Design, the two Sparkline tabs, then the
+    // PivotTable pair (TASK 47).
+    expect(contextualPanels.map((p) => p.id)).toEqual([
+      'tableDesign', 'shapeDesign', 'chartDesign', 'formulaSparkLineDesign', 'sparkLineDesign',
+      'pivotTableAnalyze', 'pivotTableDesign',
+    ]);
+    expect(contextualPanels.map((p) => p.text)).toEqual([
+      'Table Design', 'Shape Format', 'Chart Design', 'Sparkline', 'Sparkline',
+      'PivotTable Analyze', 'Design', // the pivot pair keeps the texts measured in TASK 47
+    ]);
     expect(contextualPanels.every((p) => p.contextual)).toBe(true);
     expect(contextualPanels[0].buttonGroups.map((g) => g.label)).toEqual([
-      'Insert Shapes', 'Shape Styles', 'Accessibility', 'Rotate', 'Group', 'Align', 'Arrange', 'Format Pane',
+      'Properties', 'Tools', 'Table Style Options', 'Table Styles', 'Table Binding',
     ]);
+    expect(contextualPanels[1].buttonGroups.map((g) => g.label)).toEqual([
+      'Insert Shapes', 'Shape Styles', 'Accessibility', 'Rotate', 'Group', 'Align', 'Arrange', 'Size', 'Selection Pane', 'Format Pane',
+    ]);
+    expect(contextualPanels[2].buttonGroups.map((g) => g.label)).toEqual([
+      'Chart Layouts', 'Chart Styles', 'Data', 'Type', 'Location', 'Accessibility', 'Format Pane',
+    ]);
+    expect(contextualPanels[3].buttonGroups.map((g) => g.label)).toEqual(['Argument']);
+    expect(contextualPanels[4].buttonGroups.map((g) => g.label)).toEqual(['Type', 'Show', 'Style', 'Group']);
   });
 
   it('keeps the Home command structure the same shape as the trial', () => {

@@ -5,7 +5,7 @@
  * `CellStateManagerTemplate`, `NewCellStateTemplate`) so an application can replace
  * them through `Designer.registerTemplate` exactly like the trial's. */
 import type { DesignerApi as Designer, DialogData } from './designer-api.js';
-import { recordView, type Worksheet } from './core-internals.js';
+import { emptyTableTheme, recordView, type Worksheet } from './core-internals.js';
 import { TemplateNames } from './names-generated.js';
 import { activeSheet, selectionBounds } from './commands/base.js';
 import { currentRegion } from './data-engine.js';
@@ -99,7 +99,15 @@ export function clearTableStyleOfSelection(designer: Designer): void {
   const bounds = selectionBounds(sheet);
   const table = sheet.tables.all().find((item) => item.range().contains(Math.max(0, bounds.row), Math.max(0, bounds.col)));
   if (!table) return;
-  (table as { style?: (value: unknown) => unknown }).style?.(null);
+  /* Trial (TASK 77 probe `.probe/t77/run/t77-tablefixture.json`): after the Clear the table keeps a
+   * style object whose `name()` is empty (the serialized table omits the `style` key) and reading the
+   * cell styles through the table still works. Writing a bare `null` instead left the core paint path
+   * a value without `_style` to dereference — the first Clear Table Style killed our designer's grid
+   * for the rest of the sweep session (the TASK 75 zoomSelection harness artifact). */
+  table.style(emptyTableTheme(designer.gc));
+  /* Trial (TASK 75 sweep): clearing a table style also materialises the default
+   * `showResizeHandle: true` in the serialized table. */
+  table.showResizeHandle(true);
   designer.invalidate();
 }
 

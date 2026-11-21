@@ -1,11 +1,10 @@
 /** Shared helpers for the built-in function library. */
-import type { Worksheet } from '../../worksheet.js';
+import type {} from '../../worksheet.js';
 import {
   Args,
   EvalContext,
   MISSING,
   ScalarValue,
-  toText,
 } from '../evaluate.js';
 import {
   CalcArray,
@@ -16,7 +15,6 @@ import {
   compareText,
   dateToSerial,
   error,
-  isError,
   normalizeNumber,
   numberToText,
   parseNumberText,
@@ -214,27 +212,6 @@ export function forMath(value: number | CalcError): number {
 
 export function integer(value: number): number {
   return Math.trunc(value);
-}
-
-/** Text values from arguments, expanding arrays but implicit-intersecting refs. */
-export function textValues(args: Args, ctx: EvalContext, start = 0, separator = ''): string {
-  const parts: string[] = [];
-  for (let index = start; index < args.count; index++) {
-    const value = args.value(index);
-    if (value === MISSING) continue;
-    if (value instanceof ReferenceValue || value instanceof CalcArray) {
-      for (const entry of entries(args, ctx, index)) {
-        if (isError(entry.value)) raiseError(entry.value);
-        if (entry.value === null) continue;
-        parts.push(toText(ctx, entry.value));
-      }
-    } else {
-      if (isError(value)) raiseError(value);
-      parts.push(toText(ctx, value));
-    }
-  }
-  void separator;
-  return parts.join('');
 }
 
 /** Compares values using the criteria syntax of COUNTIF/SUMIF. */
@@ -442,8 +419,4 @@ export function bool(args: Args, index: number): boolean {
 
 export function int(args: Args, index: number): number {
   return Math.trunc(args.number(index));
-}
-
-export function writeSheet(sheet: Worksheet): Worksheet {
-  return sheet;
 }

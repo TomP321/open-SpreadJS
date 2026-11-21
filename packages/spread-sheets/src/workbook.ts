@@ -51,6 +51,8 @@ import {
   type JsonRecord,
 } from './serialization.js';
 import workbookDefaults from './workbook-defaults.json';
+import { designerSerializationMode } from './serialization-mode.js';
+import { asRecord } from './object-access.js';
 import {
   type LiveWorkbookOptions,
   type SerializationOptions,
@@ -130,6 +132,8 @@ export class Workbook {
   readonly scenarioManager = new ScenarioManager(this);
   /** Hot-path flag mirroring `scenarioManager` capture state (read by the value write path). */
   _scenariosCapturing = false;
+  /** @internal See WorkbookHost._pendingPivotSlicerCaches. */
+  _pendingPivotSlicerCaches?: unknown[];
   /** `defaultTableTheme()` result: `undefined` until a name is set, `null` for an unknown one. */
   private defaultTheme: TableTheme | null | undefined;
   private host?: HTMLElement;
@@ -235,8 +239,8 @@ export class Workbook {
       },
     };
     for (const flag of ['acceptsArray', 'acceptsReference', 'acceptsError', 'acceptsMissingArgument', 'isBranch', 'isContextSensitive', 'isVolatile', 'findTestArgument', 'findBranchArgument'] as const) {
-      const source = (fn as unknown as Record<string, unknown>)[flag];
-      if (typeof source === 'function') (registered as unknown as Record<string, unknown>)[flag] = source.bind(fn);
+      const source = (asRecord(fn))[flag];
+      if (typeof source === 'function') (asRecord(registered))[flag] = source.bind(fn);
     }
     this.calc?.addSparklineFunction?.(registered);
   }
@@ -459,7 +463,7 @@ export class Workbook {
   defaultTableTheme(themeName: string): void;
   defaultTableTheme(themeName?: string): TableTheme | null | undefined {
     if (themeName === undefined) return this.defaultTheme;
-    const name = (themeName as unknown as string).toLowerCase();
+    const name = themeName.toLowerCase();
     const found = themeByName(name) ?? this.customTableThemes.get(name);
     this.defaultTheme = found ?? null;
     return undefined;
@@ -523,6 +527,17 @@ export class Workbook {
   }
   getSheetIndex(name: string): number {
     return this.sheets.findIndex((s) => s.name().toLowerCase() === name.toLowerCase());
+  }
+  /**
+   * Rebase the sheet-name counter on fromJSON (TASK 81, live-trial probe 2026-11-20).
+   * The trial counter restarts at the number of loaded sheets (baseline 1): a
+   * `[Data]` workbook names the next sheet `Sheet2`, `[Data, Sheet2, Sheet5]` names it
+   * `Sheet4` (the `addSheet` loop then skips the names already loaded), and `[Alpha,
+   * Beta]` names it `Sheet3`. The live-workbook monotonic rule (names continue after
+   * deletions) is untouched — only `fromJSON` rebases.
+   */
+  private _rebaseSheetNameCounter(): void {
+    this.nameCounter = Math.max(1, this.sheets.length);
   }
   addSheet(index: number, sheet?: Worksheet): void {
     this.assertAlive();
@@ -720,6 +735,7 @@ export class Workbook {
   addNamedStyle(style: Style): void {
     if (typeof style.name !== 'string' || !style.name) throw new Error('Named style requires a name');
     this.namedStyles.set(style.name.toLowerCase(), style);
+    for (const sheet of this.sheets) sheet._formatterEpoch++;
   }
   getNamedStyle(name: string): Style {
     return this.namedStyles.get(name.toLowerCase())!;
@@ -729,6 +745,7 @@ export class Workbook {
   }
   removeNamedStyle(name: string): void {
     this.namedStyles.delete(name.toLowerCase());
+    for (const sheet of this.sheets) sheet._formatterEpoch++;
   }
   /**
    * Workbook theme defaults (TASK 46 item 2): getter returns the registered theme object,
@@ -932,6 +949,11 @@ export class Workbook {
     if (focusIn) (this.renderer?.root ?? this.host)?.focus();    else this.host?.blur();
   }
   toJSON(options: SerializationOptions = {}): JsonRecord {
+    /* Trial (TASK 75 sweep): serialization always reflects the latest computed values —
+     * pending recalc work (dirty/queued cells) is drained first. Cheap when idle. */
+    for (const sheet of this.sheets) {
+      if (sheet.calcQueue.size || sheet.hasPendingChanges()) sheet.flushCalc();
+    }
     for (const key of [
       'saveAsView',
       'rowHeadersAsFrozenColumns',
@@ -950,6 +972,14 @@ export class Workbook {
       sheetCount: this.sheets.filter(sheet => !(sheet instanceof TableSheet)).length,
     };
     Object.assign(result, optionDifferences(this.options, workbookDefaults));
+    /* TASK 75: the trial serialises the whole focusCell record (including its default
+     * colour) once focus-cell mode is set; the generic defaults-diff would drop the
+     * colour. The record itself only exists after the Focus Cell command ran. */
+    const focusCell = (this.options as JsonRecord).focusCell as JsonRecord | undefined;
+    if (focusCell && typeof focusCell === 'object' && !Array.isArray(focusCell)) {
+      const merged: JsonRecord = { ...((workbookDefaults as JsonRecord).focusCell as JsonRecord | undefined), ...clone(focusCell) };
+      if (merged.enabled !== false) result.focusCell = merged;
+    }
     result.customList = clone(this.options.customList);
     result.defaultSheetTabStyles = clone(this.options.defaultSheetTabStyles);
     result.builtInFileIcons = clone(this.options.builtInFileIcons);
@@ -992,7 +1022,7 @@ export class Workbook {
       result.dataManager = {
         tables: Object.values(this.dataManagerInstance.tables).map(table => ({
           name: table.name,
-          primaryKey: (table as unknown as { primaryKey?: string }).primaryKey ?? '',
+          primaryKey: table.primaryKey ?? '',
           columns: Object.fromEntries(Object.entries((table.columns ?? {}) as Record<string, Record<string, unknown>>)
             .map(([key, column]) => [key, { ...column, isPrimaryKey: column.isPrimaryKey ?? false }])),
           dataSourceOption: { batch: false, ...clone(table.options) },
@@ -1012,16 +1042,15 @@ export class Workbook {
             // columnIndexMap maps display position -> natural index, pinned* hold natural
             // indexes, groupInfo carries the sheet grouping, options carries the four
             // default style rules.
-            const viewInternals = view as unknown as { columnInfos: Record<string, unknown>[]; pinnedColumns: Set<Record<string, unknown>>; pinnedRows: Set<object> };
-            const natural = viewInternals.columnInfos;
+            const natural = view._columnInfos;
             const display = view.getColumn() as Record<string, unknown>[];
             // Trial serializes columnIndexMap only when the display order differs from the
             // natural order (probe .probe/api-sweep-item2i.json: an identity map makes the
             // trial drop the column filter on a grouped sheet).
             const orderMap = display.map(column => natural.indexOf(column));
             const columnIndexMap = orderMap.every((index, position) => index === position) ? [] : orderMap;
-            const pinnedRowIndexes = [...viewInternals.pinnedRows].map(row => table.indexOf(row as never)).filter(index => index >= 0);
-            const pinnedColumnIndexes = [...viewInternals.pinnedColumns].map(column => natural.indexOf(column)).filter(index => index >= 0);
+            const pinnedRowIndexes = [...view._pinnedRows].map(row => table.indexOf(row as never)).filter(index => index >= 0);
+            const pinnedColumnIndexes = [...view._pinnedColumns].map(column => natural.indexOf(column)).filter(index => index >= 0);
             return { name: view.name, columns: clone(natural), options: { styleRules: tableViewStyleRules() },
               indexMap: Array.from({ length: view.visibleLength() }, (_, index) =>
                 table.indexOf(view.hierarchyRow(index) as Record<string, unknown>)),
@@ -1056,7 +1085,7 @@ export class Workbook {
         const cache = table._cacheJSON();
         pivotCaches[String(cache.cacheId)] = cache;
       }
-    if (Object.keys(pivotCaches).length) result.pivotCaches = pivotCaches;
+    if (Object.keys(pivotCaches).length || designerSerializationMode()) result.pivotCaches = pivotCaches;
     const slicerCaches: unknown[] = [];
     for (const sheet of this.sheets)
       slicerCaches.push(...(sheet as Partial<Worksheet>).slicers?._toPivotCachesJSON?.() ?? []);
@@ -1079,6 +1108,10 @@ export class Workbook {
     for (const key of ['frozenColumnsAsRowHeaders', 'frozenRowsAsColumnHeaders', 'incrementalLoading'])
       if (options[key]) notImplemented(`Workbook.fromJSON(${key})`);
     const json = object(data);
+    /* Trial (TASK 75 sweep): loading a document resets the workbook to its serialised
+     * calculation mode — a calc service suspended by an earlier command must not stay
+     * suspended (that left dependent values stale after the Designer reloaded). */
+    this.batch.calc = 0;
     this.suspendPaint();
     this.suspendEvent();
     try {
@@ -1151,7 +1184,7 @@ export class Workbook {
       ].sort((a, b) => Number(object(a.raw).index ?? 0) - Number(object(b.raw).index ?? 0));
       // Pivot slicers restore their binding/selection from this section once
       // the pivot tables themselves have been rebuilt (see _restorePivotTables).
-      (this as unknown as { _pendingPivotSlicerCaches?: unknown[] })._pendingPivotSlicerCaches =
+      this._pendingPivotSlicerCaches =
         Array.isArray(json.slicerCaches) ? json.slicerCaches as unknown[] : [];
       for (const { name, raw, table } of sheetEntries) {
         // The IO parser owns its temporary JSON and can transfer it without a
@@ -1193,18 +1226,16 @@ export class Workbook {
           if (addition.freeHeader) sheet.applyFreeHeaderArea(object(addition.freeHeader));
           const extras = view ? importedViewExtras.get(view) : undefined;
           if (view && extras?.pinnedColumns?.length) {
-            const internals = view as unknown as { columnInfos: Record<string, unknown>[]; pinnedColumns: Set<object> };
             for (const raw of extras.pinnedColumns) {
-              const column = internals.columnInfos[Number(raw)];
-              if (column) internals.pinnedColumns.add(column);
+              const column = view._columnInfos[Number(raw)];
+              if (column) view._pinnedColumns.add(column);
             }
           }
           if (view && extras?.pinnedRows?.length) {
-            const internals = view as unknown as { pinnedRows: Set<object>; table?: { rows?: object[] } };
-            const rows = internals.table?.rows ?? [];
+            const rows = view._rows ?? [];
             for (const raw of extras.pinnedRows) {
               const row = rows[Number(raw)];
-              if (row) internals.pinnedRows.add(row);
+              if (row) view._pinnedRows.add(row);
             }
           }
           const groups = Array.isArray(addition.groups) && addition.groups.length ? addition.groups : extras?.groups;
@@ -1277,6 +1308,12 @@ export class Workbook {
         }
         this.sheets.push(sheet);
       }
+      // TASK 81 (probe t77-sheetnames.json + 2026-11-21 re-probe): the trial re-establishes the
+      // per-workbook sheet-name counter on fromJSON — it restarts at the number of loaded sheets
+      // (baseline 1), and name generation then skips numbers already taken, so loading a
+      // `[Data]` workbook names the next sheet `Sheet2` while the live monotonic rule (names
+      // continue after deletions) stays untouched.
+      this._rebaseSheetNameCounter();
       if (!sheetEntries.length && Number(json.sheetCount ?? 0) > 0)
         this.setSheetCount(Number(json.sheetCount));
       this.active = Number(json.activeSheetIndex ?? 0);
@@ -1310,7 +1347,7 @@ export class Workbook {
         }
       }
       this._restorePivotTables(json);
-      (this as unknown as { _pendingPivotSlicerCaches?: unknown[] })._pendingPivotSlicerCaches = undefined;
+      this._pendingPivotSlicerCaches = undefined;
       this.scenarioManager._fromJSON(json.scenarios, json.scenarioAdditionalInfo);
       const known = new Set([
         'version',

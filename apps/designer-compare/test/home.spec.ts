@@ -43,9 +43,20 @@ test.describe('Home tab commands', () => {
     await page.getByRole('menuitem', { name: 'Percentage' }).click();
     await page.waitForTimeout(100);
     expect(await page.evaluate(() => (window as any).__designerCompare.spread.getActiveSheet().getActualStyle(1, 1).formatter)).toBe('0%');
+    // TASK 77 paired probes `.probe/t77/run/t77-merge-{official,ours}.json` (server 5188): the trial's
+    // `Merge Cells` menu writes a span only for a MULTI-cell selection (1x1 keeps getSpan null on both
+    // sides — the same rule the sweep measures as `mergeCells` status `same`). Drive the dropdown with
+    // a 2x2 selection like the trial measurement, assert the span, then unmerge via the same dropdown.
+    await page.evaluate(() => {
+      const sh = (window as any).__designerCompare.spread.getActiveSheet();
+      sh.setActiveCell(1, 1); sh.setSelection(1, 1, 1, 2); // the trial collapses the selection when setActiveCell comes last
+    });
     await page.locator('[data-command="ribbon.mergeCenter"] .dropdown-btn').click();
     await page.getByRole('menuitem', { name: 'Merge Cells', exact: true }).click();
-    expect(await page.evaluate(() => !!(window as any).__designerCompare.spread.getActiveSheet().getSpan(1, 1))).toBe(true);
+    expect(await page.evaluate(() => { const s = (window as any).__designerCompare.spread.getActiveSheet().getSpan(1, 1); return s && [s.row, s.col, s.rowCount, s.colCount]; })).toEqual([1, 1, 1, 2]);
+    await page.locator('[data-command="ribbon.mergeCenter"] .dropdown-btn').click();
+    await page.getByRole('menuitem', { name: 'Unmerge Cells', exact: true }).click();
+    expect(await page.evaluate(() => !!(window as any).__designerCompare.spread.getActiveSheet().getSpan(1, 1))).toBe(false);
     await page.locator('[data-command="ribbon.cellsInsert"] .dropdown-btn').click();
     await page.getByRole('menuitem', { name: 'Insert Sheet Rows' }).click();
     expect(await page.evaluate(() => (window as any).__designerCompare.spread.getActiveSheet().getValue(2, 0))).toBe('North');
@@ -62,7 +73,16 @@ test.describe('Home tab commands', () => {
     await page.locator('[data-command="ribbon.conditionFormat"] .dropdown-btn').click();
     await page.getByRole('menuitem', { name: 'Highlight Cells Rules' }).hover();
     await page.getByRole('menuitem', { name: 'Greater Than...' }).click();
-    await page.waitForTimeout(100);
+    // TASK 77 paired probes `.probe/t77/run/t77-cf4.json` (official) and `t77-cf5.json` (both sides,
+    // server 5188): the trial's `Greater Than...` menu item opens its quick rule DIALOG — the rule only
+    // materialises when the dialog is confirmed (trial: rules 0 after the click, 1 after OK). Our single
+    // New Formatting Rule dialog (recorded since TASK 75 STATUS §4) follows the same confirm flow; the
+    // bare execute stays dialog-free on both sides (probe t77-cf-exec.json, sweep rows status `same`).
+    const dialog = page.locator('.gc-designer-dialog').first();
+    await expect(dialog).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__designerCompare.spread.getActiveSheet().conditionalFormats.getRules().length)).toBe(0);
+    await page.getByRole('button', { name: 'OK', exact: true }).click();
+    await page.waitForTimeout(400);
     expect(await page.evaluate(() => (window as any).__designerCompare.spread.getActiveSheet().conditionalFormats.getRules().length)).toBeGreaterThan(0);
   });
 });

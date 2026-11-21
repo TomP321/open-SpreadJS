@@ -120,13 +120,3 @@ export const GETTER_DEFAULTS: Record<string, JsonRecord> = {
   seriesBorderPie: { color: 'rgb(255,255,255)', transparency: 0, lineType: 0, width: 2 },
   seriesBorderLine: { color: '', transparency: 0, lineType: 0, width: 2 },
 };
-
-export const DATA_LABEL_DEFAULTS: Record<string, JsonRecord> = {
-  full: {
-    showValue: true, showSeriesName: false, showCategoryName: false,
-    numberFormatLinked: true, showDataLabelsRange: false, dataLabelsRange: '',
-    color: 'rgb(89,89,89)', transparency: 0, fontFamily: 'Calibri', fontSize: 13.33,
-    fontBold: false, backColor: '', backColorTransparency: 0,
-    borderColor: '', borderColorTransparency: 0, separator: ', ', format: 'General',
-  },
-};

@@ -13,6 +13,7 @@ import {
   ganttChartGeometry, type GanttChartGeometry, type GanttChartTask,
 } from '../view/chart.js';
 import { barGeometry, drawArrowPath, GANTT_ARROW_COLOR, type GanttArrow } from '../view/arrows.js';
+import { asRecord } from '../../object-access.js';
 
 /** One column of the task grid on the left part of a GanttSheet. */
 export type GanttColumn = {
@@ -837,13 +838,13 @@ export class GanttSheet extends TableSheet {
       }
       const layout = part.layout as Record<string, unknown> | undefined;
       if (layout) {
-        const target = project.layout as unknown as Record<string, unknown>;
+        const target = asRecord(project.layout);
         for (const key of ['barHeight', 'barTextDateFormat', 'linkLineMode', 'roundBarsToWholeDays', 'tipDateFormat'])
           if (layout[key] !== undefined && typeof layout[key] === typeof target[key]) target[key] = layout[key];
       }
       const calendarSettings = part.calendarSettings as Record<string, unknown> | undefined;
       if (calendarSettings) {
-        const target = project.calendarSettings as unknown as Record<string, unknown>;
+        const target = asRecord(project.calendarSettings);
         for (const [key, value] of Object.entries(calendarSettings)) {
           if (key in target && typeof value === typeof target[key]) target[key] = value;
           else if (Array.isArray(value) && Array.isArray(target[key])) target[key] = [...value];

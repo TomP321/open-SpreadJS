@@ -9,7 +9,8 @@
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { useDesigner, useDesignerVersion } from './store.js';
 import type { DesignerApi } from './designer-api.js';
-import { activePivot, pivotPanelTable, type PivotTable } from './pivot-designer.js';
+import { activePivot, activatePivotAtPanelDrop, pivotPanelTable, type PivotTable } from './pivot-designer.js';
+import { dockPaneVisible, setDockPane } from './dock-panes.js';
 import { placeMenu } from './menu-placement.js';
 import { pivotNamespace } from './core-internals.js';
 
@@ -55,22 +56,43 @@ export function PivotFieldListPanel(): React.ReactElement {
   const panelRef = useRef<PivotPanelLike | null>(null);
   const pivot = pivotPanelTable(d);
   const pivotName = pivot?.name() ?? '';
+  const attachedPivotRef = useRef<PivotTable | null>(null);
   useEffect(() => {
     const host = hostRef.current;
     const Ctor = panelCtor(d);
     if (!host || !Ctor || !pivot) return;
     if (!panelRef.current) panelRef.current = new Ctor('pivotFieldList', pivot, host);
     else panelRef.current.attach(pivot);
+    attachedPivotRef.current = pivot;
     wireItemMenus(d, host);
   }, [d, pivot, pivotName]);
+  // TASK 77: after the core panel's own drop handlers (the event bubbles up to the host) the
+  // trial activates the pivot — the grid selection jumps to its top-left cell for EVERY drop
+  // onto the panel, even while the panel is hidden (probes t77-item2/t77-reopen/t77-panelact:
+  // `after drag` selection [2,0,1,1] on the trial in all three flows). The follow rule (bound
+  // to SelectionChanged) then re-opens the panel while follow mode is armed; with follow
+  // disarmed the selection still jumps but the panel stays closed (t77-panelact-official).
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const onDrop = (): void => {
+      const target = attachedPivotRef.current;
+      if (target) activatePivotAtPanelDrop(d, target);
+    };
+    host.addEventListener('drop', onDrop);
+    return () => host.removeEventListener('drop', onDrop);
+  }, [d]);
   const close = (): void => {
-    d._pivotFieldListOpen = false;
+    // Trial: the panel's X button is a manual close — the panel stops following the selection
+    // until a pivot is created or the Field List command opens it again (probe t77-manualclose).
+    setDockPane(d, 'pivot', false);
+    d._pivotFieldListFollow = false;
     d._pivotFieldListName = null;
-    d.invalidate();
   };
-  // Trial behaviour: after the first open the panel stays mounted and is only hidden.
+  // Trial behaviour: after the first open the panel stays mounted and is only hidden (TASK 77:
+  // it is also hidden while another pane of the dock stack is the visible one).
   return (
-    <div className="gc-designer-pivot-table-fields gc-designer-panel gc-designer-dock-panel" style={d.pivotFieldListOpen ? undefined : { display: 'none' }}>
+    <div className="gc-designer-pivot-table-fields gc-designer-panel gc-designer-dock-panel" style={d.pivotFieldListOpen && dockPaneVisible(d, 'pivot') ? undefined : { display: 'none' }}>
       <div className="gc-designer-pivot-table-fields-host" ref={hostRef} />
       <button className="gc-designer-panel-dialog-close-button-container" aria-label="Close" onClick={close}>
         <span className="gc-designer-panel-dialog-close-button-image">×</span>

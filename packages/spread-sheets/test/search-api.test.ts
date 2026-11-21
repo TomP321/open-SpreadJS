@@ -38,7 +38,9 @@ const find = (sheet: Sheet, text: string, mutate?: (condition: Condition) => voi
   const condition = new SearchCondition();
   condition.searchString = text;
   mutate?.(condition);
-  return sheet.search(condition);
+  // search() only answers null when no condition is passed (trial `search-5`);
+  // these probes always pass one.
+  return sheet.search(condition)!;
 };
 
 describe('Search.SearchCondition and Search.SearchResult', () => {
@@ -406,7 +408,7 @@ describe('Worksheet.search', () => {
     expect(found(find(sheet, ''))).toEqual([SearchFoundFlags.none, -1, -1, null]);
     expect(found(find(sheet, null as unknown as string))).toEqual([SearchFoundFlags.none, -1, -1, null]);
     const untouched = new SearchCondition();
-    expect(found(sheet.search(untouched))).toEqual([SearchFoundFlags.none, -1, -1, null]);
+    expect(found(sheet.search(untouched)!)).toEqual([SearchFoundFlags.none, -1, -1, null]);
     wb.destroy();
   });
 
@@ -415,8 +417,8 @@ describe('Worksheet.search', () => {
     const sheet = fill(wb.getActiveSheet());
     const condition = new SearchCondition();
     condition.searchString = 'gamma';
-    const first = sheet.search(condition);
-    const second = sheet.search(condition);
+    const first = sheet.search(condition)!;
+    const second = sheet.search(condition)!;
     expect(found(first)).toEqual(found(second));
     expect([condition.findBeginRow, condition.findBeginColumn]).toEqual([-1, -1]);
     wb.destroy();

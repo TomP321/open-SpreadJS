@@ -4,8 +4,8 @@
  * flat model the painter consumes.
  */
 
-import type { Worksheet } from '../worksheet.js';
-import type { Table } from '../data/index.js';
+import type {} from '../worksheet.js';
+import type {} from '../data/index.js';
 import type {
     ICategoryEncodingOption,
     IFilterOption,
@@ -244,25 +244,7 @@ function isRangeEncoding(values: unknown): values is IRangeValueEncodingOption[]
     return Array.isArray(values) && values.length === 1 && !!(values[0] as IRangeValueEncodingOption).vectors;
 }
 
-const STACKED_RE = /^(stacked|percentStacked|radialStacked|polarCoordinatesStacked)/i;
 const VALUE_NAMES = 'VALUE_NAMES';
-
-export function isStackedType(type: string): boolean {
-    return STACKED_RE.test(String(type));
-}
-
-export function isPercentType(type: string): boolean {
-    return /percentStacked/i.test(String(type));
-}
-
-/** Resolve `tableName` through the workbook's GC.Data tables. */
-export function resolveTable(sheet: Worksheet | undefined, tableName: string | undefined): Table | null {
-    if (!sheet || !tableName) return null;
-    const workbook = sheet.getParent();
-    if (!workbook) return null;
-    const manager = (workbook as unknown as { dataManager(): { tables: Record<string, Table> } }).dataManager();
-    return manager?.tables?.[tableName] ?? null;
-}
 
 /** Build the bound model for one plot against the given rows. */
 export function bindPlot(plot: IPlotOption, allRows: RowList): BoundPlot {

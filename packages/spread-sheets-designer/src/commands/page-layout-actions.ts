@@ -60,4 +60,4 @@ export function seedPageLayout(d: Designer, sheet: Worksheet): void {
  * Page Setup commands that make the trial seed the print header/heading
  * visibility and first page number into printInfo on first execution.
  */
-export const PAGE_LAYOUT_SEEDED = new Set(['fitPageWidth', 'fitPageTall', 'fitPageScale', 'orientationPortrait', 'orientationLandscape', 'marginSelector', 'marginNormal', 'marginWide', 'marginNarrow', 'paperKindSelector', 'paperLetter', 'paperLegal', 'paperA4', 'paperA3', 'setPrintArea', 'clearPrintArea', 'pageLayoutPrintGridlines']);
+export const PAGE_LAYOUT_SEEDED = new Set(['fitPageScale', 'orientationPortrait', 'orientationLandscape', 'marginNormal', 'marginWide', 'marginNarrow', 'paperLetter', 'paperLegal', 'paperA4', 'paperA3', 'pageLayoutPrintGridlines', 'pageLayoutPrintHeadings']);

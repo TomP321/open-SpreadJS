@@ -4,8 +4,10 @@
  * unit). The class methods are thin wrappers around these functions. */
 import type { DesignerApi as Designer } from './designer-api.js';
 import type { ICommand } from './types.js';
-import { internals } from './core-internals.js';
-import { applyBuiltin, activeSheet, isUndoableAction, topCell } from './commands/actions.js';
+import { setDockPane } from './dock-panes.js';
+import { internals, workbookOptionsRecord } from './core-internals.js';
+import { applyBuiltin, activeSheet, currentStyle, isUndoableAction, topCell } from './commands/actions.js';
+import { executeContextualCommand, isContextualCommand } from './contextual-actions.js';
 import { executePivotCommand, isPivotCommand } from './pivot-designer.js';
 
 export function executeDesignerCommand(d: Designer, commandName: string, propertyName?: string, value?: unknown): boolean {
@@ -15,7 +17,7 @@ export function executeDesignerCommand(d: Designer, commandName: string, propert
      * `insertCells`, `rowHeight`, `indicatorPage`, `defineName` or `barCodeSetting`
      * through `executeCommand`; ours keeps them in the builtin switch, so reach for
      * it before the plugin / formula-name fallbacks. */
-    if (executeDesignerSpecial(d, commandName, value)) {
+    if (executeDesignerSpecial(d, commandName, value, propertyName)) {
       if (!d._recentCommands.includes(commandName)) d._recentCommands.unshift(commandName);
       d._recentCommands.length = Math.min(d._recentCommands.length, 8);
       return true;
@@ -28,7 +30,16 @@ export function executeDesignerCommand(d: Designer, commandName: string, propert
     return false;
   }
   try {
-    if (command.execute) command.execute(d, propertyName, value);
+    /* TASK 84 R2 — `Designer.executeCommand` is OUR extension API (the official Designer exposes
+     * neither `executeCommand` nor `Designer.execute`: `.probe/t84/r1-r2-probe.json`, R2 facts),
+     * and its bare-call contract since RC1 is a toggle: `executeCommand('fontWeight')` — used by
+     * `style.cellButtons` commands (designer-events.ts) — bolds a normal cell. So hand the command
+     * the same shape the ribbon checkbox produces (property name + the NEXT state, read the way
+     * designer-state.ts computes `checked`). The trial-measured builtin path is untouched:
+     * `getCommand(name).execute(designer)` → `executeBuiltin` with no value still writes `normal`
+     * exactly as the TASK 75 sweep recorded ("fontWeight materialising"). */
+    const toggled = propertyName === undefined && value === undefined && (commandName === 'fontWeight' || commandName === 'fontItalic');
+    if (command.execute) command.execute(d, toggled ? commandName : propertyName, toggled ? nextFontToggle(d, commandName) : value);
     // The palette button itself is a UI toggle, not an "action" worth remembering.
     if (commandName !== 'commandPaletteButton' && !d._recentCommands.includes(commandName)) d._recentCommands.unshift(commandName);
     d._recentCommands.length = Math.min(d._recentCommands.length, 8);
@@ -40,9 +51,77 @@ export function executeDesignerCommand(d: Designer, commandName: string, propert
   }
 }
 
+/* TASK 75 r3: trial command names that just re-enter an existing canonical command
+ * (paste-variant / dialog aliases). */
+const COMMAND_ALIASES: Record<string, string> = {
+  contextMenuCopy: 'copy', contextMenuCut: 'cut',
+  designerPasteAll: 'pasteAll', designerPasteFormatting: 'pasteFormatting', designerPasteValues: 'pasteValues',
+  link: 'insertHyperLink', editHyperlink: 'insertHyperLink',
+  // TASK 75 r5 sweep (`missing-ours`): the trial's big Paste button is named `paste` and re-enters
+  // the same paste-all code as `pasteAll`.
+  paste: 'pasteAll',
+};
+/* TASK 75 r3 probe: the trial registers these names but without an `execute` — the
+ * context-menu actions call internal code instead. A bare `getCommand(name).execute()`
+ * is impossible there and must not change the model on our side either. */
+const INERT_COMMAND_NAMES = new Set([
+  'contextMenuPaste', 'insertCopiedCells', 'insertCutCells', 'sort',
+  'gc.spread.contextMenu.insertRows', 'gc.spread.contextMenu.deleteRows',
+  'gc.spread.contextMenu.insertColumns', 'gc.spread.contextMenu.deleteColumns',
+  'gc.spread.contextMenu.hideRows', 'gc.spread.contextMenu.unhideRows',
+  'gc.spread.contextMenu.hideColumns', 'gc.spread.contextMenu.unhideColumns',
+  'gc.spread.contextMenu.clearContents', 'gc.spread.contextMenu.insertSheet',
+  'gc.spread.contextMenu.deleteSheet', 'gc.spread.contextMenu.hideSheet',
+  'gc.spread.contextMenu.filter', 'gc.spread.contextMenu.insertComment',
+  'gc.spread.contextMenu.deleteComment', 'gc.spread.contextMenu.toggleComment',
+  /* TASK 75 r5 probe (.probe/t75r5/p9.json): the trial registers these Pivot-tab names as
+   * dropdown/group hosts with NO `execute` at all — clicking them cannot run anything, so a
+   * bare execute must stay inert here too instead of throwing NotImplemented. */
+  'pivotTableGrandTotals', 'pivotTableSubtotals', 'pivotTableReportLayout',
+  'pivotTableBlankRows', 'pivotTableClearList', 'pivotTableFieldsItemsSets',
+  /* Same probe: every one of these ribbon parents (gallery split buttons, the Cells / Editing /
+   * styles dropdowns, the Page Layout text toggles and the Scale-to-Fit labels) is registered by
+   * the trial WITHOUT an `execute` — the real work is done by their children (`mergeCenterButton`,
+   * `columnClusteredChart`, `marginNormal`, …). Ours routes the children already. */
+  'cellStyles', 'cellsDelete', 'cellsFormat', 'cellsInsert',
+  'columnOrBarChartPreview', 'comboChartPreview', 'funnelOrStockChartPreview', 'lineOrAreaChartPreview',
+  'pieOrDoughnutChartPreview', 'scatterOrBubbleChartPreview', 'treeMapOrSunburstChartPreview',
+  'conditionFormat', 'formatTable2',
+  'pageLayoutGridLineSeparator', 'pageLayoutGridlinesText', 'pageLayoutHeadingsText',
+  'scaleToFitHeightText', 'scaleToFitScaleText', 'scaleToFitWidthText',
+  /* `mergeCenter` is the trial's dropdown parent: its own `execute` exists but changes nothing on
+   * a bare call (`.probe/t75r5/p9.json`) — the children (`mergeCenterButton`, `mergeCells`,
+   * `mergeAcross`, `unmerge`) do the merging, and our ribbon opens the dropdown for this name. */
+  'mergeCenter',
+  /* TASK 77 probe (.probe/t77/run/t77-pivot-probe3.json): the trial's `pivotTableStyleListContent`
+   * has an `execute`, but a bare call changes nothing and opens nothing — the PivotTable Styles
+   * gallery is rendered by the dropdown host (`tabSpecs.pivotTableStyleListContent`), so a bare
+   * execute stays inert here too. */
+  'pivotTableStyleListContent',
+]);
+
+/* TASK 84 R2: next state of the bold/italic toggles, read the same way the ribbon checkbox
+ * computes its `checked` state (see designer-state.ts) so a toggle always flips what the UI shows. */
+function nextFontToggle(d: Designer, commandName: 'fontWeight' | 'fontItalic'): boolean {
+  const style = currentStyle(d);
+  if (commandName === 'fontWeight') return !/bold|[6-9]00/.test(String(style.fontWeight ?? ''));
+  return !/italic|oblique/.test(String(style.fontStyle ?? ''));
+}
+
 export function executeDesignerBuiltin(d: Designer, commandName: string, propertyName?: string, value?: unknown): void {
+  if (INERT_COMMAND_NAMES.has(commandName)) return;
+  const aliased = COMMAND_ALIASES[commandName];
+  if (aliased && aliased !== commandName) { executeDesignerBuiltin(d, aliased, propertyName ?? commandName, value); return; }
   if ((commandName === 'insertSheet' || commandName === 'deleteSheet') && !d.ensureStructureEditable()) return;
-  const special = d.executeSpecial(commandName, value);
+  /* Trial (TASK 75 sweep): New Threaded Comment on a bare execute (no ribbon property
+   * name) creates an EMPTY thread record at the active cell without opening the composer. */
+  if (commandName === 'NewThreadedComment' && propertyName === undefined) {
+    const s = activeSheet(d);
+    s.threadedComments.add(Math.max(0, s.getActiveRowIndex()), Math.max(0, s.getActiveColumnIndex()));
+    d.invalidate();
+    return;
+  }
+  const special = d.executeSpecial(commandName, value, propertyName);
   if (special) return;
   if (isUndoableAction(commandName)) {
     d.runUndoable(commandName, { propertyName, value });
@@ -52,9 +131,15 @@ export function executeDesignerBuiltin(d: Designer, commandName: string, propert
   }
 }
 
-export function executeDesignerSpecial(d: Designer, name: string, value: unknown): boolean {
+/* TASK 75: `propertyName` distinguishes the ribbon path (the controls pass the command
+ * name) from a bare `getCommand(name).execute(designer)` — several trial commands are
+ * no-ops or apply directly on the bare path (the Cell Types gallery). TASK 84 R1 removed
+ * the one Remove Duplicates exception: every path opens the dialog, like the live trial. */
+export function executeDesignerSpecial(d: Designer, name: string, value: unknown, propertyName?: string): boolean {
   // PivotTable UI commands (TASK 47): dialogs, panel toggle and Analyze/Design actions.
   if (isPivotCommand(name)) return executePivotCommand(d, name, value);
+  // Contextual-tab commands (TASK 74): Table Design / Chart Design / Sparkline.
+  if (isContextualCommand(name)) return executeContextualCommand(d, name, value);
   switch (name) {
     case 'formatCells': d.showFormatCells(); return true;
     /* TASK 68: the trial routes these commandMap names through executeCommand, too. */
@@ -102,8 +187,16 @@ export function executeDesignerSpecial(d: Designer, name: string, value: unknown
     case 'radioListCellType': case 'buttonListCellType': case 'calculatorCellType':
     case 'colorPickerCellType': case 'dateTimePickerCellType': case 'listCellType':
     case 'monthPickerCellType': case 'sliderCellType': case 'timePickerCellType':
-    case 'workflowList': case 'multiColumnPicker': case 'clearCellType': case 'clearCellDropdown':
-    case 'namedCellTemplatesListContent':
+      /* TASK 75 r3 probe: on the trial a BARE execute of the Cell Types gallery commands is
+       * a no-op (the JSON stays untouched); only the ribbon path (propertyName set) inserts
+       * the type. */
+      if (propertyName === undefined) return true;
+      d.applySelectionCellType(name); return true;
+    /* TASK 75: the trial clears the cell's type / dropdown buttons through the style
+     * (serialized as `cellType: null` / `cellButtons: []`). */
+    case 'clearCellType': d.clearSelectionCellType(); return true;
+    case 'clearCellDropdown': d.clearSelectionCellDropdown(); return true;
+    case 'workflowList': case 'multiColumnPicker': case 'namedCellTemplatesListContent':
       d.showMessageBox('Cell templates and cell editors arrive in M6b.', 'SpreadJS Designer', 1); return true;
     case 'undo': d.getWorkbook().undoManager().undo(); d.invalidate(); return true;
     case 'redo': d.getWorkbook().undoManager().redo(); d.invalidate(); return true;
@@ -156,17 +249,33 @@ export function executeDesignerSpecial(d: Designer, name: string, value: unknown
       return true;
     }
     case 'insertHyperLink': d.showHyperlink(); return true;
+    /* TASK 75 r3: trial command names with their own execute — unhide dialog, tab colour
+     * picker, hyperlink removal over the selection; the panel toggles change no model. */
+    case 'contextMenuUnhideSheet': d.showUnhideSheet(); return true;
+    case 'showTabColor': d.showTabStyleSettings(); return true;
+    case 'removeHyperlink': d.runUndoable('removeHyperlinks', {}); return true;
+    case 'fileMenuPanel': d.fileMenuOpen = !d.fileMenuOpen; d.invalidate(); return true;
+    case 'formulaBarPanel': case 'statusBarPanel': d.invalidate(); return true;
     case 'insertFunction': d.showInsertFunction(); return true;
     case 'nameManager': d.showNameManager(); return true;
     case 'newName': case 'newNameCommand': d.showNewName(); return true;
     case 'dataValidation': case 'dropdownDataValidation': case 'dataValidationInReportSheet': d.showDataValidation(); return true;
     case 'customSortData': case 'customSortEditing': d.showSort(); return true;
-    case 'removeDuplicates': d.showRemoveDuplicates(); return true;
+    case 'removeDuplicates':
+      /* TASK 84 R1 (live re-probe on `?side=official`, 2026-11-21): a bare
+       * `getCommand('removeDuplicates').execute(designer)` OPENS the "Remove Duplicates"
+       * dialog and changes no data — every path opens the dialog. The TASK 75 r3
+       * "bare = immediate de-dup" probe no longer reproduces and contradicted the paired
+       * spec that was green through RC1, so the immediate branch is gone. */
+      d.showRemoveDuplicates(); return true;
     case 'textToColumn': d.showTextToColumns(); return true;
     case 'subtotal': d.showSubtotal(); return true;
     case 'autoOutline': d.showAutoOutline(); return true;
-    case 'circleInvalidDataCommand': d.showCircleInvalidData(); return true;
-    case 'clearInvalidCircles': d.showClearInvalidCircles(); return true;
+    /* Trial (TASK 75 probe): Circle Invalid Data does not open a dialog — it sets the
+     * workbook-wide `highlightInvalidData` flag (the renderer draws the ovals);
+     * Clear Invalid Circles drops it again (key absent from the JSON). */
+    case 'circleInvalidDataCommand': workbookOptionsRecord(d.getWorkbook()).highlightInvalidData = true; d.invalidate(); return true;
+    case 'clearInvalidCircles': delete workbookOptionsRecord(d.getWorkbook()).highlightInvalidData; d.invalidate(); return true;
     case 'goalSeek': d.showGoalSeek(); return true;
     case 'zoom': d.showZoom(); return true;
     case 'rowHeight': case 'cellFormatRowHeight': d.showDimensionDialog('row'); return true;
@@ -174,14 +283,15 @@ export function executeDesignerSpecial(d: Designer, name: string, value: unknown
     case 'zoomDefault': activeSheet(d).zoom(1); d.invalidate(); return true;
     case 'zoomSelection': d.zoomToSelection(); d.invalidate(); return true;
     case 'focusCell': case 'focusCellMenuItem': d.toggleFocusCell(); return true;
-    case 'focusCellColor': d.applyFocusCellColor(String(value ?? '#00b050')); return true;
     case 'focusCellShowAutoHighlight': d._focusAutoHighlight = !d._focusAutoHighlight; d.invalidate(); return true;
-    case 'selectionPaneButton': d._selectionPaneOpen = !d._selectionPaneOpen; d.invalidate(); return true;
+    case 'selectionPaneButton': setDockPane(d, 'selection', !d._selectionPaneOpen); return true;
     case 'commandPaletteButton': d._commandPaletteOpen = !d._commandPaletteOpen; d.invalidate(); return true;
     case 'showFormulaEditorPanel': d._formulaEditorOpen = !d._formulaEditorOpen; d.invalidate(); return true;
     case 'cellFormatProtectSheet': case 'protectSheet': d.showProtectSheet(); return true;
     case 'unProtectSheet': case 'unprotectSheet': d.showUnprotectSheet(); return true;
     case 'protectWorkbook': case 'unprotectWorkbook': d.showProtectWorkbook(); return true;
+    /* Trial (TASK 75 sweep): a bare execute creates an EMPTY thread at the active cell
+     * (no composer, no dialog); only the ribbon path opens the UI composer. */
     case 'NewThreadedComment': d.commentUi().openThread(); return true;
     case 'gc.spread.contextMenu.insertComment': d.commentUi().insertComment(); return true;
     case 'formatComment': d.showFormatComment(); return true;
@@ -196,7 +306,7 @@ export function executeDesignerSpecial(d: Designer, name: string, value: unknown
     }
     case 'PreviousThreadedComment': d.commentUi().stepThread(false); d.invalidate(); return true;
     case 'NextThreadedComment': d.commentUi().stepThread(true); d.invalidate(); return true;
-    case 'ShowThreadedComments': d._showComments = !d._showComments; d.invalidate(); return true;
+    case 'ShowThreadedComments': setDockPane(d, 'threaded', !d._showComments); return true;
     case 'ThemeSetting': d.openThemeMenu('ThemeSetting'); return true;
     case 'ThemeColors': d.openThemeMenu('ThemeColors'); return true;
     case 'ThemeFonts': d.openThemeMenu('ThemeFonts'); return true;

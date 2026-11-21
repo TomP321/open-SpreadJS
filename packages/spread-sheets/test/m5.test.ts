@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import GC from '../src/index.js';
+import { registerBarcodeFunctions } from '../src/calc/functions/barcodes.js';
 import { parseColor, mixColor, resolveColor } from '../src/colors.js';
+
+// TASK 72: `BC_*` formulas come from the barcode add-in layer (trial: registered when
+// `@mescius/spread-sheets-barcode` loads); the Designer registers them for its apps, and
+// this suite loads the same layer explicitly.
+registerBarcodeFunctions();
 
 describe('M5 value formatting', () => {
   it('formats every supported cell value without passing objects into SSF', () => {

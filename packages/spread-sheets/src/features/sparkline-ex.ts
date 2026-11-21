@@ -571,7 +571,8 @@ function evaluateFormulaFor(owner: SparklineExObject, args: Args, ctx: EvalConte
 
 const sparklineExMembers = { createFunction, name, paint, toJSON, fromJSON, evaluateFormula };
 
-function SparklineExBase(this: SparklineExObject): void {
+/** The ES5 base constructor (also used directly by the barcode classes' prototype chain). */
+export function SparklineExBase(this: SparklineExObject): void {
   this.typeName = '';
   const own = (this.constructor as { sparklineFunctionName?: string }).sparklineFunctionName;
   if (own) this._name = own;
@@ -588,13 +589,17 @@ function SparklineExBase(this: SparklineExObject): void {
 Object.defineProperty(SparklineExBase.prototype, 'typeName', { value: '', writable: true, enumerable: false, configurable: true });
 for (const [key, member] of Object.entries(sparklineExMembers))
   Object.defineProperty(SparklineExBase.prototype, key, { value: member, writable: true, enumerable: false, configurable: true });
-export const SparklineEx = SparklineExBase as unknown as SparklineExConstructor;
+/** Prototype-wiring seam: an ES5 function typed as its JS constructor (trial emits classes this way). */
+const asCtor = (fn: ((this: SparklineExObject) => void) & { prototype: unknown }): SparklineExConstructor =>
+  fn as unknown as SparklineExConstructor;
+
+export const SparklineEx = asCtor(SparklineExBase);
 
 /** A built-in subclass: same members, own prototypes (trial layout), own formula name. */
 function sparklineClass(functionName: string, statics: Record<string, unknown> = {}): SparklineExConstructor {
-  const ctor = (function (this: SparklineExObject) {
+  const ctor = asCtor(function (this: SparklineExObject) {
     SparklineExBase.call(this);
-  }) as unknown as SparklineExConstructor;
+  });
   ctor.prototype = Object.create(SparklineExBase.prototype) as SparklineExObject;
   Object.defineProperty(ctor.prototype, 'constructor', { value: ctor, writable: true, enumerable: false, configurable: true });
   for (const [key, member] of Object.entries(sparklineExMembers))

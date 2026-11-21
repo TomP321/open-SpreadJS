@@ -15,6 +15,13 @@ type FilterInfo = { field: string; values?: { value: unknown; type?: string }[];
   paths?: { path: unknown[]; type?: string }[] };
 
 /**
+ * Combined getter/setter members return `undefined` in set mode on the trial even
+ * though the d.ts declares the getter's type (probed black-box). Typed `never` so
+ * every such site reads as one honest, documented assertion instead of a cast pair.
+ */
+const setModeResult = undefined as never;
+
+/**
  * The composed built-in row action the trial reports for a fresh TableSheet, both in
  * `rowActionOptions()` read-back and in workbook JSON (probe .probe/api-sweep-item2d.json:
  * fresh trial answers [{name:'composedPinDirtyNewWarningRow', icons:[ROW_ACTION_* names]}]).
@@ -665,11 +672,13 @@ export class TableSheet extends Worksheet {
   getTableTheme(): TableTheme { return this.tableTheme; }
   sort(sorts?: SortInfo[]): SortInfo[] {
     if (sorts) {
-      const workbook = this.getParent() as unknown as { getCustomFunction?: (name: string) => { evaluate: (...args: unknown[]) => unknown } };
+      const workbook = this.getParent() as Workbook | undefined;
       this.sorts = sorts.map(sort => ({ ...sort }));
       this.view?.sort(sorts.map(sort => {
-        const fn = typeof sort.compare === 'string' ? workbook?.getCustomFunction?.(sort.compare) : undefined;
-        const compare = fn ? (a: unknown, b: unknown, ascending: boolean) => Number(fn.evaluate(a, b, ascending))
+        const custom = typeof sort.compare === 'string'
+          ? workbook?.getCustomFunction(sort.compare) as { evaluate: (...args: unknown[]) => unknown } | undefined
+          : undefined;
+        const compare = custom ? (a: unknown, b: unknown, ascending: boolean) => Number(custom.evaluate(a, b, ascending))
           : typeof sort.compare === 'function' ? sort.compare : undefined;
         return { ...sort, compare };
       }));
@@ -685,7 +694,7 @@ export class TableSheet extends Worksheet {
       this.view?.groupBy(this.groups);
       this.refreshView();
       for (const listener of this.viewListeners) listener();
-      return undefined as unknown as { field: string; [key: string]: unknown }[];
+      return setModeResult;
     }
     return this.groups.map(group => ({ ...group }));
   }
@@ -715,12 +724,12 @@ export class TableSheet extends Worksheet {
   }
   groupOutlinePosition(value?: number): number {
     if (value !== undefined) {
-      this.outlinePosition = value; this.updateGroupHeaderWidth(); this._invalidate(); return undefined as unknown as number;
+      this.outlinePosition = value; this.updateGroupHeaderWidth(); this._invalidate(); return setModeResult;
     }
     return this.outlinePosition;
   }
   detailColumnsVisible(value?: boolean): boolean {
-    if (value !== undefined) { this.detailsVisible = value; this.refreshView(); return undefined as unknown as boolean; }
+    if (value !== undefined) { this.detailsVisible = value; this.refreshView(); return setModeResult; }
     return this.detailsVisible;
   }
   togglePinnedRows(indexes: number[]): number {

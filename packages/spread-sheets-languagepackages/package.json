@@ -1,0 +1,58 @@
+{
+  "name": "@opensheets/spread-sheets-languagepackages",
+  "version": "0.1.0",
+  "description": "OpenSheets calc-engine language packages add-in for the spreadsheet workbook, drop-in for the SpreadJS languagepackages add-in.",
+  "type": "module",
+  "main": "./dist/gc.spread.calcengine.languagepackages.cjs",
+  "module": "./dist/gc.spread.calcengine.languagepackages.esm.js",
+  "types": "./dist/gc.spread.calcengine.languagepackages.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets-languagepackages",
+    "opensheets-languagepackages",
+    "language",
+    "localization",
+    "calcengine",
+    "spread",
+    "sheet",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/gc.spread.calcengine.languagepackages.d.ts",
+        "default": "./dist/gc.spread.calcengine.languagepackages.esm.js"
+      },
+      "require": {
+        "types": "./dist/gc.spread.calcengine.languagepackages.d.cts",
+        "default": "./dist/gc.spread.calcengine.languagepackages.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

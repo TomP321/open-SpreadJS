@@ -18,6 +18,7 @@ import { FormulaParseError } from './calc/errors.js';
 import { columnLabel } from './rendering.js';
 import { TableSheet } from './tablesheet/index.js';
 import { commandConstants } from './command-constants.js';
+import { GC } from './generated/enums.js';
 
 export function encodeTSV(rows: unknown[][]): string {
   return rows.map(row => row.map(value => {
@@ -371,6 +372,10 @@ export class Interaction {
     if (this.view.sheet !== sheet) this.view.workbook.setActiveSheet(sheet.name());
     this.view.editor.style.opacity = '1';
     this.hints.close(); this.formulaLayer?.remove(); this.formulaLayer = undefined; for (const layer of this.referenceLayers) layer.remove(); this.referenceLayers = []; this.editing = undefined; this.pointReference = undefined; this.formulaBar = undefined; this.view.editor.style.display = 'none'; if (this.editorContainer) this.editorContainer.style.display = 'none'; this.view.root.focus();
+    // The grid commits (Enter/Tab and the formula bar's commitFromFormulaBar) run without going
+    // through sheet.endEdit(); return the sheet's editor status to `ready` here so isEditing()
+    // reflects the closed editor.
+    sheet.editorStatusValue = GC.Spread.Sheets.EditorStatus.ready;
     sheet._emit(Events.EditEnded, { ...info, newValue: sheet.getValue(row, col) });
     sheet._emit(Events.EditorStatusChanged, { sheet, sheetName: sheet.name(), oldStatus: 2, newStatus: 0 });
     this.view.schedule(); return true;

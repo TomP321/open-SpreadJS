@@ -4,6 +4,7 @@ import { addTaskTime, addWorkingTime, workingSlot, workingTimeBetween } from './
 import { TaskDependency, type TaskDependencyType } from './dependency.js';
 import { createDefaultTaskStyleRules, TaskbarLayout, TaskbarStyleRule, Timescale } from './appearance.js';
 import type { Collection } from './collection.js';
+import { asRecord } from '../object-access.js';
 
 export type TaskData = {
   name?: string;
@@ -195,7 +196,7 @@ export class Task {
     if (this.durationValue) return addTaskTime(project.calendar, project.workingSlot(project.startDate), this.durationValue.time);
     return this.finishValue;
   }
-  getValue(property: string): unknown { return (this as unknown as Record<string, unknown>)[property]; }
+  getValue(property: string): unknown { return (asRecord(this))[property]; }
   /** The trial never applies `setValue` to task fields; mirrored for behavioral parity. */
   setValue(_property: string, _value: unknown): void { /* trial-observed no-op */ }
   get isSummary(): boolean { return this._children.length > 0; }

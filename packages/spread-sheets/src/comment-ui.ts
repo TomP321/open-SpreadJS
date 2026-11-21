@@ -7,7 +7,7 @@ import type { WorkbookRenderer } from './rendering.js';
 import type { Worksheet } from './worksheet.js';
 import type { Comment } from './comments.js';
 import type { ThreadedComment, IContentBlock } from './threaded-comments.js';
-import { ContentType, blocksToText, userColor, _cacheUser } from './threaded-comments.js';
+import { ContentType, blocksToText, userColor } from './threaded-comments.js';
 import { UserManager } from './user-manager.js';
 import { Events } from './events.js';
 
@@ -738,9 +738,4 @@ export class CommentUi {
     this.card.style.left = `${left}px`;
     this.card.style.top = `${top}px`;
   }
-}
-
-/** Resolve mention display names when users were fetched from the manager. */
-export function primeUser(user: { id: string; name: string }): void {
-  _cacheUser(user);
 }

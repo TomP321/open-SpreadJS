@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= path.resolve('../../.playwright-browsers');
+// TASK 72 item 6: the unit suites run with TZ=UTC (`TZ=UTC vitest run`); the XLSX four-way
+// round-trip (m7-io) compares date cells across engines and file codecs, so the browser
+// pages need the same deterministic timezone. The launched browsers inherit this environment.
+process.env.TZ = 'UTC';
 export default defineConfig({
   testDir: './test',
   globalTeardown: './test/pixel-report.ts',

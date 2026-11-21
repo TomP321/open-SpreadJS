@@ -642,6 +642,20 @@ export function loadFormulas(engine: CalcEngine, ): void {
 }
 
 export function formulasInRange(engine: CalcEngine, dep: RangeDep): FormulaCell[] {
+    const memoKey = `${dep.sheetId}:${dep.r1}:${dep.c1}:${dep.r2}:${dep.c2}`;
+    if (engine.rangeMemoVersion !== engine.graphVersion) {
+      engine.rangeDepMemo.clear();
+      engine.rangeMemoVersion = engine.graphVersion;
+    } else {
+      const memo = engine.rangeDepMemo.get(memoKey);
+      if (memo) return memo;
+    }
+    const result = collectFormulasInRange(engine, dep);
+    engine.rangeDepMemo.set(memoKey, result);
+    return result;
+}
+
+function collectFormulasInRange(engine: CalcEngine, dep: RangeDep): FormulaCell[] {
     const result: FormulaCell[] = [];
     const sheetMap = engine.bySheet.get(dep.sheetId);
     if (!sheetMap || !sheetMap.size) return result;

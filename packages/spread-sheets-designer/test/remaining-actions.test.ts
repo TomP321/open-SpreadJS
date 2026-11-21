@@ -161,13 +161,20 @@ describe('M6b command regressions', () => {
 
   it('groups, collapses, expands and ungroups the selection', () => {
     sheet.setSelection(1, 0, 3, 1);
+    // Trial (TASK 75 sweep): the "Group..."/"Ungroup..." gallery footers only act through
+    // their dialogs — a bare execute leaves the outline untouched.
     applyBuiltin(d, 'innerGroup');
-    expect(sheet.rowOutlines.getLevel(1)).toBe(0);
+    expect(sheet.rowOutlines.getLevel(1)).toBe(-1);
+    sheet.rowOutlines.group(1, 3);
     applyBuiltin(d, 'hideDetail');
     expect(sheet.getRowVisible(1)).toBe(false);
     applyBuiltin(d, 'showDetail');
     expect(sheet.getRowVisible(1)).toBe(true);
+    // Trial (TASK 75 r3, five-case probe): bare Ungroup... never ungroups — its dialog
+    // collects the level first; the outline survives the call untouched.
     applyBuiltin(d, 'innerUngroup');
+    expect(sheet.rowOutlines.getLevel(1)).toBe(0);
+    applyBuiltin(d, 'clearOutline');
     expect(sheet.rowOutlines.getLevel(1)).toBe(-1);
   });
 
@@ -183,10 +190,12 @@ describe('M6b command regressions', () => {
 
   it('toggles workbook and sheet visibility options through their live models', () => {
     for (const command of ['showHideVGridLine', 'showHideHGridLine', 'showHideRowHeader', 'showHideColumnHeader', 'showHideTabStrip', 'showHideNewTab', 'showFormulas']) {
+      // Trial (TASK 75 sweep): these toggle through the ribbon path (propertyName set);
+      // a bare execute of showFormulas is a no-op on the trial.
       const before = JSON.stringify({ sheet: sheet.options, workbook: d.getWorkbook().options });
-      applyBuiltin(d, command);
+      applyBuiltin(d, command, { propertyName: command });
       expect(JSON.stringify({ sheet: sheet.options, workbook: d.getWorkbook().options }), command).not.toBe(before);
-      applyBuiltin(d, command);
+      applyBuiltin(d, command, { propertyName: command });
       expect(JSON.stringify({ sheet: sheet.options, workbook: d.getWorkbook().options }), command).toBe(before);
     }
   });

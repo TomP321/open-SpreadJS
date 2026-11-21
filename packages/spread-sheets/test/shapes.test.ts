@@ -103,7 +103,7 @@ describe('ShapeCollection', () => {
     expect(restored[1].cellRange()).toBe('=Sheet1!$A$1:$B$2');
   });
 
-  it('moves grouped shapes together and ungroup releases them', () => {
+  it('a grouped member moves individually; the group handle moves the whole group; ungroup releases', () => {
     const shapes = sheet.shapes;
     const a = new Shapes.Shape('rectangle 1', 1, 10, 10, 50, 50);
     const b = new Shapes.Shape('rectangle 2', 1, 200, 10, 50, 50);
@@ -112,12 +112,18 @@ describe('ShapeCollection', () => {
     expect(group).toBeTruthy();
     expect(a.groupId()).toBe(group?.groupId());
     expect(group?.all().map(item => item.name())).toEqual(['rectangle 1', 'rectangle 2']);
+    // Trial rule (probe t81-movechain2, 2026-11-21): `a.x(30)` on a grouped member moves ONLY `a`;
+    // the sibling and the group frame stay put (the old TASK 75-era sibling chain was our own rule).
     a.x(30);
-    expect(b.x()).toBe(220);
+    expect(b.x()).toBe(200);
+    expect(group?.x()).toBe(10);
+    // Moving the GROUP handle translates frame and members together.
+    group?.x(20);
+    expect([a.x(), b.x(), group?.x()]).toEqual([40, 210, 20]);
     shapes.ungroup(group as never);
     expect(a.groupId()).toBeNull();
     a.x(0);
-    expect(b.x()).toBe(220);
+    expect(b.x()).toBe(210);
   });
 
   it('hit-tests the top-most shape and reports the used range', () => {
@@ -209,6 +215,11 @@ describe('public shapes API (drop-in forms)', () => {
     expect(c.groupId()).toBeNull();
     group?.rotate(30);
     expect(a.rotation()).toBe(30);
-    expect(sheet.shapes.group([a])).toBeNull();
+    // TASK 81 trial rule (live probe 2026-11-20): group() ALWAYS answers a GroupShape — a single
+    // shape groups alone (the trial named it `GroupShape 4`) and the shape leaves the top level.
+    const single = sheet.shapes.group([a]);
+    expect(single).toBeInstanceOf(Shapes.GroupShape);
+    expect(sheet.shapes.all().map((item) => item.name())).not.toContain('a');
+    expect(single.all().map((item) => item.name())).toEqual(['a']);
   });
 });
