@@ -16,3 +16,6 @@ playwright-report/
 # temp screenshots must never be committed (official pixels)
 /tmp-*.png
 /*.png
+
+# Generated at build time from the official public d.ts (devDependency); not distributed in git
+packages/spread-sheets/src/generated/contract.txt
