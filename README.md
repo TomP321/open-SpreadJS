@@ -242,7 +242,7 @@ The two local Strata machines:
 | Weights | UD-IQ4_XS v3.1 (4-bit) | GSQ-RCO IQ3_XXS (about 3-bit) |
 | Hardware | 4 × RTX 4060 Ti 16 GB, 118 GB RAM | 1 × RTX 3060 12 GB, 62 GB RAM |
 | Engine | Strata inference server, OpenAI-compatible API, one session (`parallel 1`) | same engine, reached through an SSH tunnel |
-| Context | 400k tokens (409,600) | 512k tokens (524,288) |
+| Context | 512k tokens (524,288) | 512k tokens (524,288) |
 | Speculative decoding | MTP draft layer, 4 draft tokens | MTP draft layer |
 | Throughput | about 38–40 tokens/s | about 40 tokens/s |
 | Reasoning effort | medium | low (the 3-bit weights tended to over-think) |
