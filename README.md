@@ -33,6 +33,9 @@ known deviations. **Runnable apps:** [`examples/`](examples) (`vite-core`, `vite
 
 Requires Node.js 20.19+ and pnpm 10.
 
+![The Designer from examples/vite-designer running on OpenSheets](docs/media/designer-demo.gif)
+
+
 ## Using the core
 
 ```ts
@@ -166,6 +169,27 @@ canvas painting batched in `requestAnimationFrame`, and a parse-once dependency-
 calculation service. `Workbook`/`Designer` create/destroy cycles leak nothing (WeakRef +
 heap-snapshot verified).
 
+## Building from source
+
+![Building OpenSheets from a fresh clone: install, build, test, lint, API coverage](docs/media/build-from-source.gif)
+
+The animation is a real run on a fresh clone of this repository (Linux, Node.js 20.20, pnpm 10.34):
+`pnpm install` took 7 s with a warm store, `pnpm build` 188 s, `pnpm test` 85 s and `pnpm lint` 31 s.
+
+1. **Prerequisites** — Node.js 20.19 or newer and pnpm 10 (`corepack enable` gives you pnpm).
+2. **Clone** — `git clone https://github.com/TomP321/open-SpreadJS.git && cd open-SpreadJS`
+3. **Install** — `pnpm install` installs the 27 workspace projects (packages, apps, examples).
+4. **Build** — `pnpm build` builds every package with tsup (ESM, CommonJS, UMD/script-tag bundles, `.d.ts`,
+   theme CSS) and the apps/examples with Vite.
+5. **Test** — `pnpm test` runs the Vitest suites of every package (about 3,700 tests: 2,982 in the core, 351 in the
+   Designer, 255 type-conformance tests in `packages/compat`, ...); `pnpm lint` runs ESLint on the whole workspace.
+6. **API coverage** — `pnpm coverage:api` compares our public surface with the official `gc.spread.sheets.d.ts`
+   (207/207 classes, 1796/1796 methods, 252/252 enums).
+7. **Run it** — `pnpm --filter vite-designer dev` (or `vite-core`, `vite-react`) starts an example app.
+8. **Optional: drop-in check** — `pnpm setup:compare` downloads Chromium for Playwright, then
+   `pnpm dropin:check -- --pack` packs the packages into tarballs, installs them under the official `@mescius/*` names
+   in throw-away apps and checks that they build and render.
+
 ## Development
 
 ```sh
@@ -180,6 +204,65 @@ pnpm compare           # playground/compare apps (see apps/*/README)
 with ours in the same browser for black-box pixel/behaviour diffing; the Playwright specs in
 those apps are the visual parity gates. The `examples/` apps are workspace members, so
 `pnpm -r build` typechecks and builds them together with the packages.
+
+## How this project was built
+
+OpenSheets was written by AI coding agents under the direction of the repository owner. Nobody typed the code by
+hand; the human set the goals, the priorities and the rules, and tested the results.
+
+**Supervisor — Claude (Anthropic), running in [Claude Code](https://claude.com/claude-code).** The supervisor
+(currently Claude Opus 5.5) never wrote the bulk of the code. It:
+
+- split the roadmap into tasks (`.supervisor/task-FNN.md`, not in this repository) with the clean-room rules, the files
+  each coder may touch, the acceptance gates and the official behaviour to reproduce;
+- launched and watched the coders, audited every result before accepting it (deleted or weakened tests, unsafe
+  `as unknown as` casts, binaries, anything that looked like pixels or code copied from the official product), merged
+  the work in a separate git worktree and re-ran every gate itself (`build`, `coverage:api`, `typecheck`, `test`, `lint`,
+  `dropin:check`);
+- checked the UI with its own eyes through [web-vision](https://github.com/TomP321/web-vision) — official trial and
+  OpenSheets side by side in `apps/designer-compare` — and turned the differences into new tasks.
+
+Claude Code features that made this possible: background shell jobs for the long gate runs, the `Monitor` tool on a
+watcher script (coder stopped, idle for too long, round finished, memory low), a self-paced `/loop` with
+`ScheduleWakeup` as a heartbeat so the work went on day and night, persistent memory files for the project rules and
+lessons learned, git worktrees for clean merges, and the web-vision MCP server for screenshots and browser actions.
+
+**Coders.**
+
+| When | Coder | Model | Where it ran |
+|---|---|---|---|
+| 2026-11-06 → 11-18, on and off | [OpenAI Codex CLI](https://github.com/openai/codex) | OpenAI models (gpt-6.1-terra in the later runs) | cloud |
+| 2026-11-06, briefly | dsh (DeepSeek harness), headless | DeepSeek flash | cloud |
+| 2026-11-08 → today, the only coder since 11-18 | [opencode](https://opencode.ai) **v2.1.4**, `opencode run --auto` | **Strata Qwen3.8-Flash-Next** | **local**, two machines |
+
+The two local Strata machines:
+
+| | Machine 1 | Machine 2 |
+|---|---|---|
+| Weights | UD-IQ4_XS v3.1 (4-bit) | GSQ-RCO IQ3_XXS (about 3-bit) |
+| Hardware | 4 × RTX 4060 Ti 16 GB, 118 GB RAM | 1 × RTX 3060 12 GB, 62 GB RAM |
+| Engine | Strata inference server, OpenAI-compatible API, one session (`parallel 1`) | same engine, reached through an SSH tunnel |
+| Context | 400k tokens (409,600) | 512k tokens (524,288) |
+| Speculative decoding | MTP draft layer, 4 draft tokens | MTP draft layer |
+| Throughput | about 38–40 tokens/s | about 40 tokens/s |
+| Reasoning effort | medium | low (the 3-bit weights tended to over-think) |
+
+**The harness around opencode.** Each machine runs one queue (`feature-queue.sh`):
+
+1. It starts `opencode run --auto` with the task file as the prompt.
+2. It ends the round when the context reaches about 360k tokens or the coder stops early. It then commits a checkpoint
+   and starts a fresh round with a short "continue from the checkpoint" prompt.
+3. At the end it runs the gates and commits.
+
+Because a killed `opencode run` client does not stop its session inside the background `opencode serve` service, the
+queue also deletes the old session (`opencode session delete`). Otherwise two sessions would share one GPU server.
+The coders used web-vision from inside opencode, through its MCP integration plus a small hooks plugin. With it they
+looked at their own UI changes and measured the official Designer as a black box.
+
+**Clean room.** The contract is the public `.d.ts` files and the public documentation. The official trial package was
+used only as a black box, running side by side in `apps/compare` and `apps/designer-compare`. Nobody (neither the
+supervisor nor any coder) opened its minified JavaScript or CSS, and no official pixels, icons or strings files were
+copied. See [Clean-room](#clean-room).
 
 ## Clean-room
 
