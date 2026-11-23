@@ -287,12 +287,20 @@ describe('ThreadedCommentPanel (trial structure, probe panels46/46e/46g/46i)', (
     reopen.click();
     expect(tc.resolved()).toBe(false);
     expect(host.querySelector('.opensheets-tc-resolved')).toBeNull();
-    // Active card: the options menu offers Resolve/Delete (trial menu aria-labels).
-    const menuButton = host.querySelector('[aria-label="Threaded comment options menu"]') as HTMLButtonElement;
+    // Active card: the options menu offers Delete Thread / Resolve Thread in
+    // the trial order (TASK 95 probes t95/panel2 + t95/resolved: one shared
+    // card menu triggered by "More options" on the head or on a reply).
+    const menuButton = host.querySelector('[aria-label="More options"]') as HTMLButtonElement;
+    expect(menuButton.getAttribute('aria-haspopup')).toBe('true');
     menuButton.click();
+    expect(menuButton.getAttribute('aria-expanded')).toBe('true');
     const menuItems = [...host.querySelectorAll<HTMLElement>('.opensheets-tc-menu-items [role="menuitem"]')];
-    expect(menuItems.map((i) => i.textContent)).toEqual(['Resolve Thread', 'Delete Thread']);
-    menuItems[1].click(); // Delete Thread
+    expect(menuItems.map((i) => i.textContent)).toEqual(['Delete Thread', 'Resolve Thread']);
+    menuItems[1].click(); // Resolve Thread
+    expect(tc.resolved()).toBe(true);
+    const menuItems2 = [...host.querySelectorAll<HTMLElement>('.opensheets-tc-menu-items [role="menuitem"]')];
+    expect(menuItems2.map((i) => i.textContent)).toEqual(['Delete Thread', 'Resolve Thread']); // resolved cards keep the trial menu (probe3)
+    [...host.querySelectorAll<HTMLElement>('.opensheets-tc-menu-items [role="menuitem"]')][0].click(); // Delete Thread
     expect(sheet.threadedComments.size()).toBe(0);
     expect(host.querySelector('.opensheets-tc-resolved')).toBeNull();
     panel.destroy();
@@ -333,21 +341,29 @@ describe('ThreadedCommentPanel (trial structure, probe panels46/46e/46g/46i)', (
     wb.destroy();
   });
 
-  it('New button opens an editor on the active cell and commits a thread on Enter', () => {
+  it('New inserts a draft card for the active cell (no thread yet) and Post commits it', () => {
     const wb = new Workbook();
     const sheet = wb.getSheet(0);
     sheet.setActiveCell(2, 4);
     const host = makeHost(320);
     const panel = new ThreadedCommentPanel(host, wb);
     (host.querySelector('button[aria-label="New"]') as HTMLButtonElement).click();
-    const editor = host.querySelector('.opensheets-tc-editor') as HTMLTextAreaElement;
+    // Trial probe (t95/panel2 afterNew): a card "Threaded comment at row 6,
+    // column 6" WITHOUT data-comment-key; threadedComments.size() unchanged.
+    expect(sheet.threadedComments.size()).toBe(0);
+    const draft = host.querySelector('.opensheets-tc-list [role="listitem"]') as HTMLElement;
+    expect(draft.getAttribute('aria-label')).toBe('Threaded comment at row 3, column 5');
+    expect(draft.hasAttribute('data-comment-key')).toBe(false);
+    const editor = host.querySelector('.opensheets-tc-editor') as HTMLElement;
     expect(editor).not.toBeNull();
-    editor.value = 'typed via panel';
+    expect(editor.getAttribute('contenteditable')).toBe('true');
+    expect(editor.getAttribute('data-placeholder')).toBe('@mention or reply');
+    editor.textContent = 'typed via panel';
     editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     expect(sheet.threadedComments.size()).toBe(1);
     expect(sheet.threadedComments.get(2, 4)).not.toBeNull();
     const item = host.querySelector('[data-comment-key="2_4"]')!;
-    expect(ownText(item.querySelector('.opensheets-tc-text')!)).toBe('typed via panel');
+    expect(item.querySelector('.opensheets-tc-text')!.textContent).toBe('typed via panel');
     panel.destroy();
     wb.destroy();
   });

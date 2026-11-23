@@ -13,7 +13,7 @@
  */
 import { resolveSlicerColor, SlicerStyle } from './styles.js';
 import type { JsonRecord } from '../../serialization.js';
-import type { SlicerItem } from './types.js';
+import { SLICER_BLANK_TEXT, slicerBlankLabel, type SlicerItem } from './types.js';
 import {
   SLICER_BUTTON_RADIUS, SLICER_HEADER_HEIGHT,
   SLICER_ITEM_GAP, SLICER_ITEM_LEFT, SLICER_ITEM_RIGHT, SLICER_LIST_TOP, SLICER_LIST_TOP_NO_HEADER,
@@ -264,7 +264,7 @@ function firstBorder(style: SlicerStyle): string {
 }
 
 function itemDisplay(item: SlicerItem): string {
-  return item.text === '' ? '(blank)' : item.text;
+  return item.text === '' || item.text === SLICER_BLANK_TEXT ? slicerBlankLabel() : item.text;
 }
 
 function itemKey(item: SlicerItem, hovered: boolean, visualNoData = true): string {

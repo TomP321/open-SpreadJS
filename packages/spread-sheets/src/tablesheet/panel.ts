@@ -3,6 +3,10 @@ import { Workbook } from '../workbook.js';
 import { CheckBox } from '../features/cell-types.js';
 import { clearWorkbookHost, registerWorkbookHost } from '../features/controls.js';
 import { Events } from '../events.js';
+import { ltext } from '../localization.js';
+
+/** TableSheet panel captions (`tablePanel.*` language namespace). */
+const ttext = (key: string, fallback: string, ...args: (string | number)[]) => ltext(`tablePanel.${key}`, fallback, ...args);
 import { Style } from '../primitives.js';
 
 type PanelOptions = { showSource?: number; fieldAreaVisible?: boolean; groupAreaVisible?: boolean };
@@ -70,10 +74,10 @@ export class TableSheetPanel {
     this.fieldContainer.className = 'gc-table-sheet-field-container';
     const fieldHeader = document.createElement('span');
     fieldHeader.className = 'gc-table-sheet-field-header';
-    fieldHeader.textContent = 'Fields';
+    fieldHeader.textContent = ttext('fields', 'Fields');
     const addCalc = document.createElement('span');
     addCalc.className = 'gc-table-sheet-add-calculate-column';
-    addCalc.title = 'Add Calculated Column';
+    addCalc.title = ttext('addCalc', 'Add Calculated Column');
     addCalc.setAttribute('role', 'button');
     addCalc.addEventListener('click', () => this.addCalculateRow());
     fieldHeader.append(addCalc);
@@ -85,18 +89,18 @@ export class TableSheetPanel {
     this.groupPanel.className = 'gc-table-sheet-group-panel';
     const groupHeader = document.createElement('span');
     groupHeader.className = 'gc-table-sheet-group-header';
-    groupHeader.textContent = 'Groups';
+    groupHeader.textContent = ttext('groups', 'Groups');
     this.groupList = document.createElement('ul');
     this.groupList.className = 'gc-table-sheet-group-list';
     this.groupList.setAttribute('role', 'listbox');
-    this.groupList.setAttribute('aria-label', 'Groups');
+    this.groupList.setAttribute('aria-label', ttext('groups', 'Groups'));
     this.groupPanel.append(groupHeader, this.groupList);
 
     const cross = document.createElement('div');
     cross.className = 'gc-table-sheet-group-panel gc-table-sheet-cross-panel gc-table-sheet-cross-column gc-table-sheet-hidden';
     const crossHeader = document.createElement('span');
     crossHeader.className = 'gc-table-sheet-group-header';
-    crossHeader.textContent = 'Cross';
+    crossHeader.textContent = ttext('cross', 'Cross');
     const crossDetail = document.createElement('div');
     crossDetail.className = 'gc-table-sheet-cross-column-detail';
     cross.append(crossHeader, crossDetail);
@@ -446,7 +450,7 @@ export class TableSheetPanel {
       const tip = document.createElement('span');
       tip.className = 'gc-table-sheet-group-tip';
       tip.setAttribute('role', 'option');
-      tip.textContent = 'Drag here to set row groups';
+      tip.textContent = ttext('dragGroups', 'Drag here to set row groups');
       this.groupList.append(tip);
       this.selectedGroup = 0;
       return;
@@ -465,8 +469,8 @@ export class TableSheetPanel {
       const remove = document.createElement('span');
       remove.className = 'gc-table-sheet-group-item-remove';
       remove.setAttribute('role', 'button');
-      remove.setAttribute('aria-label', 'Remove');
-      remove.title = 'Remove';
+      remove.setAttribute('aria-label', ttext('remove', 'Remove'));
+      remove.title = ttext('remove', 'Remove');
       remove.addEventListener('click', event => {
         event.stopPropagation();
         this.removeGroup(group.field);
@@ -476,7 +480,7 @@ export class TableSheetPanel {
       item.append(label, remove);
       const input = document.createElement('input');
       input.className = 'gc-table-sheet-group-input';
-      input.setAttribute('aria-label', 'Group Name');
+      input.setAttribute('aria-label', ttext('groupName', 'Group Name'));
       item.addEventListener('click', () => {
         this.selectedGroup = index;
         this.summaryDrafts = [];
@@ -555,10 +559,10 @@ export class TableSheetPanel {
     headerLabel.textContent = group.field;
     const addFunction = document.createElement('span');
     addFunction.className = 'gc-table-sheet-summary-function';
-    addFunction.title = 'Add Summary Field';
+    addFunction.title = ttext('addSummary', 'Add Summary Field');
     const removeAll = document.createElement('span');
     removeAll.className = 'gc-table-sheet-summary-remove';
-    removeAll.title = 'Remove All';
+    removeAll.title = ttext('removeAll', 'Remove All');
     addFunction.addEventListener('click', () => {
       this.summaryDrafts = [...this.summaryDrafts, { formula: '' }];
       this.renderSummary();
@@ -593,10 +597,10 @@ export class TableSheetPanel {
         row.append(label, input);
         return row;
       };
-      const formulaRow = makeRow('formula', 'Formula', summary.formula ?? '');
+      const formulaRow = makeRow('formula', ttext('formula', 'Formula'), summary.formula ?? '');
       const removeIcon = document.createElement('span');
       removeIcon.className = 'gc-table-sheet-summary-item-remove-icon';
-      removeIcon.title = 'Remove';
+      removeIcon.title = ttext('remove', 'Remove');
       removeIcon.addEventListener('click', () => {
         if (summaryIndex < committed.length) {
           this.writeSummaries(group.field, list0 => list0.filter((_, i) => i !== summaryIndex));
@@ -608,8 +612,8 @@ export class TableSheetPanel {
       formulaRow.append(removeIcon);
       item.append(
         formulaRow,
-        makeRow('caption', 'Caption', String(summary.caption ?? summary.formula ?? '')),
-        makeRow('slice', 'Slice', typeof summary.slice === 'string' ? summary.slice : ''),
+        makeRow('caption', ttext('caption', 'Caption'), String(summary.caption ?? summary.formula ?? '')),
+        makeRow('slice', ttext('slice', 'Slice'), typeof summary.slice === 'string' ? summary.slice : ''),
       );
       list.append(item);
     });

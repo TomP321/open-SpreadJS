@@ -245,3 +245,104 @@ describe('TableSheet JSON trial shape', () => {
     restored.destroy();
   });
 });
+
+/**
+ * TASK 97 TS-1 — hierarchy + filter + sort combined interchange. All trial
+ * observations recorded under .probe/hier-probe.json, hier-probe2.json and
+ * hier-probe3.json (black-box runs of the same script against both products):
+ * - live sort/filter over a hierarchy view orders siblings by the sort with
+ *   children following their parent — ours already matched (cases A-D);
+ * - pinned rows are INERT on hierarchy views: togglePinnedRows changes nothing,
+ *   answers undefined and serializes pinnedRows [] (case F), while flat views
+ *   pin and answer the count (case G);
+ * - a hierarchy view with an active filter reloads in NATURAL hierarchy order:
+ *   the trial keeps the sort spec (sort() read-back, rowFilter.sortMap, view
+ *   sortInfo) but does not reapply it when a filter is restored (cases I/J/M);
+ *   without a filter the sort is reapplied (case H), and flat views keep
+ *   sort+filter+pin intact (case K);
+ * - pinnedRows carried in JSON on a hierarchy view stay in the raw list but
+ *   never move rows (richJSONHierarchyImportsOurWorkbook).
+ */
+describe('TableSheet hierarchy JSON interchange', () => {
+  async function hierFixture() {
+    const workbook = new GC.Spread.Sheets.Workbook(undefined, { sheetCount: 0 });
+    const data = Array.from({ length: 12 }, (_, i) => ({
+      id: i + 1, parentId: i >= 4 && i < 8 ? i - 3 : null, level: i >= 4 && i < 8 ? 1 : 0,
+      name: `N${i + 1}`, city: i % 3 === 0 ? 'Paris' : 'Rome', score: (i + 1) * 5, order: i,
+    }));
+    const table = workbook.dataManager().addTable('hier', { data, schema: {
+      hierarchy: { type: 'Parent', column: 'parentId' },
+      columns: { id: { isPrimaryKey: true }, parentId: {}, level: {}, name: {}, city: {}, score: {},
+        order: { dataType: 'rowOrder' } },
+    } });
+    const view = table.addView('hierV', [
+      { value: 'id', caption: 'ID', width: 80 }, { value: 'name', caption: 'Name', width: 130, outlineColumn: true },
+      { value: 'city', caption: 'City', width: 100 }, { value: 'score', caption: 'Score', width: 90 },
+      { value: 'order', caption: 'Order', width: 70 }]);
+    await view.fetch();
+    const sheet = workbook.addSheetTab(0, 'Hier', GC.Spread.Sheets.SheetType.tableSheet) as TableSheetInstance;
+    sheet.setDataView(view);
+    return { workbook, view, sheet };
+  }
+  const ids = (view: { visibleLength(): number; getRowData(index: number): Record<string, unknown> }) =>
+    Array.from({ length: view.visibleLength() }, (_, index) => view.getRowData(index).id);
+
+  it('keeps live sort+filter over a hierarchy in trial order (siblings sorted, children follow parents)', async () => {
+    const { workbook, view, sheet } = await hierFixture();
+    sheet.sort([{ field: 'score', ascending: false }]);
+    expect(ids(view)).toEqual([12, 11, 10, 9, 4, 8, 3, 7, 2, 6, 1, 5]);
+    sheet.filter([{ field: 'city', values: [{ value: 'Rome' }] }]);
+    expect(ids(view)).toEqual([12, 11, 9, 4, 8, 3, 7, 2, 6, 1, 5]);
+    workbook.destroy();
+  });
+
+  it('makes pinned rows inert on hierarchy views (toggle undefined, no move, empty pinnedRows)', async () => {
+    const { workbook, view, sheet } = await hierFixture();
+    expect(sheet.togglePinnedRows([1])).toBeUndefined();
+    expect(ids(view)).toEqual([1, 5, 2, 6, 3, 7, 4, 8, 9, 10, 11, 12]);
+    const json = JSON.parse(JSON.stringify(workbook.toJSON({ includeBindingSource: true })));
+    expect(json.dataManager.tables[0].views[0].pinnedRows).toEqual([]);
+    workbook.destroy();
+  });
+
+  it('reloads a filtered hierarchy view in natural order with the sort spec kept for read-back', async () => {
+    const { workbook, sheet } = await hierFixture();
+    sheet.sort([{ field: 'score', ascending: false }]);
+    sheet.filter([{ field: 'city', values: [{ value: 'Rome' }] }]);
+    const json = JSON.parse(JSON.stringify(workbook.toJSON({ includeBindingSource: true })));
+    workbook.destroy();
+    const { restored, tab } = await reload(json);
+    const sheet2 = tab('Hier');
+    expect(ids((sheet2.getDataView()) as never)).toEqual([1, 5, 2, 6, 3, 7, 4, 8, 9, 11, 12]);
+    expect(sheet2.sort()).toEqual([{ field: 'score', ascending: false }]);
+    expect(sheet2.filter()).toEqual([{ field: 'city', values: [{ value: 'Rome', type: 'value' }] }]);
+    const again = JSON.parse(JSON.stringify(restored.toJSON({ includeBindingSource: true })));
+    expect(again.sheetTabs.Hier.rowFilter.sortMap['-1']).toEqual({ '3': { index: 3, ascending: false } });
+    expect(again.sheetTabs.Hier.addition.rowFilter.sortMap['-1']).toEqual({ '3': { index: 3, ascending: false } });
+    restored.destroy();
+  });
+
+  it('reloads a sorted hierarchy view (no filter) still sorted', async () => {
+    const { workbook, sheet } = await hierFixture();
+    sheet.sort([{ field: 'score', ascending: false }]);
+    const json = JSON.parse(JSON.stringify(workbook.toJSON({ includeBindingSource: true })));
+    workbook.destroy();
+    const { restored, tab } = await reload(json);
+    expect(ids((tab('Hier').getDataView()) as never)).toEqual([12, 11, 10, 9, 4, 8, 3, 7, 2, 6, 1, 5]);
+    restored.destroy();
+  });
+
+  it('keeps JSON-carried pinned rows on a hierarchy view raw but inert on reload', async () => {
+    const { workbook, sheet } = await hierFixture();
+    sheet.sort([{ field: 'score', ascending: false }]);
+    sheet.filter([{ field: 'city', values: [{ value: 'Rome' }] }]);
+    const json = JSON.parse(JSON.stringify(workbook.toJSON({ includeBindingSource: true })));
+    json.dataManager.tables[0].views[0].pinnedRows = [10]; // as our workbook answered the trial before the fix
+    workbook.destroy();
+    const { restored, tab } = await reload(json);
+    expect(ids((tab('Hier').getDataView()) as never)).toEqual([1, 5, 2, 6, 3, 7, 4, 8, 9, 11, 12]);
+    const again = JSON.parse(JSON.stringify(restored.toJSON({ includeBindingSource: true })));
+    expect(again.dataManager.tables[0].views[0].pinnedRows).toEqual([10]);
+    restored.destroy();
+  });
+});

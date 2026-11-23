@@ -1,4 +1,5 @@
 import { strToU8 } from 'fflate';
+import { encryptXlsx } from './encryption.js';
 import { address, arr, bool, cellPosition, normalFormula, obj, range, rangeAddress, relsPath, resolvePart, shiftFormula, type IoOptions, type IoState, type RecordValue, type Rect } from './common.js';
 import { child, children, declaration, descendants, elements, escapeXml, parseXml, section, tag, textOf, type XmlNode } from './xml.js';
 import { defaultTheme, isDateFormat, readColor, readStyles, readTheme, StyleWriter, themeXml, colorXml } from './styles.js';
@@ -90,11 +91,69 @@ function namesXml(json:RecordValue,sheets:RecordValue[]):string {
 function topLevelRaw(xml:string):{name:string;raw:string}[] {
   if(!xml)return [];const noData=xml.replace(/<(?:\w+:)?sheetData\b[^>]*>[\s\S]*?<\/(?:\w+:)?sheetData>/,'<sheetData/>');const root=parseXml(noData);return root.children.map(n=>({name:n.name,raw:section(noData,n.name)}));
 }
+/* TASK 93: export view options (official semantics measured on the trial,
+   black-box: header content is prepended to the data region, formulas shift,
+   frozen counts become the inserted header size; auto-merged equal runs
+   become real mergeCells; saveAsView writes the rendered text for
+   formula/template format-string formatters). */
+function headerCellsPresent(dt:RecordValue,mode:'row'|'col'):boolean {
+  if(mode==='row'){for(const cell of Object.values(obj(dt['0'])))if(obj(cell).value!==undefined)return true;}
+  else{for(const row of Object.values(dt))if(obj(obj(row)['0']).value!==undefined)return true;}
+  return false;
+}
+function shiftRect(x:RecordValue,h:number,r:number):RecordValue {return {...x,row:Number(x.row??0)+r,col:Number(x.col??0)+h};}
+function shiftKeys(map:RecordValue,by:number):RecordValue {return by?Object.fromEntries(Object.entries(map).map(([k,v])=>[String(+k+by),v])):map;}
+function applyViewShift(s:RecordValue,options:IoOptions):RecordValue {
+  const rd=obj(s.rowHeaderData),cd=obj(s.colHeaderData);
+  const h=options.rowHeadersAsFrozenColumns&&headerCellsPresent(obj(rd.dataTable),'col')?1:0;
+  const r=options.columnHeadersAsFrozenRows&&headerCellsPresent(obj(cd.dataTable),'row')?1:0;
+if(!h&&!r)return s;
+  const t:RecordValue={...s,rowCount:Math.min(1048576,Number(s.rowCount??200)+r),columnCount:Math.min(16384,Number(s.columnCount??20)+h)};
+  if(h)t.frozenColCount=h;if(r)t.frozenRowCount=r;
+  const data={...obj(s.data)};
+  const rows:RecordValue={};
+  const put=(row:number,col:number,cell:RecordValue):void=>{rows[String(row)]={...obj(rows[String(row)]),[String(col)]:cell};};
+  for(const [rk,raw]of Object.entries(obj(obj(s.data).dataTable)))for(const [ck,cell]of Object.entries(obj(raw))){
+    const cl={...obj(cell)};const dr=+rk+r,dc=+ck+h;
+    if(typeof cl.formula==='string')cl.formula=shiftFormula(String(cl.formula),r,h);
+    for(const key of ['arrayInfo','arrayFormula'])if(obj(cl[key]).rowCount)cl[key]={...obj(cl[key]),row:Number(obj(cl[key]).row??0)+r,col:Number(obj(cl[key]).col??0)+h};
+    put(dr,dc,cl);
+  }
+  if(h)for(const [rk,raw]of Object.entries(obj(rd.dataTable)))for(const [ck,cell]of Object.entries(obj(raw))){if(+ck!==0)continue;const v=obj(cell);if(v.value!==undefined)put(+rk+r,0,{...v});}
+  if(r)for(const [ck,cell]of Object.entries(obj(obj(cd.dataTable)['0']))){const v=obj(cell);if(v.value!==undefined)put(0,+ck+h,{...v});}
+  data.dataTable=rows;
+  t.data=data;
+  if(Array.isArray(s.spans))t.spans=arr(s.spans).map(x=>shiftRect(obj(x),h,r));
+  if(Array.isArray(s.autoMergeRangeInfos))t.autoMergeRangeInfos=arr(s.autoMergeRangeInfos).map(x=>({...obj(x),range:shiftRect(obj(obj(x).range),h,r)}));
+  if(obj(s.rows))t.rows=shiftKeys(obj(s.rows),r);
+  if(obj(s.columns))t.columns=shiftKeys(obj(s.columns),h);
+  if(obj(data.rowDataArray))data.rowDataArray=shiftKeys(obj(data.rowDataArray),r);
+  if(obj(data.columnDataArray))data.columnDataArray=shiftKeys(obj(data.columnDataArray),h);
+  if(obj(s.rowOutlines).items)t.rowOutlines={...obj(s.rowOutlines),items:[...Array(r).fill(null),...arr(obj(s.rowOutlines).items)]};
+  if(obj(s.columnOutlines).items)t.columnOutlines={...obj(s.columnOutlines),items:[...Array(h).fill(null),...arr(obj(s.columnOutlines).items)]};
+  for(const key of ['rowHeaderData','colHeaderData'])if(t[key]===s[key])delete t[key];
+  return t;
+}
+function autoMergeSpans(s:RecordValue):RecordValue[] {
+  const data=obj(obj(s.data).dataTable);
+  const at=(r:number,c:number)=>obj(obj(data[String(r)])[String(c)]).value;
+  const eq=(r1:number,c1:number,r2:number,c2:number)=>{const a=at(r1,c1),b=at(r2,c2);return a!==undefined&&b!==undefined&&String(a)===String(b);};
+  const out:RecordValue[]=[];
+  for(const info of arr(s.autoMergeRangeInfos)){
+    const rec=obj(info);if(Number(rec.sheetArea??3)!==3)continue;
+    const rg=obj(rec.range),r0=Number(rg.row??0),c0=Number(rg.col??0),rc=Number(rg.rowCount??0),cc=Number(rg.colCount??0);
+    if(Number(rec.direction)===2)for(let row=r0;row<r0+rc;row++){let c=c0;while(c<c0+cc){let e=c;while(e+1<c0+cc&&eq(row,e,row,e+1))e++;if(e>c)out.push({row,col:c,rowCount:1,colCount:e-c+1});c=e+1;}}
+    else for(let c=c0;c<c0+cc;c++){let row=r0;while(row<r0+rc){let e=row;while(e+1<r0+rc&&eq(e,c,e+1,c))e++;if(e>row)out.push({row,col:c,rowCount:e-row+1,colCount:1});row=e+1;}}
+  }
+  return out;
+}
 export function writeXlsx(json:RecordValue,options:IoOptions={},state?:IoState):{bytes:Uint8Array;warnings:string[]} {
-  if(options.password)throw new Error('NotImplemented: encrypted XLSX export');
-  for(const k of ['saveAsView','rowHeadersAsFrozenColumns','columnHeadersAsFrozenRows','includeAutoMergedCells'])if(options[k])throw new Error(`NotImplemented: XLSX ${k}`);
+  // TASK 93: `password` encrypts the finished package (Agile AES-256/SHA-512,
+  // the same format our importer decrypts). The view/header options are handled
+  // while building the sheet parts below.
   const warnings:string[]=[],sheets=Object.values(obj(json.sheets)).map(obj).sort((a,b)=>Number(a.index??0)-Number(b.index??0));
   if(!sheets.length)throw new Error('Workbook has no sheets');
+  if(options.rowHeadersAsFrozenColumns||options.columnHeadersAsFrozenRows)sheets.forEach((s,i)=>{sheets[i]=applyViewShift(s,options);});
   const files:Record<string,Uint8Array|string>={...state?.archive},oldFiles=state?.archive??{},bookPath=state?related(oldFiles,'','officeDocument'):'xl/workbook.xml',base=bookPath.slice(0,bookPath.lastIndexOf('/')+1),oldRels=state?relationships(oldFiles,bookPath):[];
   const themePath=related(oldFiles,bookPath,'theme')||`${base}theme/theme1.xml`,stylesPath=related(oldFiles,bookPath,'styles')||`${base}styles.xml`,sharedPath=related(oldFiles,bookPath,'sharedStrings')||`${base}sharedStrings.xml`;
   const theme=state?readTheme(xmlFile(oldFiles,themePath)):defaultTheme,styles=new StyleWriter(theme,xmlFile(oldFiles,stylesPath)),names=new Map<string,RecordValue>(arr(json.namedStyles).map(x=>[String(obj(x).name),obj(x)]));
@@ -104,7 +163,7 @@ export function writeXlsx(json:RecordValue,options:IoOptions={},state?:IoState):
   const relative=(target:string)=>target.startsWith(base)?target.slice(base.length):'/'+target;
   rid(bookRels,'styles',relative(stylesPath));rid(bookRels,'theme',relative(themePath));rid(bookRels,'sharedStrings',relative(sharedPath));
   const sheetEntries:string[]=[],parts:{path:string;type:string}[]=[];let tableId=0,hasDynamic=false;
-  const ext=String(options.excelFileType??'XLSX');if(ext!=='XLSX'&&ext!=='XLTX')throw new Error(`NotImplemented: Excel file type ${ext}`);
+  const ext=String(options.excelFileType??'XLSX').toUpperCase();if(!['XLSX','XLTX','XLSM','XLTM'].includes(ext))throw new Error(`NotImplemented: Excel file type ${ext}`);
   sheets.forEach((s,i)=>{
     const path=state?.sheetPaths[i]??`${base}worksheets/sheet${i+1}.xml`,oldXml=xmlFile(oldFiles,path),oldRoot=oldXml?parseXml(oldXml.replace(/<(?:\w+:)?sheetData\b[^>]*>[\s\S]*?<\/(?:\w+:)?sheetData>/,'<sheetData/>')):undefined;
     const id=rid(bookRels,'worksheet',relative(path));sheetEntries.push(tag('sheet',{name:s.name,sheetId:i+1,'r:id':id,state:s.visible===0?'hidden':s.visible===2?'veryHidden':undefined}));
@@ -125,6 +184,9 @@ export function writeXlsx(json:RecordValue,options:IoOptions={},state?:IoState):
         const inherited=Object.keys(defaultStyle).some(k=>k!=='themeFont')?defaultStyle:{};
         const explicit={...ownStyle(obj(colStyles[ck]).style,sheetNames),...rowStyle,...ownStyle(cell.style,sheetNames)};
         const style=options.includeStyles===false?{}:{...inherited,...explicit};
+        // saveAsView: formula/template format strings have no Excel equivalent, so the
+        // rendered text replaces the raw value (measured on the official export).
+        if(options.saveAsView&&value!==undefined&&typeof options.displayText==='function'&&/^=|\{\{[^}]*=/.test(String(style.formatter??'')))value=options.displayText(i,r,c);
         if((explicit.font||explicit.fontFamily)&&explicit.themeFont===undefined)delete style.themeFont;
         const d=typeof value==='string'?/^\/OADate\(([-\d.]+)\)\/$/.exec(value):null;if(d){value=+d[1];if(!style.formatter)style.formatter='M/d/yyyy';}
         let formula=options.includeFormulas===false?undefined:cell.formula as string|undefined;
@@ -149,7 +211,7 @@ export function writeXlsx(json:RecordValue,options:IoOptions={},state?:IoState):
     const view=tag('sheetViews',{},tag('sheetView',{workbookViewId:0,tabSelected:Number(json.activeSheetIndex??0)===i?1:undefined,showGridLines:obj(s.gridline).showHorizontalGridline===false||obj(s.gridline).showVerticalGridline===false?0:undefined,showRowColHeaders:s.rowHeaderVisible===false&&s.colHeaderVisible===false?0:undefined,showZeros:s.showZeros===false?0:undefined,rightToLeft:s.rightToLeft?1:undefined,zoomScale:s.zoomFactor===undefined?undefined:Number(s.zoomFactor)*100,topLeftCell:address(fr?0:top,fc?0:left)},(fr||fc?tag('pane',{xSplit:fc||undefined,ySplit:fr||undefined,topLeftCell:address(Math.max(fr,top),Math.max(fc,left)),activePane:pane,state:'frozen'}):'')+tag('selection',{pane:fr||fc?pane:undefined,activeCell:address(Number(s.activeRow??0),Number(s.activeCol??0)),sqref:sels.join(' ')||'A1'})));
     const pr=tag('sheetPr',{},(s.sheetTabColor?colorXml(s.sheetTabColor,theme,'tabColor'):'')+(child(oldRoot,'sheetPr')?section(section(oldXml,'sheetPr'),'outlinePr'):''));
     const protection=s.isProtected?tag('sheetProtection',{...child(oldRoot,'sheetProtection')?.attrs,sheet:1,...Object.fromEntries(Object.entries(obj(s.protectionOptions)).filter(([k])=>k.startsWith('allow')).map(([k,v])=>[k==='allowEditObjects'?'objects':k==='allowEditScenarios'?'scenarios':k[5].toLowerCase()+k.slice(6),v?0:1]))}):'';
-    const spans=arr(s.spans),merge=spans.length?tag('mergeCells',{count:spans.length},spans.map(x=>tag('mergeCell',{ref:rangeAddress(x as Rect)})).join('')):'';
+    const spans=[...arr(s.spans),...(options.includeAutoMergedCells?autoMergeSpans(s):[])],merge=spans.length?tag('mergeCells',{count:spans.length},spans.map(x=>tag('mergeCell',{ref:rangeAddress(x as Rect)})).join('')):'';
     const tables=arr(s.tables).map(t=>{tableId++;const p=`${base}tables/table${tableId}.xml`;files[p]=writeTable(t,tableId,warnings);parts.push({path:p,type:'application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml'});return tag('tablePart',{'r:id':rid(rels,'table','/'+p)});});
     const hyperlinks=writeHyperlinks(cells,rels);let commentDrawing='';if(arr(s.comments).length){const p=`${base}comments${i+1}.xml`,vml=`${base}drawings/comments${i+1}.vml`;files[p]=commentsXml(s.comments);files[vml]=commentsVml(s.comments);rid(rels,'comments','/'+p);commentDrawing=tag('legacyDrawing',{'r:id':rid(rels,'vmlDrawing','/'+vml)});parts.push({path:p,type:'application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml'});}
     const print=obj(s.printInfo);let printXml='';for(const k of ['printOptions','pageMargins','pageSetup','headerFooter']){const data=obj(print[k]);if(!Object.keys(data).length)continue;if(k==='headerFooter'){const fields=['oddHeader','oddFooter','evenHeader','evenFooter','firstHeader','firstFooter'];printXml+=tag(k,Object.fromEntries(Object.entries(data).filter(([key])=>!fields.includes(key))),fields.filter(f=>data[f]!==undefined).map(f=>tag(f,{},escapeXml(data[f]))).join(''));}else printXml+=tag(k,data);}
@@ -183,11 +245,12 @@ export function writeXlsx(json:RecordValue,options:IoOptions={},state?:IoState):
   }
   const typesXml=xmlFile(oldFiles,'[Content_Types].xml'),types=typesXml?parseXml(typesXml):undefined;
   const overrides=new Map(children(types,'Override').map(n=>[n.attrs.PartName,n.attrs.ContentType]));
-  overrides.set('/'+bookPath,ext==='XLTX'?'application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml');overrides.set('/'+stylesPath,'application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml');overrides.set('/'+themePath,'application/vnd.openxmlformats-officedocument.theme+xml');overrides.set('/'+sharedPath,'application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml');parts.forEach(p=>overrides.set('/'+p.path,p.type));
+  overrides.set('/'+bookPath,({'XLTX':'application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml','XLSM':'application/vnd.ms-excel.sheet.macroEnabled.main+xml','XLTM':'application/vnd.ms-excel.template.macroEnabled.main+xml'} as Record<string,string>)[ext]??'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml');overrides.set('/'+stylesPath,'application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml');overrides.set('/'+themePath,'application/vnd.openxmlformats-officedocument.theme+xml');overrides.set('/'+sharedPath,'application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml');parts.forEach(p=>overrides.set('/'+p.path,p.type));
   const defs=new Map(children(types,'Default').map(n=>[n.attrs.Extension,n.attrs.ContentType]));defs.set('rels','application/vnd.openxmlformats-package.relationships+xml');defs.set('xml','application/xml');defs.set('vml','application/vnd.openxmlformats-officedocument.vmlDrawing');
   files['[Content_Types].xml']=declaration+tag('Types',{xmlns:'http://schemas.openxmlformats.org/package/2006/content-types'},[...defs].map(([Extension,ContentType])=>tag('Default',{Extension,ContentType})).join('')+[...overrides].filter(([p])=>files[p.slice(1)]!==undefined).map(([PartName,ContentType])=>tag('Override',{PartName,ContentType})).join(''));
   if(options.losslessEditing!==false&&state)warnings.push(...state.warnings);
   if(!state){for(const s of sheets)for(const k of ['floatingObjects','sparklineGroups','charts','pivotTables','slicers'])if(arr(s[k]).length)warnings.push(`${s.name}: ${k} XLSX export is not mapped`);}
-  return {bytes:writeZip(files),warnings:[...new Set(warnings)]};
+  const raw=writeZip(files);
+  return {bytes:options.password?encryptXlsx(raw,String(options.password)):raw,warnings:[...new Set(warnings)]};
 }
 void strToU8;

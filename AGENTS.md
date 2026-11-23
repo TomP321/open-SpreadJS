@@ -21,6 +21,8 @@ Apps switch to us without code changes via npm aliases:
 - Visual/behavioural reference = running the official trial package in the `apps/compare`
   page and comparing screenshots/behaviour (black-box only).
 - Never commit any file from the official packages.
+- Never grep/cat/read inside build outputs that contain official code: `apps/compare/dist`, any `apps/*/dist`, `node_modules`,
+  `.vite` caches. Scope searches to `packages/*/src|test` and `apps/*/src|test` (`--exclude-dir=dist --exclude-dir=node_modules`).
 - **Never embed pixels/bitmaps captured from the official rendering** (screenshots, canvas readbacks,
   sprites, base64 images, RGB arrays) in our source. Every glyph/icon/arrow is drawn by our own
   code (paths, shapes, gradients). Observing screenshots to measure positions, sizes and colours is fine;

@@ -26,6 +26,7 @@
     "@opensheets/spread-sheets-designer": "workspace:*",
     "@opensheets/spread-sheets-designer-react": "workspace:*",
     "@opensheets/spread-sheets-designer-resources-en": "workspace:*",
+    "@opensheets/spread-sheets-designer-resources-it": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

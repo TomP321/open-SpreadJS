@@ -4,6 +4,11 @@ import type GC from '@mescius/spread-sheets';
 import { columnName, globalGC } from './app-helpers.js';
 import { userManager } from './core-internals.js';
 
+import { resolveText } from './resolve.js';
+
+/** TASK 87: panel captions (`panels` subtree of the loaded resources). */
+const P = (designer: { resources: Record<string, unknown> }, key: string, en: string): string => resolveText(`\${res.panels.${key}}`, designer.resources) || en;
+
 /* Threaded comments dock panel ------------------------------------------- */
 
 export function ThreadedCommentPanel(): React.ReactElement {
@@ -25,25 +30,25 @@ export function ThreadedCommentPanel(): React.ReactElement {
   return (
     <div className="gc-designer-threaded-comment-panel gc-designer-dock-panel" data-open="true">
       <div className="gc-designer-dock-panel-header gc-designer-threaded-comment-header">
-        <span className="gc-designer-dock-panel-title">Threaded Comments</span>
-        <button type="button" className="gc-designer-threaded-comment-new" title="New Threaded Comment" onClick={() => d.commentUi().openThread()}>New</button>
-        <button type="button" className="gc-designer-dock-panel-close" title="Close" onClick={close}>×</button>
+        <span className="gc-designer-dock-panel-title">{P(d, 'threadedComments', 'Threaded Comments')}</span>
+        <button type="button" className="gc-designer-threaded-comment-new" title={P(d, 'newThread', 'New Threaded Comment')} onClick={() => d.commentUi().openThread()}>{P(d, 'new', 'New')}</button>
+        <button type="button" className="gc-designer-dock-panel-close" title={resolveText('${res.close}', d.resources) || 'Close'} onClick={close}>×</button>
       </div>
       <div className="gc-designer-threaded-comment-toolbar">
-        <button type="button" className="gc-designer-threaded-comment-reset" onClick={() => { sheet.threadedComments.clear(); d.invalidate(); }}>Reset All</button>
+        <button type="button" className="gc-designer-threaded-comment-reset" onClick={() => { sheet.threadedComments.clear(); d.invalidate(); }}>{P(d, 'resetAll', 'Reset All')}</button>
         <div className="gc-designer-threaded-comment-filter">
-          <button type="button" className="gc-designer-threaded-comment-filter-button" onClick={() => setFilter((value) => value === '' ? null : '')}>{filter ? filterLabel(filter) : 'Filter By'}</button>
+          <button type="button" className="gc-designer-threaded-comment-filter-button" onClick={() => setFilter((value) => value === '' ? null : '')}>{filter ? filterLabel(filter, d) : P(d, 'filterBy', 'Filter By')}</button>
           {filter === '' && (
             <div className="gc-designer-ribbon-dropdown gc-designer-threaded-comment-filter-menu" role="menu">
               {[['mentions', '@mentions Me'], ['active', 'Active Only'], ['resolved', 'Resolved Only']].map(([key, label]) => (
-                <div key={key} role="menuitem" className="gc-designer-context-item" onClick={() => { setFilter(key); d.invalidate(); }}>{label}</div>
+                <div key={key} role="menuitem" className="gc-designer-context-item" onClick={() => { setFilter(key); d.invalidate(); }}>{P(d, 'filter' + key, label)}</div>
               ))}
             </div>
           )}
         </div>
       </div>
       <div className="gc-designer-threaded-comment-list">
-        {threads.length === 0 && <div className="gc-designer-threaded-comment-empty">No comments</div>}
+        {threads.length === 0 && <div className="gc-designer-threaded-comment-empty">{P(d, 'noComments', 'No comments')}</div>}
         {threads.map((thread) => {
           const key = `${thread.row()}:${thread.col()}`;
           const replies = thread.all();
@@ -54,7 +59,7 @@ export function ThreadedCommentPanel(): React.ReactElement {
               <div className="gc-designer-threaded-comment-card-address">{address}</div>
               {shown.map((reply, index) => <ThreadReplyRow key={index} reply={reply} />)}
               {replies.length > 1 && !expanded.has(key) && (
-                <button type="button" className="gc-designer-threaded-comment-more" onClick={(event) => { event.stopPropagation(); setExpanded((value) => new Set(value).add(key)); }}>See more comments</button>
+                <button type="button" className="gc-designer-threaded-comment-more" onClick={(event) => { event.stopPropagation(); setExpanded((value) => new Set(value).add(key)); }}>{P(d, 'seeMore', 'See more comments')}</button>
               )}
             </div>
           );
@@ -64,8 +69,11 @@ export function ThreadedCommentPanel(): React.ReactElement {
   );
 }
 
-function filterLabel(filter: string): string {
-  return filter === 'mentions' ? '@mentions Me' : filter === 'active' ? 'Active Only' : filter === 'resolved' ? 'Resolved Only' : 'Filter By';
+function filterLabel(filter: string, designer: { resources: Record<string, unknown> }): string {
+  // TASK 87: display only — the filter STATE keys ('mentions'/'active'/'resolved') stay English.
+  return filter === 'mentions' ? P(designer, 'filterMentions', '@mentions Me')
+    : filter === 'active' ? P(designer, 'filterActive', 'Active Only')
+      : filter === 'resolved' ? P(designer, 'filterResolved', 'Resolved Only') : P(designer, 'filterBy', 'Filter By');
 }
 
 function ThreadReplyRow({ reply }: { reply: GC.Spread.Sheets.ThreadedComments.IReply }): React.ReactElement {

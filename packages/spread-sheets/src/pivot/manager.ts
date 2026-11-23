@@ -47,7 +47,11 @@ export class PivotTableManager {
   ): PivotTable {
     const pivotName = String(name);
     if (this.findByName(pivotName)) throw new Error('The pivot table name already exists in the workbook.');
-    const table = new PivotTable(pivotName, this.sheet, row, col, layout, theme, options);
+    // Contract (d.ts example): without an explicit theme a new pivot uses the
+    // workbook's defaultPivotTableTheme (TASK 93). With no default registered the
+    // trial falls back to Pivot Style Light 16 (measured: styleName PivotStyleLight16).
+    const themeOrDefault = theme ?? (this.sheet.parent as { defaultPivotTableTheme?: () => PivotTableTheme | undefined } | undefined)?.defaultPivotTableTheme?.() ?? 'light16';
+    const table = new PivotTable(pivotName, this.sheet, row, col, layout, themeOrDefault, options);
     table._setCacheId(nextCacheId(this.sheet.parent));
     this.tables.push(table);
     try {

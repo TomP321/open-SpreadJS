@@ -2,8 +2,10 @@
  * Styles gallery (TASK 47). */
 import React from 'react';
 import { useDesigner } from '../store.js';
+import { resource } from '../app-helpers.js';
 import type GC from '@mescius/spread-sheets';
 import { pivotTableThemes, themeColors } from '../core-internals.js';
+import { customPivotThemeTiles, TablePreview } from '../dialogs/TableStyleDialogs.js';
 
 /**
  * Page Layout Themes / Colors / Fonts gallery. Every preview is drawn from the
@@ -27,7 +29,7 @@ export function ThemeGalleryMenu({ command }: { command: string }): React.ReactE
   if (command === 'ThemeSetting') {
     const names: string[] = Object.keys(themeEntries(sheets.Themes));
     return (
-      <div className="gc-designer-theme-tiles" role="menu" aria-label="Themes">
+      <div className="gc-designer-theme-tiles" role="menu" aria-label={resource(d, '${res.ribbon.commands.ThemeSetting}') || 'Themes'}>
         {names.map((name) => {
           const theme = themeEntries(sheets.Themes)[name] as GC.Spread.Sheets.Theme;
           const colors = schemeColors(theme.colors());
@@ -47,7 +49,7 @@ export function ThemeGalleryMenu({ command }: { command: string }): React.ReactE
   }
   if (command === 'ThemeColors') {
     return (
-      <div className="gc-designer-theme-list" role="menu" aria-label="Theme Colors">
+      <div className="gc-designer-theme-list" role="menu" aria-label={resource(d, '${res.ribbon.commands.ThemeColors}') || 'Theme Colors'}>
         {Object.keys(themeEntries(sheets.ThemeColors)).map((name) => {
           const colors = schemeColors(themeEntries(sheets.ThemeColors)[name] as GC.Spread.Sheets.ColorScheme);
           return (
@@ -61,7 +63,7 @@ export function ThemeGalleryMenu({ command }: { command: string }): React.ReactE
     );
   }
   return (
-    <div className="gc-designer-theme-list" role="menu" aria-label="Theme Fonts">
+    <div className="gc-designer-theme-list" role="menu" aria-label={resource(d, '${res.ribbon.commands.ThemeFonts}') || 'Theme Fonts'}>
       {Object.keys(themeEntries(sheets.ThemeFonts)).map((name) => {
         const font = themeEntries(sheets.ThemeFonts)[name] as GC.Spread.Sheets.ThemeFont;
         return (
@@ -176,16 +178,66 @@ export function PivotStyleGalleryMenu(): React.ReactElement {
     d.executeSpecial('pivotTableStyle', key);
     d.invalidate();
   };
+  /* TASK 93: the trial's gallery tiles answer a right-click menu (measured black-box):
+   * custom tiles get Apply / Modify... / Duplicate... / Delete / Set As Default;
+   * built-in tiles get Apply / Duplicate... / Set As Default. */
+  const customs = customPivotThemeTiles(d);
+  const [tileMenu, setTileMenu] = React.useState<{ name: string; builtIn: boolean; x: number; y: number } | null>(null);
+  const tileMenuRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (!tileMenu) return;
+    const close = (event: MouseEvent): void => {
+      if (tileMenuRef.current && !tileMenuRef.current.contains(event.target as Node)) setTileMenu(null);
+    };
+    document.addEventListener('mousedown', close, true);
+    return () => document.removeEventListener('mousedown', close, true);
+  }, [tileMenu]);
+  const runOnTile = (action: 'apply' | 'modify' | 'duplicate' | 'delete' | 'default', name: string, builtIn: boolean): void => {
+    setTileMenu(null);
+    if (action === 'apply') pick(name);
+    else if (action === 'default') d.setDefaultPivotTheme(name);
+    else if (action === 'modify') { d.openMenu = null; d.showNewPivotTableStyleDialog(name); }
+    else if (action === 'duplicate') d.duplicatePivotTheme(name, builtIn);
+    else d.deletePivotTheme(name);
+  };
+  const tileContextMenu = (name: string, builtIn: boolean) => (event: React.MouseEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    setTileMenu({ name, builtIn, x: event.clientX, y: event.clientY });
+  };
   const runCommand = (command: string): void => {
     d.openMenu = null;
     d.executeSpecial(command, null);
     d.invalidate();
   };
+  const tileItems: { action: 'apply' | 'modify' | 'duplicate' | 'delete' | 'default'; text: string }[] = [
+    { action: 'apply', text: resource(d, '${res.apply}') || 'Apply' },
+    { action: 'modify', text: resource(d, '${res.modifyStyle}') || 'Modify...' },
+    { action: 'duplicate', text: resource(d, '${res.duplicateStyle}') || 'Duplicate...' },
+    { action: 'delete', text: resource(d, '${res.delete}') || 'Delete' },
+    { action: 'default', text: resource(d, '${res.setAsDefault}') || 'Set As Default' },
+  ];
+  const tile = (key: string, name: string, builtIn: boolean, selected: boolean, child: React.ReactNode, display: string): React.ReactElement => (
+    <div key={key} role="menuitemradio" aria-checked={selected} title={display} aria-label={display} data-value={key}
+      className={`gc-pivot-style-tile${selected ? ' gc-pivot-style-tile-selected' : ''}`}
+      onClick={() => pick(key)} onContextMenu={tileContextMenu(name, builtIn)}>
+      {child}
+    </div>
+  );
   return (
-    <div className="gc-pivot-style-gallery" role="menu" aria-label="PivotTable Styles">
+    <div className="gc-pivot-style-gallery" role="menu" aria-label={resource(d, '${res.ribbon.commands.pivotTableStyleListContent}') || 'PivotTable Styles'}>
+      {customs.length > 0 && (
+        <div className="gc-pivot-style-section">
+          <div className="gc-pivot-style-section-title">{resource(d, '${res.custom}') || 'Custom'}</div>
+          <div className="gc-pivot-style-grid">
+            {customs.map((item) => tile(item.name, item.name, false, item.name.toLowerCase() === String(current).toLowerCase(),
+              <TablePreview theme={{ ...item.theme }} width={61} height={49} />, item.name))}
+          </div>
+        </div>
+      )}
       {sections.map((section) => (
         <div key={section.title} className="gc-pivot-style-section">
-          <div className="gc-pivot-style-section-title">{section.title}</div>
+          <div className="gc-pivot-style-section-title">{resource(d, `\${res.ribbon.menus.${section.title.toLowerCase()}}`) || section.title}</div>
           <div className="gc-pivot-style-grid">
             {keys.filter(section.filter).map((key) => {
               const theme = holder[key];
@@ -193,18 +245,24 @@ export function PivotStyleGalleryMenu(): React.ReactElement {
               // The trial titles the neutral `light0` tile "None".
               const name = key === 'light0' ? 'None' : theme.name();
               const selected = name.toLowerCase() === String(current).toLowerCase();
-              return (
-                <div key={key} role="menuitemradio" aria-checked={selected} title={name} aria-label={name} className={`gc-pivot-style-tile${selected ? ' gc-pivot-style-tile-selected' : ''}`} onClick={() => pick(key)}>
-                  <PivotStyleThumb json={theme.toJSON()} scheme={scheme} />
-                </div>
-              );
+              const display = key === 'light0' ? resource(d, '${res.settings.none}') || name : name;
+              return tile(key, key, true, selected, <PivotStyleThumb json={theme.toJSON()} scheme={scheme} />, display);
             })}
           </div>
         </div>
       ))}
       <div className="gc-designer-ribbon-separator-horizontal" role="separator" />
-      <div role="menuitem" className="gc-pivot-style-footer-item" onClick={() => runCommand('newPivotTableStyle')}>New Pivot Table Style...</div>
-      <div role="menuitem" className="gc-pivot-style-footer-item" onClick={() => runCommand('clearPivotTableStyle')}>Clear</div>
+      <div role="menuitem" className="gc-pivot-style-footer-item" onClick={() => runCommand('newPivotTableStyle')}>{resource(d, '${res.ribbon.commands.newPivotTableStyleText}') || 'New Pivot Table Style...'}</div>
+      <div role="menuitem" className="gc-pivot-style-footer-item" onClick={() => runCommand('clearPivotTableStyle')}>{resource(d, '${res.ribbon.commands.clearPivotTableStyle}') || 'Clear'}</div>
+      {tileMenu && (
+        <div ref={tileMenuRef} className="gc-designer-context-menu gc-pivot-style-tile-menu" role="menu"
+          style={{ position: 'fixed', left: tileMenu.x, top: tileMenu.y, zIndex: 12000 }}
+          onContextMenu={(event) => event.preventDefault()}>
+          {tileItems.filter((item) => !tileMenu.builtIn || item.action === 'apply' || item.action === 'duplicate' || item.action === 'default').map((item) => (
+            <div key={item.action} role="menuitem" className="gc-designer-context-item" onClick={() => runOnTile(item.action, tileMenu.name, tileMenu.builtIn)}>{item.text}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

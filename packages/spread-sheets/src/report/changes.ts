@@ -69,6 +69,16 @@ export class ReportChanges {
     this.originals.delete(key);
   }
   clear(): void { this.originals.clear(); this.pendings = []; this.deletes = []; }
+  /** Internal: inspectable copy of the pending bookkeeping (report command undo). */
+  _snapshot(): { originals: [string, unknown][]; pendings: Pending[]; deletes: Claim[] } {
+    return { originals: [...this.originals], pendings: this.pendings.map(item => ({ ...item })), deletes: this.deletes.map(item => ({ ...item })) };
+  }
+  /** Internal: restore a `_snapshot()` copy (report command undo). */
+  _restore(snapshot: { originals: [string, unknown][]; pendings: Pending[]; deletes: Claim[] }): void {
+    this.originals = new Map(snapshot.originals);
+    this.pendings = snapshot.pendings.map(item => ({ ...item }));
+    this.deletes = snapshot.deletes.map(item => ({ ...item }));
+  }
   isInserted(row: number): boolean { return this.pendings.some(item => item.row === row && !item.dropped); }
   isEdited(row: number, col: number): boolean { return this.originals.has(`${row},${col}`); }
   insert(row: number, col: number): void {

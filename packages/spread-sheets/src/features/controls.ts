@@ -5,6 +5,11 @@ import { sparklineRange } from './sparklines.js';
 import { columnLabel } from '../rendering.js';
 import { FormulaHints } from './formula-hints.js';
 import { colorSpans } from './formula-color.js';
+import { ltext } from '../localization.js';
+
+/** Control captions (`controls.*` / `status.*` language namespaces). */
+const ctext = (key: string, fallback: string, ...args: (string | number)[]) => ltext(`controls.${key}`, fallback, ...args);
+const stext = (key: string, fallback: string, ...args: (string | number)[]) => ltext(`status.${key}`, fallback, ...args);
 /**
  * Two registries mirror the trial (probes core46p..core46r): `GC.Spread.Sheets.findControl`
  * resolves workbook hosts only (a FormulaTextBox placed on a child of a workbook host stays
@@ -111,7 +116,7 @@ export class FormulaTextBox {
     if (!this.input) {
       this.input = this.host instanceof HTMLInputElement || this.host instanceof HTMLTextAreaElement ? this.host : document.createElement('div');
       if (this.input !== this.host) { this.input.contentEditable = 'true'; this.input.className = 'opensheets-formula-input'; this.host.replaceChildren(this.input); }
-      this.input.setAttribute('aria-label', 'Formula bar'); this.input.setAttribute('role', 'textbox'); this.input.spellcheck = false;
+      this.input.setAttribute('aria-label', ctext('formulaBar', 'Formula bar')); this.input.setAttribute('role', 'textbox'); this.input.spellcheck = false;
       const signal = this.abort.signal;
       this.input.addEventListener('input', () => {
         const sheet = this.wb?.getActiveSheet(), input = this.input;
@@ -139,7 +144,12 @@ export class FormulaTextBox {
   refresh(ignoreEditing = false): void {
     if (!this.wb || !this.input || !ignoreEditing && document.activeElement === this.input) return;
     const s = this.wb.getActiveSheet(), row = s.getActiveRowIndex(), col = s.getActiveColumnIndex();
-    this.text(s.getFormula(row, col) ? '=' + s.getFormula(row, col) : s.getText(row, col));
+    const formula = s.getFormula(row, col), array = s._arrayFormula(row, col);
+    // TASK 91: formula cells keep the leading `=`; array formulas get the trial's `{=...}` braces.
+    // Non-formula cells show the trial's bar text: the `General` text of the VALUE (the trial
+    // shows `396.5` in the bar even when the cell format is `#,##0.00`), not the formatted text.
+    const general = new GeneralFormatter('General').format(s.getValue(row, col));
+    this.text(formula ? `${array ? '{' : ''}=${formula}${array ? '}' : ''}` : general === '' ? s.getText(row, col) : general);
   }
   private key(event: KeyboardEvent): void {
     if (event.key === 'Escape') { event.preventDefault(); this.wb?.getActiveSheet().endEdit(true); this.hints?.close(); this.refresh(true); this.wb?.focus(); return; }
@@ -174,8 +184,8 @@ export class NameBox {
   private bound = () => this.refresh();
   constructor(host: HTMLElement | string, private workbook: Workbook, options = {}) {
     this.host = hostElement(host); this.original = [...this.host.childNodes]; this.options = { dropDownMaxHeight: 300, enableAddCustomName: true, enableNavigateToRange: true, showCustomNameListIndicator: true, ...options };
-    this.input = document.createElement('input'); this.input.className = 'opensheets-name-input'; this.input.setAttribute('aria-label', 'Name box'); const container = document.createElement('div'); container.className = 'opensheets-name-container'; container.append(this.input); this.host.replaceChildren(container); controls.set(this.host, this);
-    if (this.options.showCustomNameListIndicator) { const arrow = document.createElement('button'); arrow.className = 'opensheets-name-arrow'; arrow.setAttribute('aria-label', 'Names'); arrow.addEventListener('click', () => { const existing = this.host.querySelector('.opensheets-name-list'); if (existing) { existing.remove(); return; } const list = document.createElement('div'); list.className = 'opensheets-name-list'; list.setAttribute('role', 'listbox'); list.style.maxHeight = `${this.options.dropDownMaxHeight}px`; for (const name of [...workbook.getCustomNames(), ...workbook.getActiveSheet().getCustomNames()]) { const button = document.createElement('button'); button.textContent = name.getName(); button.setAttribute('role', 'option'); button.addEventListener('click', () => { this.input.value = name.getName(); this.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); list.remove(); }); list.append(button); } this.host.append(list); }, { signal: this.abort.signal }); container.append(arrow); }
+    this.input = document.createElement('input'); this.input.className = 'opensheets-name-input'; this.input.setAttribute('aria-label', ctext('nameBox', 'Name box')); const container = document.createElement('div'); container.className = 'opensheets-name-container'; container.append(this.input); this.host.replaceChildren(container); controls.set(this.host, this);
+    if (this.options.showCustomNameListIndicator) { const arrow = document.createElement('button'); arrow.className = 'opensheets-name-arrow'; arrow.setAttribute('aria-label', ctext('names', 'Names')); arrow.addEventListener('click', () => { const existing = this.host.querySelector('.opensheets-name-list'); if (existing) { existing.remove(); return; } const list = document.createElement('div'); list.className = 'opensheets-name-list'; list.setAttribute('role', 'listbox'); list.style.maxHeight = `${this.options.dropDownMaxHeight}px`; for (const name of [...workbook.getCustomNames(), ...workbook.getActiveSheet().getCustomNames()]) { const button = document.createElement('button'); button.textContent = name.getName(); button.setAttribute('role', 'option'); button.addEventListener('click', () => { this.input.value = name.getName(); this.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); list.remove(); }); list.append(button); } this.host.append(list); }, { signal: this.abort.signal }); container.append(arrow); }
     this.input.addEventListener('keydown', e => { if (e.key === 'Escape') { this.refresh(); workbook.focus(); } if (e.key !== 'Enter') return; e.preventDefault(); const text = this.input.value, sheet = workbook.getActiveSheet();
       try { const name = sheet.getCustomName(text) ?? workbook.getCustomName(text), ref = name ? String(name.getExpression()).replace(/^=/, '') : text; const parsed = sparklineRange(ref); const target = parsed.sheetName ? workbook.getSheetFromName(parsed.sheetName) : sheet; if (target && this.options.enableNavigateToRange) { if (target !== sheet) workbook.setActiveSheet(target.name()); target.setActiveCell(parsed.range.row, parsed.range.col); target.setSelection(parsed.range.row, parsed.range.col, parsed.range.rowCount, parsed.range.colCount); target.showCell(parsed.range.row, parsed.range.col); } }
       catch { if (this.options.enableAddCustomName && /^[A-Za-z_][\w.]*$/.test(text)) { const r = sheet.getSelections()[0]; workbook.addCustomName(text, `${columnLabel(r.col)}${r.row + 1}:${columnLabel(r.col + r.colCount - 1)}${r.row + r.rowCount}`, 0, 0); } }
@@ -213,7 +223,7 @@ export class StatusBar {
     const defaultNames: Record<string, string> = { cellMode: 'Cell Mode', progress: 'Progress', average: 'Average', count: 'Count', numericalCount: 'Numerical Count', min: 'Min', max: 'Max', sum: 'Sum', zoomSlider: 'Zoom Slider', zoomPanel: 'Zoom' };
     this.items = options?.items ?? ['cellMode', 'progress', 'calcProgress', 'average', 'count', 'numericalCount', 'min', 'max', 'sum', 'zoomSlider', 'zoomPanel'].map(name => new StatusItem(name, { menuContent: defaultNames[name], align: name === 'cellMode' || name === 'progress' ? 'left' : 'right', visible: !['numericalCount', 'min', 'max'].includes(name), value: name === 'cellMode' ? 'Ready' : name === 'progress' ? 0 : name === 'zoomSlider' ? 100 : name === 'zoomPanel' ? '100%' : undefined })); this.render();
   }
-  private render(): void { this.view.replaceChildren(); for (const item of this.items) { const container = document.createElement('span'); container.className = `opensheets-status-item status-${item.name}`; container.dataset.align = item.align; this.view.append(container); item.onCreateItemView(container); if (['progress', 'calcProgress'].includes(item.name)) container.style.display = 'none'; if (item.name === 'zoomSlider') { const input = document.createElement('input'); input.type = 'range'; input.min = '10'; input.max = '400'; input.value = String(item.value ?? 100); input.setAttribute('aria-label', 'Zoom'); input.addEventListener('input', () => { this.workbook?.getActiveSheet().zoom(Number(input.value) / 100); this.update(); }); container.replaceChildren(input); } } }
+  private render(): void { this.view.replaceChildren(); for (const item of this.items) { const container = document.createElement('span'); container.className = `opensheets-status-item status-${item.name}`; container.dataset.align = item.align; this.view.append(container); item.onCreateItemView(container); if (['progress', 'calcProgress'].includes(item.name)) container.style.display = 'none'; if (item.name === 'zoomSlider') { const input = document.createElement('input'); input.type = 'range'; input.min = '10'; input.max = '400'; input.value = String(item.value ?? 100); input.setAttribute('aria-label', ctext('zoom', 'Zoom')); input.addEventListener('input', () => { this.workbook?.getActiveSheet().zoom(Number(input.value) / 100); this.update(); }); container.replaceChildren(input); } } }
   all(): StatusItem[] { return [...this.items]; }
   get(name: string): StatusItem | undefined { return this.items.find(item => item.name === name); }
   add(item: StatusItem, position: number): boolean { if (this.get(item.name)) return false; this.items.splice(Math.max(0, position), 0, item); if (this.workbook) item.onBind(this.workbook); this.render(); return true; }
@@ -226,7 +236,8 @@ export class StatusBar {
     for (const [row, col] of sheet._viewCellStore()?.entries() ?? []) if (selections.some(r => r.contains(row, col))) { const value = sheet.getValue(row, col); if (value != null && value !== '') count++; if (typeof value === 'number' && Number.isFinite(value)) values.push(value); }
     const sum = values.reduce((a, b) => a + b, 0), show = count > 1;
     const computed: Record<string, unknown> = { cellMode: this.mode, count: show ? `Count: ${count}` : '', numericalCount: show ? `Numerical Count: ${values.length}` : '', sum: show && values.length ? `Sum: ${sum}` : '', average: show && values.length ? `Average: ${sum / values.length}` : '', min: show && values.length ? `Min: ${Math.min(...values)}` : '', max: show && values.length ? `Max: ${Math.max(...values)}` : '', zoomPanel: `${Math.round(sheet.zoom() * 100)}%` };
-    for (const item of this.items) { if (item.name === 'zoomSlider') { const input = this.view.querySelector<HTMLInputElement>('.status-zoomSlider input'); if (input) input.value = String(Math.round(sheet.zoom() * 100)); } else if (item.name in computed) { item.value = computed[item.name]; item.onUpdate(String(item.value)); } else { item.onUpdate(); if (['progress', 'calcProgress'].includes(item.name)) this.view.querySelector<HTMLElement>(`.status-${item.name}`)!.style.display = 'none'; } }
+    const painted: Record<string, string> = { cellMode: stext(`mode.${this.mode}`, this.mode), count: show ? stext('count', 'Count: {0}', count) : '', numericalCount: show ? stext('numericalCount', 'Numerical Count: {0}', values.length) : '', sum: show && values.length ? stext('sum', 'Sum: {0}', sum) : '', average: show && values.length ? stext('average', 'Average: {0}', sum / values.length) : '', min: show && values.length ? stext('min', 'Min: {0}', Math.min(...values)) : '', max: show && values.length ? stext('max', 'Max: {0}', Math.max(...values)) : '', zoomPanel: computed.zoomPanel as string };
+    for (const item of this.items) { if (item.name === 'zoomSlider') { const input = this.view.querySelector<HTMLInputElement>('.status-zoomSlider input'); if (input) input.value = String(Math.round(sheet.zoom() * 100)); } else if (item.name in computed) { item.value = computed[item.name]; item.onUpdate(painted[item.name] ?? String(item.value)); } else { item.onUpdate(); if (['progress', 'calcProgress'].includes(item.name)) this.view.querySelector<HTMLElement>(`.status-${item.name}`)!.style.display = 'none'; } }
   }
   dispose(): void { this.unbind(); this.items.forEach(item => item.onDispose()); this.host.replaceChildren(...this.original); controls.delete(this.host); }
 }

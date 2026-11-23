@@ -11,6 +11,7 @@
  */
 import { GC } from '../generated/enums.js';
 import { PivotDataType, PivotTableFieldType } from './types.js';
+import { ltext } from '../localization.js';
 import type { PivotTable } from './pivot-table.js';
 
 const PanelSection = GC.Spread.Pivot.PivotPanelSection as unknown as {
@@ -94,6 +95,8 @@ function ensureStyles(): void {
   document.head.append(tag);
 }
 
+const ptext = (key: string, fallback: string, ...args: (string | number)[]): string => ltext(`pivotPanel.${key}`, fallback, ...args);
+/** Built-in (English) panel captions; `text()` localises them per culture. */
 const TEXT = {
   title: 'PivotTable Fields',
   choose: 'Choose fields to add to report',
@@ -104,6 +107,7 @@ const TEXT = {
   search: 'Search',
   noMatches: 'No matches',
 };
+const panelText = (name: keyof typeof TEXT): string => ptext(name, TEXT[name]);
 const AREAS: { area: number; label: string; key: string }[] = [
   { area: PivotTableFieldType.filterField, label: 'Filters', key: 'Filters' },
   { area: PivotTableFieldType.columnField, label: 'Columns', key: 'Columns' },
@@ -232,7 +236,7 @@ export class PivotPanel {
       const header = el('div', 'gc-panel-header');
       // The trial renders the title as an <h2> (16px/600, #242424).
       const title = el('h2', '');
-      title.textContent = TEXT.title;
+      title.textContent = panelText('title');
       header.append(title);
       withoutViews.append(header);
       withoutViews.append(this.fieldsSection(fields));
@@ -251,7 +255,7 @@ export class PivotPanel {
 
   private fieldsSection(fields: PanelField[]): HTMLElement {
     const section = el('div', 'gc-panel-fields-section');
-    section.append(textNode(TEXT.choose, 'gc-panel-fields-title'));
+    section.append(textNode(panelText('choose'), 'gc-panel-fields-title'));
     const box = el('div', 'gc-panel-search-box');
     const fieldsList = el('div', 'gc-panel-all-field');
     fieldsList.addEventListener('dragover', event => { if (this.dragging && this.dragging.from !== -1) event.preventDefault(); });
@@ -264,7 +268,7 @@ export class PivotPanel {
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'gc-panel-search-input';
-    input.placeholder = TEXT.search;
+    input.placeholder = panelText('search');
     input.value = this.search;
     input.addEventListener('input', () => {
       this.search = input.value;
@@ -274,7 +278,7 @@ export class PivotPanel {
     section.append(box);
     for (const field of fields) fieldsList.append(this.fieldItem(field));
     section.append(fieldsList);
-    section.append(textNode(TEXT.noMatches, 'gc-panel-all-field-no-matches'));
+    section.append(textNode(panelText('noMatches'), 'gc-panel-all-field-no-matches'));
     this.refreshFieldList(section, fields);
     return section;
   }
@@ -322,14 +326,14 @@ export class PivotPanel {
 
   private areasSection(fields: PanelField[]): HTMLElement {
     const section = el('div', 'gc-panel-areas-section');
-    section.append(textNode(TEXT.drag, 'gc-panel-areas-title'));
+    section.append(textNode(panelText('drag'), 'gc-panel-areas-title'));
     const areaWrap = el('div', 'gc-panel-field-area');
     for (const area of AREAS) {
       const box = el('div', `gc-panel-area-section gc-panel-area-section-${area.key}`);
       const title = el('div', 'gc-panel-area-item-title');
       title.append(el('span', `gc-panel-area-icon gc-panel-area-icon-${area.key}`), gap());
       const titleText = el('span', 'gc-panel-area-item-title-text');
-      titleText.textContent = area.label;
+      titleText.textContent = ptext(`area.${area.key}`, area.label);
       title.append(titleText);
       const content = el('div', 'gc-panel-area-item-content');
       for (const field of fields.filter(field => field.area === area.area).sort((a, b) => a.index - b.index))
@@ -358,10 +362,10 @@ export class PivotPanel {
     checkbox.checked = this.deferred;
     const label = document.createElement('label');
     label.className = 'gc-panel-defer-layout-label';
-    label.append(document.createTextNode(' ' + TEXT.defer));
+    label.append(document.createTextNode(' ' + panelText('defer')));
     deferLeft.append(checkbox, label);
     const update = el('button', 'gc-panel-defer-layout-right-button') as HTMLButtonElement;
-    update.textContent = TEXT.update;
+    update.textContent = panelText('update');
     update.disabled = !this.dirty;
     update.addEventListener('click', () => {
       if (!this.deferred) return;
@@ -414,7 +418,7 @@ export class PivotPanel {
   private viewsSection(): HTMLElement {
     const section = el('div', 'gc-panel-views');
     const label = el('span', 'gc-panel-views-label');
-    label.textContent = TEXT.views;
+    label.textContent = panelText('views');
     section.append(label);
     const content = el('div', 'gc-panel-views-content');
     const collapse = el('div', 'gc-panel-collapse');
@@ -434,7 +438,7 @@ export class PivotPanel {
     add.type = 'button';
     add.className = 'gc-panel-button gc-panel-add';
     add.value = '\u271a';
-    add.title = 'Add a new view';
+    add.title = ptext('addView', 'Add a new view');
     add.addEventListener('click', () => {
       const name = combo.value.trim();
       if (name) { this.pivot?.views.add({ name, config: this.pivot.serialize() }); this.render(); }
@@ -443,7 +447,7 @@ export class PivotPanel {
     apply.type = 'button';
     apply.className = 'gc-panel-button gc-panel-apply';
     apply.value = '\u2714';
-    apply.title = 'Apply the view';
+    apply.title = ptext('applyView', 'Apply the view');
     apply.addEventListener('click', () => {
       const name = combo.value.trim();
       if (name && this.pivot?.views.get(name)) { this.pivot.views.apply(name); this.render(); }

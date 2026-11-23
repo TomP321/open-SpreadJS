@@ -9,6 +9,7 @@
  * the workbook option so `toJSON()` round-trips what the user entered.
  */
 import React from 'react';
+import { T } from './t.js';
 
 interface IconRow {
   name: string;
@@ -29,20 +30,20 @@ export function BuiltInFileIconsEditor({ data, update }: {
   const write = (next: IconRow[]): void => update('icons', fromRows(next));
   return (
     <div className="gc-file-icons">
-      <div className="gc-dialog-text">File icons used by the built-in file cells.</div>
+      <div className="gc-dialog-text">{T('fileIconsUsedByTheBuiltInFileCells', 'File icons used by the built-in file cells.')}</div>
       <table className="gc-name-table gc-icon-table">
-        <thead><tr><th>Name</th><th>Image</th><th /></tr></thead>
+        <thead><tr><th>{T('name', 'Name')}</th><th>{T('image', 'Image')}</th><th /></tr></thead>
         <tbody>
           {rows.map((row, index) => (
             <tr key={`${row.name}-${index}`}>
               <td><input className="gc-dialog-input" aria-label={`Icon name ${index + 1}`} value={row.name} onChange={(event) => write(rows.map((item, at) => (at === index ? { ...item, name: event.target.value } : item)))} /></td>
               <td><input className="gc-dialog-input" aria-label={`Icon image ${index + 1}`} value={row.url} onChange={(event) => write(rows.map((item, at) => (at === index ? { ...item, url: event.target.value } : item)))} /></td>
-              <td><button type="button" className="gc-dialog-secondary" onClick={() => write(rows.filter((_, at) => at !== index))}>Delete</button></td>
+              <td><button type="button" className="gc-dialog-secondary" onClick={() => write(rows.filter((_, at) => at !== index))}>{T('delete', 'Delete')}</button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button type="button" className="gc-dialog-secondary gc-icon-add" onClick={() => write([...rows, { name: '', url: '' }])}>Add</button>
+      <button type="button" className="gc-dialog-secondary gc-icon-add" onClick={() => write([...rows, { name: '', url: '' }])}>{T('add', 'Add')}</button>
     </div>
   );
 }
@@ -68,9 +69,9 @@ export function TabStyleEditor({ data, update }: {
   };
   return (
     <div className="gc-tab-styles">
-      <div className="gc-dialog-text">Colours of the sheet-tab states.</div>
+      <div className="gc-dialog-text">{T('coloursOfTheSheetTabStates', 'Colours of the sheet-tab states.')}</div>
       <table className="gc-name-table gc-icon-table">
-        <thead><tr><th>State</th><th>Background</th><th>Text</th></tr></thead>
+        <thead><tr><th>{T('state', 'State')}</th><th>{T('background', 'Background')}</th><th>{T('text', 'Text')}</th></tr></thead>
         <tbody>
           {rows.map((row, index) => (
             <tr key={row.state}>

@@ -161,9 +161,14 @@ describe('Range geometry', () => {
   });
 });
 it('resolves live default styles and composite font fields', () => {
+  // TASK 90 round 2 probe (.probe/t90/rangefont-r1.json / rangefont2-r1.json, measured on the
+  // trial): the workbook CONSTRUCTOR option `font` is stored but does not participate in style
+  // resolution - the trial's getActualStyle(0,0).font is `14.6667px Calibri` even with
+  // {font:'bold 16px Arial'} (the built-in default style carries themeFont 'Body').
   const wb = new GC.Spread.Sheets.Workbook(undefined, { font: 'bold 16px Arial' }),
     s = wb.getSheet(0);
-  expect(s.getActualStyle(0, 0).font).toBe('bold 16px Arial');
+  expect(wb.options.font).toBe('bold 16px Arial');
+  expect(s.getActualStyle(0, 0).font).toBe('14.6667px Calibri');
   const style = s.getDefaultStyle();
   expect(style.hAlign).toBe(3);
   expect(s.getStyle(-1, -1)).toBe(style);
@@ -176,6 +181,27 @@ it('resolves live default styles and composite font fields', () => {
   expect(font.fontSize).toBe('12px');
   font.fontSize = '20px';
   expect(font.font).toBe('italic bold 20px Arial');
+});
+
+it('themeFont accessor getter walks the cascade raw, like the trial (TASK 90)', () => {
+  // .probe/t90/rangefont2-r1.json (measured on the trial): CellRange.themeFont() returns the RAW
+  // member of the most specific level that DEFINES one - the area default's built-in 'Body' is
+  // reported even when the resolved actual style drops it - not the resolved cascade value.
+  const s = new Worksheet('ThemeWalk');
+  expect(s.getRange(0, 0, 1, 1).themeFont()).toBe('Body'); // plain cell: the default style's token
+  const rowStyle = new Style();
+  rowStyle.font = '16pt Verdana';
+  s.setStyle(-1, 1, rowStyle);
+  expect(s.getRange(2, 1, 1, 1).font()).toBe('16pt Verdana'); // the family resolves through the row style
+  expect(s.getRange(2, 1, 1, 1).themeFont()).toBe('Body'); // ...yet the getter still reports 'Body'
+  const own = new Style();
+  own.font = 'bold italic 22pt "Segoe UI"';
+  s.setStyle(4, 4, own);
+  expect(s.getActualStyle(4, 4).themeFont).toBeUndefined(); // the RESOLVED style carries none (explicit family wins)
+  expect(s.getRange(4, 4, 1, 1).themeFont()).toBe('Body'); // the getter keeps walking down to the default
+  s.getRange(6, 6, 1, 1).themeFont('Whatever'); // a string token on the cell is the most specific level
+  expect(s.getRange(6, 6, 1, 1).themeFont()).toBe('Whatever');
+  expect(s.getActualStyle(6, 6).font).toBe('14.6667px Whatever'); // unknown tokens pass through verbatim
 });
 
 describe('Rect and Point', () => {

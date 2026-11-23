@@ -1,4 +1,6 @@
 import englishFormats from './en-us-formats.json';
+import italianFormats from './it-it-formats.json';
+import italianStrings from './it-it-strings.json';
 import japaneseFormats from './ja-jp-formats.json';
 export interface NumberCulture {
   currencyDecimalSeparator?: string;
@@ -113,10 +115,15 @@ export class CultureManager {
   private static current = 'en-us';
   private static cultures = new Map<string, CultureInfo>();
   private static languages = new Map<string, object>();
+  /** Bumped on every registration so the string cache in `localization.ts` drops stale resources. */
+  private static generation = 0;
   static addCultureInfo(name: string, culture: CultureInfo, language: object = {}): void {
     this.cultures.set(name.toLowerCase(), culture);
     this.languages.set(name.toLowerCase(), language);
+    this.generation++;
   }
+  /** @internal how many times a culture was (re)registered — resource packages loaded late must take effect. */
+  static _cultureGeneration(): number { return this.generation; }
   static culture(name?: string, _force = false): string {
     if (name !== undefined) {
       const key = name.toLowerCase();
@@ -180,3 +187,26 @@ japanese.TimelineDateOrder = japaneseFormats.TimelineDateOrder;
 japanese.TimelineDateSuffix = japaneseFormats.TimelineDateSuffix;
 japanese._setName('ja-JP');
 CultureManager.addCultureInfo('ja-jp', japanese);
+
+// TASK 88: the built-in it-IT culture (the Italian counterpart of the trial core's
+// ja-JP). The data fields are our own transcription of the public Italian regional
+// conventions (decimal ',', thousands '.', dd/MM/yyyy patterns, Italian month/day
+// names, empty AM/PM designators); no official Italian culture exists in the trial,
+// so nothing here was sampled from a reference implementation. `listSeparator`
+// follows the d.ts contract (the separator of formula arguments) and reports ';'.
+// Formula *parsing* in this build stays ',' for every culture — see docs/STATUS.md.
+// The language object is the core UI string table (see src/localization.ts).
+const italian = new CultureInfo();
+Object.assign(italian, {
+  id: italianFormats.id,
+  displayName: italianFormats.displayName,
+  paperKind: italianFormats.paperKind,
+});
+Object.assign(italian.DateTimeFormat, italianFormats.DateTimeFormat);
+Object.assign(italian.NumberFormat, italianFormats.NumberFormat);
+Object.assign(italian.TextFormat, italianFormats.TextFormat);
+Object.assign(italian.LocalNumberFormat, italianFormats.LocalNumberFormat);
+italian.predefinedFormats = italianFormats.predefinedFormats;
+italian.instanceType = italianFormats.instanceType;
+italian._setName('it-IT');
+CultureManager.addCultureInfo('it-it', italian, italianStrings);

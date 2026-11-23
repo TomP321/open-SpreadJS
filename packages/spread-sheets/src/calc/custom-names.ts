@@ -17,7 +17,8 @@
  * Probe: `.probe/api-sweep-probe.mjs`, reports `.probe/report-item4n.json`,
  * `.probe/report-item4o.json`, `.probe/report-item4q.json`.
  */
-import { parseFormula } from './parser.js';
+import { astToText, parseFormula } from './parser.js';
+import { getActiveCalcLanguagePackage } from './language-packages.js';
 
 /** First character must be a letter or an underscore; the rest of these plus `_ . ? \`. */
 const CUSTOM_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_.?\\]*$/;
@@ -52,11 +53,33 @@ export function assertCustomName(name: unknown, formula: unknown): void {
  * Parses the expression of a custom name. The trial builds the expression when
  * the name is added and fails there for an expression it cannot parse
  * (`1+(`), so the failure is reported at `addCustomName` time here as well.
+ * With an active calc language package the localized grammar is accepted too.
  */
 export function assertNameFormula(formula: string, r1c1 = false): void {
   try {
     parseFormula(formula, { r1c1 });
   } catch {
-    throw new Error(INVALID_NAME);
+    const language = getActiveCalcLanguagePackage();
+    if (!language) throw new Error(INVALID_NAME);
+    try {
+      parseFormula(formula, { r1c1, language });
+    } catch {
+      throw new Error(INVALID_NAME);
+    }
+  }
+}
+
+/**
+ * Canonical English form of a name expression typed in any accepted grammar
+ * (TASK 89): stored name text stays invariant so `toJSON`/XLSX never carry localized
+ * formulas. Unparseable text is returned unchanged (still rejected by assertNameFormula).
+ */
+export function normalizeNameFormula(formula: string, r1c1 = false): string {
+  const language = getActiveCalcLanguagePackage();
+  if (!language) return formula;
+  try {
+    return astToText(parseFormula(formula, { r1c1, language }), { r1c1 });
+  } catch {
+    return formula;
   }
 }

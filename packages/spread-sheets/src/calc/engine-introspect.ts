@@ -10,7 +10,8 @@
  */
 import type { Worksheet } from '../model.js';
 import type { AstNode, NameNode, RefNode } from './parser.js';
-import { collectRefs, translateRefs } from './parser.js';
+import { collectRefs, localizeFormulaText, translateRefs } from './parser.js';
+import { getActiveCalcLanguagePackage } from './language-packages.js';
 import { forEachIndexEntry } from './engine-deps.js';
 import type { CalcEngine, FormulaCell } from './engine.js';
 
@@ -293,7 +294,8 @@ export function formulaInformationOf(
   info.hasFormula = true;
   info.isArrayFormula = Boolean(sheet._arrayFormula(row, col));
   info.formula = text;
-  info.formulaWithCulture = text;
+  // TASK 89: the engine's official slot for the localized display form.
+  info.formulaWithCulture = localizeFormulaText(text, getActiveCalcLanguagePackage(), engine.isR1C1());
   const spill = cell?.spill;
   if (spill && engine.allowDynamicArray()) {
     info.isDynamicArray = true;

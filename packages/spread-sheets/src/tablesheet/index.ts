@@ -687,6 +687,11 @@ export class TableSheet extends Worksheet {
     return this.sorts.map(sort => ({ ...sort }));
   }
   removeSort(): void { this.sort([]); }
+  // TASK 97 TS-1: restore a serialized sort spec WITHOUT reordering the rows.
+  // The trial does exactly this when a hierarchy view with an active filter is
+  // reloaded from JSON: sort() reads the spec back, rowFilter serializes it,
+  // but the display order is the natural hierarchy order (probe hier-probe3 I/J/M).
+  _restoreSortSpec(sorts: SortInfo[]): void { this.sorts = sorts.map(sort => ({ ...sort })); }
   groupBy(groups?: { field: string; [key: string]: unknown }[]): { field: string; [key: string]: unknown }[] {
     if (groups) {
       this.groups = groups.map(group => ({ ...group }));
@@ -732,8 +737,11 @@ export class TableSheet extends Worksheet {
     if (value !== undefined) { this.detailsVisible = value; this.refreshView(); return setModeResult; }
     return this.detailsVisible;
   }
-  togglePinnedRows(indexes: number[]): number {
-    const count = this.view?.togglePinnedRows(indexes) ?? 0;
+  togglePinnedRows(indexes: number[]): number | undefined {
+    // TASK 97 TS-1: hierarchy views make pinned rows inert in the trial; mirror
+    // the no-op (undefined return, no frozen-rows change) — probe hier-probe2 F.
+    const count = this.view?.togglePinnedRows(indexes);
+    if (count === undefined) return undefined;
     this.frozenRowCount(count);
     this.refreshView();
     return count;

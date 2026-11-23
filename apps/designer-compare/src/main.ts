@@ -18,15 +18,16 @@ function layout() {
   const root = document.getElementById('root')!;
   const d = document.createElement('div');
   d.style.cssText = 'display:flex;width:100%;height:100%';
+  const lang = params.get('lang') === 'it' ? '&lang=it' : '';
   const left = document.createElement('iframe');
   left.name = 'official';
   left.title = 'official';
-  left.src = location.pathname + '?side=official&embed=1';
+  left.src = location.pathname + `?side=official&embed=1${lang}`;
   left.style.cssText = 'flex:1;border:0;border-right:1px solid #888;height:100%';
   const right = document.createElement('iframe');
   right.name = 'ours';
   right.title = 'ours';
-  right.src = location.pathname + '?side=ours&embed=1';
+  right.src = location.pathname + `?side=ours&embed=1${lang}`;
   right.style.cssText = 'flex:1;border:0;height:100%';
   d.append(left, right);
   root.append(d);

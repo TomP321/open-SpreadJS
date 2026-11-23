@@ -12,6 +12,8 @@ import { CHART_TYPE_CATEGORIES, CHART_TYPE_TILES, type ChartSeriesPlan } from '.
 import { activeRanges, activeSheet, topCell } from './commands/actions.js';
 import { currentRegion } from './data-engine.js';
 import { selectionBounds } from './commands/base.js';
+import { messageText } from './resolve.js';
+import { SPARK_DIALOG_SPECS } from './sparkline-dialog-specs.js';
 
 const insertColumnName = (index: number): string => toA1({ row: 0, col: index, rowCount: 1, colCount: 1 }).replace(/\d+$/, '');
 
@@ -70,8 +72,8 @@ export function showCameraDialog(d: Designer): void {
   d.showDialog('cameraShapeDialogTemplate', { reference }, (data) => {
     const value = String(data.reference ?? reference);
     try { d.runUndoable('applyCamera', { data: { reference: value } }); }
-    catch (error) { d.showMessageBox(String((error as Error)?.message ?? error), 'Create camera shape', 3); }
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Create camera shape', 3); });
+    catch (error) { d.showMessageBox(String((error as Error)?.message ?? error), messageText(d, 'createCameraShape', 'Create camera shape'), 3); }
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'createCameraShape', 'Create camera shape'), 3); });
 }
 
 export function showBarcodeDialog(d: Designer): void {
@@ -92,27 +94,43 @@ export function showBarcodeDialog(d: Designer): void {
       showLabel: submitted.showLabel === true || submitted.showLabel === 'true',
     };
     try { d.runUndoable('applyBarcode', { data: clean }); }
-    catch (error) { d.showMessageBox(String((error as Error)?.message ?? error), 'Barcode Dialog', 3); }
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Barcode Dialog', 3); });
+    catch (error) { d.showMessageBox(String((error as Error)?.message ?? error), messageText(d, 'barcodeDialog', 'Barcode Dialog'), 3); }
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'barcodeDialog', 'Barcode Dialog'), 3); });
 }
 
 /** "Create Sparklines" dialog; `sparklineFunction` selects LINE/AREA/COLUMN/... formulas.
- *  TASK 68: like the trial, a single-cell selection expands to the current region. */
+ *  TASK 68: like the trial, a single-cell selection expands to the current region.
+ *  TASK 93: the formula types the trial gives a dedicated dialog (per-argument fields)
+ *  open `formulaSparklineDialogTemplate` instead; the generic dialog now carries the
+ *  trial's `isFormulaSparkline` checkbox (checked by default). */
 export function showSparklineDialog(d: Designer, sparklineFunction: string): void {
   const sheet = activeSheet(d);
   const bounds = selectionBounds(sheet);
   const region = bounds.rowCount <= 1 && bounds.colCount <= 1
     ? currentRegion(sheet, { row: Math.max(0, bounds.row), col: Math.max(0, bounds.col), rowCount: 1, colCount: 1 })
     : bounds;
+  const spec = SPARK_DIALOG_SPECS[sparklineFunction];
+  if (spec) {
+    const data = {
+      sparklineFunction,
+      fields: Object.fromEntries(spec.fields.map((field) => [field.key, field.def])),
+      locationRange: '',
+    };
+    d.showDialog('formulaSparklineDialogTemplate', data, (submitted) => {
+      try { d.runUndoable('applyFormulaSparkline', { data: { ...submitted, sparklineFunction } }); }
+      catch (error) { d.showMessageBox(String((error as Error)?.message ?? error), messageText(d, 'createSparklines', 'Create Sparklines'), 3); }
+    }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'createSparklines', 'Create Sparklines'), 3); });
+    return;
+  }
   const data = {
     sparklineFunction,
     dataRange: toA1({ row: Math.max(0, region.row), col: Math.max(0, region.col), rowCount: Math.max(1, region.rowCount), colCount: Math.max(1, region.colCount) }),
-    locationRange: '', isFormulaSparkline: false,
+    locationRange: '', isFormulaSparkline: true,
   };
   d.showDialog('createSparklinesDialogTemplate', data, (submitted) => {
     try { d.runUndoable('applySparklines', { data: { ...submitted, sparklineFunction } }); }
     catch (error) { d.showMessageBox(String((error as Error)?.message ?? error), 'SpreadJS Designer', 3); }
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Create Sparklines', 3); });
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'createSparklines', 'Create Sparklines'), 3); });
 }
 
 export function showShapeLinkDialog(d: Designer): void {
@@ -259,7 +277,7 @@ export function showMoveChartDialog(d: Designer, chart: GC.Spread.Sheets.Charts.
     let target: GC.Spread.Sheets.Worksheet | null = null;
     if (mode === 'new') {
       const name = String(data.newSheetName ?? '').trim();
-      if (!name || names.includes(name)) { d.showMessageBox('A sheet with that name already exists.', 'Move Chart', 3); return; }
+      if (!name || names.includes(name)) { d.showMessageBox(messageText(d, 'sheetNameExists', 'A sheet with that name already exists.'), messageText(d, 'moveChart', 'Move Chart'), 3); return; }
       target = addNamedSheet(workbook, name);
     } else {
       target = workbook.getSheetFromName(String(data.sheetName ?? '')) ?? null;

@@ -9,11 +9,12 @@ import type {
   DesignerEvents, ClipboardData, RibbonMenuState, DockPane,
 } from './designer-api.js';
 import { CommandNames, TemplateNames } from './names-generated.js';
+import { functionDisplayName, syncCalcLanguageDescriptionsForActivePackage } from './function-library.js';
 import { activateDockPane as activateDockPaneHelper, dockPaneVisible, dockStackOpen, setDockPane as setDockPaneHelper } from './dock-panes.js';
 import { DefaultConfig, ToolBarModeConfig, resolveRibbon } from './config.js';
 import { deepClone, mergeConfig } from './config-merge.js';
 import { defaultTheme } from './theme-default.js';
-import { getResources, mergeResources, themeToCss } from './resolve.js';
+import { getResources, mergeResources, themeToCss , messageText} from './resolve.js';
 import { activeSheet } from './commands/actions.js';
 import { selectedShapes as insertSelectedShapes, snapshotChartLauncherState } from './commands/insert.js';
 import { internals, legacyCommentsOf, shapesOf, sheetsNamespace, designerCore, type DesignerShape, type GCRoot, type Style, type Workbook, type Worksheet } from './core-internals.js';
@@ -38,8 +39,9 @@ import {
   showTransformCells,
 } from './designer-dialogs.js';
 import {
-  addCellState, clearTableStyleElement, clearTableStyleOfSelection, editCellStateStyle, editTableStyleElement,
-  pickCellStateRange, removeCellState, showManageCellStatesDialog, showNewTableStyleDialog, type CellStatesDraft,
+  addCellState, clearPivotStyleElement, clearTableStyleElement, clearTableStyleOfSelection, deletePivotTheme, duplicatePivotTheme, setDefaultPivotTheme,
+  editCellStateStyle, editPivotStyleElement, editTableStyleElement,
+  pivotThemeDraft, pickCellStateRange, removeCellState, showManageCellStatesDialog, showNewPivotTableStyleDialog, showNewTableStyleDialog, type CellStatesDraft, type PivotStyleDraft,
 } from './designer-custom-styles.js';
 import {
   deleteConditionalRule, duplicateConditionalRule, editConditionalRule, editConditionalRuleStyle, moveConditionalRule,
@@ -76,7 +78,7 @@ import { applyUndoableAction, commitFormula, installFormulaCommit, installUndoBr
 import {
   activePivot, hasActivePivot, showCalcItemSolveOrder, showCalculatedField, showCalculatedItem,
   showChangeDataSource, showInsertPivotTable, showMovePivotTable, showPivotFieldSettings,
-  showPivotTableOptions, showReportFilterPages, showValueFieldSettings, type PivotTable as PivotTableType,
+  showPivotGrouping, showPivotTableOptions, showReportFilterPages, showValueFieldSettings, type PivotTable as PivotTableType,
 } from './pivot-designer.js';
 import { newWorkbook, openFile, saveFile } from './designer-file.js';
 
@@ -144,6 +146,10 @@ export class Designer implements DesignerApi {
     this.resources = getResources();
     const initial = sheetsNamespace(this.gc).DesignerResources;
     if (initial) this.resources = mergeResources(this.resources, initial);
+    // TASK 89: fill the active calc language package's function descriptions from the loaded
+    // resources now, so the core's autocomplete/tooltip shows them from the first keystroke
+    // (later activations are covered by the lazy sync in activeCalcLanguage()).
+    syncCalcLanguageDescriptionsForActivePackage();
     this.config = mergeConfig(DefaultConfig, config ?? null);
     this.findController = new FindReplaceController(this);
 
@@ -479,6 +485,15 @@ export class Designer implements DesignerApi {
   clearTableStyleElement(key: string): void { clearTableStyleElement(this, key); }
   /** Format Table gallery's Clear: remove the style of the table under the cursor. */
   clearTableStyleOfSelection(): void { clearTableStyleOfSelection(this); }
+  /* TASK 93: PivotTable Styles gallery's New Pivot Table Style... (+ Modify via name). */
+  _pivotStyleDraft: PivotStyleDraft | undefined = undefined;
+  showNewPivotTableStyleDialog(name?: string): void { showNewPivotTableStyleDialog(this, name ? pivotThemeDraft(this, name) : undefined); }
+  editPivotStyleElement(key: string): void { editPivotStyleElement(this, key); }
+  clearPivotStyleElement(key: string): void { clearPivotStyleElement(this, key); }
+  /* TASK 93: the PivotTable Styles gallery tile context menu. */
+  duplicatePivotTheme(name: string, builtIn?: boolean): void { duplicatePivotTheme(this, name, builtIn); }
+  deletePivotTheme(name: string): void { deletePivotTheme(this, name); }
+  setDefaultPivotTheme(name: string): void { setDefaultPivotTheme(this, name); }
   /** Manage Cell States dialog (Cell Styles gallery footer). */
   showManageCellStatesDialog(): void { showManageCellStatesDialog(this); }
   /** Add Cell States: the Create Cell States dialog for a new row of the working list. */
@@ -552,7 +567,8 @@ export class Designer implements DesignerApi {
 
   showFormatCells(tab?: string): void { showFormatCells(this, tab); }
   insertFunctionText(name: string, suffix = '('): void {
-    this._formulaInsertion = { text: `=${name}${suffix}`, nonce: Date.now() };
+    // TASK 89: insert the localized display name when a calc language package is active.
+    this._formulaInsertion = { text: `=${functionDisplayName(name)}${suffix}`, nonce: Date.now() };
     this.invalidate();
   }
   showInsertTable(): void { showInsertTable(this); }
@@ -567,6 +583,7 @@ export class Designer implements DesignerApi {
   showPivotFieldSettings(fieldName: string): void { showPivotFieldSettings(this, fieldName); }
   showValueFieldSettings(fieldName: string): void { showValueFieldSettings(this, fieldName); }
   showPivotTableOptions(): void { showPivotTableOptions(this); }
+  showPivotGrouping(): void { showPivotGrouping(this); }
   /* TASK 77: the Fields, Items & Sets dialogs + Show Report Filter Pages. */
   showCalculatedField(): void { showCalculatedField(this); }
   showCalculatedItem(): void { showCalculatedItem(this); }
@@ -653,7 +670,7 @@ export class Designer implements DesignerApi {
     this.notImplementedPlugin('Picture');
   }
   notImplementedPlugin(feature: string): void {
-    this.showMessageBox(`${feature} requires a plugin that is not installed.\nInstall the corresponding SpreadJS plugin to use this feature.`, feature, 1);
+    this.showMessageBox(messageText(this, 'pluginMissing', '{0} requires a plugin that is not installed.\nInstall the corresponding SpreadJS plugin to use this feature.', [feature]), feature, 1);
   }
   /**
    * The trial's Page Layout tab seeds the print header/heading visibility and
@@ -783,7 +800,7 @@ export class Designer implements DesignerApi {
       this.invalidateNow();
       try { dialog.success?.(dialog.data); } catch (error) {
         if (dialog.error) dialog.error(error);
-        else this.showMessageBox(String((error as Error)?.message ?? error), 'Error', 3);
+        else this.showMessageBox(String((error as Error)?.message ?? error), messageText(this, 'error', 'Error'), 3);
       }
     } else {
       this.dialog = null;
@@ -827,8 +844,16 @@ export class Designer implements DesignerApi {
   }
   getTheme(): ITheme { return { ...this.theme }; }
   applyThemeToHost(): void {
+    // Only customise tokens that actually differ from the built-in theme: the stylesheet's
+    // `:root` / `[data-theme="dark"]` blocks then keep governing everything the app did not
+    // override, so importing the dark stylesheet (and flipping the theme attribute) darkens
+    // the designer without a JS theme call (TASK 86).
     const css = themeToCss(this.theme);
-    for (const [key, value] of Object.entries(css)) this.host.style.setProperty(key, value);
+    const defaults = themeToCss(defaultTheme);
+    for (const [key, value] of Object.entries(css)) {
+      if (defaults[key] === value) this.host.style.removeProperty(key);
+      else this.host.style.setProperty(key, value);
+    }
     this.host.dataset.theme = this.theme.colorBackground === '#1f1f1f' || this.theme.colorBackground === '#252526' ? 'dark' : 'light';
   }
 

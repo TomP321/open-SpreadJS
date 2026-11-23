@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import GC from '@mescius/spread-sheets';
 import { Designer } from '../src/designer.js';
 import { applyInsertAction, barcodeFormula, formControls, parseA1, shapeGalleryGroups, sparklineFormulas, sparklineGroups, toA1 } from '../src/commands/insert.js';
+import { resolveText } from '../src/resolve.js';
+import { englishResources } from '../src/resources.js';
 
 describe('A1 helpers', () => {
   it('round-trips relative and absolute references', () => {
@@ -106,7 +108,8 @@ describe('applyInsertAction on the model', () => {
 
 describe('Insert-tab galleries (trial parity)', () => {
   it('reproduces the trial shape gallery: 8 groups, 186 presets, trial order', () => {
-    expect(shapeGalleryGroups.map(group => [group.title, group.items.length])).toEqual([
+    // TASK 87: gallery titles are `${res.…}` placeholders; resolve against the English resources before comparing.
+    expect(shapeGalleryGroups.map(group => [resolveText(group.title, englishResources), group.items.length])).toEqual([
       ['Lines', 9], ['Rectangles', 9], ['Basic Shapes', 71], ['Block Arrows', 27],
       ['Equation Shapes', 6], ['Flowchart', 28], ['Stars and Banners', 20], ['Callouts', 16],
     ]);
@@ -124,7 +127,7 @@ describe('Insert-tab galleries (trial parity)', () => {
   });
 
   it('keeps the sparkline and form-control galleries at the trial counts', () => {
-    expect(sparklineGroups.map(group => [group.title, group.items.length])).toEqual([
+    expect(sparklineGroups.map(group => [resolveText(group.title, englishResources), group.items.length])).toEqual([
       ['Line Sparkline', 2], ['Bar Sparkline', 8], ['Pie Sparkline', 1], ['Scatter Sparkline', 2],
       ['Calendar Sparkline', 2], ['Other Sparkline', 8],
     ]);

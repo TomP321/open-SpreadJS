@@ -241,8 +241,19 @@ export class GeneralFormatter extends FormatterBase {
       data.conditionalForeColor = color;
     }
     const raw = value instanceof Date ? dateToSerial(value) : value;
+    // TASK 91 (2b): a numeric value formatted with `General` must still localise its decimal
+    // and group separators with the current culture (the trial shows `396,5` under it-it).
+    const general = format.toLowerCase() === 'general';
+    const numericGeneral = general && typeof raw === 'number';
     let text: string;
-    if (format.toLowerCase() === 'general' && value instanceof Date) {
+    if (general && typeof raw === 'number' && !(value instanceof Date)) {
+      // TASK 91: the trial's `General` text of a number is its `String()` form (`1234567890123`,
+      // `-1e-12`, `1e+21` — not the 11-digit scientific form the SSF engine produces); the
+      // culture's separators are applied below by `localizeNumber`. A Date keeps the date text
+      // below (its serial number must never leak into `getText`).
+      text = String(raw);
+    }
+    else if (general && value instanceof Date) {
       const date = value as Date;
       const hasTime = date.getHours() || date.getMinutes() || date.getSeconds() || date.getMilliseconds();
       text = SSF.format(hasTime ? 'm/d/yyyy h:mm:ss' : 'm/d/yyyy', raw as number);
@@ -267,7 +278,7 @@ export class GeneralFormatter extends FormatterBase {
       }
     }
     if (SSF.is_date(section)) text = this.localizeDate(text, culture);
-    else text = this.localizeNumber(text, culture, section);
+    else text = this.localizeNumber(text, culture, section, numericGeneral);
     if (data) data.content = this.content(text, culture);
     return text;
   }
@@ -294,7 +305,7 @@ export class GeneralFormatter extends FormatterBase {
       CultureManager.getCultureInfo('en-us')
     );
   }
-  private localizeNumber(text: string, culture: CultureInfo, section: string): string {
+  private localizeNumber(text: string, culture: CultureInfo, section: string, numericGeneral = false): string {
     const nf = culture.NumberFormat;
     const decimal = nf.numberDecimalSeparator ?? '.',
       group = nf.numberGroupSeparator ?? ',';
@@ -302,7 +313,7 @@ export class GeneralFormatter extends FormatterBase {
     if (decimal === '.' && group === ',') return text;
     const first = text.search(/\d/),
       last = Math.max(...[...text.matchAll(/\d/g)].map((m) => m.index ?? 0));
-    if (first < 0 || !/[0#?]/.test(section)) return text;
+    if (first < 0 || (!/[0#?]/.test(section) && !numericGeneral)) return text;
     return (
       text.slice(0, first) +
       text.slice(first, last + 1).replace(/[.,]/g, (c) => (c === '.' ? decimal : group)) +

@@ -2,9 +2,11 @@
  * sparklines and barcodes. Every command writes through the public sheet model so
  * the workbook JSON (and the paired browser specs) observe the same state as the trial. */
 import type { DesignerApi as Designer } from '../designer-api.js';
+const g = (key: string): string => `\${res.ribbon.galleries.${key}}`;
 import type GC from '@mescius/spread-sheets';
 import type { DesignerShape, GCRoot, SelectionRange, Worksheet } from '../core-internals.js';
 import { chartsOf, extendView, recordView, shapesOf } from '../core-internals.js';
+import { formulaSparklineText } from '../dialogs/FormulaSparklineDialogs.js';
 
 const activeSheet = (d: Designer): Worksheet => d.getWorkbook().getActiveSheet();
 const activeRanges = (sheet: Worksheet): SelectionRange[] => {
@@ -86,17 +88,17 @@ const CALLOUTS: ShapeGalleryEntry[] = [
 ].map(id => ({ id, preset: id }));
 
 export const shapeGalleryGroups: ShapeGalleryGroup[] = [
-  { title: 'Lines', items: CONNECTORS },
-  { title: 'Rectangles', items: RECTANGLES },
-  { title: 'Basic Shapes', items: BASIC_SHAPES },
-  { title: 'Block Arrows', items: BLOCK_ARROWS },
-  { title: 'Equation Shapes', items: EQUATION },
-  { title: 'Flowchart', items: FLOWCHART },
-  { title: 'Stars and Banners', items: STARS },
-  { title: 'Callouts', items: CALLOUTS },
+  { title: g('lines'), items: CONNECTORS },
+  { title: g('rectangles'), items: RECTANGLES },
+  { title: g('basicShapes'), items: BASIC_SHAPES },
+  { title: g('blockArrows'), items: BLOCK_ARROWS },
+  { title: g('equationShapes'), items: EQUATION },
+  { title: g('flowchart'), items: FLOWCHART },
+  { title: g('starsAndBanners'), items: STARS },
+  { title: g('callouts'), items: CALLOUTS },
 ];
 /** The trial draws the Lines group with 16px icons, every other group with 20px. */
-export const shapeGalleryIconSize = (title: string): number => (title === 'Lines' ? 16 : 20);
+export const shapeGalleryIconSize = (title: string): number => (title === g('lines') || title === 'Lines' ? 16 : 20);
 export const shapeGalleryById = new Map<string, ShapeGalleryEntry>(shapeGalleryGroups.flatMap(g => g.items).map(e => [e.id, e]));
 
 /** Form Controls gallery: item id, trial shape name and paint object type. */
@@ -114,38 +116,38 @@ export const formControls: { id: string; label: string; objectType: string; widt
 
 /** Sparklines gallery: groups with the trial labels, ids and formula functions. */
 export const sparklineGroups: { title: string; items: { command: string; title: string; formula: string | null }[] }[] = [
-  { title: 'Line Sparkline', items: [
-    { command: 'sparklinesLineSparkline', title: 'Insert Line Sparkline', formula: 'LINESPARKLINE' },
-    { command: 'sparklinesAreaSparkline', title: 'Insert Area Sparkline', formula: 'AREASPARKLINE' },
+  { title: g('lineSparkline'), items: [
+    { command: 'sparklinesLineSparkline', title: g('insertLineSparkline'), formula: 'LINESPARKLINE' },
+    { command: 'sparklinesAreaSparkline', title: g('insertAreaSparkline'), formula: 'AREASPARKLINE' },
   ] },
-  { title: 'Bar Sparkline', items: [
-    { command: 'sparklinesColumnSparkline', title: 'Insert Column Sparkline', formula: 'COLUMNSPARKLINE' },
-    { command: 'sparklinesWinLossSparkline', title: 'Insert Win/Loss Sparkline', formula: 'WINLOSSSPARKLINE' },
-    { command: 'sparklinesStackedSparkline', title: 'Insert Stacked Sparkline', formula: null },
-    { command: 'sparklinesCascadeSparkline', title: 'Insert Cascade Sparkline', formula: null },
-    { command: 'sparklinesParetoSparkline', title: 'Insert Pareto Sparkline', formula: null },
-    { command: 'sparklinesHBarSparkline', title: 'Insert Hbar Sparkline', formula: 'HBARSPARKLINE' },
-    { command: 'sparklinesVBarSparkline', title: 'Insert Vbar Sparkline', formula: 'VBARSPARKLINE' },
-    { command: 'sparklinesHistogramSparkline', title: 'Insert Histogram Sparkline', formula: null },
+  { title: g('barSparkline'), items: [
+    { command: 'sparklinesColumnSparkline', title: g('insertColumnSparkline'), formula: 'COLUMNSPARKLINE' },
+    { command: 'sparklinesWinLossSparkline', title: g('insertWinLossSparkline'), formula: 'WINLOSSSPARKLINE' },
+    { command: 'sparklinesStackedSparkline', title: g('insertStackedSparkline'), formula: null },
+    { command: 'sparklinesCascadeSparkline', title: g('insertCascadeSparkline'), formula: null },
+    { command: 'sparklinesParetoSparkline', title: g('insertParetoSparkline'), formula: null },
+    { command: 'sparklinesHBarSparkline', title: g('insertHbarSparkline'), formula: 'HBARSPARKLINE' },
+    { command: 'sparklinesVBarSparkline', title: g('insertVbarSparkline'), formula: 'VBARSPARKLINE' },
+    { command: 'sparklinesHistogramSparkline', title: g('insertHistogramSparkline'), formula: null },
   ] },
-  { title: 'Pie Sparkline', items: [{ command: 'sparklinesPieSparkline', title: 'Insert Pie Sparkline', formula: 'PIESPARKLINE' }] },
-  { title: 'Scatter Sparkline', items: [
-    { command: 'sparklinesScatterSparkline', title: 'Insert Scatter Sparkline', formula: null },
-    { command: 'sparklinesSpreadsSparkline', title: 'Insert Spread Sparkline', formula: null },
+  { title: g('pieSparkline'), items: [{ command: 'sparklinesPieSparkline', title: g('insertPieSparkline'), formula: 'PIESPARKLINE' }] },
+  { title: g('scatterSparkline'), items: [
+    { command: 'sparklinesScatterSparkline', title: g('insertScatterSparkline'), formula: null },
+    { command: 'sparklinesSpreadsSparkline', title: g('insertSpreadSparkline'), formula: null },
   ] },
-  { title: 'Calendar Sparkline', items: [
-    { command: 'sparklinesMonthSparkline', title: 'Insert Month Sparkline', formula: null },
-    { command: 'sparklinesYearSparkline', title: 'Insert Year Sparkline', formula: null },
+  { title: g('calendarSparkline'), items: [
+    { command: 'sparklinesMonthSparkline', title: g('insertMonthSparkline'), formula: null },
+    { command: 'sparklinesYearSparkline', title: g('insertYearSparkline'), formula: null },
   ] },
-  { title: 'Other Sparkline', items: [
-    { command: 'sparklinesBoxPlotSparkline', title: 'Insert BoxPlot Sparkline', formula: null },
-    { command: 'sparklinesBulletSparkline', title: 'Insert Bullet Sparkline', formula: null },
-    { command: 'sparklinesVarianceSparkline', title: 'Insert Variance Sparkline', formula: null },
-    { command: 'sparklinesRangeBlockSparkline', title: 'Insert RangeBlock Sparkline', formula: null },
-    { command: 'sparklinesGaugeKPISparkline', title: 'Insert GaugeKPI Sparkline', formula: null },
-    { command: 'sparklineImageSparkline', title: 'Insert Image Function', formula: null },
-    { command: 'sparklinesLollipopVarianceSparkline', title: 'Insert Lollipop Variance Sparkline', formula: null },
-    { command: 'sparklinesProgressSparkline', title: 'Insert Progress Sparkline', formula: null },
+  { title: g('otherSparkline'), items: [
+    { command: 'sparklinesBoxPlotSparkline', title: g('insertBoxPlotSparkline'), formula: null },
+    { command: 'sparklinesBulletSparkline', title: g('insertBulletSparkline'), formula: null },
+    { command: 'sparklinesVarianceSparkline', title: g('insertVarianceSparkline'), formula: null },
+    { command: 'sparklinesRangeBlockSparkline', title: g('insertRangeBlockSparkline'), formula: null },
+    { command: 'sparklinesGaugeKPISparkline', title: g('insertGaugeKPISparkline'), formula: null },
+    { command: 'sparklineImageSparkline', title: g('insertImageFunction'), formula: null },
+    { command: 'sparklinesLollipopVarianceSparkline', title: g('insertLollipopVarianceSparkline'), formula: null },
+    { command: 'sparklinesProgressSparkline', title: g('insertProgressSparkline'), formula: null },
   ] },
 ];
 
@@ -617,8 +619,37 @@ export function applyInsertAction(d: Designer, name: string, args: Record<string
     }
     case 'applySparklines': {
       const fn = String(data.sparklineFunction ?? 'LINESPARKLINE');
+      // TASK 93: the generic dialog's `isFormulaSparkline` unchecked for the
+      // LINE/COLUMN/WINLOSS family creates classic sparklines (trial behavior);
+      // everything else stays formula-based.
+      const classic = /^(LINE|COLUMN|WINLOSS)/.test(fn) && data.isFormulaSparkline === false;
       const items = sparklineFormulas(fn, String(data.dataRange ?? ''), String(data.locationRange ?? ''));
+      if (classic) {
+        const Sparklines = d.gc.Spread.Sheets.Sparklines;
+        const sparklineType = fn.startsWith('LINE') ? Sparklines.SparklineType.line : fn.startsWith('COLUMN') ? Sparklines.SparklineType.column : Sparklines.SparklineType.winloss;
+        const setting = new Sparklines.SparklineSetting();
+        for (const item of items) {
+          const match = /^=(?:LINE|COLUMN|WINLOSS)SPARKLINE\(([^,)]+),(\d)\)$/.exec(item.formula);
+          if (match) {
+            const orientation = Number(match[2]) === Sparklines.DataOrientation.horizontal ? Sparklines.DataOrientation.horizontal : Sparklines.DataOrientation.vertical;
+            sheet.setSparkline(item.row, item.col, match[1], orientation, sparklineType, setting);
+          }
+        }
+        return true;
+      }
       for (const item of items) sheet.setFormula(item.row, item.col, item.formula);
+      return true;
+    }
+    case 'applyFormulaSparkline': {
+      // TASK 93: the per-type dialogs write their composed formula; a blank
+      // Location Range targets the active cell, like the trial.
+      const fn = String(data.sparklineFunction ?? '');
+      const formula = formulaSparklineText(fn, data as Record<string, unknown>);
+      if (!formula) return true;
+      const reference = String(data.locationRange ?? '').trim();
+      const target = reference ? parseA1(reference) : (() => { const c = selectionRange(d); return { row: c.row, col: c.col, rowCount: 1, colCount: 1 }; })();
+      if (target.rowCount > 1 || target.colCount > 1) throw new Error('Location reference does not support cell range, it should be single cell');
+      sheet.setFormula(Math.max(0, target.row), Math.max(0, target.col), formula);
       return true;
     }
     case 'applyBarcode': {

@@ -769,3 +769,35 @@ describe('pivot events', () => {
     sheet.pivotTables.remove('watched');
   });
 });
+
+/* TASK 93: ungrouped date row items display like the trial (m/d/yyyy), while
+   filtering/drill keep working on the raw cache keys. */
+describe('date item labels (TASK 93)', () => {
+  const dates = () => {
+    const wb = new Workbook();
+    const sheet = wb.getSheet(0);
+    sheet.name('Sales');
+    sheet.setArray(0, 0, [['When', 'Amt'],
+      [new Date(2022, 0, 3), 10], [new Date(2022, 1, 5), 20], [new Date(2022, 2, 7), 30]] as never);
+    const table = sheet.pivotTables.add('p', 'Sales!$A$1:$B$4', 6, 0, Pivot.PivotTableLayoutType.tabular, 'light0');
+    table.add('When', 'When', Pivot.PivotTableFieldType.rowField);
+    table.add('Amt', 'Amt', Pivot.PivotTableFieldType.valueField, Pivot.SubtotalType.sum);
+    return { wb, sheet, table };
+  };
+  it('writes formatted labels into the sheet', () => {
+    const { wb, sheet } = dates();
+    expect(sheet.getValue(7, 0)).toBe('1/3/2022');
+    expect(sheet.getValue(8, 0)).toBe('2/5/2022');
+    expect(sheet.getValue(10, 0)).toBe('Grand Total');
+    wb.destroy();
+  });
+  it('label filters keep matching on the cache keys', () => {
+    const { wb, sheet, table } = dates();
+    // The cache key is the Date's epoch time (TZ-independent: built like the fixture).
+    table.labelFilter('When', { textItem: { list: [String(new Date(2022, 0, 3).getTime())], isAll: false } });
+    const texts: string[] = [];
+    for (let r = 7; r < 12; r++) { const v = sheet.getValue(r, 0); if (v !== null && v !== undefined && v !== '') texts.push(String(v)); }
+    expect(texts).toEqual(['1/3/2022', 'Grand Total']);
+    wb.destroy();
+  });
+});

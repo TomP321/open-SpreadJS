@@ -8,7 +8,7 @@
  */
 import { asRecord } from './object-access.js';
 import { GC } from './generated/enums.js';
-import { Range, Style, getFont } from './primitives.js';
+import { Range, Style, getFont, parseFontParts, recomposeFont } from './primitives.js';
 import { GeneralFormatter } from './formatter.js';
 import { cellTypeFromJSON, defaultCellType } from './features/cell-types.js';
 import { DefaultDataValidator } from './features/data-validation.js';
@@ -109,7 +109,11 @@ export function getActualStyle(sheet: Worksheet, row: number, col: number, area 
     const result = Object.assign(new Style(), {
       hAlign: header ? 1 : 3,
       vAlign: header ? 1 : 0,
-      font: sheet.parent?.options.font ?? '14.6667px Calibri',
+      // TASK 90 round 2 (`.probe/t90/rangefont-r1.json` / `rangefont2-r1.json`, measured): the
+      // trial's workbook CONSTRUCTOR option `font` (not in the contract options interfaces) is
+      // stored but never participates in style resolution - with `{font:'bold 16px Arial'}` its
+      // getActualStyle(0,0).font is still `14.6667px Calibri` (theme body font, themeFont 'Body').
+      font: '14.6667px Calibri',
       themeFont: 'Body',
       locked: true,
       hidden: false,
@@ -129,27 +133,68 @@ export function getActualStyle(sheet: Worksheet, row: number, col: number, area 
         parent = resolve(sheet.getNamedStyle(parentName) ?? sheet.parent?.getNamedStyle(parentName), seen);
       }
       if (typeof style === 'string') return { ...parent };
-      // `font` is a prototype accessor (TASK 79), invisible to Object.entries: compose it
-      // explicitly so the resolved actual style keeps the shorthand like the trial. It goes
-      // FIRST: assigning the shorthand parses it into the result's parts, and the explicit
-      // long-hand members then overwrite those parsed slots (the reverse order would let the
-      // shorthand setter clear long-hand members like `fontStyle: 'normal'`).
-      const own = Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) as JsonRecord;
+      // `font` is a prototype accessor (TASK 79), invisible to Object.entries: read it through
+      // `getFont` and merge the PARTS it parses into, so the cascade merges font parts and the
+      // recomposition at the end of `getActualStyle` reports the shorthand the merged parts make.
+      // TASK 90 (`.probe/t90/parse-r1.json`): the trial's actual style does exactly this — a cell
+      // holding `font:'18pt'` resolves to `18pt Calibri` (family from the sheet default),
+      // `font:'bold'` to `bold 14.6667px Calibri`, and a resolved style never reports a shorthand
+      // without a size or a family. Copying the source shorthand over the resolved long-hands (the
+      // pre-TASK 90 code) produced fragments like `12pt` / `bold`, and handing one to the canvas is
+      // an invalid `font` value Chromium ignores: the cell is drawn in the previous font.
       const font = getFont(style);
-      if (font !== undefined) return { ...parent, font, ...own };
+      const parts = typeof font === 'string' ? parseFontParts(font)?.parts : undefined;
+      const own: JsonRecord = {};
+      for (const [key, value] of Object.entries(style)) {
+        if (value === undefined || key === 'font') continue;
+        own[key] = value;
+      }
+      if (parts) {
+        for (const member of ['fontStyle', 'fontWeight', 'fontSize', 'fontFamily'] as const)
+          if (parts[member] !== undefined && own[member] === undefined) own[member] = parts[member];
+      } else if (font !== undefined) own.font = font; // a value the parser cannot express stays verbatim
       return { ...parent, ...own };
     };
-    for (const style of [data.defaultStyle, data.colStyles.get(col), data.rowStyles.get(row)])
-      Object.assign(result, resolve(style));
+    const levels: JsonRecord[] = [];
+    for (const style of [data.defaultStyle, data.colStyles.get(col), data.rowStyles.get(row)]) levels.push(resolve(style));
     if (area === VIEW && row >= 0 && col >= 0 && sheet.tables._hasAny()) {
       const tableStyle = sheet._tableStyleAt(row, col);
-      if (tableStyle) Object.assign(result, resolve(tableStyle));
+      if (tableStyle) levels.push(resolve(tableStyle));
     }
-    Object.assign(result, resolve(sheet.cell(row, col, area)?.style));
+    levels.push(resolve(sheet.cell(row, col, area)?.style));
     if (area === VIEW && row >= 0 && col >= 0) {
       const conditional = sheet.conditionalFormats.styleFor(row, col, sheet.getValue(row, col));
-      if (conditional) Object.assign(result, resolve(conditional));
+      if (conditional) levels.push(resolve(conditional));
     }
+    for (const level of levels) Object.assign(result, level);
+    /* TASK 90 round 4 (`.probe/t90/themefont.mjs`, `themefont2.mjs`, `themejson.mjs`, measured on
+     * the trial): the resolved FAMILY comes from the MOST SPECIFIC cascade level that carries a
+     * `fontFamily` or a `themeFont`. A level with a `themeFont` resolves its family THROUGH the
+     * theme even when the same style also names an explicit family - `Body` gives the theme body
+     * font name (Calibri), an unknown token passes through verbatim (`Heading` -> 'Heading',
+     * 'Whatever' -> 'Whatever'), and the resolved token stays as the result's `themeFont`. When
+     * the winning level supplies an explicit family instead, the result carries no themeFont at
+     * all (trial: row `themeFont:Heading` + cell `Verdana` -> family Verdana, themeFont null).
+     * That is why a default-style `13pt Trebuchet MS` resolves as `13pt Calibri` there: the
+     * built-in default style carries `themeFont:'Body'`. */
+    for (let i = levels.length - 1; i >= 0; i--) {
+      const level = levels[i];
+      const themeFont = level.themeFont;
+      const hasFamily = level.fontFamily !== undefined && level.fontFamily !== '';
+      const hasTheme = typeof themeFont === 'string' && themeFont !== '';
+      if (!hasFamily && !hasTheme) continue;
+      if (hasTheme) {
+        result.themeFont = themeFont;
+        result.fontFamily = themeFont === 'Body' ? (sheet._themeFonts?.()[1] ?? 'Calibri') : String(themeFont);
+      } else {
+        result.fontFamily = level.fontFamily;
+        Object.assign(result, { themeFont: undefined }); // explicit family on the winning level: the trial reports no themeFont at all
+      }
+      break;
+    }
+    // TASK 90: the resolved style reports the shorthand the merged parts compose into, never a
+    // remembered raw fragment (`font:'bold'` -> `bold 14.6667px Calibri`), like the trial.
+    recomposeFont(result);
     return result;
 }
 
@@ -163,7 +208,7 @@ export function getActualStyle(sheet: Worksheet, row: number, col: number, area 
  */
 export function fillStyleRecord(sheet: Worksheet, row: number, col: number): JsonRecord {
   const computed = asRecord(getActualStyle(sheet, row, col)) as JsonRecord;
-  const defaultFont = sheet.parent?.options.font ?? '14.6667px Calibri';
+  const defaultFont = '14.6667px Calibri'; // TASK 90 round 2: the resolved default ignores the workbook ctor `font` option (`.probe/t90/rangefont-r1.json`)
   const record: JsonRecord = {};
   if (computed.backColor != null) record.backColor = computed.backColor;
   if (computed.foreColor != null) record.foreColor = computed.foreColor;
@@ -185,6 +230,30 @@ export function _tableStyleAt(sheet: Worksheet, row: number, col: number): Style
       if (style) return style;
     }
     return null;
+}
+
+/**
+ * TASK 90 round 2 (`.probe/t90/rangefont-r1.json` / `rangefont2-r1.json`, measured on the trial):
+ * the `CellRange.themeFont()` accessor getter does NOT return the resolved actual-style member -
+ * it returns the RAW `themeFont` of the MOST SPECIFIC style level in the cascade that DEFINES one
+ * (cell own with a named-style reference resolved, then row, then column, then the area default),
+ * whatever that value is: the built-in default style's `'Body'` is reported even when the resolved
+ * actual style drops themeFont (a cell font with an explicit family), and a non-string stored value
+ * round-trips verbatim (the trial's own `getActualStyle` throws on such a value; ours tolerates
+ * it). Falls back to the resolved value when no level defines the member.
+ */
+export function _themeFontRaw(sheet: Worksheet, row: number, col: number, area = VIEW): unknown {
+  const levels: (Style | null)[] = [
+    row === -1 && col === -1 ? null : getStyle(sheet, row, col, area),
+    row >= 0 ? getStyle(sheet, row, -1, area) : null,
+    col >= 0 ? getStyle(sheet, -1, col, area) : null,
+    getDefaultStyle(sheet, area),
+  ];
+  for (const style of levels) {
+    const value = style?.themeFont;
+    if (value !== undefined) return value;
+  }
+  return getActualStyle(sheet, row, col, area).themeFont;
 }
 
 export function setStyleName(sheet: Worksheet, row: number, col: number, name: string, area = VIEW): void {

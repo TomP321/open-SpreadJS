@@ -181,3 +181,90 @@ describe('threaded comment card editor', () => {
     h.wb.destroy();
   });
 });
+
+describe('classic comment connector line (TASK 92 item 3)', () => {
+  function classic(row: number, col: number, text = 'Hello'): { wb: InstanceType<typeof Workbook>; sheet: ReturnType<InstanceType<typeof Workbook>['getActiveSheet']>; host: HTMLElement; ui: CommentUi } {
+    const host = document.createElement('div');
+    host.style.width = '640px';
+    host.style.height = '480px';
+    document.body.append(host);
+    const wb = new Workbook(host);
+    const sheet = wb.getActiveSheet();
+    sheet.comments.add(row, col, text);
+    const view = sheet._view()!;
+    // jsdom has no layout: give the renderer a measured viewport so cell rects are real.
+    Object.defineProperty(view.root, 'clientWidth', { value: 640, configurable: true });
+    Object.defineProperty(view.root, 'clientHeight', { value: 480, configurable: true });
+    view.paint();
+    const ui = view.interaction.commentUi;
+    return { wb, sheet, host, ui };
+  }
+  const svg = (host: HTMLElement): SVGSVGElement | null => host.querySelector('.gc-comment-layoutPanel svg.os-comment-connector');
+  const boxHost = (host: HTMLElement): HTMLElement => host.querySelector<HTMLElement>('.gc-comment-layoutPanel .gc-spread-host-container')!;
+
+  it('draws the connector (line + arrowhead) from the shown box corner to the cell corner', () => {
+    const { wb, host, ui } = classic(1, 1);
+    ui.reveal(1, 1);
+    const paths = svg(host)?.querySelectorAll('path') ?? [];
+    expect(paths.length).toBe(2);
+    // Line starts exactly at the comment box's top-left corner (trial: m4-comments probe).
+    const box = boxHost(host);
+    const d = paths[0].getAttribute('d')!;
+    expect(d.startsWith(`M${parseFloat(box.style.left).toFixed(1)} ${parseFloat(box.style.top).toFixed(1)}`)).toBe(true);
+    expect(paths[0].getAttribute('stroke')).toBe('#000000');
+    expect(paths[0].getAttribute('stroke-width')).toBe('1');
+    // Arrowhead: a closed filled triangle at the other (cell) end, pointing down-left.
+    const head = paths[1].getAttribute('d')!;
+    expect(head.endsWith('Z')).toBe(true);
+    expect(paths[1].getAttribute('fill')).toBe('#000000');
+    const tip = /M(-?[\d.]+)/.exec(head)![1];
+    expect(Number(tip)).toBeLessThan(parseFloat(box.style.left));
+    wb.destroy();
+  });
+
+  it('anchors the box at the trial offsets: 17 px right of the cell, 16 px above its top (TASK 98 item 3)', () => {
+    const { wb, sheet, host, ui } = classic(3, 1);
+    ui.reveal(3, 1);
+    const rect = sheet.getCellRect(3, 1);
+    const box = boxHost(host);
+    expect(parseFloat(box.style.left)).toBeCloseTo(rect.x + rect.width + 17, 6);
+    expect(parseFloat(box.style.top)).toBeCloseTo(rect.y - 16, 6);
+    // The connector runs from that box corner down to the cell's top-right corner.
+    const paths = svg(host)!.querySelectorAll('path');
+    const d = paths[0].getAttribute('d')!;
+    expect(d.startsWith(`M${parseFloat(box.style.left).toFixed(1)} ${parseFloat(box.style.top).toFixed(1)}`)).toBe(true);
+    // Arrowhead tip at the cell's top-right corner (the trial's line-canvas corner ink).
+    expect(paths[1].getAttribute('d')!.startsWith(`M${(rect.x + rect.width - 1).toFixed(1)} ${(rect.y + 2).toFixed(1)}`)).toBe(true);
+    wb.destroy();
+  });
+
+  it('keeps the connector while the box is repositioned and removes it when the box closes', () => {
+    const { wb, host, ui } = classic(2, 2);
+    ui.reveal(2, 2);
+    expect(svg(host)!.querySelectorAll('path').length).toBe(2);
+    ui.hoverOut();
+    expect(svg(host)!.querySelectorAll('path').length).toBe(0);
+    wb.destroy();
+  });
+
+  it('always-shown comments carry a connector; hiding removes it', () => {
+    const { wb, sheet, host, ui } = classic(3, 1);
+    const comment = sheet.comments.get(3, 1)!;
+    comment.displayMode(GC.Spread.Sheets.Comments.DisplayMode.alwaysShown);
+    ui.sync();
+    expect(host.querySelector('[data-os-always]')).toBeTruthy();
+    expect(svg(host)!.querySelectorAll('path').length).toBe(2);
+    comment.displayMode(GC.Spread.Sheets.Comments.DisplayMode.hoverShown);
+    ui.sync();
+    expect(svg(host)!.querySelectorAll('path').length).toBe(0);
+    wb.destroy();
+  });
+
+  it('thread cards get no connector (only classic comments do)', () => {
+    const { wb, host, ui } = classic(1, 1);
+    ui.openThread();
+    expect(host.querySelector('.os-thread-card')).toBeTruthy();
+    expect(svg(host)).toBeNull();
+    wb.destroy();
+  });
+});

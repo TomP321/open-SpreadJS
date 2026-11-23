@@ -49,6 +49,22 @@ function DesignerShell({ designer }: { designer: Designer }): React.ReactElement
         designer.openFind('replace');
         return;
       }
+      // TASK 90 A/B (trial probe `.probe/t90/ctrl-keys2-r1.json`): Ctrl+B / Ctrl+I / Ctrl+U toggle
+      // the ribbon Bold / Italic / Underline checkbox — the trial resolved `14.6667px Calibri` to
+      // `bold 14.6667px Calibri`, then `italic bold ...`, then textDecoration 1, keeping the
+      // checked state in sync (the ribbon box gained `...-checked` after each chord). We dispatch
+      // through the same command path as the checkbox click (`executeCommand(name, name, !checked)`)
+      // so the chord and the button are one and the same command.
+      if (control && !event.shiftKey && !event.altKey) {
+        const chordMap: Record<string, string | undefined> = { b: 'fontWeight', i: 'fontItalic', u: 'fontUnderline' };
+        const chord = chordMap[event.key.toLowerCase()];
+        if (chord) {
+          event.preventDefault();
+          designer.executeCommand(chord, chord, !designer.getCommandState(chord).checked);
+          designer.invalidate();
+          return;
+        }
+      }
       if (event.key !== 'F9') return;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       event.preventDefault();

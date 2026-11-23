@@ -492,16 +492,24 @@ export class ShapeBase extends FloatingObject {
   }
 
   // ------------------------------------------------------------- snapshot ----
-  /** PNG of the shape as it is painted, the trial's `toImageSrc()` data URL. */
+  /**
+   * PNG of the shape as it is painted (own canvas code, independent of the live
+   * viewport). TASK 95 measured the trial snapshot size semantics black-box
+   * (probe .probe/t95 images): the PNG covers the shape box plus the painting
+   * margin — 200x100 -> 206x106, 120x60 -> 126x65 — i.e. the shape is painted
+   * inside a (width+6) x (height+6) canvas with a 3 px inset on every side;
+   * hidden shapes are painted too (the trial returns the same image).
+   */
   toImageSrc(): string {
     const width = Number((this as ShapeBase).width()), height = Number((this as ShapeBase).height());
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return '';
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(width));
-    canvas.height = Math.max(1, Math.round(height));
+    canvas.width = Math.max(1, Math.round(width)) + 6;
+    canvas.height = Math.max(1, Math.round(height)) + 6;
     const context = canvas.getContext('2d');
     if (!context) return '';
-    this.paintTo(context, canvas.width, canvas.height);
+    context.translate(3, 3);
+    this.paintTo(context, Math.round(width), Math.round(height));
     try { return canvas.toDataURL('image/png'); } catch { return ''; }
   }
   toImageSrcAsync(): Promise<string> { return Promise.resolve(this.toImageSrc()); }

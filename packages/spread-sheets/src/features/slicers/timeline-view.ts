@@ -16,6 +16,8 @@ import type { PivotTableTimelineSlicer } from './pivot-slicer.js';
 import type { WorkbookRenderer } from '../../rendering.js';
 import type { JsonRecord } from '../../serialization.js';
 import { GC } from '../../generated/enums.js';
+import { CultureManager } from '../../culture.js';
+import { ltext } from '../../localization.js';
 
 const TimelineLevel = GC.Spread.Sheets.Slicers.TimelineLevel;
 
@@ -35,11 +37,28 @@ const SCROLL_BUTTON = 15;
 const ICON_SIZE = 16;
 
 const DAY = 86_400_000;
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const DEFAULT_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+/** Timeline month labels follow the culture's abbreviated month names (en-US: JAN..DEC). */
+let monthCacheKey = '';
+let monthCache: string[] = DEFAULT_MONTHS;
+const MONTHS = (): string[] => {
+  const key = `${CultureManager.culture()}#${CultureManager._cultureGeneration()}`;
+  if (key === monthCacheKey) return monthCache;
+  const names = CultureManager.getCultureInfo()?.DateTimeFormat.abbreviatedMonthNames ?? [];
+  const labels = names.slice(0, 12).map((name) => String(name).toUpperCase());
+  monthCache = labels.length === 12 && labels.every((name) => name) ? labels : DEFAULT_MONTHS;
+  monthCacheKey = key;
+  return monthCache;
+};
 const LEVEL_NAMES: Record<number, string> = {
   [TimelineLevel.years]: 'YEARS', [TimelineLevel.quarters]: 'QUARTERS',
   [TimelineLevel.months]: 'MONTHS', [TimelineLevel.days]: 'DAYS',
 };
+const LEVEL_KEYS: Record<number, string> = {
+  [TimelineLevel.years]: 'years', [TimelineLevel.quarters]: 'quarters',
+  [TimelineLevel.months]: 'months', [TimelineLevel.days]: 'days',
+};
+const itext = (key: string, fallback: string, ...args: (string | number)[]): string => ltext(`slicer.${key}`, fallback, ...args);
 /** Block pitch per level, measured from the trial (months: ~52.5px). */
 const BLOCK_WIDTH: Record<number, number> = {
   [TimelineLevel.years]: 172, [TimelineLevel.quarters]: 84,
@@ -99,7 +118,7 @@ function bucketLabel(start: number, level: number): string {
   switch (level) {
     case TimelineLevel.years: return String(date.getFullYear());
     case TimelineLevel.quarters: return `Q${Math.floor(date.getMonth() / 3) + 1}`;
-    case TimelineLevel.months: return MONTHS[date.getMonth()]!;
+    case TimelineLevel.months: return MONTHS()[date.getMonth()]!;
     default: return String(date.getDate());
   }
 }
@@ -109,7 +128,7 @@ function periodOf(start: number, level: number): string {
   switch (level) {
     case TimelineLevel.quarters:
     case TimelineLevel.months: return String(date.getFullYear());
-    case TimelineLevel.days: return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+    case TimelineLevel.days: return `${MONTHS()[date.getMonth()]} ${date.getFullYear()}`;
     default: return '';
   }
 }
@@ -150,7 +169,7 @@ export function timelineLayout(slicer: PivotTableTimelineSlicer, buckets: Timeli
   }
   return {
     showHeader, showLevels, showSelectionLabel, buckets, blockWidth, barLeft, barRight, first, capacity,
-    levelLabel: { x: barLeft, right: width - SIDE_MARGIN - 12, text: LEVEL_NAMES[level] ?? '' },
+    levelLabel: { x: barLeft, right: width - SIDE_MARGIN - 12, text: itext(`timeline.${LEVEL_KEYS[level] ?? 'years'}`, LEVEL_NAMES[level] ?? '') },
     selectionLabel: { x: barLeft, text: selectionText(slicer, buckets) },
     clearIcon: { x: width - SIDE_MARGIN - ICON_SIZE - 2, y: 4 },
     leftArrow: { x: SIDE_MARGIN, y: SCROLL_TOP },
@@ -165,7 +184,7 @@ function selectionText(slicer: PivotTableTimelineSlicer, buckets: TimelineBucket
   const to = slicer.selectedTo;
   const full = from === null || to === null
     || (from <= buckets[0]!.start && to >= buckets[buckets.length - 1]!.end);
-  if (full) return 'All Periods';
+  if (full) return itext('timeline.allPeriods', 'All Periods');
   const format = (time: number): string => {
     const date = new Date(time);
     return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;

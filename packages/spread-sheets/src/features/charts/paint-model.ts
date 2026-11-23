@@ -34,6 +34,12 @@ export interface PaintSeries {
   sizes?: (number | null)[];
   /** Scatter series that keep a painted connector line (trial `ln` without `noFill`). */
   hasLine?: boolean;
+  /** Raw chartSpace `c:trendline` entries on the series (TASK 92 rendering). */
+  trendlines?: JsonRecord[] | null;
+  /** Raw chartSpace `c:errBars` entries on the series (TASK 92 rendering). */
+  errBars?: JsonRecord[] | null;
+  /** Resolved scatter/bubble x-values (else the category index is the domain). */
+  dataX?: number[];
 }
 
 export interface PaintGroup {
@@ -184,6 +190,13 @@ export function buildPaintModel(chart: ChartLike, sheet: Worksheet): PaintModel 
         hasLine: group.chartType === 1
           ? !!ser.spPr?.ln && !ser.spPr.ln.noFill && Number(ser.spPr.ln.w ?? 2) > 0
           : undefined,
+        // TASK 92: carry the raw chartSpace trendline / error-bar entries and the
+        // resolved scatter x-domain into the paint model for the decoration pass.
+        trendlines: Array.isArray(ser.trendline) ? (ser.trendline as JsonRecord[])
+          : (Array.isArray(ser.trendlines) ? (ser.trendlines as JsonRecord[]) : null),
+        errBars: Array.isArray(ser.errBars) ? (ser.errBars as JsonRecord[])
+          : (ser.errBars && typeof ser.errBars === 'object' ? [ser.errBars as JsonRecord] : null),
+        dataX: (group.chartType === 1 || group.chartType === 3) && xValues.length ? xValues.map(v => v ?? 0) : undefined,
       };
     });
     // Stacked (non-percent) groups scale to the largest per-category total,

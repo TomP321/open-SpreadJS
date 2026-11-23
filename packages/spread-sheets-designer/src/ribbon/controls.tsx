@@ -8,6 +8,17 @@ import type { CommandState, IButtonGroup, ICommand, ICommandGroup, IRibbonPanel 
 import { DesignerIcon } from '../icons.js';
 import { ribbonCollapseThresholds } from '../config.js';
 import { commandOf, commandText, commandTitle, currentRibbon, isBig, openRibbonMenu, resource, useRibbonWidth } from '../app-helpers.js';
+import { localizedText } from '../resolve.js';
+import { ribbonGroupLabelResources } from './label-resources.js';
+
+/** TASK 87: group caption shown under a classic group / inside a collapsed group.
+ * The English label stays the config identity (thresholds, metrics, command ids);
+ * only the displayed text follows the loaded resource language. */
+const groupLabel = (d: Parameters<typeof resource>[0], group: IButtonGroup): string => {
+  const fallback = group.label ?? group.buttonGroupName ?? '';
+  const path = ribbonGroupLabelResources[fallback];
+  return (path ? resource(d, `\${res.${path}}`) : '') || fallback;
+};
 
 /** Inside a collapsed-group flyout the trial renders small dropdown rows with their text
  *  (e.g. "Sum" / "Fill" / "Clear" in the Editing popup); on the ribbon strip they are icon-only. */
@@ -46,14 +57,17 @@ export function ClassicGroup({ group }: { group: IButtonGroup }): React.ReactEle
   const layout = groupItems(group);
   const vertical = layout.direction === 'vertical';
   const rootClass = `gc-designer-component-container gc-designer-flex-default${vertical ? ' gc-designer-component-container-vertical' : ''}${layout.className ? ` ${layout.className}` : ''}`;
+  const label = groupLabel(d, group);
   return (
-    <div className={`gc-designer-ribbon-group${group.class ? ` ${group.class}` : ''}`} aria-label={group.label}>
+    <div className={`gc-designer-ribbon-group${group.class ? ` ${group.class}` : ''}`} aria-label={label}>
       <div className="gc-designer-ribbon-group-content">
         <div className={rootClass} data-direction={layout.direction}>
           {layout.items.map((item, index) => <ConfigNode key={nodeKey(item, index)} node={item} rootLevel />)}
         </div>
       </div>
-      <div className="gc-designer-ribbon-group-title">{group.label}</div>
+      <div className="gc-designer-ribbon-group-title">{label}</div>
+      {/* TASK 94: the trial's indicator buttons keep the raw machine name as aria-label
+        * ("indicatorFonts" in every language), matching what dialog-launcher automation sees. */}
       {group.indicator && (
         <div className="gc-designer-ribbon-group-indicator" role="button" aria-label={group.indicator} onClick={() => {
           const tabs: Record<string, string> = { indicatorFonts: 'font', indicatorAlignment: 'alignment', indicatorNumbers: 'number' };
@@ -97,6 +111,7 @@ export function CollapsedGroup({ group, panelId, suffix = '' }: { group: IButton
   // half) and keeps a flat #ebebeb fill over the whole 52x74 button - measured with the pointer
   // parked away from the button, so it is not the hover shading.
   const menuKey = `group:${panelId}:${group.label ?? ''}`;
+  const shown = groupLabel(d, group);
   const selected = d.openMenu?.command === menuKey;
   const open = (event: React.MouseEvent): void => {
     event.stopPropagation();
@@ -107,27 +122,27 @@ export function CollapsedGroup({ group, panelId, suffix = '' }: { group: IButton
     openRibbonMenu(d, `group:${panelId}:${group.label ?? ''}`, anchor, owner);
   };
   return (
-    <div className="gcd-ribbon-group" aria-label={group.label} style={{ width: metrics.width, flex: `0 0 ${metrics.width}px` }}>
+    <div className="gcd-ribbon-group" aria-label={shown} style={{ width: metrics.width, flex: `0 0 ${metrics.width}px` }}>
       <div
         className={`gc-designer-ribbon-list gc-designer-ribbon-list-large${selected ? ' gc-designer-ribbon-list-selected' : ''}`}
         style={{ width: listWidth, minWidth: listWidth, maxWidth: listWidth, height: metrics.height }}
         data-buttontype="dropdown"
         data-command={commandId}
-        aria-label={group.label}
+        aria-label={shown}
         aria-haspopup="true"
-        title={group.label}
+        title={shown}
         role="button"
         aria-disabled="true"
         tabIndex={-1}
         onClick={open}
       >
-        <div role="button" className="gc-designer-ribbon-list-hover-item ribbon-split-btn" aria-label={group.label}>
+        <div role="button" className="gc-designer-ribbon-list-hover-item ribbon-split-btn" aria-label={shown}>
           <div className="gc-designer-ribbon-list-icon">
             <div className={`gc-designer-ribbon-icon ${group.thumbnailClass ?? ''}`}><DesignerIcon className={group.thumbnailClass} size={24} /></div>
           </div>
         </div>
         <div role="button" className="gc-designer-ribbon-list-hover-item dropdown-btn" aria-haspopup="true" aria-disabled="false" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); (event.currentTarget as HTMLElement).click(); } }}>
-          <div className="gc-designer-ribbon-text" style={metrics.twoLine ? { maxWidth: 52 } : undefined}>{group.label}</div>
+          <div className="gc-designer-ribbon-text" style={metrics.twoLine ? { maxWidth: 52 } : undefined}>{shown}</div>
           <div className="ribbon-button-thumbnail-group-icon ribbon-custom-triangle-1-s" />
         </div>
       </div>
@@ -175,7 +190,7 @@ function ShapeStylesMoreSpinner(): React.ReactElement {
     openRibbonMenu(d, 'shapeStylesMore', new DOMRect(rect.left, rect.bottom, 0, 0), owner);
   };
   return (
-    <div className="gc-shape-style-spinner" role="button" aria-label="Shape Styles" aria-haspopup="true" data-buttontype="dropdown" data-command="ribbon.shapeStylesMore" onClick={open}>
+    <div className="gc-shape-style-spinner" role="button" aria-label={resource(d, '${res.ribbon.commands.shapeStylesMore}') || 'Shape Styles'} aria-haspopup="true" data-buttontype="dropdown" data-command="ribbon.shapeStylesMore" onClick={open}>
       <span className="gc-shape-style-arrow" aria-hidden="true" />
       <span className="gc-shape-style-arrow gc-shape-style-arrow-down" aria-hidden="true" />
     </div>
@@ -265,7 +280,7 @@ export function ThemeSettingControl({ title }: { title: string }): React.ReactEl
     <div className="gc-designer-combo-container gc-theme-setting-icon" role="combobox" tabIndex={-1} title={title} aria-label={title} data-command="ribbon.ThemeSetting" onClick={() => d.executeCommand('ThemeSetting')}>
       <div className="gc-theme-setting-icon-container">
         <div className="gc-theme-setting-icon-border"><DesignerIcon className="ribbon-thumbnail-themes" size={30} /></div>
-        <div className="gc-theme-setting-icon-text">Themes</div>
+        <div className="gc-theme-setting-icon-text">{resource(d, '${res.ribbon.commands.ThemeSetting}') || title || 'Themes'}</div>
         <div className="gc-designer-ribbon-list-triangle" />
       </div>
     </div>
@@ -277,7 +292,7 @@ export function ThemeSubControl({ name, title }: { name: string; title: string }
   return (
     <div className={`gc-designer-combo-container ${name === 'ThemeColors' ? 'gc-theme-color-icon' : 'gc-theme-font-icon'}`} role="combobox" tabIndex={-1} title={title} aria-label={title} data-command={`ribbon.${name}`} onClick={() => d.executeCommand(name)}>
       <div className="gc-theme-sub-icon"><DesignerIcon className={name === 'ThemeColors' ? 'ribbon-thumbnail-themes' : 'ribbon-button-textfunction'} size={16} /></div>
-      <div className="gc-theme-sub-text">{name === 'ThemeColors' ? 'Colors' : 'Fonts'}</div>
+      <div className="gc-theme-sub-text">{resource(d, name === 'ThemeColors' ? '${res.ribbon.commands.ThemeColorsText}' : '${res.ribbon.commands.ThemeFontsText}') || (name === 'ThemeColors' ? 'Colors' : 'Fonts')}</div>
       <div className="gc-designer-ribbon-list-triangle" />
     </div>
   );
@@ -328,6 +343,17 @@ export function BigCommandButton({ name, command, title, text, disabled }: { nam
     pivotTableChangeDataSource: ['Change Data', 'Source'],
   };
   const lines = captionLines[name]?.join(' ') === text ? captionLines[name] : undefined;
+  // TASK 87: language packages bring longer captions than the trial measured the
+  // slot for. When the caption ink clearly exceeds the button (hysteresis so the
+  // few-pixel English overflows keep their trial-measured layout), allow the
+  // caption to wrap inside the button instead of overlapping its neighbours.
+  const captionRef = React.useRef<HTMLDivElement | null>(null);
+  const [captionWide, setCaptionWide] = React.useState(false);
+  React.useEffect(() => {
+    const el = captionRef.current;
+    if (!el) return;
+    setCaptionWide(el.scrollWidth > el.clientWidth + 8);
+  }, [text]);
   // The trial tags its Command Palette trigger with its own class so it can be styled
   // and addressed separately from the other big buttons.
   const extra = name === 'commandPaletteButton' ? ' gc-command-palette-trigger-button' : '';
@@ -346,13 +372,23 @@ export function BigCommandButton({ name, command, title, text, disabled }: { nam
       <div className="gc-designer-ribbon-button-icon">
         <div className={`gc-designer-ribbon-icon ${command.iconClass ?? ''}`}><DesignerIcon className={command.iconClass} size={24} /></div>
       </div>
-      <div className="gc-designer-ribbon-text gc-designer-fixed-caption">{lines ? lines.map((line, i) => <span key={i}>{line}{i === 0 ? ' ' : ''}</span>) : text}</div>
+      <div ref={captionRef} className={`gc-designer-ribbon-text gc-designer-fixed-caption${captionWide ? ' gc-designer-fixed-caption-wrap' : ''}`}>{lines ? lines.map((line, i) => <span key={i}>{line}{i === 0 ? ' ' : ''}</span>) : text}</div>
     </div>
   );
 }
 
 export function HorizontalCommandButton({ name, command, title, text, disabled }: { name: string; command: ICommand; title: string; text: string; disabled: boolean }): React.ReactElement {
   const d = useDesigner();
+  // TASK 87: long captions from language packages may exceed the English trial's
+  // measured slot; then the button grows to fit instead of clipping. English
+  // captions always fit, so the layout stays pixel-identical.
+  const buttonRef = React.useRef<HTMLDivElement | null>(null);
+  const [grow, setGrow] = React.useState(false);
+  React.useEffect(() => {
+    const el = buttonRef.current;
+    if (!el) return;
+    setGrow(el.scrollWidth > el.clientWidth + 2);
+  }, [text]);
   return (
     <div
       className={`gc-designer-ribbon-button gc-designer-ribbon-button-horizontal gc-designer-ribbon-text-button${disabled ? ' gc-designer-ribbon-button-disable' : ''}`}
@@ -362,7 +398,8 @@ export function HorizontalCommandButton({ name, command, title, text, disabled }
       aria-disabled={disabled}
       data-command={`ribbon.${name}`}
       tabIndex={0}
-      style={command.maxWidth ? { width: command.maxWidth, minWidth: command.maxWidth, flex: '0 0 auto' } : undefined}
+      ref={buttonRef}
+      style={command.maxWidth && !grow ? { width: command.maxWidth, minWidth: command.maxWidth, flex: '0 0 auto' } : undefined}
       onClick={() => { if (!disabled) { d.executeCommand(name, name); d.invalidate(); } }}
     >
       <div className="gc-designer-ribbon-button-icon">
@@ -377,9 +414,18 @@ export function CheckBoxControl({ name, command, state, title, text, disabled }:
   const d = useDesigner();
   const withText = !!text && (name === 'wrapText' || isBig(d, command) || command.type === 'checkbox');
   const big = isBig(d, command);
+  // TASK 87: same grow-to-fit rule as HorizontalCommandButton (English fits).
+  const cbRef = React.useRef<HTMLLabelElement | null>(null);
+  const [cbGrow, setCbGrow] = React.useState(false);
+  React.useEffect(() => {
+    const el = cbRef.current;
+    if (!el) return;
+    setCbGrow(el.scrollWidth > el.clientWidth + 2);
+  }, [text, withText]);
   return (
     <label
-      style={command.maxWidth ? { width: command.maxWidth, minWidth: command.maxWidth, maxWidth: command.maxWidth, flex: '0 0 auto' } : undefined}
+      ref={cbRef}
+      style={command.maxWidth && !cbGrow ? { width: command.maxWidth, minWidth: command.maxWidth, maxWidth: command.maxWidth, flex: '0 0 auto' } : undefined}
       className={`gc-designer-ribbon-check-box${big ? ' gc-designer-ribbon-check-box-large' : ''}${withText ? ' gc-designer-ribbon-check-box-icon-text-both' : ' gc-designer-ribbon-check-box-only-icon'}${state.checked ? ' gc-designer-ribbon-check-box-checked' : ''}${disabled ? ' gc-designer-ribbon-button-disable' : ''} gc-designer-ribbon-check-box-custom-icon${command.iconClass ? '' : ' gc-designer-ribbon-check-box-text-only'}`}
       data-buttontype="checkbox"
       role="checkbox"
@@ -432,9 +478,9 @@ export function ComboBoxControl({ name, command, state, title, editable }: { nam
   const [local, setLocal] = useState('');
   const [editing, setEditing] = useState(false);
   const value = state.value ?? '';
-  const display = editing ? local : String(value ?? '');
   const width = command.comboWidth ?? (name === 'fontSize' ? 33 : 100);
   const printSize = name === 'fitPageWidth' || name === 'fitPageTall';
+  const display = editing ? local : (printSize ? localizedText(d.resources, String(value ?? ''), 'ribbon.commandTexts') : name === 'ribbonNumberFormat' ? (state.text || String(value ?? '')) : String(value ?? ''));
   const open = (event?: React.MouseEvent): void => {
     const combo = ((event?.currentTarget as HTMLElement | undefined)?.closest('.gc-designer-ribbon-comboBox')) as HTMLElement | null;
     const rect = combo?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0);
@@ -630,10 +676,11 @@ export function DropdownControl({ name, node }: { name: string; node?: ICommandG
 /* Toolbar mode ----------------------------------------------------------- */
 
 export function ToolbarPanel({ panel }: { panel: IRibbonPanel }): React.ReactElement {
+  const d = useDesigner();
   return (
     <>
       {panel.buttonGroups.map((group, index) => <ToolbarGroup key={index} group={group} />)}
-      <div className="gc-designer-ribbon-toolbar-overflow" role="button" aria-label="More Options" onClick={() => { /* overflow is represented by the groups */ }}>
+      <div className="gc-designer-ribbon-toolbar-overflow" role="button" aria-label={resource(d, '${res.ribbon.menus.moreOptions}') || 'More Options'} onClick={() => { /* overflow is represented by the groups */ }}>
         <span>⋯</span>
       </div>
     </>

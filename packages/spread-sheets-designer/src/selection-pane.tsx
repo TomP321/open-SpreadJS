@@ -2,6 +2,10 @@ import React, { useRef, useState } from 'react';
 import { useDesigner, useDesignerVersion } from './store.js';
 import { shapesOf, type Worksheet } from './core-internals.js';
 import { type SelectableObject } from './app-helpers.js';
+import { resolveText } from './resolve.js';
+
+/** TASK 87: panel captions (`panels` subtree). */
+const P = (designer: { resources: Record<string, unknown> }, key: string, en: string): string => resolveText(`\${res.panels.${key}}`, designer.resources) || en;
 
 /* Selection Pane ------------------------------------------------------------ */
 
@@ -54,14 +58,14 @@ export function SelectionPanePanel(): React.ReactElement {
   };
   return (
     <div className="gc-designer-panel gc-designer-selection-pane gc-designer-dock-panel" data-open="true">
-      <div className="gc-designer-panel-dialog-close-button-container" title="Close" onClick={close}>
+      <div className="gc-designer-panel-dialog-close-button-container" title={P(d, 'close', 'Close')} onClick={close}>
         <div className="gc-designer-panel-dialog-close-button-image">×</div>
       </div>
       <div className="gc-designer-selection-side-panel gc-designer-component-container">
-        <div className="gc-designer-panel-title"><div className="gc-designer-text">Selection</div></div>
+        <div className="gc-designer-panel-title"><div className="gc-designer-text">{P(d, 'selection', 'Selection')}</div></div>
         <div className="gc-tab-selection-buttons gc-designer-component-container">
-          <div className="gc-tab-selection-pane-show"><button type="button" className="gc-image-button" onClick={() => toggleAll(true)}><span className="button-text">Show All</span></button></div>
-          <div className="gc-tab-selection-pane-hide"><button type="button" className="gc-image-button" onClick={() => toggleAll(false)}><span className="button-text">Hide All</span></button></div>
+          <div className="gc-tab-selection-pane-show"><button type="button" className="gc-image-button" onClick={() => toggleAll(true)}><span className="button-text">{P(d, 'showAll', 'Show All')}</span></button></div>
+          <div className="gc-tab-selection-pane-hide"><button type="button" className="gc-image-button" onClick={() => toggleAll(false)}><span className="button-text">{P(d, 'hideAll', 'Hide All')}</span></button></div>
           <div className="gc-tab-selection-pane-up"><button type="button" className="gc-image-button" title="△" onClick={() => { for (const item of items) if (item.isSelected()) move(item, 1); }}><span className="button-text">△</span></button></div>
           <div className="gc-tab-selection-pane-down"><button type="button" className="gc-image-button" title="▽" onClick={() => { for (const item of items) if (item.isSelected()) move(item, -1); }}><span className="button-text">▽</span></button></div>
         </div>
@@ -95,7 +99,7 @@ export function SelectionPanePanel(): React.ReactElement {
                   )}
                   <div
                     className="gc-designer-shape-node-visible-button"
-                    title={visible ? 'Hide' : 'Show'}
+                    title={visible ? P(d, 'hide', 'Hide') : P(d, 'show', 'Show')}
                     onClick={(event) => { event.stopPropagation(); item.isVisible(!visible); deselectAll(); d.invalidate(); }}
                   >
                     <SelectionEyeIcon visible={visible} />

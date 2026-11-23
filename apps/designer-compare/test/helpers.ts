@@ -5,10 +5,10 @@ import pixelmatch from 'pixelmatch';
 
 export type Side = 'official' | 'ours';
 
-export async function boot(page: Page, side: Side): Promise<void> {
+export async function boot(page: Page, side: Side, query = ''): Promise<void> {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(`/?side=${side}&embed=1`, { waitUntil: 'networkidle' });
+  await page.goto(`/?side=${side}&embed=1${query}`, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => (window as any).__designerCompare?.ready === true, null, { timeout: 30_000 });
   await page.waitForTimeout(250);
   if (errors.length) throw new Error(`${side} page errors: ${errors.join('\n')}`);

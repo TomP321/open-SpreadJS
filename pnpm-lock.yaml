@@ -135,6 +135,9 @@ importers:
       '@opensheets/spread-sheets-designer-resources-en':
         specifier: workspace:*
         version: link:../../packages/spread-sheets-designer-resources-en
+      '@opensheets/spread-sheets-designer-resources-it':
+        specifier: workspace:*
+        version: link:../../packages/spread-sheets-designer-resources-it
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -383,6 +386,12 @@ importers:
         specifier: workspace:@opensheets/spread-sheets-designer@*
         version: link:../spread-sheets-designer
 
+  packages/spread-sheets-designer-resources-it:
+    devDependencies:
+      '@mescius/spread-sheets-designer':
+        specifier: workspace:@opensheets/spread-sheets-designer@*
+        version: link:../spread-sheets-designer
+
   packages/spread-sheets-ganttsheet:
     devDependencies:
       '@mescius/spread-sheets':
@@ -448,6 +457,12 @@ importers:
         version: 18.3.1(react@18.3.1)
 
   packages/spread-sheets-reportsheet-addon:
+    devDependencies:
+      '@mescius/spread-sheets':
+        specifier: workspace:@opensheets/spread-sheets@*
+        version: link:../spread-sheets
+
+  packages/spread-sheets-resources-it:
     devDependencies:
       '@mescius/spread-sheets':
         specifier: workspace:@opensheets/spread-sheets@*

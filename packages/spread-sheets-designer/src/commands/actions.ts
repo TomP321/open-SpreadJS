@@ -77,8 +77,8 @@ export function applyBuiltin(d: Designer, name: string, args: Record<string, unk
   switch (name) {
     case 'fontWeight': setBold(d, args.value ?? false); return;
     case 'fontItalic': setItalic(d, args.value ?? false); return;
-    case 'fontUnderline': setUnderline(d); return;
-    case 'fontDoubleUnderline': setDoubleUnderline(d); return;
+    case 'fontUnderline': setUnderline(d, args.value); return;
+    case 'fontDoubleUnderline': setDoubleUnderline(d, args.value); return;
     /* Trial (TASK 75 sweep): the font combo setters apply the chosen value; a bare
      * execute (no value) is a no-op. The size steppers walk the ribbon size list
      * starting at the rounded current point size. */

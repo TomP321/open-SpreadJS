@@ -2,11 +2,12 @@ import { applyMask, applyMaskInfo, type MaskOptions } from './features/input-mas
 import { applyInsets, hitButton, parseInsets, type ButtonRect } from './features/cell-extras.js';
 import { filterMenu } from './features/filter-menu.js';
 import { compactMenu, renderMenu, type MenuItemData } from './features/context-menu.js';
+import { ltext } from './localization.js';
 import { CommentUi } from './comment-ui.js';
 import { HideRowFilter, type RowFilterBase } from './features/filters.js';
 import type { WorkbookRenderer } from './rendering.js';
 import type { Worksheet } from './worksheet.js';
-import { Range } from './primitives.js';
+import { Range, Style } from './primitives.js';
 import { adjustFormula } from './range.js';
 import { Events } from './events.js';
 import { notImplemented } from './not-implemented.js';
@@ -19,6 +20,9 @@ import { columnLabel } from './rendering.js';
 import { TableSheet } from './tablesheet/index.js';
 import { commandConstants } from './command-constants.js';
 import { GC } from './generated/enums.js';
+
+/** Items one wheel event moves, the trial's fixed step (see the wheel handler: TASK 90 C). */
+const WHEEL_ITEMS = 3;
 
 export function encodeTSV(rows: unknown[][]): string {
   return rows.map(row => row.map(value => {
@@ -78,7 +82,7 @@ export class Interaction {
   private pointDragging = false;
   private formulaBar?: HTMLElement;
   private cut = false;
-  private clipboard?: { sheet: Worksheet; range: Range; values: unknown[][] };
+  private clipboard?: { sheet: Worksheet; range: Range; values: unknown[][]; formulas: unknown[][]; styles: (Style | null)[][] };
   private menu?: HTMLElement;
   private ants?: ReturnType<typeof setInterval>;
   private tabDrag?: number;
@@ -107,13 +111,25 @@ export class Interaction {
     root.addEventListener('wheel', event => {
       event.preventDefault();
       if (event.ctrlKey && view.workbook.options.allowUserZoom) {
-        const s = view.sheet!, oldZoomFactor = s.zoom(), newZoomFactor = Math.max(0.1, Math.min(4, Math.round((oldZoomFactor + (event.deltaY > 0 ? -0.1 : 0.1)) * 10) / 10));
+        /* TASK 90 round 4 (`.probe/t90/zoomwheel.mjs`): the trial steps zoom by a FIXED 0.15 per
+         * Ctrl+wheel event - independent of the notch size (deltaY 30, 60, 120 and 300 all give
+         * 1 -> 1.15 -> 1.3 -> 1.45 ...), clamped to its 0.1..4 range. */
+        const s = view.sheet!, oldZoomFactor = s.zoom(), newZoomFactor = Math.max(0.1, Math.min(4, Math.round((oldZoomFactor + (event.deltaY > 0 ? -0.15 : 0.15)) * 100) / 100));
         const info = { sheet: s, oldZoomFactor, newZoomFactor, cancel: false };
         s._emit(Events.ViewZooming, info);
         if (!info.cancel) { s.zoom(newZoomFactor); s._emit(Events.ViewZoomed, info); }
       } else {
-        const scale = event.deltaMode === 1 ? 20 : event.deltaMode === 2 ? view.viewHeight : 1;
-        view.scroll((event.shiftKey ? 0 : event.deltaY) * scale / view.zoom, (event.deltaX + (event.shiftKey ? event.deltaY : 0)) * scale / view.zoom);
+        /* TASK 90 C: the trial steps whole items per wheel event (3 rows, 3 columns), whatever the
+         * delta magnitude or mode (measured `.probe/t90/wheel3-r1.json`, both with the default 20px
+         * rows and with explicit 40px rows / 120px columns, at zoom 1, 1.5 and 4). The pixel
+         * formula below it replaces ignored the small deltas a touchpad sends: deltaY 1, 4 and 20
+         * scrolled nothing at all, which is the reported "the mouse wheel / touchpad does not
+         * scroll". Shift+wheel and deltaX move sideways, like the trial. */
+        const step = event.shiftKey ? Math.sign(event.deltaY) : 0;
+        const rows = event.shiftKey ? 0 : Math.sign(event.deltaY);
+        const columns = step || Math.sign(event.deltaX);
+        if (rows) view.scrollItems(true, rows * WHEEL_ITEMS);
+        if (columns) view.scrollItems(false, columns * WHEEL_ITEMS);
       }
     }, { passive: false, signal });
     root.addEventListener('copy', event => this.copy(event, false), { signal });
@@ -790,7 +806,7 @@ export class Interaction {
       const info = { ...this.info(drag.start), [row ? 'rowList' : 'colList']: [index], header: false, newSize: size, cancel: false };
       s._emit(row ? Events.RowHeightChanging : Events.ColumnWidthChanging, info);
       if (!info.cancel) { if (row) s.setRowHeight(index, size); else s.setColumnWidth(index, size); }
-      if (this.view.workbook.options.showResizeTip) this.view.overlay.title = `${row ? 'Height' : 'Width'}: ${Math.round(size)} pixels`;
+      if (this.view.workbook.options.showResizeTip) this.view.overlay.title = row ? ltext('status.heightTip', 'Height: {0} pixels', Math.round(size)) : ltext('status.widthTip', 'Width: {0} pixels', Math.round(size));
       return;
     }
     if (y > this.view.viewHeight - 10) this.view.scroll(20, 0); else if (y < this.view.headerHeight) this.view.scroll(-20, 0);
@@ -937,7 +953,7 @@ export class Interaction {
     menu.classList.add('opensheets-sheet-list');
     const wrapper = document.createElement('div'); wrapper.className = 'opensheets-sheet-search';
     Object.assign(wrapper.style, { position: 'absolute', zIndex: '10', left: '80px', bottom: '17px' });
-    const label = document.createElement('label'); label.textContent = hidden ? 'Unhide Sheet:' : 'Active Sheet:';
+    const label = document.createElement('label'); label.textContent = hidden ? ltext('sheets.unhideSheet', 'Unhide Sheet:') : ltext('sheets.activeSheet', 'Active Sheet:');
     const search = document.createElement('input'); search.setAttribute('aria-label', label.textContent);
     search.addEventListener('input', () => { for (const item of menu.children) { const element = item as HTMLElement; element.hidden = !element.textContent?.toLowerCase().includes(search.value.toLowerCase()); } });
     menu.style.maxHeight = `${this.view.viewHeight - 80}px`; menu.style.overflow = 'auto';
@@ -973,7 +989,18 @@ export class Interaction {
     const escape = (value: unknown) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
     event?.clipboardData?.setData('text/plain', text);
     event?.clipboardData?.setData('text/html', '<table>' + values.map(row => '<tr>' + row.map(value => `<td>${escape(value)}</td>`).join('') + '</tr>').join('') + '</table>');
-    event?.preventDefault(); this.clipboard = { sheet: s, range, values }; this.cut = cut; this.view.copiedRange = range;
+    event?.preventDefault();
+    const formulas = s.getArray(range.row, range.col, range.rowCount, range.colCount, true);
+    const styles: (Style | null)[][] = [];
+    for (let r = 0; r < range.rowCount; r++) {
+      const rowStyles: (Style | null)[] = [];
+      for (let c = 0; c < range.colCount; c++) {
+        const style = s.getStyle(range.row + r, range.col + c);
+        rowStyles.push(style instanceof Style ? style.clone() : style ?? null);
+      }
+      styles.push(rowStyles);
+    }
+    this.clipboard = { sheet: s, range, values, formulas, styles }; this.cut = cut; this.view.copiedRange = range;
     if (this.ants) clearInterval(this.ants);
     this.ants = setInterval(() => this.view.drawSelection(), 120);
     s._emit(Events.ClipboardChanged, { ...info, copyData: text }); this.view.drawSelection();
@@ -1010,6 +1037,81 @@ export class Interaction {
       this.undoableMutation('clipboardPaste', [source, range], () => { if (this.cut) s.moveTo(source.row, source.col, row, col, source.rowCount, source.colCount); else s.copyTo(source.row, source.col, row, col, source.rowCount, source.colCount); });
       if (this.cut) this.clearCopy();
     } else this.batchValues(range, (r, c) => this.parseText(values[r - row]?.[c - col] ?? '', r, c));
+    s._userSetSelection(range.row, range.col, range.rowCount, range.colCount);
+    s._emit(Events.ClipboardPasted, info);
+  }
+  /**
+   * Context-menu paste options (`pasteFormula`, `pasteFormatting`,
+   * `pasteValuesFormatting`, `pasteFormulaFormatting`): apply the matching
+   * subset of the internal clipboard snapshot at the active cell. Same-sheet
+   * formulas are re-based to the paste position; values are pasted without the
+   * formula for the values-only variants (trial Paste Options behaviour).
+   */
+  pasteSpecial(option: 'pasteFormula' | 'pasteFormatting' | 'pasteValuesFormatting' | 'pasteFormulaFormatting'): void {
+    const s = this.view.sheet!, clip = this.clipboard;
+    if (!clip) return; // the trial needs its internal clipboard state for these items
+    const withFormula = option === 'pasteFormula' || option === 'pasteFormulaFormatting';
+    const withStyle = option === 'pasteFormatting' || option === 'pasteValuesFormatting' || option === 'pasteFormulaFormatting';
+    const row = s.getActiveRowIndex(), col = s.getActiveColumnIndex();
+    if (!s._isEditableCell(row, col)) return;
+    const rowCount = Math.min(clip.range.rowCount, s.getRowCount() - row), colCount = Math.min(clip.range.colCount, s.getColumnCount() - col);
+    if (rowCount <= 0 || colCount <= 0) return;
+    const range = new Range(row, col, rowCount, colCount);
+    const info = { ...this.info(range), cellRange: range, pasteData: { text: '' }, cancel: false };
+    s._emit(Events.ClipboardPasting, info); if (info.cancel) return;
+    const sameSheet = clip.sheet === s;
+    const snapshot = () => {
+      const rows: { f: unknown; v: unknown; st: Style | null }[][] = [];
+      for (let r = 0; r < rowCount; r++) {
+        const line: { f: unknown; v: unknown; st: Style | null }[] = [];
+        for (let c = 0; c < colCount; c++) {
+          const cellRow = range.row + r, cellCol = range.col + c;
+          const style = s.getStyle(cellRow, cellCol);
+          line.push({ f: s.getFormula(cellRow, cellCol), v: s.getValue(cellRow, cellCol), st: style instanceof Style ? style.clone() : style ?? null });
+        }
+        rows.push(line);
+      }
+      return rows;
+    };
+    const restore = (rows: { f: unknown; v: unknown; st: Style | null }[][]) => {
+      for (let r = 0; r < rowCount; r++) for (let c = 0; c < colCount; c++) {
+        const cellRow = range.row + r, cellCol = range.col + c, { f, v, st } = rows[r][c];
+        if (typeof f === 'string' && f) { s.setFormula(cellRow, cellCol, f); s._setCalculatedValue(cellRow, cellCol, v); }
+        else { s.setFormula(cellRow, cellCol, null); s.setValue(cellRow, cellCol, v ?? null); }
+        s.setStyle(cellRow, cellCol, st);
+      }
+    };
+    const before = snapshot();
+    this.view.workbook.suspendPaint(); s.suspendCalcService();
+    try {
+      for (let r = 0; r < rowCount; r++) for (let c = 0; c < colCount; c++) {
+        const cellRow = range.row + r, cellCol = range.col + c;
+        const sourceRow = clip.range.row + r, sourceCol = clip.range.col + c;
+        if (withFormula) {
+          const formula = clip.sheet.getFormula(sourceRow, sourceCol);
+          if (typeof formula === 'string' && formula) {
+            if (sameSheet) s.setFormula(cellRow, cellCol, adjustFormula(formula, cellRow - sourceRow, cellCol - sourceCol));
+            else { s.setFormula(cellRow, cellCol, formula); s._setCalculatedValue(cellRow, cellCol, clip.values[r][c]); }
+          }
+          else { s.setFormula(cellRow, cellCol, null); s.setValue(cellRow, cellCol, clip.values[r][c] ?? null); }
+        }
+        else if (option !== 'pasteFormatting') { s.setFormula(cellRow, cellCol, null); s.setValue(cellRow, cellCol, clip.values[r][c] ?? null); }
+        if (withStyle) {
+          const style = clip.styles[r][c];
+          s.setStyle(cellRow, cellCol, style instanceof Style ? style.clone() : style);
+        }
+      }
+    } finally { s.resumeCalcService(); this.view.workbook.resumePaint(); }
+    const after = snapshot();
+    let first = true;
+    const wb = this.view.workbook;
+    wb.commandManager().register('clipboardPaste', { canUndo: true, execute: (_ctx, _opts, undo) => {
+      if (first) { first = false; return true; }
+      wb.suspendPaint(); s.suspendCalcService();
+      try { restore(undo ? before : after); } finally { s.resumeCalcService(); wb.resumePaint(); }
+      return true;
+    } });
+    wb.commandManager().execute({ cmd: 'clipboardPaste' });
     s._userSetSelection(range.row, range.col, range.rowCount, range.colCount);
     s._emit(Events.ClipboardPasted, info);
   }
@@ -1149,7 +1251,7 @@ export class Interaction {
     switch (action) {
       case 'copy': document.execCommand('copy'); return;
       case 'cut': document.execCommand('cut'); return;
-      case 'pasteFormula': case 'pasteFormatting': case 'pasteValuesFormatting': case 'pasteFormulaFormatting': console.warn(`NotImplemented: ContextMenu.${action}`); return;
+      case 'pasteFormula': case 'pasteFormatting': case 'pasteValuesFormatting': case 'pasteFormulaFormatting': this.pasteSpecial(action); return;
       case 'pasteAll': case 'pasteValues':
         if (this.clipboard) this.pasteValues(this.clipboard.values.map(row => row.map(v => v == null ? '' : String(v))));
         else void navigator.clipboard?.readText().then(text => this.pasteValues(decodeTSV(text))); return;

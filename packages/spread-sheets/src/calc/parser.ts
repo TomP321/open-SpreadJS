@@ -17,6 +17,7 @@ import {
   type TokenType,
 } from './lexer.js';
 import { FormulaParseError } from './errors.js';
+import { getActiveCalcLanguagePackage, type LanguagePackage } from './language-packages.js';
 import type {
   ArrayNode,
   AstNode,
@@ -94,10 +95,33 @@ export class Parser {
   private index = 0;
   private readonly text: string;
   private readonly r1c1: boolean;
+  private readonly language: LanguagePackage | undefined;
   constructor(text: string, options: LexOptions = {}) {
     this.text = text;
     this.r1c1 = Boolean(options.r1c1);
+    this.language = options.language;
     this.tokens = new Lexer(text, options).tokenize();
+  }
+  /** ',' always separates; with an active package ';' separates too (its list separator). */
+  private isArgumentSeparator(token: Token): boolean {
+    if (token.type === 'comma') return true;
+    return this.language !== undefined && token.type === 'semicolon';
+  }
+  /** Token type that closes one array-constant row (English ';', ';' cultures '\'). */
+  private isArrayRowSeparator(token: Token): boolean {
+    return this.language && this.language.arrayGroupSeparator === '\\'
+      ? token.type === 'backslash'
+      : token.type === 'semicolon';
+  }
+  /** TRUE/FALSE always; the package literals (VERO/FALSO) additionally. */
+  private booleanLiteral(text: string): boolean | undefined {
+    if (/^TRUE$/i.test(text)) return true;
+    if (/^FALSE$/i.test(text)) return false;
+    if (this.language) {
+      if (text.toUpperCase() === this.language.trueValue.toUpperCase()) return true;
+      if (text.toUpperCase() === this.language.falseValue.toUpperCase()) return false;
+    }
+    return undefined;
   }
   parseFormula(): AstNode {
     const node = this.parseExpression(0, true);
@@ -131,16 +155,16 @@ export class Parser {
       } else if (token.type === 'op' && BINARY_PRECEDENCE[token.text] !== undefined) {
         precedence = BINARY_PRECEDENCE[token.text]!;
         operator = token.text;
-      } else if (allowUnion && token.type === 'comma') {
+      } else if (allowUnion && this.isArgumentSeparator(token)) {
         precedence = UNION_PRECEDENCE;
-        operator = ',';
+        operator = 'union';
       }
       if (!operator || precedence < minPrecedence) break;
       if (operator !== ' ') this.next();
-      if (operator === ',') {
+      if (operator === 'union') {
         const parts = [left];
         parts.push(this.parseExpression(UNION_PRECEDENCE + 0.1, false));
-        while (this.peek().type === 'comma') {
+        while (this.isArgumentSeparator(this.peek())) {
           this.next();
           parts.push(this.parseExpression(UNION_PRECEDENCE + 0.1, false));
         }
@@ -239,11 +263,13 @@ export class Parser {
         this.next();
         const name = token.text;
         if (this.peek().type === 'lparen') {
-          return { kind: 'function', name: name.toUpperCase(), args: this.parseArguments() };
+          // Localized names resolve to the canonical English name; unknown names stay verbatim
+          // (displayed unchanged, #NAME? at evaluation), like the official engine.
+          const canonical = this.language?.functionToEnglish(name) ?? name.toUpperCase();
+          return { kind: 'function', name: canonical, args: this.parseArguments() };
         }
-        if (!this.r1c1 && /^(TRUE|FALSE)$/i.test(name)) {
-          return { kind: 'boolean', value: name.toUpperCase() === 'TRUE' };
-        }
+        const boolean = !this.r1c1 ? this.booleanLiteral(name) : undefined;
+        if (boolean !== undefined) return { kind: 'boolean', value: boolean };
         return { kind: 'name', name };
       }
       case 'structured': {
@@ -290,7 +316,7 @@ export class Parser {
       return args;
     }
     for (;;) {
-      if (this.peek().type === 'comma') {
+      if (this.isArgumentSeparator(this.peek())) {
         args.push({ kind: 'missing' });
         this.next();
         continue;
@@ -301,7 +327,7 @@ export class Parser {
         break;
       }
       args.push(this.parseExpression(0, false));
-      if (this.peek().type === 'comma') {
+      if (this.isArgumentSeparator(this.peek())) {
         this.next();
         if (this.peek().type === 'rparen') {
           args.push({ kind: 'missing' });
@@ -322,11 +348,11 @@ export class Parser {
     for (;;) {
       row.push(this.parseArrayElement());
       const token = this.peek();
-      if (token.type === 'comma') {
+      if (this.isArgumentSeparator(token)) {
         this.next();
         continue;
       }
-      if (token.type === 'semicolon') {
+      if (this.isArrayRowSeparator(token)) {
         this.next();
         rows.push(row);
         row = [];
@@ -359,9 +385,10 @@ export class Parser {
       this.next();
       return { kind: 'error', value: token.value as string };
     }
-    if (token.type === 'ident' && /^(TRUE|FALSE)$/i.test(token.text)) {
+    const boolean = this.booleanLiteral(token.text);
+    if (token.type === 'ident' && boolean !== undefined) {
       this.next();
-      return { kind: 'boolean', value: token.text.toUpperCase() === 'TRUE' };
+      return { kind: 'boolean', value: boolean };
     }
     throw new FormulaParseError('Invalid array element', token.start, this.text);
   }
@@ -436,6 +463,44 @@ export function parseFormula(formula: string, options: LexOptions = {}): AstNode
   return new Parser(text, options).parseFormula();
 }
 
+const localizationCache = new Map<string, string>();
+
+/**
+ * Parses user-typed formula text with the active calc language package's grammar (falling
+ * back to the invariant English grammar) and returns the canonical English text used for
+ * storage. Non-formula or unparseable text is returned unchanged.
+ */
+export function normalizeFormulaText(userText: string, r1c1 = false): string {
+  const language = getActiveCalcLanguagePackage();
+  const stripped = userText.startsWith('=') ? userText.slice(1) : userText;
+  if (!language) return stripped;
+  try {
+    return astToText(parseFormula(stripped, { r1c1, language }), { r1c1 });
+  } catch {
+    return stripped;
+  }
+}
+
+/**
+ * Re-renders canonical (English) formula text into a package's localized display form
+ * (`SUM(A1,1.5)` -> `SOMMA(A1;1,5)`). Falls back to the input text if it cannot be read.
+ */
+export function localizeFormulaText(canonical: string, language: LanguagePackage | undefined, r1c1 = false): string {
+  if (!language) return canonical;
+  const key = `${language.languageName}\u0000${r1c1 ? 'R1C1' : 'A1'}\u0000${canonical}`;
+  const cached = localizationCache.get(key);
+  if (cached !== undefined) return cached;
+  let localized = canonical;
+  try {
+    localized = astToText(parseFormula(canonical, { r1c1 }), { r1c1, language });
+  } catch {
+    // Never break a display path on text this renderer cannot read.
+  }
+  if (localizationCache.size > 4000) localizationCache.clear();
+  localizationCache.set(key, localized);
+  return localized;
+}
+
 // ---------------------------------------------------------------------------
 // Renderer
 // ---------------------------------------------------------------------------
@@ -481,14 +546,25 @@ function renderRef(node: RefNode, options: LexOptions): string {
   return node.sheet ? `${formatSheetName(node.sheet)}!${text}` : text;
 }
 
+/** Canonical number literal -> the culture's decimal form (`1.5` -> `1,5`); no-op for '.' cultures. */
+function localizeNumberRaw(raw: string, language: LanguagePackage | undefined): string {
+  if (!language || language.numberDecimalSeparator === '.') return raw;
+  const fixed = /^\.\d/.test(raw) ? `0${raw}` : raw;
+  return fixed.replace('.', language.numberDecimalSeparator);
+}
+
 function render(node: AstNode, options: LexOptions): string {
+  const language = options.language;
+  const separator = language?.listSeparator ?? ',';
   switch (node.kind) {
     case 'number':
-      return node.raw;
+      return localizeNumberRaw(node.raw, language);
     case 'string':
       return `"${node.value.replace(/"/g, '""')}"`;
     case 'boolean':
-      return node.value ? 'TRUE' : 'FALSE';
+      return language
+        ? node.value ? language.trueValue : language.falseValue
+        : node.value ? 'TRUE' : 'FALSE';
     case 'error':
       return node.value;
     case 'missing':
@@ -500,7 +576,7 @@ function render(node: AstNode, options: LexOptions): string {
     case 'range':
       return `${render(node.start, options)}:${render(node.end, options)}`;
     case 'union':
-      return node.parts.map((part) => render(part, options)).join(',');
+      return node.parts.map((part) => render(part, options)).join(separator);
     case 'intersect':
       return `${render(node.left, options)} ${render(node.right, options)}`;
     case 'binary':
@@ -511,10 +587,15 @@ function render(node: AstNode, options: LexOptions): string {
       return `${render(node.operand, options)}%`;
     case 'paren':
       return `(${render(node.inner, options)})`;
-    case 'function':
-      return `${node.name}(${node.args.map((arg) => render(arg, options)).join(',')})`;
-    case 'array':
-      return `{${node.rows.map((row) => row.map((value) => render(value, options)).join(',')).join(';')}}`;
+    case 'function': {
+      const name = language?.englishToFunction(node.name) ?? node.name;
+      return `${name}(${node.args.map((arg) => render(arg, options)).join(separator)})`;
+    }
+    case 'array': {
+      const element = language?.arrayListSeparator ?? ',';
+      const row = language?.arrayGroupSeparator ?? ';';
+      return `{${node.rows.map((r) => r.map((value) => render(value, options)).join(element)).join(row)}}`;
+    }
     case 'spill':
       return `${render(node.ref, options)}#`;
     case 'structured': {
@@ -524,7 +605,7 @@ function render(node: AstNode, options: LexOptions): string {
       return `${node.table}${spec}`;
     }
     case 'call':
-      return `${render(node.callee, options)}(${node.args.map((arg) => render(arg, options)).join(',')})`;
+      return `${render(node.callee, options)}(${node.args.map((arg) => render(arg, options)).join(separator)})`;
   }
 }
 

@@ -12,18 +12,20 @@ export { UNDERLINE_DECORATION } from '../dialogs/number-format.js';
 
 export const H = { left: 0, center: 1, right: 2, general: 3, top: 0, middle: 1, bottom: 2 } as const;
 
+// TASK 87: `text` is a resource placeholder (resolved at render time); `value`
+// stays the real format code the selection logic and the sheet use.
 export const formatList = [
-  { text: 'General', value: 'General', iconClass: 'number-format-general' },
-  { text: 'Number', value: '0.00', iconClass: 'number-format-number' },
-  { text: 'Currency', value: '$#,##0.00', iconClass: 'number-format-currency' },
-  { text: 'Accounting', value: '$#,##0.00_);($#,##0.00)', iconClass: 'number-format-accounting' },
-  { text: 'Short Date', value: 'm/d/yyyy', iconClass: 'number-format-shortdate' },
-  { text: 'Long Date', value: 'dddd, mmmm dd, yyyy', iconClass: 'number-format-longdate' },
-  { text: 'Time', value: 'h:mm:ss AM/PM', iconClass: 'number-format-time' },
-  { text: 'Percentage', value: '0%', iconClass: 'number-format-percentage' },
-  { text: 'Fraction', value: '# ?/?', iconClass: 'number-format-fraction' },
-  { text: 'Scientific', value: '0.00E+00', iconClass: 'number-format-scientific' },
-  { text: 'Text', value: '@', iconClass: 'number-format-text' },
+  { text: '${res.ribbon.home.general}', value: 'General', iconClass: 'number-format-general' },
+  { text: '${res.ribbon.home.number}', value: '0.00', iconClass: 'number-format-number' },
+  { text: '${res.ribbon.home.currency}', value: '$#,##0.00', iconClass: 'number-format-currency' },
+  { text: '${res.ribbon.home.accounting}', value: '$#,##0.00_);($#,##0.00)', iconClass: 'number-format-accounting' },
+  { text: '${res.ribbon.home.shortDate}', value: 'm/d/yyyy', iconClass: 'number-format-shortdate' },
+  { text: '${res.ribbon.home.longDate}', value: 'dddd, mmmm dd, yyyy', iconClass: 'number-format-longdate' },
+  { text: '${res.ribbon.home.time}', value: 'h:mm:ss AM/PM', iconClass: 'number-format-time' },
+  { text: '${res.ribbon.home.percentage}', value: '0%', iconClass: 'number-format-percentage' },
+  { text: '${res.ribbon.home.fraction}', value: '# ?/?', iconClass: 'number-format-fraction' },
+  { text: '${res.ribbon.home.scientific}', value: '0.00E+00', iconClass: 'number-format-scientific' },
+  { text: '${res.ribbon.home.text}', value: '@', iconClass: 'number-format-text' },
 ];
 
 export const fontFamilies = [
@@ -48,33 +50,62 @@ export function applyStyle(d: Designer, property: string, value: unknown): void 
   setStyleProperty(activeSheet(d), activeRanges(activeSheet(d)), property, value);
 }
 
-/* TASK 75 (trial probe): the trial's font commands write a value from the command
- * arguments (`false` when no value is given — the ribbon checkbox passes the next
- * state), and serialise the change as the `font` shorthand next to the longhand
- * property. The underline family writes `textDecoration: 0` (the trial's enum). */
+/* TASK 90 (`.probe/t90/fonts-r1.json`, `.probe/t90/decoration-r1.json`): the trial's font commands
+ * write the LONG-HAND member and let the style recompose the `font` shorthand from its parts —
+ * the cell it produced for a ribbon Bold on a size-only cell is `{font:'bold 11pt', fontWeight:
+ * 'bold', fontSize:'11pt'}`, for the family combo `{font:'italic bold 20pt Georgia', ...}`, for the
+ * steppers `{font:'12pt', fontSize:'12pt'}`. Writing the fragment itself (`font:'bold'`,
+ * `font:'12pt'`) put a shorthand without size or family into the cell: `getActualStyle().font`
+ * reported that fragment, it is not a valid `ctx.font` value, Chromium silently ignored the
+ * assignment and the cell was drawn in whatever font the canvas last used — the user's "the font
+ * falls back to a default" and the bold glitches (symptoms A and B). Writing only the long-hands
+ * makes every font command rebuild the full shorthand from the cell's current font, including
+ * sizes/families inherited from a named, row, column or area default style. */
 export function setBold(d: Designer, on: unknown): void {
   applyStyle(d, 'fontWeight', on ? 'bold' : 'normal');
-  applyStyle(d, 'font', on ? 'bold' : 'normal');
 }
 export function setItalic(d: Designer, on: unknown): void {
   applyStyle(d, 'fontStyle', on ? 'italic' : 'normal');
-  applyStyle(d, 'font', on ? 'italic' : 'normal');
 }
-export function setUnderline(d: Designer): void {
-  applyStyle(d, 'textDecoration', 0);
+const TEXT_UNDERLINE = 1;
+const TEXT_DOUBLE_UNDERLINE = 8;
+
+/** Trial (TASK 90): the Underline / Double Underline checkboxes toggle their bit in the cell's
+ *  `TextDecorationType` mask and keep the other decorations — a strikethrough cell measured
+ *  2 -> 3 (underline added) -> 2 (underline removed). A bare execute (no value) clears the
+ *  decoration, the value the TASK 75 sweep recorded. */
+export function setDecorationToggle(d: Designer, bit: number, on: unknown): void {
+  if (on === undefined) {
+    applyStyle(d, 'textDecoration', 0);
+    return;
+  }
+  const sheet = activeSheet(d);
+  const siblings = bit === TEXT_DOUBLE_UNDERLINE ? TEXT_UNDERLINE : TEXT_DOUBLE_UNDERLINE;
+  for (const range of activeRanges(sheet)) {
+    const r = range.row, c = range.col;
+    const rows = r < 0 ? [r] : Array.from({ length: range.rowCount }, (_, i) => r + i);
+    const cols = c < 0 ? [c] : Array.from({ length: range.colCount }, (_, i) => c + i);
+    for (const row of rows) for (const col of cols) {
+      const mask = Number(sheet.getActualStyle(row, col).textDecoration ?? 0) >>> 0;
+      const next = on ? (mask | bit) & ~siblings : mask & ~bit;
+      internals(sheet)._setStyleProperty(row, col, 'textDecoration', next);
+    }
+  }
+  d.invalidate();
 }
-export function setDoubleUnderline(d: Designer): void {
-  applyStyle(d, 'textDecoration', 0);
+export function setUnderline(d: Designer, on: unknown): void {
+  setDecorationToggle(d, TEXT_UNDERLINE, on);
 }
-/** Trial shorthand: the font name alone goes into `font` together with `fontFamily`. */
+export function setDoubleUnderline(d: Designer, on: unknown): void {
+  setDecorationToggle(d, TEXT_DOUBLE_UNDERLINE, on);
+}
+/** Trial shorthand: the font name goes into `fontFamily`; `font` follows the style's parts. */
 export function setFontFamily(d: Designer, family: unknown): void {
   applyStyle(d, 'fontFamily', String(family));
-  applyStyle(d, 'font', String(family));
 }
-/** Trial shorthand: the point size goes into `font` together with `fontSize`. */
+/** Trial shorthand: the point size goes into `fontSize`; `font` follows the style's parts. */
 export function setFontSizePt(d: Designer, size: number): void {
   applyStyle(d, 'fontSize', `${size}pt`);
-  applyStyle(d, 'font', `${size}pt`);
 }
 /** Effective font size in points: the trial's unstyled cell computes as 11pt (15px). */
 export function effectiveFontSizePt(style: Record<string, unknown>): number {

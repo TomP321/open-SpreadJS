@@ -6,6 +6,7 @@ import type { SparklineFunctionEntry } from '../features/sparkline-ex.js';
  */
 import type { Workbook, Worksheet } from '../model.js';
 import { AstNode, RefNode, astToText, collectRefs, containsFunction, parseFormula, translateRefs } from './parser.js';
+import { getActiveCalcLanguagePackage, type LanguagePackage } from './language-packages.js';
 import { AreaRef, CalcArray, CalcError, ScalarValue, Value, ReferenceValue, isReference } from './values.js';
 import { EvalContext, EvalHost, Evaluator, builtinNames } from './evaluate.js';
 import { getGlobalFunction } from './functions-api.js';
@@ -205,7 +206,7 @@ export class CalcEngine implements EvalHost {
   recalculating = false;
   minimal = false;
   orderCounter = 0;
-  lastParsed: { text: string; r1c1: boolean; ast: AstNode } | undefined;
+  lastParsed: { text: string; r1c1: boolean; ast: AstNode; language?: string } | undefined;
   nameDepth = 0;
 
   constructor(workbook: Workbook) {
@@ -312,11 +313,12 @@ export class CalcEngine implements EvalHost {
   }
 
   hasFormula(sheet: Worksheet, row: number, col: number): boolean {
-    return sheet.getFormula(row, col) !== null;
+    return sheet._getFormula(row, col) !== null;
   }
 
+  /** The cell's STORED (canonical English) formula — calc internals, never display text. */
   getFormulaText(sheet: Worksheet, row: number, col: number): string | null {
-    return sheet.getFormula(row, col);
+    return sheet._getFormula(row, col);
   }
 
   workbookIndex(sheet: Worksheet): number {
@@ -367,24 +369,38 @@ export class CalcEngine implements EvalHost {
     this.rebuildFormulas(true);
   }
 
-  /** Parses/validates a formula and returns its canonical text. */
+  /**
+   * Parses/validates a formula and returns its canonical text. This is the USER-input seam
+   * (`sheet.setFormula` and friends): with an active calc language package the text may be
+   * localized (`=SOMMA(A1;1,5)`); the stored text stays invariant English.
+   */
   parseFormula(sheet: Worksheet, row: number, col: number, formula: string): string {
-    const text = this.parseFormulaText(sheet, formula);
-    this.validateStructured(this.compile(formula), sheet, row, col);
+    const text = this.parseFormulaText(sheet, formula, this.isR1C1(), getActiveCalcLanguagePackage());
+    this.validateStructured(this.compile(formula, this.isR1C1(), getActiveCalcLanguagePackage()), sheet, row, col);
     return text;
   }
 
-  parseFormulaText(sheet: Worksheet, formula: string, r1c1 = this.isR1C1()): string {
-    const ast = this.compile(formula, r1c1);
+  parseFormulaText(
+    sheet: Worksheet,
+    formula: string,
+    r1c1 = this.isR1C1(),
+    language?: LanguagePackage,
+  ): string {
+    const ast = this.compile(formula, r1c1, language);
     this.validate(ast, sheet);
     return astToText(ast, { r1c1 });
   }
 
-  compile(formula: string, r1c1 = this.isR1C1()): AstNode {
-    if (this.lastParsed && this.lastParsed.text === formula && this.lastParsed.r1c1 === r1c1)
+  compile(formula: string, r1c1 = this.isR1C1(), language?: LanguagePackage): AstNode {
+    if (
+      this.lastParsed &&
+      this.lastParsed.text === formula &&
+      this.lastParsed.r1c1 === r1c1 &&
+      this.lastParsed.language === language?.languageName
+    )
       return this.lastParsed.ast;
-    const ast = parseFormula(formula, { r1c1 });
-    this.lastParsed = { text: formula, r1c1, ast };
+    const ast = parseFormula(formula, { r1c1, language });
+    this.lastParsed = { text: formula, r1c1, ast, language: language?.languageName };
     return ast;
   }
 
@@ -446,7 +462,7 @@ export class CalcEngine implements EvalHost {
   valueChanged(sheet: Worksheet, row: number, col: number): void {
     this.detachSpillCell(sheet, row, col, true);
     const key = this.key(sheet, row, col);
-    const storeFormula = sheet.getFormula(row, col);
+    const storeFormula = sheet._getFormula(row, col);
     // A plain value write over a formula cell removes its registration.
     if (this.formulas.has(key)) {
       if (storeFormula === null) this.removeFormula(key);
@@ -859,11 +875,22 @@ export class CalcEngine implements EvalHost {
 
   /** Translates relative references for copy/fill. */
   translateFormula(formula: string, rows: number, columns: number): string {
+    const r1c1 = this.isR1C1();
     try {
-      const ast = parseFormula(formula, { r1c1: this.isR1C1() });
-      return astToText(translateRefs(ast, rows, columns), { r1c1: this.isR1C1() });
+      const ast = parseFormula(formula, { r1c1 });
+      return astToText(translateRefs(ast, rows, columns), { r1c1 });
     } catch {
-      return formula;
+      // Callers hand us either canonical stored text or the localized display text of the
+      // active package; accept both and always return canonical English. Unparseable text
+      // keeps the previous behaviour: returned unchanged (never throws).
+      const language = getActiveCalcLanguagePackage();
+      if (!language) return formula;
+      try {
+        const ast = parseFormula(formula, { r1c1, language });
+        return astToText(translateRefs(ast, rows, columns), { r1c1 });
+      } catch {
+        return formula;
+      }
     }
   }
 
@@ -988,7 +1015,8 @@ export class CalcEngine implements EvalHost {
   formulaRanges(formula: string, sheet: Worksheet, baseRow = 0, baseCol = 0, r1c1 = false): AreaRef[] {
     let ast: AstNode;
     try {
-      ast = parseFormula(formula, { r1c1 });
+      // Public helper: accepts the active language package's formula form.
+      ast = parseFormula(formula, { r1c1, language: getActiveCalcLanguagePackage() });
     } catch {
       return [];
     }

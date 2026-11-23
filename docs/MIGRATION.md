@@ -173,7 +173,55 @@ colours/geometry match the paired gates in `apps/compare` /
 `apps/designer-compare`; if you override internal `.gc-*` classes, diff against
 the running pages before shipping.
 
-## 5. Known deviations (v0.1)
+## 5. Lingua italiana (Designer UI in Italian)
+
+The official product ships per-language Designer resource packages
+(`@mescius/spread-sheets-designer-resources-en`, `-ja`, `-zh`, `-de`, `-es`,
+`-fr`, `-ko`, `-pt-br`) but no Italian one. OpenSheets provides its own
+translation as `@opensheets/spread-sheets-designer-resources-it`; since there is
+no official twin, use it directly — no npm alias is needed:
+
+```bash
+npm install @opensheets/spread-sheets-designer-resources-it
+```
+
+Import the package **after** the Designer and **before** creating the
+`Designer`, exactly like the official language packages: the Designer reads the
+resources once at construction, and labels measured at startup (ribbon widths,
+adaptive layout) then use the Italian strings.
+
+```ts
+import '@opensheets/spread-sheets-designer';
+import '@opensheets/spread-sheets-designer-resources-it'; // after the designer, before construction
+
+const designer = new GC.Spread.Sheets.Designer.Designer(host); // UI in Italian
+```
+
+CommonJS / script tag work the same way:
+
+```js
+require('@opensheets/spread-sheets-designer');
+require('@opensheets/spread-sheets-designer-resources-it');
+```
+
+```html
+<script src="node_modules/@opensheets/spread-sheets-designer/dist/gc.spread.sheets.designer.all.min.js"></script>
+<script src="node_modules/@opensheets/spread-sheets-designer-resources-it/dist/gc.spread.sheets.designer.resource.it.min.js"></script>
+```
+
+The package exports `italianResources` with exactly the key tree of
+`englishResources` and merges it through the public
+`GC.Spread.Sheets.Designer.setResources`, so partial overrides
+(`setResources({ ... })`) keep working; terminology follows the Italian
+Microsoft Excel UI (Home, Inserisci, Layout di pagina, Formule, Dati, Revisione,
+Visualizza, Impostazioni; Incolla/Taglia/Copia/Copia formato; Grassetto,
+Corsivo, Sottolineato; Formattazione condizionale, Formatta come tabella, Stili
+cella; Inserisci funzione, Gestione nomi; Ordina e filtra, Convalida dati,
+Rimuovi duplicati, Testo in colonne; Blocca riquadri; Proteggi foglio; ...).
+English stays the default: nothing changes unless the Italian package (or an
+equivalent `setResources` call) is loaded.
+
+## 6. Known deviations (v0.1)
 
 Behavioural parity is verified black-box against the official trial
 (API-coverage report: classes 207/207, methods/functions 1796/1796, enums
@@ -253,7 +301,7 @@ switch — these are *matching* the trial, not bugs to file against the trial):
 silently stubbed, so a `NotImplemented:` error in the console means an unported
 API, not a broken one.
 
-## 6. Switch checklist
+## 7. Switch checklist
 
 1. Replace the dependency lines with the alias block (§ 1) for exactly the
    packages you import; reinstall.
@@ -265,8 +313,77 @@ API, not a broken one.
 5. If you use the Designer through `globalThis.GC` hacks or an alias bridge
    added for the official packages, remove them — the plain alias install now
    resolves one core (§ 1, GAP-52-1/2 closed).
-6. Check § 5 against your feature list before shipping.
+6. Check § 6 against your feature list before shipping.
 
 Performance after switching is normally a large win in one direction only — see
 [docs/PERFORMANCE.md](PERFORMANCE.md) (1M-row open 0.3 ms vs 1164 ms, `setArray`
 200k×20 33x faster, half the heap, smaller bundles).
+
+## 7. Lingua italiana (core)
+
+Official SpreadJS localises its spreadsheet UI through per-language resource packages
+(`@mescius/spread-sheets-resources-ja|ko|zh`). There is **no official Italian one**, so an
+Italian application has nothing to alias there — this is the OpenSheets side of the feature
+(core part; the Designer strings live in `@opensheets/spread-sheets-designer-resources-it`).
+
+Add the alias only if you want the official-style package name (it is optional: the culture and
+the strings are already built into `@opensheets/spread-sheets`):
+
+```json
+"@mescius/spread-sheets-resources-it": "npm:@opensheets/spread-sheets-resources-it@^0.1.0"
+```
+
+Then load it after the core and switch the culture before creating workbooks/controls:
+
+```ts
+import GC from '@mescius/spread-sheets';
+import '@mescius/spread-sheets-resources-it';         // side effect: registers it-it
+
+GC.Spread.Common.CultureManager.culture('it-it');
+const wb = new GC.Spread.Sheets.Workbook(host);
+```
+
+```html
+<script src="@mescius/spread-sheets/dist/gc.spread.sheets.all.min.js"></script>
+<script src="@mescius/spread-sheets-resources-it/dist/gc.spread.sheets.resources.it.min.js"></script>
+<script>GC.Spread.Common.CultureManager.culture('it-it');</script>
+```
+
+What switching to `it-it` changes:
+
+- **Number/date model** — decimal `,`, thousands `.` (numbers, currency and percentages),
+  `€` currency symbol, `dd/MM/yyyy` short date, `HH:mm`/`HH:mm:ss` times, Italian month and day
+  names, empty AM/PM designators, Italian `predefinedFormats`. Typing `1.234,5` into a cell
+  stores `1234.5` and a `#,##0.00` cell paints `1.234,50`; `5/11/2026` reads as 5 November.
+  `General` rendering keeps the trial's behaviour (culture-independent) on both engines.
+- **Core UI strings** — context menus (cells, rows, columns, corner, sheet tabs, tables,
+  pivot, slicer), the filter/sort menus and the Custom AutoFilter dialog (`Seleziona tutto`,
+  `Deseleziona tutto`, `(Vuote)`, `Cancella filtro da "…"`), the comment and threaded-comment
+  UI, the pivot field panel and pivot filter dropdown, the TableSheet panel, the scenario panel,
+  the DataChart config panel, the status bar (`Pronto`, `Somma: 6`, `Conteggio: 3`), the sheet
+  list popups, the slicer blank label and the timeline captions/month labels.
+- **Formulas in Italian** (calc language package, TASK 89) — activating `it` makes the grammar
+  Excel-in-Italy: `=SOMMA(A1;A2)`, `=SE(A1>0;"sì";"no")`, `=1,5*2` (decimal comma), array
+  constants `{1;2\3;4}`. Function names, `VERO`/`FALSO` and errors (`#N/D`, `#VALORE!`, …) are
+  accepted in Italian **and** still in English; the cell editor, the formula bar and
+  `getFormula()` show the Italian form. Storage stays invariant English: `toJSON()`, XLSX and
+  `getFormulaInformation().formula` keep `=SUM(A1,A2)` (the localized text is also available as
+  `formulaWithCulture`), so files open in Excel in any language.
+
+Notes when you switch:
+
+- Default behaviour is untouched: without the import (or with `culture('en-us')`) every string
+  and format is what it was, byte for byte. `en-US` and `ja-JP` keep their built-in cultures.
+- Public API values do not shift: `StatusItem.value`, `contextMenu.menuData[].text` and the
+  internal slicer blank marker stay English data; only the painted/DOM captions localise.
+- Controls that build their DOM once (threaded-comment panel, TableSheet panel, scenario panel,
+  DataChart config panel) take the culture active **at build time**; build them after switching.
+  Menus, filter dialogs, status bar and slicer/timeline painting follow the culture live.
+- `CultureManager.getResources('it-it')` answers the string table on our core; the trial core
+  answers `{}`/`null` for every culture (its UI text is compiled in), so a migration helper that
+  probes `getResources` must tolerate `null` when it runs against the official package.
+- `it-it` reports `NumberFormat.listSeparator = ';'` (the d.ts contract for formula arguments).
+  Formula parsing/display follows the **calc language package**, not the culture: `culture('it-it')`
+  alone keeps English `,` formulas; loading `@opensheets/spread-sheets-resources-it` (or calling
+  `GC.Spread.CalcEngine.LanguagePackages.languagePackages('it')`) activates the Italian grammar —
+  the gap recorded in docs/STATUS.md § TASK 88 is closed by § TASK 89.

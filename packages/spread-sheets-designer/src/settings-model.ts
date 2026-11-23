@@ -12,6 +12,9 @@ import type Core from '@mescius/spread-sheets';
 import type { Workbook, Worksheet } from './core-internals.js';
 import { internals, recordView } from './core-internals.js';
 
+/** TASK 87: dialog captions are placeholders under res.settings, resolved by the dialog host. */
+const sr = (key: string): string => `\${res.settings.${key}}`;
+
 export type SettingValue = boolean | number | string;
 
 export interface SettingOption { text: string; value: SettingValue }
@@ -84,62 +87,62 @@ const pick = (key: string, label: string, options: SettingOption[], extra: Parti
 const action = (key: string, label: string, text: string): SettingField => ({ key, kind: 'button', label, text });
 
 /** Scrollbar visibility takes `true | false | 'auto'` in the contract. */
-const SCROLLBAR: SettingOption[] = [{ text: 'Show', value: true }, { text: 'Hide', value: false }, { text: 'Auto', value: 'auto' }];
+const SCROLLBAR: SettingOption[] = [{ text: sr('show'), value: true }, { text: sr('hide'), value: false }, { text: sr('auto'), value: 'auto' }];
 /** `GC.Spread.Sheets.AllowDragHeaderToMove`. */
-const DRAG_HEADER: SettingOption[] = [{ text: 'None', value: 0 }, { text: 'Column', value: 1 }, { text: 'Row', value: 2 }, { text: 'Both', value: 3 }];
+const DRAG_HEADER: SettingOption[] = [{ text: sr('none'), value: 0 }, { text: sr('column'), value: 1 }, { text: sr('row'), value: 2 }, { text: sr('both'), value: 3 }];
 /** `GC.Spread.Sheets.ResizeMode`. */
-const RESIZE_MODE: SettingOption[] = [{ text: 'Normal', value: 0 }, { text: 'Split', value: 1 }];
+const RESIZE_MODE: SettingOption[] = [{ text: sr('normal'), value: 0 }, { text: sr('split'), value: 1 }];
 /** `GC.Spread.Sheets.ReferenceStyle`. */
-const REFERENCE_STYLE: SettingOption[] = [{ text: 'A1', value: 0 }, { text: 'R1C1', value: 1 }];
+const REFERENCE_STYLE: SettingOption[] = [{ text: sr('a1'), value: 0 }, { text: sr('r1C1'), value: 1 }];
 /** `GC.Spread.Sheets.TabStripPosition`, in the trial's combo order. */
-const TAB_STRIP_POSITION: SettingOption[] = [{ text: 'Bottom', value: 0 }, { text: 'Top', value: 1 }, { text: 'Left', value: 2 }, { text: 'Right', value: 3 }];
+const TAB_STRIP_POSITION: SettingOption[] = [{ text: sr('bottom'), value: 0 }, { text: sr('top'), value: 1 }, { text: sr('left'), value: 2 }, { text: sr('right'), value: 3 }];
 /** `GC.Spread.Sheets.AllSheetsListVisibility`. */
-const ALL_SHEETS_LIST: SettingOption[] = [{ text: 'Auto', value: 2 }, { text: 'Show', value: 1 }, { text: 'Hide', value: 0 }];
+const ALL_SHEETS_LIST: SettingOption[] = [{ text: sr('auto'), value: 2 }, { text: sr('show'), value: 1 }, { text: sr('hide'), value: 0 }];
 /** `GC.Spread.Sheets.CopyPasteHeaderOptions`, in the order the dialog lays them out. */
 const COPY_PASTE_HEADERS: SettingOption[] = [
-  { text: 'No Headers', value: 0 }, { text: 'Row Headers', value: 1 },
-  { text: 'All Headers', value: 3 }, { text: 'Column Headers', value: 2 },
+  { text: sr('noHeaders'), value: 0 }, { text: sr('rowHeaders'), value: 1 },
+  { text: sr('allHeaders'), value: 3 }, { text: sr('columnHeaders'), value: 2 },
 ];
 /** `GC.Spread.Sheets.HeaderAutoText`. */
-const HEADER_AUTO_TEXT: SettingOption[] = [{ text: 'Blank', value: 0 }, { text: 'Numbers', value: 1 }, { text: 'Letters', value: 2 }];
+const HEADER_AUTO_TEXT: SettingOption[] = [{ text: sr('blank'), value: 0 }, { text: sr('numbers'), value: 1 }, { text: sr('letters'), value: 2 }];
 /** `GC.Spread.Sheets.SelectionPolicy`. */
-const SELECTION_POLICY: SettingOption[] = [{ text: 'Single Select', value: 0 }, { text: 'Range Select', value: 1 }, { text: 'MultiRange Select', value: 2 }];
+const SELECTION_POLICY: SettingOption[] = [{ text: sr('singleSelect'), value: 0 }, { text: sr('rangeSelect'), value: 1 }, { text: sr('multiRangeSelect'), value: 2 }];
 
 /** Spread Settings tabs, in the trial's order. */
 export const spreadSettingTabs: SettingTab[] = [
   {
     key: 'general',
-    text: 'General',
+    text: sr('general'),
     layout: { column: 270, label: 125, editor: 102, combo: 120 },
     rows: [
       {
         groups: [{
-          title: 'Settings',
+          title: sr('settings'),
           fields: [
-            check('allowUserDragDrop', 'Allow Drag and Drop'),
-            check('allowUserDragFill', 'Allow Drag and Fill'),
-            check('allowUndo', 'Allow Undo'),
-            check('allowUserDragMerge', 'Allow Drag and Merge'),
-            check('allowAutoCreateHyperlink', 'Allow Auto Create Hyperlink'),
-            check('allowAutoExtendFilterRange', 'Allow Auto Extend Filter Range'),
-            check('formulaFormatHint', 'Formula Format Hints'),
-            pick('allowDragHeaderToMove', 'Drag Header to Move', DRAG_HEADER),
-            pick('rowResizeMode', 'Row Resize Mode', RESIZE_MODE),
-            pick('columnResizeMode', 'Column Resize Mode', RESIZE_MODE),
-            action('builtInFileIcons', 'Built-in File Icons', 'Manage Icons'),
+            check('allowUserDragDrop', sr('allowUserDragDrop')),
+            check('allowUserDragFill', sr('allowUserDragFill')),
+            check('allowUndo', sr('allowUndo')),
+            check('allowUserDragMerge', sr('allowUserDragMerge')),
+            check('allowAutoCreateHyperlink', sr('allowAutoCreateHyperlink')),
+            check('allowAutoExtendFilterRange', sr('allowAutoExtendFilterRange')),
+            check('formulaFormatHint', sr('formulaFormatHint')),
+            pick('allowDragHeaderToMove', sr('allowDragHeaderToMove'), DRAG_HEADER),
+            pick('rowResizeMode', sr('rowResizeMode'), RESIZE_MODE),
+            pick('columnResizeMode', sr('columnResizeMode'), RESIZE_MODE),
+            action('builtInFileIcons', sr('builtInFileIcons'), sr('manageIcons')),
           ],
         }],
         right: [{
           fields: [
-            check('allowUserEditFormula', 'Allow User to Enter Formulas'),
-            check('allowUserZoom', 'Allow Zoom'),
-            check('allowDynamicArray', 'Allow DynamicArray'),
-            check('allowInvalidFormula', 'Allow Invalid Formula'),
-            check('enableAccessibility', 'Enable Accessibility'),
-            check('scrollByPixel', 'Pixel Scrolling'),
-            num('scrollPixel', 'Scroll by <pixels>', { min: 1 }),
-            check('dynamicReferences', 'Use GetPivotData functions for PivotTable references'),
-            num('maxUndoRedoStackSize', 'Undo/Redo Stack Size', { max: 2147483647 }),
+            check('allowUserEditFormula', sr('allowUserEditFormula')),
+            check('allowUserZoom', sr('allowUserZoom')),
+            check('allowDynamicArray', sr('allowDynamicArray')),
+            check('allowInvalidFormula', sr('allowInvalidFormula')),
+            check('enableAccessibility', sr('enableAccessibility')),
+            check('scrollByPixel', sr('scrollByPixel')),
+            num('scrollPixel', sr('scrollPixel'), { min: 1 }),
+            check('dynamicReferences', sr('dynamicReferences')),
+            num('maxUndoRedoStackSize', sr('maxUndoRedoStackSize'), { max: 2147483647 }),
           ],
         }],
       },
@@ -147,23 +150,23 @@ export const spreadSettingTabs: SettingTab[] = [
   },
   {
     key: 'scrollBars',
-    text: 'ScrollBars',
+    text: sr('scrollBars'),
     layout: { column: 350, label: 130, editor: 100 },
     rows: [
       {
         groups: [{
-          title: 'Visibility',
+          title: sr('visibility'),
           fields: [
-            pick('showVerticalScrollbar', 'Vertical ScrollBar', SCROLLBAR),
-            check('scrollbarShowMax', 'ScrollBar ShowMax'),
-            check('useMobileScrollbar', 'Use Mobile Scrollbar'),
+            pick('showVerticalScrollbar', sr('showVerticalScrollbar'), SCROLLBAR),
+            check('scrollbarShowMax', sr('scrollbarShowMax')),
+            check('useMobileScrollbar', sr('useMobileScrollbar')),
           ],
         }],
         right: [{
           fields: [
-            pick('showHorizontalScrollbar', 'Horizontal ScrollBar', SCROLLBAR),
-            check('scrollbarMaxAlign', 'ScrollBar MaxAlign'),
-            check('scrollIgnoreHidden', 'Scroll Ignore Hidden'),
+            pick('showHorizontalScrollbar', sr('showHorizontalScrollbar'), SCROLLBAR),
+            check('scrollbarMaxAlign', sr('scrollbarMaxAlign')),
+            check('scrollIgnoreHidden', sr('scrollIgnoreHidden')),
           ],
         }],
       },
@@ -171,105 +174,105 @@ export const spreadSettingTabs: SettingTab[] = [
   },
   {
     key: 'calculation',
-    text: 'Calculation',
+    text: sr('calculation'),
     layout: { column: 703, label: 134, editor: 46, row: 30 },
     rows: [{
       groups: [{
         // `Reference Style` sits where the other tabs put their group title.
-        title: 'Reference Style',
+        title: sr('referenceStyle'),
         fields: [
           { key: 'referenceStyle', kind: 'radio', label: '', options: REFERENCE_STYLE, columns: 1 },
-          check('incrementalCalculation', 'Enable incremental calculation'),
-          check('calcOnDemand', 'Calculate on Demand'),
-          check('iterativeCalculation', 'Enable iterative calculation'),
-          num('iterativeCalculationMaximumIterations', 'Maximum Iterations:', { min: 1, max: 32767 }),
-          num('iterativeCalculationMaximumChange', 'Maximum Change:'),
+          check('incrementalCalculation', sr('incrementalCalculation')),
+          check('calcOnDemand', sr('calcOnDemand')),
+          check('iterativeCalculation', sr('iterativeCalculation')),
+          num('iterativeCalculationMaximumIterations', sr('iterativeCalculationMaximumIterations'), { min: 1, max: 32767 }),
+          num('iterativeCalculationMaximumChange', sr('iterativeCalculationMaximumChange')),
         ],
       }],
     }],
   },
   {
     key: 'tabStrip',
-    text: 'Tab Strip',
+    text: sr('tabStrip'),
     layout: { column: 350, label: 180, editor: 102, combo: 120, row: 29 },
     rows: [
       {
         groups: [{
-          title: 'Settings',
+          title: sr('settings'),
           fields: [
-            check('tabStripVisible', 'Tab Strip Visible'),
-            check('newTabVisible', 'New Tab Visible'),
-            num('tabStripRatio', 'Tab Strip Ratio(as percentage)', { min: 1, max: 100, suffix: '%' }),
-            num('tabStripWidth', 'Tab Strip Width', { min: 80 }),
-            pick('tabStripPosition', 'Tab Strip Position', TAB_STRIP_POSITION),
-            pick('allSheetsListVisible', 'All Sheets List Visible', ALL_SHEETS_LIST),
+            check('tabStripVisible', sr('tabStripVisible')),
+            check('newTabVisible', sr('newTabVisible')),
+            num('tabStripRatio', sr('tabStripRatio'), { min: 1, max: 100, suffix: '%' }),
+            num('tabStripWidth', sr('tabStripWidth'), { min: 80 }),
+            pick('tabStripPosition', sr('tabStripPosition'), TAB_STRIP_POSITION),
+            pick('allSheetsListVisible', sr('allSheetsListVisible'), ALL_SHEETS_LIST),
           ],
         }],
-        right: [{ fields: [check('tabEditable', 'Tab Strip Editable')] }],
+        right: [{ fields: [check('tabEditable', sr('tabEditable'))] }],
       },
       {
         groups: [{
-          title: 'Styles',
-          fields: [action('defaultSheetTabStyles', 'Sheet Tab State Styles', 'Manage Style')],
+          title: sr('styles'),
+          fields: [action('defaultSheetTabStyles', sr('defaultSheetTabStyles'), sr('manageStyle'))],
         }],
       },
     ],
   },
   {
     key: 'clipboard',
-    text: 'Clipboard',
+    text: sr('clipboard'),
     layout: { column: 350 },
     rows: [
       {
         groups: [{
-          title: 'Settings',
+          title: sr('settings'),
           fields: [
-            check('allowCopyPasteExcelStyle', 'Allow Copy Paste Excel Style'),
-            check('pasteSkipInvisibleRange', 'Allow Paste Skip Invisible Range'),
+            check('allowCopyPasteExcelStyle', sr('allowCopyPasteExcelStyle')),
+            check('pasteSkipInvisibleRange', sr('pasteSkipInvisibleRange')),
           ],
         }],
-        right: [{ fields: [check('allowExtendPasteRange', 'Allow Paste Extend Range')] }],
+        right: [{ fields: [check('allowExtendPasteRange', sr('allowExtendPasteRange'))] }],
       },
       {
-        groups: [{ fields: [{ key: 'copyPasteHeaderOptions', kind: 'radio', label: 'Header Options', options: COPY_PASTE_HEADERS, columns: 2 }] }],
+        groups: [{ fields: [{ key: 'copyPasteHeaderOptions', kind: 'radio', label: sr('headerOptions'), options: COPY_PASTE_HEADERS, columns: 2 }] }],
       },
     ],
   },
-  { key: 'customList', text: 'Custom Lists', rows: [] },
-  { key: 'namedPattern', text: 'Named Patterns', rows: [] },
+  { key: 'customList', text: sr('customLists'), rows: [] },
+  { key: 'namedPattern', text: sr('namedPatterns'), rows: [] },
 ];
 
 /** Sheet Settings tabs, in the trial's order. */
 export const sheetSettingTabs: SettingTab[] = [
   {
     key: 'general',
-    text: 'General',
+    text: sr('general'),
     layout: { column: 290, label: 180, editor: 72, row: 26 },
     rows: [
       {
         groups: [{
           fields: [
-            num('colCount', 'Column Count', { min: 0 }),
-            num('rowCount', 'Row Count', { min: 0 }),
-            num('frozenColumnCount', 'Frozen Column Count', { min: 0 }),
-            num('frozenLeftColumn', 'Left Column', { min: 0, indent: true }),
-            num('frozenRowCount', 'Frozen Row Count', { min: 0 }),
-            num('frozenTopRow', 'Top Row', { min: 0, indent: true }),
-            num('frozenTrailingColumnCount', 'Trailing Frozen Column Count', { min: 0, max: 100 }),
-            { key: 'frozenTrailingColumnStickToEdge', kind: 'checkbox', label: 'Stick to Edge', indent: true },
-            num('frozenTrailingRowCount', 'Trailing Frozen Row Count', { min: 0, max: 100 }),
-            { key: 'frozenTrailingRowStickToEdge', kind: 'checkbox', label: 'Stick to Edge', indent: true },
+            num('colCount', sr('colCount'), { min: 0 }),
+            num('rowCount', sr('rowCount'), { min: 0 }),
+            num('frozenColumnCount', sr('frozenColumnCount'), { min: 0 }),
+            num('frozenLeftColumn', sr('frozenLeftColumn'), { min: 0, indent: true }),
+            num('frozenRowCount', sr('frozenRowCount'), { min: 0 }),
+            num('frozenTopRow', sr('frozenTopRow'), { min: 0, indent: true }),
+            num('frozenTrailingColumnCount', sr('frozenTrailingColumnCount'), { min: 0, max: 100 }),
+            { key: 'frozenTrailingColumnStickToEdge', kind: 'checkbox', label: sr('stickToEdge'), indent: true },
+            num('frozenTrailingRowCount', sr('frozenTrailingRowCount'), { min: 0, max: 100 }),
+            { key: 'frozenTrailingRowStickToEdge', kind: 'checkbox', label: sr('stickToEdge'), indent: true },
           ],
         }],
         right: [
-          { title: 'Selection Policy', bordered: true, fields: [{ key: 'selectionPolicy', kind: 'radio', label: '', options: SELECTION_POLICY, columns: 1 }] },
+          { title: sr('selectionPolicy'), bordered: true, fields: [{ key: 'selectionPolicy', kind: 'radio', label: '', options: SELECTION_POLICY, columns: 1 }] },
           {
             fields: [
-              check('allowCellOverflow', 'Allow Overflow'),
-              check('showZeros', 'Show Zero Value Cells'),
-              check('addColumnButtonVisible', 'Add Column Button Visible'),
-              check('addRowButtonVisible', 'Add Row Button Visible'),
-              check('rightToLeft', 'Right-to-left'),
+              check('allowCellOverflow', sr('allowCellOverflow')),
+              check('showZeros', sr('showZeros')),
+              check('addColumnButtonVisible', sr('addColumnButtonVisible')),
+              check('addRowButtonVisible', sr('addRowButtonVisible')),
+              check('rightToLeft', sr('rightToLeft')),
             ],
           },
         ],
@@ -278,45 +281,45 @@ export const sheetSettingTabs: SettingTab[] = [
   },
   {
     key: 'gridlines',
-    text: 'Grid Lines',
+    text: sr('gridLines'),
     layout: { column: 300, label: 100, editor: 150, row: 34 },
     rows: [{
-      groups: [{ fields: [check('showHorizontalGridline', 'Horizontal Gridline'), check('showVerticalGridline', 'Vertical Gridline')] }],
-      right: [{ fields: [{ key: 'gridlineColor', kind: 'color', label: 'Gridline Color' }] }],
+      groups: [{ fields: [check('showHorizontalGridline', sr('showHorizontalGridline')), check('showVerticalGridline', sr('showVerticalGridline'))] }],
+      right: [{ fields: [{ key: 'gridlineColor', kind: 'color', label: sr('gridlineColor') }] }],
     }],
   },
   {
     key: 'headers',
-    text: 'Headers',
+    text: sr('headers'),
     layout: { column: 710, label: 180, editor: 72, row: 26 },
     rows: [],
     subTabs: [
       {
         key: 'columnHeaders',
-        text: 'Column Headers',
+        text: sr('columnHeaders'),
         rows: [{
           groups: [{
             fields: [
-              num('colHeaderRowCount', 'Column Header Row Count', { min: 0, max: 100 }),
-              { key: 'colHeaderAutoText', kind: 'radio', label: 'Column Header Auto Text', options: HEADER_AUTO_TEXT, inline: true, width: 250 },
-              num('colHeaderAutoTextIndex', 'Column Header Auto Index', { min: -1, max: 100 }),
-              num('colHeaderDefRowHeight', 'Default Row Height', { min: 0, max: 100 }),
-              check('colHeaderVisible', 'Column Header Visible'),
+              num('colHeaderRowCount', sr('colHeaderRowCount'), { min: 0, max: 100 }),
+              { key: 'colHeaderAutoText', kind: 'radio', label: sr('columnHeaderAutoText'), options: HEADER_AUTO_TEXT, inline: true, width: 250 },
+              num('colHeaderAutoTextIndex', sr('colHeaderAutoTextIndex'), { min: -1, max: 100 }),
+              num('colHeaderDefRowHeight', sr('colHeaderDefRowHeight'), { min: 0, max: 100 }),
+              check('colHeaderVisible', sr('colHeaderVisible')),
             ],
           }],
         }],
       },
       {
         key: 'rowHeaders',
-        text: 'Row Headers',
+        text: sr('rowHeaders'),
         rows: [{
           groups: [{
             fields: [
-              num('rowHeaderColCount', 'Row Header Column Count', { min: 0, max: 100 }),
-              { key: 'rowHeaderAutoText', kind: 'radio', label: 'Row Header Auto Text', options: HEADER_AUTO_TEXT, inline: true, width: 250 },
-              num('rowHeaderAutoTextIndex', 'Row Header Auto Index', { min: -1, max: 100 }),
-              num('rowHeaderDefColWidth', 'Default Column Width', { min: 0, max: 100 }),
-              check('rowHeaderVisible', 'Row Header Visible'),
+              num('rowHeaderColCount', sr('rowHeaderColCount'), { min: 0, max: 100 }),
+              { key: 'rowHeaderAutoText', kind: 'radio', label: sr('rowHeaderAutoText'), options: HEADER_AUTO_TEXT, inline: true, width: 250 },
+              num('rowHeaderAutoTextIndex', sr('rowHeaderAutoTextIndex'), { min: -1, max: 100 }),
+              num('rowHeaderDefColWidth', sr('rowHeaderDefColWidth'), { min: 0, max: 100 }),
+              check('rowHeaderVisible', sr('rowHeaderVisible')),
             ],
           }],
         }],
@@ -325,13 +328,13 @@ export const sheetSettingTabs: SettingTab[] = [
   },
   {
     key: 'sheetTab',
-    text: 'SheetTab',
+    text: sr('sheetTab'),
     layout: { column: 710, label: 180, editor: 110, row: 34 },
     rows: [{
       groups: [{
         fields: [
-          { key: 'sheetTabColor', kind: 'color', label: 'Sheet Tab Color:' },
-          action('sheetTabStateStyles', 'Sheet Tab State Styles:', 'Manage Style'),
+          { key: 'sheetTabColor', kind: 'color', label: sr('sheetTabColor') },
+          action('sheetTabStateStyles', sr('sheetTabStateStyles'), sr('manageStyle')),
         ],
       }],
     }],

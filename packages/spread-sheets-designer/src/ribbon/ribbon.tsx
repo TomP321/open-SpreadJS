@@ -3,14 +3,21 @@
  * The active tab's panels are rendered by the Classic or the Toolbar mode. */
 import React, { useEffect, useRef, useState } from 'react';
 import { useDesigner, useDesignerVersion } from '../store.js';
-import { contextualTrigger, currentRibbon } from '../app-helpers.js';
+import { contextualTrigger, currentRibbon, resource } from '../app-helpers.js';
 import { contextualTabsWithoutActivation } from '../contextual-ribbon.js';
+import { ribbonTabLabelResources } from './label-resources.js';
 import { ClassicPanel, ToolbarPanel } from './controls.js';
 
 export function Ribbon(): React.ReactElement {
   const d = useDesigner();
   useDesignerVersion();
   const { panels, ribbonHeight } = currentRibbon(d);
+  // TASK 87: tab captions follow the loaded resource language (identity keys unchanged).
+  const tabText = (id: string, fallback: string): string => {
+    const path = ribbonTabLabelResources[id];
+    return (path ? resource(d, `\${res.${path}}`) : '') || fallback;
+  };
+  const fileText = resource(d, '${res.ribbon.home.file}') || 'File';
   const active = panels.find((p) => p.id === d.activeTab) ?? panels[0];
   // Contextual tabs (Shape Format / Table Design / Chart Design / Sparkline /
   // PivotTable Analyze): the trial activates a tab that just appeared and keeps
@@ -81,10 +88,10 @@ export function Ribbon(): React.ReactElement {
             className="gc-designer-fileMenuButton fileMenuButton"
             data-command="fileMenuButton"
             tabIndex={-1}
-            aria-label="File"
+            aria-label={fileText}
             onClick={() => { d.fileMenuOpen = true; d.openMenu = null; d.invalidate(); }}
           >
-            File
+            {fileText}
           </div>
           <div className="gc-designer-ribbon-tabs-nav-container" role="tablist">
             <div className="gc-designer-ribbon-scrollbar-container" ref={railRef}>
@@ -95,7 +102,7 @@ export function Ribbon(): React.ReactElement {
                     className={`gc-designer-ribbon-tab-nav-text${panel.id === d.activeTab ? ' selected' : ''}`}
                     role="tab"
                     data-id={panel.id}
-                    aria-label={panel.text}
+                    aria-label={tabText(panel.id, panel.text ?? '')}
                     aria-selected={panel.id === d.activeTab}
                     onClick={() => {
                       d.activeTab = panel.id;
@@ -104,13 +111,13 @@ export function Ribbon(): React.ReactElement {
                       d.invalidate();
                     }}
                   >
-                    <span className="sd-text-content">{panel.text}</span>
-                    <span className="sd-text-placeholer" aria-hidden="true">{panel.text}</span>
+                    <span className="sd-text-content">{tabText(panel.id, panel.text ?? '')}</span>
+                    <span className="sd-text-placeholer" aria-hidden="true">{tabText(panel.id, panel.text ?? '')}</span>
                   </div>
                 ))}
               </div>
-              {railOffset > 0 && <button className="gc-designer-ribbon-scrollbar-arrow-l" aria-label="Scroll tabs left" onClick={() => setRailOffset(Math.max(0, railOffset - 100))} />}
-              {railOverflow && <button className="gc-designer-ribbon-scrollbar-arrow-r" aria-label="Scroll tabs right" onClick={() => {
+              {railOffset > 0 && <button className="gc-designer-ribbon-scrollbar-arrow-l" aria-label={resource(d, '${res.ribbon.menus.scrollLeft}') || 'Scroll tabs left'} onClick={() => setRailOffset(Math.max(0, railOffset - 100))} />}
+              {railOverflow && <button className="gc-designer-ribbon-scrollbar-arrow-r" aria-label={resource(d, '${res.ribbon.menus.scrollRight}') || 'Scroll tabs right'} onClick={() => {
                 const rail = railRef.current;
                 const content = rail?.firstElementChild as HTMLElement | null;
                 setRailOffset(Math.min(railOffset + 100, Math.max(0, (content?.scrollWidth ?? 0) - (rail?.clientWidth ?? 0) + 16)));
@@ -132,7 +139,7 @@ export function Ribbon(): React.ReactElement {
             <div
               className="gc-designer-ribbon-tab-collapsed-button"
               role="button"
-              aria-label="Collapse the Ribbon"
+              aria-label={resource(d, '${res.ribbon.menus.collapseRibbon}') || 'Collapse the Ribbon'}
               onClick={() => { d.collapsed = true; d.openMenu = null; d.invalidate(); }}
             >
               <span className="gc-designer-collapse-chevron" />

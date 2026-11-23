@@ -16,7 +16,7 @@ import { parseDateText } from './text.js';
 const DAY = 86400000;
 
 function daySerial(date: Date): number {
-  return Math.floor((date.getTime() - Date.UTC(1899, 11, 30)) / DAY);
+  return Math.floor(dateToSerial(date));
 }
 
 function toDateValue(value: ScalarValue): Date | CalcError {
@@ -57,7 +57,7 @@ function daysInYear(year: number): number {
   return isLeapYear(year) ? 366 : 365;
 }
 function daysInMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, 0)).getUTCDate(); // pure arithmetic on components
 }
 
 
@@ -66,18 +66,18 @@ function lastDayOfMonth(year: number, month: number): number {
 }
 
 function addMonths(date: Date, months: number): Date {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const day = date.getUTCDate();
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
   const targetMonth = month + months;
   const targetYear = year + Math.floor(targetMonth / 12);
   const normalizedMonth = ((targetMonth % 12) + 12) % 12;
   const last = lastDayOfMonth(targetYear, normalizedMonth + 1);
-  return new Date(Date.UTC(targetYear, normalizedMonth, Math.min(day, last)));
+  return new Date(targetYear, normalizedMonth, Math.min(day, last));
 }
 
 function weekdayNumber(date: Date, type: number): number {
-  const day = date.getUTCDay(); // 0 = Sunday
+  const day = date.getDay(); // 0 = Sunday
   switch (type) {
     case 1:
       return day + 1;
@@ -142,7 +142,7 @@ function weekendMask(code: number | string): boolean[] {
 }
 
 function isWeekend(date: Date, mask: boolean[]): boolean {
-  return mask[date.getUTCDay()]!;
+  return mask[date.getDay()]!;
 }
 
 function holidaySet(args: Args, ctx: EvalContext, index: number): Set<number> {
@@ -170,11 +170,12 @@ function networkDays(start: Date, end: Date, mask: boolean[], holidays: Set<numb
     sign = -1;
   }
   let count = 0;
-  const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
-  while (cursor <= to) {
+  const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const limit = new Date(to.getFullYear(), to.getMonth(), to.getDate() + 1);
+  while (cursor < limit) {
     const serial = daySerial(cursor);
     if (!isWeekend(cursor, mask) && !holidays.has(serial)) count++;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    cursor.setDate(cursor.getDate() + 1);
   }
   return sign * count;
 }
@@ -182,27 +183,27 @@ function networkDays(start: Date, end: Date, mask: boolean[], holidays: Set<numb
 function workday(start: Date, days: number, mask: boolean[], holidays: Set<number>): Date {
   const direction = days >= 0 ? 1 : -1;
   let remaining = Math.abs(Math.trunc(days));
-  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
   while (remaining > 0) {
-    cursor.setUTCDate(cursor.getUTCDate() + direction);
+    cursor.setDate(cursor.getDate() + direction);
     if (!isWeekend(cursor, mask) && !holidays.has(daySerial(cursor))) remaining--;
   }
   return cursor;
 }
 
 function days360(start: Date, end: Date, european: boolean): number {
-  let d1 = start.getUTCDate();
-  let d2 = end.getUTCDate();
+  let d1 = start.getDate();
+  let d2 = end.getDate();
   if (european) {
     if (d1 === 31) d1 = 30;
     if (d2 === 31) d2 = 30;
   } else {
-    if (d1 === 31 || (d1 === lastDayOfMonth(start.getUTCFullYear(), start.getUTCMonth() + 1) && d1 >= 30)) d1 = 30;
+    if (d1 === 31 || (d1 === lastDayOfMonth(start.getFullYear(), start.getMonth() + 1) && d1 >= 30)) d1 = 30;
     if (d2 === 31 && d1 >= 30) d2 = 30;
   }
   return (
-    (end.getUTCFullYear() - start.getUTCFullYear()) * 360 +
-    (end.getUTCMonth() - start.getUTCMonth()) * 30 +
+    (end.getFullYear() - start.getFullYear()) * 360 +
+    (end.getMonth() - start.getMonth()) * 30 +
     (d2 - d1)
   );
 }
@@ -211,17 +212,17 @@ function yearFrac(start: Date, end: Date, basis: number): number | CalcError {
   if (start > end) [start, end] = [end, start];
   if (basis === 0) return days360(start, end, false) / 360;
   if (basis === 1) {
-    const days = (end.getTime() - start.getTime()) / DAY;
-    const y1 = start.getUTCFullYear();
-    const y2 = end.getUTCFullYear();
+    const days = dateToSerial(end) - dateToSerial(start);
+    const y1 = start.getFullYear();
+    const y2 = end.getFullYear();
     if (y1 === y2) return days / daysInYear(y1);
     let total = 0;
     for (let year = y1; year <= y2; year++) total += daysInYear(year);
     const average = total / (y2 - y1 + 1);
     return days / average;
   }
-  if (basis === 2) return (end.getTime() - start.getTime()) / DAY / 360;
-  if (basis === 3) return (end.getTime() - start.getTime()) / DAY / 365;
+  if (basis === 2) return (dateToSerial(end) - dateToSerial(start)) / 360;
+  if (basis === 3) return (dateToSerial(end) - dateToSerial(start)) / 365;
   if (basis === 4) return days360(start, end, true) / 360;
   return error(ErrorCode.num);
 }
@@ -229,9 +230,9 @@ function yearFrac(start: Date, end: Date, basis: number): number | CalcError {
 function datedif(start: Date, end: Date, unit: string): number | CalcError {
   if (start > end) return error(ErrorCode.num);
   const upper = unit.toUpperCase();
-  const years = end.getUTCFullYear() - start.getUTCFullYear();
+  const years = end.getFullYear() - start.getFullYear();
   const months =
-    years * 12 + (end.getUTCMonth() - start.getUTCMonth()) + (end.getUTCDate() >= start.getUTCDate() ? 0 : -1);
+    years * 12 + (end.getMonth() - start.getMonth()) + (end.getDate() >= start.getDate() ? 0 : -1);
   const anchor = addMonths(start, months);
   switch (upper) {
     case 'Y':
@@ -239,14 +240,14 @@ function datedif(start: Date, end: Date, unit: string): number | CalcError {
     case 'M':
       return months;
     case 'D':
-      return Math.round((end.getTime() - start.getTime()) / DAY);
+      return Math.round(dateToSerial(end) - dateToSerial(start));
     case 'YM':
       return months % 12;
     case 'MD':
-      return Math.round((end.getTime() - anchor.getTime()) / DAY);
+      return Math.round(dateToSerial(end) - dateToSerial(anchor));
     case 'YD': {
       const anchorYear = addMonths(start, Math.floor(months / 12) * 12);
-      return Math.round((end.getTime() - anchorYear.getTime()) / DAY);
+      return Math.round(dateToSerial(end) - dateToSerial(anchorYear));
     }
     default:
       return error(ErrorCode.num);
@@ -255,19 +256,19 @@ function datedif(start: Date, end: Date, unit: string): number | CalcError {
 }
 
 function isoWeekNumber(date: Date): number {
-  const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = target.getUTCDay() || 7;
-  target.setUTCDate(target.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = target.getDay() || 7;
+  target.setUTCDate(target.getDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(target.getFullYear(), 0, 1));
   return Math.ceil(((target.getTime() - yearStart.getTime()) / DAY + 1) / 7);
 }
 
 function weekNumber(date: Date, type: number): number {
   // Week 1 contains January 1. type 1 = week starts Sunday, type 2 = Monday.
-  const startOfYear = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const startOfYear = new Date(date.getFullYear(), 0, 1);
   const weekStart = type === 2 ? 1 : 0;
-  const offset = (startOfYear.getUTCDay() - weekStart + 7) % 7;
-  const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / DAY);
+  const offset = (startOfYear.getDay() - weekStart + 7) % 7;
+  const dayOfYear = daySerial(date) - daySerial(startOfYear);
   return Math.floor((dayOfYear + offset) / 7) + 1;
 }
 
@@ -276,7 +277,7 @@ function dateFromParts(args: Args): Date | CalcError {
   const month = Math.trunc(args.number(1));
   const day = Math.trunc(args.number(2));
   if (year < 1900) year += 1900;
-  const value = new Date(Date.UTC(year, month - 1, day));
+  const value = new Date(year, month - 1, day);
   if (Number.isNaN(value.getTime())) return error(ErrorCode.num);
   return value;
 }
@@ -285,15 +286,15 @@ export const DATE_FUNCTIONS: DefinedFunction[] = [
   define('DATE', 3, 3, (args) => dateFromParts(args)),
   define('YEAR', 1, 1, (args) => {
     const date = dateArg(args, 0);
-    return isError(date) ? date : date.getUTCFullYear();
+    return isError(date) ? date : date.getFullYear();
   }),
   define('MONTH', 1, 1, (args) => {
     const date = dateArg(args, 0);
-    return isError(date) ? date : date.getUTCMonth() + 1;
+    return isError(date) ? date : date.getMonth() + 1;
   }),
   define('DAY', 1, 1, (args) => {
     const date = dateArg(args, 0);
-    return isError(date) ? date : date.getUTCDate();
+    return isError(date) ? date : date.getDate();
   }),
   define('HOUR', 1, 1, (args) => {
     const serial = serialArg(args, 0);
@@ -337,13 +338,11 @@ export const DATE_FUNCTIONS: DefinedFunction[] = [
   define('EOMONTH', 2, 2, (args) => {
     const date = dateArg(args, 0);
     if (isError(date)) return date;
-    const shifted = addMonths(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)), Math.trunc(args.number(1)));
+    const shifted = addMonths(new Date(date.getFullYear(), date.getMonth(), 1), Math.trunc(args.number(1)));
     return new Date(
-      Date.UTC(
-        shifted.getUTCFullYear(),
-        shifted.getUTCMonth(),
-        lastDayOfMonth(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1),
-      ),
+      shifted.getFullYear(),
+      shifted.getMonth(),
+      lastDayOfMonth(shifted.getFullYear(), shifted.getMonth() + 1),
     );
   }),
   define('DATEVALUE', 1, 1, (args) => {
@@ -361,7 +360,7 @@ export const DATE_FUNCTIONS: DefinedFunction[] = [
     const minutes = Math.trunc(args.number(1));
     const seconds = Math.trunc(args.number(2));
     const total = hours * 3600 + minutes * 60 + seconds;
-    return new Date(Date.UTC(1899, 11, 30) + total * 1000);
+    return serialToDate((total * 1000) / DAY); // wall-clock TIME result (total is seconds)
   }),
   define('DAYS', 2, 2, (args) => {
     const end = serialArg(args, 0);
@@ -435,12 +434,12 @@ export const DATE_FUNCTIONS: DefinedFunction[] = [
   }),
   define('TODAY', 0, 0, () => {
     const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }, { volatile: true }),
   define('NOW', 0, 0, () => new Date(), { volatile: true }),
   define('DATESTRING', 1, 1, (args) => {
     const date = dateArg(args, 0);
-    return isError(date) ? date : `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+    return isError(date) ? date : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }),
 ];
 

@@ -13,6 +13,7 @@ import { type ThemeJSON } from './table-theme-data.js';
 import { TableColumn, TableTheme, TableThemes, themeByName } from './table-style.js';
 import { CustomThemeManagerBase } from './workbook-managers.js';
 import { TableSlicerData } from './slicers/table-data.js';
+import { normalizeFormulaText } from '../calc/parser.js';
 
 // Public classes and style helpers live in the `table-style.ts` leaf module
 // (moved out unchanged); re-exported here so existing import paths and the
@@ -315,14 +316,17 @@ export class Table {
   setColumnFormula(tableColumnIndex: number, formula: string): this {
     const column = this.columns[tableColumnIndex];
     if (column) {
-      const canonical = formula.replace(/(^|[^A-Za-z0-9_])\[([^\]]+)\]/g, (_m, prefix: string, inner: string) =>
+      // TASK 89: table formulas are stored canonical-English, like cell formulas, so the
+      // per-row regeneration in writeDataFormulas stays grammar-independent.
+      const userText = normalizeFormulaText(formula, this.sheet?.calcEngine?.isR1C1?.() ?? false);
+      const canonical = userText.replace(/(^|[^A-Za-z0-9_])\[([^\]]+)\]/g, (_m, prefix: string, inner: string) =>
         /^#|^@/.test(inner) ? `${prefix}[${inner}]` : `${prefix}${this.tableName}[${inner}]`,
       );
-      column.fields.formula = formula;
+      column.fields.formula = userText;
       // The footer formula is qualified only when a footer actually exists.
-      column.fields.footerFormula = this.options.showFooter ? canonical : formula;
+      column.fields.footerFormula = this.options.showFooter ? canonical : userText;
       if (this.sheet && this.options.showFooter) {
-        this.sheet.setFormula(this.footerIndex(), this.col + tableColumnIndex, canonical);
+        this.sheet._setFormula(this.footerIndex(), this.col + tableColumnIndex, canonical);
       }
     }
     return this;
@@ -331,7 +335,7 @@ export class Table {
     const column = this.columns[tableColumnIndex];
     if (column) {
       if (formula == null) delete column.fields.dataAreaFormula;
-      else column.fields.dataAreaFormula = formula;
+      else column.fields.dataAreaFormula = normalizeFormulaText(formula, this.sheet?.calcEngine?.isR1C1?.() ?? false);
     }
     return this;
   }
@@ -342,7 +346,7 @@ export class Table {
       const formula = this.columns[c]?.fields.dataAreaFormula;
       if (typeof formula !== 'string') continue;
       for (let r = data.row; r < data.row + data.rowCount; r++)
-        this.sheet.setFormula(r, this.col + c, formula);
+        this.sheet._setFormula(r, this.col + c, formula);
     }
   }
   getColumnValue(tableColumnIndex: number): unknown {

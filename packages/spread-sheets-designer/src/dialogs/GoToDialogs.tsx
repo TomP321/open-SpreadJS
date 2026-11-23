@@ -24,6 +24,7 @@ import { internals, recordView, type Worksheet } from '../core-internals.js';
 import type { Bounds } from '../data-engine.js';
 import { currentRegion } from '../data-engine.js';
 import { definedNames } from '../defined-names.js';
+import { T } from './t.js';
 
 /* ------------------------------------------------------- shared helpers -- */
 
@@ -459,15 +460,15 @@ export function GoToBody({ data, update }: {
   const [selected, setSelected] = useState(-1);
   return (
     <div className="gc-goto-dialog">
-      <div className="gc-dialog-label">Go to:</div>
-      <div className="gc-dialog-list gc-goto-list" role="listbox" aria-label="Go to:">
+      <div className="gc-dialog-label">{T('goTo2', 'Go to:')}</div>
+      <div className="gc-dialog-list gc-goto-list" role="listbox" aria-label={T('goTo2', 'Go to:')}>
         {names.map((name, index) => (
           <div key={name} role="option" aria-selected={index === selected} className={`gc-dialog-list-item${index === selected ? ' selected' : ''}`}
             onClick={() => { setSelected(index); update('reference', name); }}>{name}</div>
         ))}
       </div>
-      <div className="gc-dialog-label">Reference:</div>
-      <input className="gc-dialog-input gc-goto-reference" aria-label="Reference:" value={String(data.reference ?? '')} onChange={(event) => update('reference', event.target.value)} autoFocus />
+      <div className="gc-dialog-label">{T('reference', 'Reference:')}</div>
+      <input className="gc-dialog-input gc-goto-reference" aria-label={T('reference', 'Reference:')} value={String(data.reference ?? '')} onChange={(event) => update('reference', event.target.value)} autoFocus />
     </div>
   );
 }
@@ -488,45 +489,45 @@ export function GoToSpecialBody({ data, update }: {
     const value = String(data[`${owner}Level`] ?? 'direct');
     return (
       <div className={`gc-goto-levels${disabled ? ' disabled' : ''}`}>
-        <SpecialRadio label="Direct only" checked={value === 'direct'} disabled={disabled} onClick={() => setTypeFor(data, update, owner, 'direct')} />
-        <SpecialRadio label="All levels" checked={value === 'all'} disabled={disabled} onClick={() => setTypeFor(data, update, owner, 'all')} />
+        <SpecialRadio label={T('directOnly', 'Direct only')} checked={value === 'direct'} disabled={disabled} onClick={() => setTypeFor(data, update, owner, 'direct')} />
+        <SpecialRadio label={T('allLevels', 'All levels')} checked={value === 'all'} disabled={disabled} onClick={() => setTypeFor(data, update, owner, 'all')} />
       </div>
     );
   };
   return (
     <div className="gc-goto-special">
       <div className="gc-dialog-groupbox gc-goto-select-group">
-        <legend>Select</legend>
+        <legend>{T('select', 'Select')}</legend>
         <div className="gc-goto-columns">
           <div className="gc-goto-column">
-            {radio('notes', 'Notes')}
-            {radio('constants', 'Constants')}
-            {radio('formulas', 'Formulas')}
+            {radio('notes', T('notes', 'Notes'))}
+            {radio('constants', T('constants', 'Constants'))}
+            {radio('formulas', T('formulas', 'Formulas'))}
             <div className={`gc-goto-filters${filtersOn ? '' : ' disabled'}`}>
-              <SpecialCheck label="Numbers" checked={data.numbers !== false} disabled={!isConstants && !isFormulas} onChange={(value) => update('numbers', value)} />
-              <SpecialCheck label="Text" checked={data.text !== false} disabled={!isConstants && !isFormulas} onChange={(value) => update('text', value)} />
-              <SpecialCheck label="Logicals" checked={data.logicals !== false} disabled={!isConstants && !isFormulas} onChange={(value) => update('logicals', value)} />
-              <SpecialCheck label="Errors" checked={data.errors !== false} disabled={!isConstants && !isFormulas} onChange={(value) => update('errors', value)} />
+              <SpecialCheck label={T('numbers', 'Numbers')} checked={data.numbers !== false} disabled={!isConstants && !isFormulas} onChange={(value) => update('numbers', value)} />
+              <SpecialCheck label={T('text', 'Text')} checked={data.text !== false} disabled={!isConstants && !isFormulas} onChange={(value) => update('text', value)} />
+              <SpecialCheck label={T('logicals', 'Logicals')} checked={data.logicals !== false} disabled={!isConstants && !isFormulas} onChange={(value) => update('logicals', value)} />
+              <SpecialCheck label={T('errors', 'Errors')} checked={data.errors !== false} disabled={!isConstants && !isFormulas} onChange={(value) => update('errors', value)} />
             </div>
-            {radio('blanks', 'Blanks')}
-            {radio('currentRegion', 'Current region')}
-            {radio('currentArray', 'Current array')}
-            {radio('objects', 'Objects')}
+            {radio('blanks', T('blanks', 'Blanks'))}
+            {radio('currentRegion', T('currentRegion', 'Current region'))}
+            {radio('currentArray', T('currentArray', 'Current array'))}
+            {radio('objects', T('objects', 'Objects'))}
           </div>
           <div className="gc-goto-column">
-            {radio('rowDifferences', 'Row differences')}
-            {radio('columnDifferences', 'Column differences')}
-            {radio('precedents', 'Precedents')}
+            {radio('rowDifferences', T('rowDifferences', 'Row differences'))}
+            {radio('columnDifferences', T('columnDifferences', 'Column differences'))}
+            {radio('precedents', T('precedents', 'Precedents'))}
             {levelGroup('precedents')}
-            {radio('dependents', 'Dependents')}
+            {radio('dependents', T('dependents', 'Dependents'))}
             {levelGroup('dependents')}
-            {radio('lastCell', 'Last cell')}
-            {radio('visibleCells', 'Visible cells only')}
-            {radio('conditionalFormats', 'Conditional formats')}
-            {radio('dataValidation', 'Data validation')}
+            {radio('lastCell', T('lastCell', 'Last cell'))}
+            {radio('visibleCells', T('visibleCells', 'Visible cells only'))}
+            {radio('conditionalFormats', T('conditionalFormats', 'Conditional formats'))}
+            {radio('dataValidation', T('dataValidation', 'Data validation'))}
             <div className={`gc-goto-levels${option === 'conditionalFormats' || option === 'dataValidation' ? '' : ' disabled'}`}>
-              <SpecialRadio label="All" checked={String(data.formatLevel ?? 'all') === 'all'} disabled={option !== 'conditionalFormats' && option !== 'dataValidation'} onClick={() => update('formatLevel', 'all')} />
-              <SpecialRadio label="Same" checked={String(data.formatLevel ?? 'all') === 'same'} disabled={option !== 'conditionalFormats' && option !== 'dataValidation'} onClick={() => update('formatLevel', 'same')} />
+              <SpecialRadio label={T('all', 'All')} checked={String(data.formatLevel ?? 'all') === 'all'} disabled={option !== 'conditionalFormats' && option !== 'dataValidation'} onClick={() => update('formatLevel', 'all')} />
+              <SpecialRadio label={T('same', 'Same')} checked={String(data.formatLevel ?? 'all') === 'same'} disabled={option !== 'conditionalFormats' && option !== 'dataValidation'} onClick={() => update('formatLevel', 'same')} />
             </div>
           </div>
         </div>
@@ -638,32 +639,32 @@ export function SeriesBody({ data, update }: {
     <div className="gc-series-dialog">
       <div className="gc-series-groups">
         <div className="gc-dialog-groupbox gc-series-in">
-          <legend>Series in</legend>
-          <SpecialRadio label="Rows" checked={String(data.seriesIn) === 'rows'} onClick={() => update('seriesIn', 'rows')} />
-          <SpecialRadio label="Columns" checked={String(data.seriesIn) !== 'rows'} onClick={() => update('seriesIn', 'columns')} />
+          <legend>{T('seriesIn', 'Series in')}</legend>
+          <SpecialRadio label={T('rows', 'Rows')} checked={String(data.seriesIn) === 'rows'} onClick={() => update('seriesIn', 'rows')} />
+          <SpecialRadio label={T('columns', 'Columns')} checked={String(data.seriesIn) !== 'rows'} onClick={() => update('seriesIn', 'columns')} />
         </div>
         <div className="gc-dialog-groupbox gc-series-type">
-          <legend>Type</legend>
-          <SpecialRadio label="Linear" checked={type === 'linear'} onClick={() => update('type', 'linear')} />
-          <SpecialRadio label="Growth" checked={type === 'growth'} onClick={() => update('type', 'growth')} />
-          <SpecialRadio label="Date" checked={type === 'date'} onClick={() => update('type', 'date')} />
-          <SpecialRadio label="AutoFill" checked={type === 'autoFill'} onClick={() => update('type', 'autoFill')} />
+          <legend>{T('type', 'Type')}</legend>
+          <SpecialRadio label={T('linear', 'Linear')} checked={type === 'linear'} onClick={() => update('type', 'linear')} />
+          <SpecialRadio label={T('growth', 'Growth')} checked={type === 'growth'} onClick={() => update('type', 'growth')} />
+          <SpecialRadio label={T('date2', 'Date')} checked={type === 'date'} onClick={() => update('type', 'date')} />
+          <SpecialRadio label={T('autoFill', 'AutoFill')} checked={type === 'autoFill'} onClick={() => update('type', 'autoFill')} />
         </div>
         <div className={`gc-dialog-groupbox gc-series-unit${isDate ? '' : ' disabled'}`}>
-          <legend>Date unit</legend>
+          <legend>{T('dateUnit', 'Date unit')}</legend>
           {(['day', 'weekday', 'month', 'year'] as const).map((unit) => (
             <SpecialRadio key={unit} label={unit[0]!.toUpperCase() + unit.slice(1)} disabled={!isDate}
               checked={String(data.unit ?? 'day') === unit} onClick={() => update('unit', unit)} />
           ))}
         </div>
       </div>
-      <SpecialCheck label="Trend" checked={trend} onChange={(value) => update('trend', value)} />
+      <SpecialCheck label={T('trend', 'Trend')} checked={trend} onChange={(value) => update('trend', value)} />
       <div className="gc-series-steps">
-        <span className="gc-dialog-label">Step Value</span>
-        <input className="gc-dialog-input gc-series-step" aria-label="Step Value" disabled={trend} value={String(data.step ?? '')}
+        <span className="gc-dialog-label">{T('stepValue', 'Step Value')}</span>
+        <input className="gc-dialog-input gc-series-step" aria-label={T('stepValue', 'Step Value')} disabled={trend} value={String(data.step ?? '')}
           onChange={(event) => update('step', event.target.value)} onFocus={() => setStepFocused(true)} />
-        <span className="gc-dialog-label">Stop Value</span>
-        <input className="gc-dialog-input gc-series-stop" aria-label="Stop Value" disabled={trend} value={String(data.stop ?? '')}
+        <span className="gc-dialog-label">{T('stopValue', 'Stop Value')}</span>
+        <input className="gc-dialog-input gc-series-stop" aria-label={T('stopValue', 'Stop Value')} disabled={trend} value={String(data.stop ?? '')}
           onChange={(event) => update('stop', event.target.value)} />
       </div>
     </div>

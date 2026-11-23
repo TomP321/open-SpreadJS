@@ -5,6 +5,7 @@
 import type { DesignerApi as Designer } from './designer-api.js';
 import type GC from '@mescius/spread-sheets';
 import { emitDesignerEvent } from './designer-registry.js';
+import { messageText } from './resolve.js';
 
 export function newWorkbook(d: Designer): void {
   const wb = d.getWorkbook();
@@ -37,7 +38,7 @@ export async function openFile(d: Designer, file?: File): Promise<void> {
     emitDesignerEvent('FileLoaded', { designer: d, fileName: file.name });
   } catch (error) {
     emitDesignerEvent('FileLoaded', { designer: d, fileName: file.name, error });
-    d.showMessageBox(`Cannot open the specified file.\n${String((error as Error)?.message ?? error)}`, 'Open', 3);
+    d.showMessageBox(messageText(d, 'openFailed', 'Cannot open the specified file.\n{0}', [String((error as Error)?.message ?? error)]), messageText(d, 'open', 'Open'), 3);
   }
 }
 export function saveFile(d: Designer, asNew = false): void {

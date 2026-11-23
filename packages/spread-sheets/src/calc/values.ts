@@ -217,16 +217,25 @@ const DAY = 86400000;
 /** SpreadJS date serial epoch: 1899-12-30 (no 1900 leap-year fiction). */
 export const SERIAL_EPOCH = Date.UTC(1899, 11, 30);
 
+/**
+ * Serial <-> wall-clock, never UTC-instant: the trial's serial of a cell Date
+ * is built from its LOCAL fields (probe on this machine under Europe/Rome:
+ * `new Date(2024,0,15)` + 30 → 45336 exactly, not 45335.9583). A raw
+ * `getTime()` difference would shift every local-midnight date by the TZ
+ * offset, so we re-interpret the components in a UTC frame on both directions.
+ */
 export function dateToSerial(date: Date): number {
-  return (date.getTime() - SERIAL_EPOCH) / DAY;
+  const ms = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+  return (ms - SERIAL_EPOCH) / DAY;
 }
 export function serialToDate(serial: number): Date {
-  return new Date(SERIAL_EPOCH + Math.round(serial * DAY));
+  const ms = SERIAL_EPOCH + Math.round(serial * DAY);
+  const u = new Date(ms);
+  return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds(), u.getUTCMilliseconds());
 }
-/** UTC based construction used by DATE/TIME so results do not depend on TZ. */
+/** Wall-clock construction used by DATE/TIME so results do not depend on TZ. */
 export function makeDate(year: number, month: number, day: number, hours = 0, minutes = 0, seconds = 0): Date {
-  const date = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
-  return date;
+  return new Date(year, month - 1, day, hours, minutes, seconds);
 }
 
 function scientificText(precision: string): string {

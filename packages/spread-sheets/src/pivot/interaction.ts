@@ -11,6 +11,7 @@ import type { LayoutCell } from './layout.js';
 import { PivotTableFieldType } from './types.js';
 import type { PivotCaptionFilterOperator, PivotValueFilterOperator } from './types.js';
 import { asRecord } from '../object-access.js';
+import { ltext } from '../localization.js';
 
 interface Rect { x: number; y: number; width: number; height: number }
 
@@ -115,13 +116,15 @@ function addSubmenuArrow(row: HTMLElement): void {
   row.append(arrow);
 }
 
-const CAPTION_OPERATORS: [string, number][] = [
-  ['Equals', 0], ['Does Not Equal', 1], ['Begins With', 2], ['Does Not Begin With', 3],
-  ['Ends With', 4], ['Does Not End With', 5], ['Contains', 6], ['Does Not Contain', 7],
+const ptext = (key: string, fallback: string, ...args: (string | number)[]): string => ltext(`pivotMenu.${key}`, fallback, ...args);
+/** [resource key, built-in English caption, condition operator code]. */
+const CAPTION_OPERATORS: [string, string, number][] = [
+  ['equals', 'Equals', 0], ['doesNotEqual', 'Does Not Equal', 1], ['beginsWith', 'Begins With', 2], ['doesNotBeginWith', 'Does Not Begin With', 3],
+  ['endsWith', 'Ends With', 4], ['doesNotEndWith', 'Does Not End With', 5], ['contains', 'Contains', 6], ['doesNotContain', 'Does Not Contain', 7],
 ];
-const VALUE_OPERATORS: [string, number][] = [
-  ['Equals', 0], ['Does Not Equal', 1], ['Greater Than', 2], ['Greater Than Or Equal To', 3],
-  ['Less Than', 4], ['Less Than Or Equal To', 5], ['Between', 6], ['Not Between', 7],
+const VALUE_OPERATORS: [string, string, number][] = [
+  ['equals', 'Equals', 0], ['doesNotEqual', 'Does Not Equal', 1], ['greaterThan', 'Greater Than', 2], ['greaterThanOrEqual', 'Greater Than Or Equal To', 3],
+  ['lessThan', 'Less Than', 4], ['lessThanOrEqual', 'Less Than Or Equal To', 5], ['between', 'Between', 6], ['notBetween', 'Not Between', 7],
 ];
 
 /** The "Select field" filter/sort dropdown of a pivot header button. */
@@ -133,7 +136,7 @@ export function openPivotFilterDropdown(table: PivotTable, fieldName: string, ho
   panel.style.top = `${y}px`;
 
   const title = document.createElement('div');
-  title.textContent = 'Select field';
+  title.textContent = ptext('selectField', 'Select field');
   title.style.cssText = 'padding:2px 6px 4px;';
   const select = document.createElement('select');
   select.style.cssText = 'width:calc(100% - 12px);margin:0 6px 4px;font:' + FONT + ';';
@@ -153,15 +156,15 @@ export function openPivotFilterDropdown(table: PivotTable, fieldName: string, ho
     panel.append(row);
     return row;
   };
-  addRow('Sort A to Z', 'A\u2193', 0, () => { table.sort(select.value, { sortType: 0 /* asc */ }); panel.remove(); });
-  addRow('Sort Z to A', 'Z\u2191', 0, () => { table.sort(select.value, { sortType: 1 /* desc */ }); panel.remove(); });
-  addRow('More Sort Options...', undefined, 1, () => openMoreSortDialog(table, select.value, panel, host));
+  addRow(ptext('sortAsc', 'Sort A to Z'), 'A\u2193', 0, () => { table.sort(select.value, { sortType: 0 /* asc */ }); panel.remove(); });
+  addRow(ptext('sortDesc', 'Sort Z to A'), 'Z\u2191', 0, () => { table.sort(select.value, { sortType: 1 /* desc */ }); panel.remove(); });
+  addRow(ptext('moreSort', 'More Sort Options...'), undefined, 1, () => openMoreSortDialog(table, select.value, panel, host));
   const hasFilter = (name: string): boolean => {
     const label = table.labelFilter(name) as { textItem?: { isAll: boolean } } | undefined;
     const value = table.valueFilter(name) as unknown;
     return !!(label && label.textItem && !label.textItem.isAll) || !!value;
   };
-  const clearRow = addRow(`Clear Filter From "${select.value}"`, '⧩', 1, () => {
+  const clearRow = addRow(ptext('clearFilterFrom', 'Clear Filter From "{0}"', select.value), '⧩', 1, () => {
     if (!hasFilter(select.value)) return;
     table.labelFilter(select.value, null);
     table.valueFilter(select.value, null);
@@ -172,9 +175,9 @@ export function openPivotFilterDropdown(table: PivotTable, fieldName: string, ho
     clearRow.style.color = on ? '#333' : '#a6a6a6';
     clearRow.style.cursor = on ? 'pointer' : 'default';
   };
-  const labelRow = addRow('Label Filters', undefined, 1, null);
+  const labelRow = addRow(ptext('labelFilters', 'Label Filters'), undefined, 1, null);
   addSubmenuArrow(labelRow);
-  const valueRow = addRow('Value Filters', undefined, 1, null);
+  const valueRow = addRow(ptext('valueFilters', 'Value Filters'), undefined, 1, null);
   addSubmenuArrow(valueRow);
   const submenuFor = (kind: 'label' | 'value'): (() => void) => () => {
     openSub?.remove();
@@ -183,10 +186,11 @@ export function openPivotFilterDropdown(table: PivotTable, fieldName: string, ho
     styleDropdown(submenu);
     submenu.style.left = `${panel.offsetWidth - 6}px`;
     submenu.style.top = `${(kind === 'label' ? labelRow : valueRow).offsetTop}px`;
-    for (const [text, op] of (kind === 'label' ? CAPTION_OPERATORS : VALUE_OPERATORS)) {
+    for (const [opKey, caption, op] of (kind === 'label' ? CAPTION_OPERATORS : VALUE_OPERATORS)) {
+      const text = ptext(`operator.${opKey}`, caption);
       const row = dropRow(text, {});
       row.addEventListener('click', () => {
-        const value = window.prompt(`${text} — enter value:`, kind === 'value' ? '100' : 'Mom');
+        const value = window.prompt(ptext('enterValue', '{0} — enter value:', text), kind === 'value' ? '100' : 'Mom');
         if (value === null) return;
         if (kind === 'label')
           table.labelFilter(select.value, { conType: 1 /* caption */, val: [value], operator: op as PivotCaptionFilterOperator } as never);
@@ -208,7 +212,7 @@ export function openPivotFilterDropdown(table: PivotTable, fieldName: string, ho
   valueRow.addEventListener('mouseenter', submenuFor('value'));
 
   const search = document.createElement('input');
-  search.placeholder = 'Search';
+  search.placeholder = ptext('search', 'Search');
   search.style.cssText = 'width:calc(100% - 12px);margin:6px;padding:3px 4px;font:' + FONT + ';box-sizing:border-box;';
   panel.append(search);
   const checkRow = document.createElement('div');
@@ -227,7 +231,7 @@ export function openPivotFilterDropdown(table: PivotTable, fieldName: string, ho
     });
     return span;
   };
-  checkRow.append(mkCheckAll('Check All', '✔', true), mkCheckAll('Uncheck All', '✖', false));
+  checkRow.append(mkCheckAll(ptext('checkAll', 'Check All'), '✔', true), mkCheckAll(ptext('uncheckAll', 'Uncheck All'), '✖', false));
   panel.append(checkRow);
 
   const list = document.createElement('div');
@@ -266,7 +270,7 @@ export function openPivotFilterDropdown(table: PivotTable, fieldName: string, ho
       + (primary ? 'border:2px solid #3c89d9;background:#fff;color:#333;' : 'border:1px solid #adadad;background:#e4e4e4;color:#333;');
     return button;
   };
-  const ok = mkButton('OK', true);
+  const ok = mkButton(ptext('ok', 'OK'), true);
   ok.addEventListener('click', () => {
     const boxes = [...list.querySelectorAll('input[type=checkbox]')] as HTMLInputElement[];
     const all = boxes.length > 0 && boxes.every(box => box.checked);
@@ -276,7 +280,7 @@ export function openPivotFilterDropdown(table: PivotTable, fieldName: string, ho
     else table.labelFilter(select.value, { textItem: { list: [], isAll: false } });
     panel.remove();
   });
-  const cancel = mkButton('Cancel', false);
+  const cancel = mkButton(ptext('cancel', 'Cancel'), false);
   cancel.addEventListener('click', () => panel.remove());
   buttons.append(ok, cancel);
   panel.append(buttons);
@@ -302,7 +306,7 @@ function openMoreSortDialog(table: PivotTable, fieldName: string, panel: HTMLEle
   dialog.style.top = '60px';
   dialog.style.width = '210px';
   const title = document.createElement('div');
-  title.textContent = `Sort "${fieldName}" By`;
+  title.textContent = ptext('sortBy', 'Sort "{0}" By', fieldName);
   title.style.cssText = 'padding:4px 6px;';
   dialog.append(title);
   const makeRadio = (labelText: string, checked: boolean): HTMLLabelElement => {
@@ -316,14 +320,14 @@ function openMoreSortDialog(table: PivotTable, fieldName: string, panel: HTMLEle
     return label;
   };
   const current = ((table.sort as (n: string, i?: unknown) => unknown)(fieldName) as { sortType?: number } | undefined)?.sortType ?? 0;
-  const manual = makeRadio('Manual', current === 2);
-  const asc = makeRadio('Ascending (A to Z)', current === 0);
-  const desc = makeRadio('Descending (Z to A)', current === 1);
+  const manual = makeRadio(ptext('sortManual', 'Manual'), current === 2);
+  const asc = makeRadio(ptext('sortAscending', 'Ascending (A to Z)'), current === 0);
+  const desc = makeRadio(ptext('sortDescending', 'Descending (Z to A)'), current === 1);
   dialog.append(manual, asc, desc);
   const buttons = document.createElement('div');
   buttons.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;padding:6px;';
   const ok = document.createElement('button');
-  ok.textContent = 'OK';
+  ok.textContent = ptext('ok', 'OK');
   ok.style.cssText = 'font:' + FONT + ';padding:2px 16px;cursor:pointer;border:1px solid #adadad;background:#e4e4e4;';
   ok.addEventListener('click', () => {
     const sortType = asc.querySelector('input')!.checked ? 0 : desc.querySelector('input')!.checked ? 1 : 2;
@@ -334,7 +338,7 @@ function openMoreSortDialog(table: PivotTable, fieldName: string, panel: HTMLEle
     panel.remove();
   });
   const cancel = document.createElement('button');
-  cancel.textContent = 'Cancel';
+  cancel.textContent = ptext('cancel', 'Cancel');
   cancel.style.cssText = ok.style.cssText;
   cancel.addEventListener('click', () => dialog.remove());
   buttons.append(ok, cancel);

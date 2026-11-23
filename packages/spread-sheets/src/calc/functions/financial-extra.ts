@@ -26,28 +26,28 @@ function roundDate(serial: number): Date {
 }
 
 function addMonths(date: Date, months: number): Date {
-  const targetMonth = date.getUTCMonth() + months;
-  const year = date.getUTCFullYear() + Math.floor(targetMonth / 12);
+  const targetMonth = date.getMonth() + months;
+  const year = date.getFullYear() + Math.floor(targetMonth / 12);
   const month = ((targetMonth % 12) + 12) % 12;
-  const day = Math.min(date.getUTCDate(), new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
-  return new Date(Date.UTC(year, month, day));
+  const day = Math.min(date.getDate(), new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
+  return new Date(year, month, day);
 }
 
 
 function basisDays(start: Date, end: Date, basis: number): number {
   if (basis === 0) return days360(start, end, false);
   if (basis === 4) return days360(start, end, true);
-  return Math.round((end.getTime() - start.getTime()) / DAY);
+  return Math.round(dateToSerial(end) - dateToSerial(start));
 }
 
 function yearBasis(basis: number, start: Date, end: Date): number {
   if (basis === 2) return 360;
   if (basis === 3) return 365;
   if (basis === 1) {
-    const years = end.getUTCFullYear() - start.getUTCFullYear();
-    if (years <= 0) return (end.getUTCFullYear() % 4 === 0 ? 366 : 365);
+    const years = end.getFullYear() - start.getFullYear();
+    if (years <= 0) return (end.getFullYear() % 4 === 0 ? 366 : 365);
     let total = 0;
-    for (let year = start.getUTCFullYear(); year <= end.getUTCFullYear(); year++)
+    for (let year = start.getFullYear(); year <= end.getFullYear(); year++)
       total += (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
     return total / (years + 1);
   }
@@ -84,10 +84,10 @@ function couponSchedule(
   }
   periods++;
   const thirty360 = basis === 0 || basis === 4;
-  const daysInPeriod = thirty360 ? 360 / frequency : (next.getTime() - previous.getTime()) / DAY;
+  const daysInPeriod = thirty360 ? 360 / frequency : dateToSerial(next) - dateToSerial(previous);
   const daysFromPrevious = thirty360
     ? days360(previous, settlement, basis === 4)
-    : (settlement.getTime() - previous.getTime()) / DAY;
+    : dateToSerial(settlement) - dateToSerial(previous);
   const daysToNext = daysInPeriod - daysFromPrevious;
   return { previous, next, periods, daysInPeriod, daysFromPrevious, daysToNext };
 }

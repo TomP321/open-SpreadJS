@@ -10,6 +10,7 @@ import type { SlicerStyle } from './styles.js';
 import type { GeneralSlicerData } from './general-data.js';
 import type { Table } from '../tables.js';
 import type { ISlicerFilteredData, ISlicerListener } from './types.js';
+import { SLICER_BLANK_TEXT, slicerBlankLabel } from './types.js';
 import { GC } from '../../generated/enums.js';
 
 const SortState = GC.Spread.Sheets.SortState;
@@ -87,7 +88,7 @@ export class ItemSlicer implements ISlicerListener {
         + `top:${Number(this.props.showHeader !== false ? 27 : 2) + position * itemHeight}px;height:${itemHeight - 3}px;`
         + `background:${background};border:1px solid ${border};border-radius:2px;box-sizing:border-box;`
         + `font:normal 11pt Calibri;color:#000;line-height:${itemHeight - 1}px;padding-left:4px;overflow:hidden;`
-        + `white-space:nowrap;text-overflow:ellipsis">${displayText(entry.text)}</div>`;
+        + `white-space:nowrap;text-overflow:ellipsis">${entry.text === '' || entry.text === SLICER_BLANK_TEXT ? slicerBlankLabel() : displayText(entry.text)}</div>`;
     }).join('');
     const headerHtml = this.props.showHeader === false ? ''
       : `<div class="gc-slicer-header" style="position:absolute;left:0;right:0;top:0;height:26px;font:bold 11pt Calibri;`

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import GC from '@mescius/spread-sheets';
+import { setResources } from '../src/resolve.js';
 import {
-  allCategory, allFunctions, categoryFunctions, categoryList, categoryOf, formulaFromArguments,
-  functionCategories, functionArgumentRows, functionDescription, functionParameters, functionSignature, dialogCategories,
+  activeCalcLanguage, allCategory, allFunctions, categoryFunctions, categoryList, categoryOf, formulaFromArguments,
+  functionCategories, functionArgumentRows, functionDescription, functionDescriptionLocalized, functionDisplayName,
+  functionListSeparator, functionParameters, functionSignature, dialogCategories,
   moreFunctionCategories, recommendedCategory, ribbonCategories, ribbonFunctions, ribbonHiddenFunctions, searchFunctions,
 } from '../src/function-library.js';
 
@@ -90,5 +93,51 @@ describe('Designer function library', () => {
     const unknown = allFunctions.filter((name) => functionDescription(name) === '');
     expect(unknown).toEqual([]);
     expect(functionCategories).toContain('Math and Trigonometry');
+  });
+});
+
+describe('TASK 89: localized function UI with the Italian calc language package', () => {
+  const LP = GC.Spread.CalcEngine.LanguagePackages;
+  it('displays and inserts Italian names with the culture separator, then restores English', () => {
+    expect(LP.languagePackages('it')).toBe('it');
+    try {
+      expect(functionDisplayName('SUM')).toBe('SOMMA');
+      expect(functionDisplayName('VLOOKUP')).toBe('CERCA.VERT');
+      expect(functionDisplayName('MAX')).toBe('MAX'); // Excel-IT keeps the name
+      expect(functionListSeparator()).toBe(';');
+      expect(functionSignature('ABS')).toBe('ASS(number)');
+      expect(formulaFromArguments('ROUND', ['=1,5', '', '0'])).toBe('ARROTONDA(1,5;0)');
+      // The dialog data stays canonical English; only display is localized.
+      expect(categoryList('Math and Trigonometry')).toContain('SUM');
+      expect(searchFunctions('somma')).toContain('SUM');
+      expect(searchFunctions('CERCA.VERT')).toContain('VLOOKUP');
+    } finally {
+      // The public d.ts types the parameter as `string`, so reset with the empty-name
+      // form (deactivates; `null` does too but is untyped — covered in the core tests).
+      LP.languagePackages('');
+    }
+    expect(functionDisplayName('SUM')).toBe('SUM');
+    expect(functionListSeparator()).toBe(',');
+  });
+  it('prefers the loaded resource language descriptions and falls back to the English catalog', () => {
+    expect(functionDescriptionLocalized({ functionDescriptions: { SUM: 'Somma i valori specificati.' } }, 'SUM'))
+      .toBe('Somma i valori specificati.');
+    expect(functionDescriptionLocalized({ functionDescriptions: { STDEV_P: 'x' } }, 'STDEV.P')).toBe('x');
+    expect(functionDescriptionLocalized({}, 'SUM').toLowerCase()).toContain('number');
+  });
+  it('merges the loaded resource descriptions into the active package for the core autocomplete', () => {
+    setResources({ functionDescriptions: { TESTONLY_FUNCTION: 'Solo test.' } });
+    expect(LP.languagePackages('it')).toBe('it');
+    try {
+      const pkg = activeCalcLanguage();
+      expect(pkg?.languageName).toBe('it');
+      expect(pkg?.description('TESTONLY_FUNCTION')).toBe('Solo test.');
+      // Dotted catalog names are addressed by underscore keys in the resources and must reverse-map.
+      expect((pkg?.description('STDEV.P') ?? '').toLowerCase()).toContain('standard deviation');
+      // Genuine underscore catalog names (`BC_CODABAR`) are NOT rewritten to dots.
+      expect(pkg?.description('BC.CODABAR')).toBeUndefined();
+    } finally {
+      LP.languagePackages('');
+    }
   });
 });

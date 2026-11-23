@@ -5,44 +5,55 @@
 import type { IDialogTemplate } from '../types.js';
 import { TemplateNames } from '../names-generated.js';
 
+/** TASK 87: dialog captions are placeholders under res.dialogs, resolved by the dialog host. */
+const sr = (key: string): string => `\${res.dialogs.${key}}`;
+
 export const insertPivotTableTemplate: IDialogTemplate = {
   templateName: TemplateNames.InsertPivotTableDialogTemplate ?? 'insertPivotTableDialogTemplate',
-  title: 'Create PivotTable', modal: true,
+  title: sr('createPivotTable'), modal: true,
   content: [{ type: 'PivotCreateBody', bindingPath: '' }],
-  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+  buttons: [{ text: sr('oK'), buttonType: 'Ok', closeAfterClick: true }, { text: sr('cancel'), buttonType: 'Cancel', closeAfterClick: true }],
 };
 
 export const changeDataSourceTemplate: IDialogTemplate = {
   templateName: TemplateNames.PivotTableChangeDataSourceTemplate ?? 'PivotTableChangeDataSourceTemplate',
-  title: 'Change Data Source', modal: true,
+  title: sr('changeDataSource'), modal: true,
   content: [{ type: 'PivotCreateBody', bindingPath: '' }],
-  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+  buttons: [{ text: sr('oK'), buttonType: 'Ok', closeAfterClick: true }, { text: sr('cancel'), buttonType: 'Cancel', closeAfterClick: true }],
 };
 
 export const movePivotTableTemplate: IDialogTemplate = {
   templateName: TemplateNames.MovePivotTableDialogTemplate ?? 'movePivotTableDialogTemplate',
-  title: 'Move PivotTable', modal: true,
+  title: sr('movePivotTable'), modal: true,
   content: [{ type: 'PivotMoveBody', bindingPath: '' }],
-  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+  buttons: [{ text: sr('oK'), buttonType: 'Ok', closeAfterClick: true }, { text: sr('cancel'), buttonType: 'Cancel', closeAfterClick: true }],
 };
 
 export const valueFieldSettingsTemplate: IDialogTemplate = {
   templateName: 'pivotValueFieldSettingsDialogTemplate',
-  title: 'Value Field Settings', modal: true, hideFooter: true,
+  title: sr('valueFieldSettings'), modal: true, hideFooter: true,
   content: [{ type: 'PivotValueFieldBody', bindingPath: '' }],
 };
 
 export const fieldSettingsTemplate: IDialogTemplate = {
   templateName: 'pivotFieldSettingsDialogTemplate',
-  title: 'Field Settings', modal: true, hideFooter: true,
+  title: sr('fieldSettings'), modal: true, hideFooter: true,
   content: [{ type: 'PivotFieldSettingsBody', bindingPath: '' }],
 };
 
 export const pivotTableOptionsTemplate: IDialogTemplate = {
   templateName: TemplateNames.PivotTableOptionsDialogTemplate ?? 'pivotTableOptionsDialogTemplate',
-  title: 'PivotTable Options', modal: true,
+  title: sr('pivotTableOptions'), modal: true,
   content: [{ type: 'PivotOptionsBody', bindingPath: '' }],
-  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+  buttons: [{ text: sr('oK'), buttonType: 'Ok', closeAfterClick: true }, { text: sr('cancel'), buttonType: 'Cancel', closeAfterClick: true }],
+};
+
+/* TASK 93: the trial's Grouping dialog (date units / number buckets). */
+export const pivotGroupingTemplate: IDialogTemplate = {
+  templateName: 'pivotGroupingDialogTemplate',
+  title: sr('grouping'), modal: true,
+  content: [{ type: 'PivotGroupingBody', bindingPath: '' }],
+  buttons: [{ text: sr('oK'), buttonType: 'Ok', closeAfterClick: true }, { text: sr('cancel'), buttonType: 'Cancel', closeAfterClick: true }],
 };
 
 /* TASK 77: the PivotTable Analyze ▸ Fields, Items & Sets dialogs + the Show Report Filter
@@ -50,33 +61,33 @@ export const pivotTableOptionsTemplate: IDialogTemplate = {
  * replaces them through `Designer.registerTemplate` exactly like the trial's. */
 export const calculatedFieldTemplate: IDialogTemplate = {
   templateName: TemplateNames.CalculatedFieldsDialogTemplate ?? 'calculatedFieldsDialogTemplate',
-  title: 'Insert Calculated Field', modal: true,
+  title: sr('insertCalculatedField'), modal: true,
   content: [{ type: 'PivotCalcFieldBody', bindingPath: '' }],
-  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+  buttons: [{ text: sr('oK'), buttonType: 'Ok', closeAfterClick: true }, { text: sr('cancel'), buttonType: 'Cancel', closeAfterClick: true }],
 };
 
 export const calculatedItemTemplate: IDialogTemplate = {
   templateName: TemplateNames.CalculatedItemsDialogTemplate ?? 'calculatedItemsDialogTemplate',
-  title: 'Insert Calculated Item', modal: true,
+  title: sr('insertCalculatedItem'), modal: true,
   content: [{ type: 'PivotCalcItemBody', bindingPath: '' }],
-  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+  buttons: [{ text: sr('oK'), buttonType: 'Ok', closeAfterClick: true }, { text: sr('cancel'), buttonType: 'Cancel', closeAfterClick: true }],
 };
 
 export const calcItemSolveOrderTemplate: IDialogTemplate = {
   templateName: TemplateNames.CalculatedItemSolveOrderDialogTemplate ?? 'calculatedItemSolveOrderDialogTemplate',
-  title: 'Calculated Item Solve Order', modal: true, hideFooter: true,
+  title: sr('calculatedItemSolveOrder'), modal: true, hideFooter: true,
   content: [{ type: 'PivotSolveOrderBody', bindingPath: '' }],
 };
 
 export const reportFilterPagesTemplate: IDialogTemplate = {
   templateName: TemplateNames.PivotShowReportFilterDialogTemplate ?? 'pivotShowReportFilterDialogTemplate',
-  title: 'Show Report Filter Pages', modal: true,
+  title: sr('showReportFilterPages'), modal: true,
   content: [{ type: 'PivotReportFilterBody', bindingPath: '' }],
-  buttons: [{ text: 'OK', buttonType: 'Ok', closeAfterClick: true }, { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true }],
+  buttons: [{ text: sr('oK'), buttonType: 'Ok', closeAfterClick: true }, { text: sr('cancel'), buttonType: 'Cancel', closeAfterClick: true }],
 };
 
 export const pivotTemplates: IDialogTemplate[] = [
   insertPivotTableTemplate, changeDataSourceTemplate, movePivotTableTemplate,
-  valueFieldSettingsTemplate, fieldSettingsTemplate, pivotTableOptionsTemplate,
+  valueFieldSettingsTemplate, fieldSettingsTemplate, pivotTableOptionsTemplate, pivotGroupingTemplate,
   calculatedFieldTemplate, calculatedItemTemplate, calcItemSolveOrderTemplate, reportFilterPagesTemplate,
 ];

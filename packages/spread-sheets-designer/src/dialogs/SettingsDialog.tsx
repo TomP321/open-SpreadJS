@@ -16,6 +16,13 @@ import {
   type SettingField, type SettingGroup, type SettingLayout, type SettingTab, type SettingValue,
 } from '../settings-model.js';
 import { ColorCombo } from './ColorCombo.js';
+import { resolveText } from '../resolve.js';
+
+/** TASK 87: every caption from `settings-model.ts` is a `${'${res.settings.<key>}'}` placeholder;
+ *  resolve it against the loaded language package (English values are byte-identical). */
+const rt = (designer: Designer, value: string): string => resolveText(value, designer.resources);
+/** Placeholder builder for literals first introduced by this file. */
+const st = (key: string): string => `\${res.settings.${key}}`;
 
 export interface SettingsDialogData {
   tabOption?: string;
@@ -47,18 +54,18 @@ function FieldControl({ field, value, layout, designer, onChange }: {
       return (
         <label className={`gc-dialog-checkbox gc-setting-checkbox${field.indent ? ' gc-setting-indent' : ''}`}>
           <input type="checkbox" checked={isOn(value)} onChange={(event) => onChange(event.target.checked)} />
-          <span>{field.label}</span>
+          <span>{rt(designer, field.label)}</span>
         </label>
       );
     case 'combo': {
       const index = (field.options ?? []).findIndex((option) => String(option.value) === String(value ?? ''));
       return (
         <label className={`gc-setting-line${field.indent ? ' gc-setting-indent' : ''}`} style={{ '--gc-setting-label': `${layout.label ?? 130}px` } as React.CSSProperties}>
-          <span className="gc-setting-label">{field.label}</span>
-          <CustomSelect className="gc-dialog-select gc-setting-combo" ariaLabel={field.label}
+          <span className="gc-setting-label">{rt(designer, field.label)}</span>
+          <CustomSelect className="gc-dialog-select gc-setting-combo" ariaLabel={rt(designer, field.label)}
             style={{ width: `${field.width ?? layout.combo ?? layout.editor ?? 100}px` }}
             value={index >= 0 ? index : 0}
-            options={(field.options ?? []).map((option, at) => ({ text: option.text, value: at }))}
+            options={(field.options ?? []).map((option, at) => ({ text: rt(designer, option.text), value: at }))}
             onChange={(next) => onChange(field.options?.[Number(next)]?.value ?? '')} />
         </label>
       );
@@ -66,21 +73,21 @@ function FieldControl({ field, value, layout, designer, onChange }: {
     case 'number':
       return (
         <label className={`gc-setting-line${field.indent ? ' gc-setting-indent' : ''}`} style={{ '--gc-setting-label': `${layout.label ?? 130}px` } as React.CSSProperties}>
-          <span className="gc-setting-label">{field.label}</span>
+          <span className="gc-setting-label">{rt(designer, field.label)}</span>
           <span className="gc-setting-editor">
-            <input className="gc-dialog-input gc-setting-number" type="number" aria-label={field.label}
+            <input className="gc-dialog-input gc-setting-number" type="number" aria-label={rt(designer, field.label)}
               style={{ width: `${field.width ?? layout.editor ?? 100}px` }}
               min={field.min} max={field.max} value={Number(value ?? 0)}
               onChange={(event) => onChange(event.target.value === '' ? 0 : Number(event.target.value))} />
-            {field.suffix ? <span className="gc-setting-suffix">{field.suffix}</span> : null}
+            {field.suffix ? <span className="gc-setting-suffix">{rt(designer, field.suffix)}</span> : null}
           </span>
         </label>
       );
     case 'color':
       return (
         <label className="gc-setting-line" style={{ '--gc-setting-label': `${layout.label ?? 130}px` } as React.CSSProperties}>
-          <span className="gc-setting-label">{field.label}</span>
-          <ColorCombo value={String(value ?? '')} width={field.width ?? layout.editor ?? 150} ariaLabel={field.label} designer={designer} onChange={onChange} />
+          <span className="gc-setting-label">{rt(designer, field.label)}</span>
+          <ColorCombo value={String(value ?? '')} width={field.width ?? layout.editor ?? 150} ariaLabel={rt(designer, field.label)} designer={designer} onChange={onChange} />
         </label>
       );
     default:
@@ -99,8 +106,8 @@ function FieldRow({ field, value, layout, designer, onAction, onChange }: {
   if (field.kind === 'button') {
     return (
       <div className={`gc-setting-line gc-setting-line-button${field.indent ? ' gc-setting-indent' : ''}`} style={{ '--gc-setting-label': `${layout.label ?? 130}px` } as React.CSSProperties}>
-        <span className="gc-setting-label">{field.label}</span>
-        <button type="button" className="gc-dialog-secondary gc-setting-button" onClick={() => onAction(field)}>{field.text}</button>
+        <span className="gc-setting-label">{rt(designer, field.label)}</span>
+        <button type="button" className="gc-dialog-secondary gc-setting-button" onClick={() => onAction(field)}>{rt(designer, field.text ?? '')}</button>
       </div>
     );
   }
@@ -110,12 +117,12 @@ function FieldRow({ field, value, layout, designer, onAction, onChange }: {
     // label's own row (all as the trial lays them out).
     const columns = field.inline ? (field.options?.length ?? 1) : (field.columns ?? 1);
     const radios = (
-      <div className={`gc-setting-radios${field.inline ? ' gc-setting-radios-inline' : ''}`} role="radiogroup" aria-label={field.label}
+      <div className={`gc-setting-radios${field.inline ? ' gc-setting-radios-inline' : ''}`} role="radiogroup" aria-label={rt(designer, field.label)}
         style={{ gridTemplateColumns: `repeat(${columns}, max-content)` }}>
         {(field.options ?? []).map((option) => (
-          <label key={option.text} className="gc-dialog-radio gc-setting-radio">
+          <label key={String(option.value)} className="gc-dialog-radio gc-setting-radio">
             <input type="radio" name={`gc-setting-${field.key}`} checked={String(value ?? '') === String(option.value)} onChange={() => onChange(option.value)} />
-            <span>{option.text}</span>
+            <span>{rt(designer, option.text)}</span>
           </label>
         ))}
       </div>
@@ -124,14 +131,14 @@ function FieldRow({ field, value, layout, designer, onAction, onChange }: {
     if (field.inline) {
       return (
         <div className="gc-setting-line" style={{ '--gc-setting-label': `${layout.label ?? 130}px` } as React.CSSProperties}>
-          <span className="gc-setting-label">{field.label}</span>
+          <span className="gc-setting-label">{rt(designer, field.label)}</span>
           {radios}
         </div>
       );
     }
     return (
       <div className="gc-setting-block">
-        <div className="gc-setting-label gc-setting-block-label">{field.label}</div>
+        <div className="gc-setting-label gc-setting-block-label">{rt(designer, field.label)}</div>
         {radios}
       </div>
     );
@@ -153,7 +160,7 @@ function GroupBlock({ group, data, layout, designer, onAction, setValue }: {
   if (!group.title) return <div className="gc-setting-group gc-setting-plain">{body}</div>;
   return (
     <fieldset className={`gc-setting-group${group.bordered ? ' gc-setting-group-bordered' : ''}`}>
-      <legend>{group.title}</legend>
+      <legend>{rt(designer, group.title ?? '')}</legend>
       {body}
     </fieldset>
   );
@@ -167,6 +174,7 @@ function CustomListTab({ designer, data, update }: {
 }): React.ReactElement {
   const workbook = designer.getWorkbook();
   const user = useMemo(() => data.customLists ?? userCustomLists(workbook), [data.customLists]);
+  // TASK 87: the gallery name is display-only (`rt`), the caption of a real list stays the user's data.
   const lists = useMemo(
     () => [{ name: 'NEW LIST', items: [] as string[] }, ...BUILT_IN_CUSTOM_LISTS.map((items) => ({ name: customListCaption(items), items })), ...user.map((items) => ({ name: customListCaption(items), items }))],
     [user],
@@ -182,17 +190,17 @@ function CustomListTab({ designer, data, update }: {
   return (
     <div className="gc-setting-custom-list">
       <div className="gc-setting-col">
-        <div className="gc-setting-label">Custom lists:</div>
-        <div className="gc-dialog-list gc-custom-list-gallery" role="listbox" aria-label="Custom lists:">
+        <div className="gc-setting-label">{rt(designer, st('customLists'))}</div>
+        <div className="gc-dialog-list gc-custom-list-gallery" role="listbox" aria-label={rt(designer, st('customLists'))}>
           {lists.map((entry, at) => (
             <div key={`${entry.name}-${at}`} role="option" aria-selected={at === index} className={`gc-dialog-list-item${at === index ? ' selected' : ''}`}
-              onClick={() => selectAt(at)}>{entry.name}</div>
+              onClick={() => selectAt(at)}>{entry.name === 'NEW LIST' ? rt(designer, st('newList')) : entry.name}</div>
           ))}
         </div>
       </div>
       <div className="gc-setting-col">
-        <div className="gc-setting-label">List entries:</div>
-        <textarea className="gc-dialog-input gc-dialog-textarea gc-custom-list-entries" aria-label="List entries:" value={text} onChange={(event) => update('customListText', event.target.value)} />
+        <div className="gc-setting-label">{rt(designer, st('listEntries'))}</div>
+        <textarea className="gc-dialog-input gc-dialog-textarea gc-custom-list-entries" aria-label={rt(designer, st('listEntries'))} value={text} onChange={(event) => update('customListText', event.target.value)} />
       </div>
       <div className="gc-custom-list-buttons">
         <button type="button" className="gc-dialog-secondary" onClick={() => {
@@ -201,7 +209,7 @@ function CustomListTab({ designer, data, update }: {
           update('customLists', [...user, items]);
           update('customListIndex', 0);
           update('customListText', '');
-        }}>Add</button>
+        }}>{rt(designer, '${res.add}') || 'Add'}</button>
         <button type="button" className="gc-dialog-secondary" disabled={index === 0 || builtIn} onClick={() => {
           if (index === 0 || builtIn) return;
           const next = [...user];
@@ -209,7 +217,7 @@ function CustomListTab({ designer, data, update }: {
           update('customLists', next);
           update('customListIndex', 0);
           update('customListText', '');
-        }}>Delete</button>
+        }}>{rt(designer, '${res.delete}') || 'Delete'}</button>
       </div>
     </div>
   );
@@ -229,31 +237,31 @@ function NamedPatternTab({ designer, data, update }: {
   return (
     <div className="gc-setting-named-patterns">
       <div className="gc-setting-col gc-setting-pattern-form">
-        <div className="gc-setting-label">Name</div>
-        <input className="gc-dialog-input" aria-label="Name" value={name} onChange={(event) => update('patternName', event.target.value)} />
-        <div className="gc-setting-label gc-setting-pattern-label">Pattern</div>
-        <textarea className="gc-dialog-input gc-dialog-textarea gc-setting-pattern-text" aria-label="Pattern" value={pattern} onChange={(event) => update('patternValue', event.target.value)} />
+        <div className="gc-setting-label">{rt(designer, st('name'))}</div>
+        <input className="gc-dialog-input" aria-label={rt(designer, st('name'))} value={name} onChange={(event) => update('patternName', event.target.value)} />
+        <div className="gc-setting-label gc-setting-pattern-label">{rt(designer, st('pattern'))}</div>
+        <textarea className="gc-dialog-input gc-dialog-textarea gc-setting-pattern-text" aria-label={rt(designer, st('pattern'))} value={pattern} onChange={(event) => update('patternValue', event.target.value)} />
         <div className="gc-setting-pattern-buttons">
           <button type="button" className="gc-dialog-secondary" onClick={() => {
             const trimmed = name.trim();
             if (!trimmed) return;
             const rest = patterns.filter((entry) => entry.name !== trimmed);
             write([...rest, { name: trimmed, pattern }]);
-          }}>Add</button>
+          }}>{rt(designer, '${res.add}') || 'Add'}</button>
           <button type="button" className="gc-dialog-secondary" onClick={() => {
             const trimmed = name.trim();
             if (!trimmed) return;
             write(patterns.filter((entry) => entry.name !== trimmed));
             update('patternName', '');
             update('patternValue', '');
-          }}>Delete</button>
+          }}>{rt(designer, '${res.delete}') || 'Delete'}</button>
         </div>
       </div>
       <div className="gc-setting-col">
-        <div className="gc-setting-label">Named Patterns List</div>
-        <div className="gc-dialog-list gc-pattern-list" role="listbox" aria-label="Named Patterns List">
+        <div className="gc-setting-label">{rt(designer, st('namedPatternsList'))}</div>
+        <div className="gc-dialog-list gc-pattern-list" role="listbox" aria-label={rt(designer, st('namedPatternsList'))}>
           <table>
-            <thead><tr><th>Name</th><th>Pattern</th></tr></thead>
+            <thead><tr><th>{rt(designer, st('name'))}</th><th>{rt(designer, st('pattern'))}</th></tr></thead>
             <tbody>
               {patterns.map((entry) => (
                 <tr key={entry.name} role="option" aria-selected={entry.name === name} className={entry.name === name ? ' selected' : ''}
@@ -288,7 +296,7 @@ function TabBody({ tab, subTab, designer, data, update, onAction, setValue }: {
         <div className="gc-setting-subtabs" role="tablist">
           {tab.subTabs.map((entry) => (
             <button key={entry.key} type="button" role="tab" aria-selected={entry.key === subTab} className={`gc-dialog-tab${entry.key === subTab ? ' selected' : ''}`}
-              onClick={() => update('subTabOption', entry.key)}>{entry.text}</button>
+              onClick={() => update('subTabOption', entry.key)}>{rt(designer, entry.text)}</button>
           ))}
         </div>
       ) : null}
@@ -325,10 +333,10 @@ export function SettingsBody({ designer, data, update, tabs, kind }: {
   };
   return (
     <div className={`gc-settings-dialog gc-${kind}-settings`}>
-      <div className="gc-settings-tabs" role="tablist" aria-label={kind === 'spread' ? 'Spread Settings' : 'Sheet Settings'}>
+      <div className="gc-settings-tabs" role="tablist" aria-label={rt(designer, kind === 'spread' ? st('spreadSettings') : st('sheetSettings'))}>
         {tabs.map((tab) => (
           <button key={tab.key} type="button" role="tab" aria-selected={tab.key === active.key} className={`gc-dialog-tab${tab.key === active.key ? ' selected' : ''}`}
-            onClick={() => update('tabOption', tab.key)}>{tab.text}</button>
+            onClick={() => update('tabOption', tab.key)}>{rt(designer, tab.text)}</button>
         ))}
       </div>
       <TabBody tab={active} subTab={subTab} designer={designer} data={data} update={update} onAction={onAction} setValue={setValue} />

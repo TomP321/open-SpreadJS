@@ -521,7 +521,11 @@ for (const key of styleProperties) {
     configurable: true,
     writable: true,
     value: function (this: CellRange, value?: unknown): unknown {
-      if (!arguments.length) return this.sheet.getActualStyle(this.row, this.col, this.sheetArea)[key];
+      if (!arguments.length)
+        // TASK 90 round 2: `themeFont()` follows the trial's raw cascade walk, not the resolved
+        // actual style (`.probe/t90/rangefont2-r1.json`: reports the default style's 'Body' even
+        // when the cell font names an explicit family, and round-trips the stored value verbatim).
+        return key === 'themeFont' ? this.sheet._themeFontRaw(this.row, this.col, this.sheetArea) : this.sheet.getActualStyle(this.row, this.col, this.sheetArea)[key];
       this._each((r, c) => this.sheet._setStyleProperty(r, c, key, value, this.sheetArea), true);
       return this;
     },

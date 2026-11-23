@@ -6,6 +6,7 @@ import type { PaintContext } from './paint.js';
 import type { PaintGroup, PaintSeries } from './paint-model.js';
 import type { JsonRecord } from './types.js';
 import { formatValue } from './scale.js';
+import { drawSeriesDecorations } from './paint-decorations.js';
 
 interface Plot { x: number, y: number, width: number, height: number }
 
@@ -76,6 +77,8 @@ export function drawGroup(pc: PaintContext, group: PaintGroup): void {
   else if (group.kind === 'radar') drawRadar(pc, group, plot);
   else if (group.kind === 'stock') drawStock(pc, group, plot);
   else if (group.kind === 'pie' || group.kind === 'doughnut') drawPie(pc, group, plot);
+  // TASK 92: trendlines + error bars sit on top of the series glyphs.
+  drawSeriesDecorations(pc, group);
 }
 
 function valueY(pc: PaintContext, value: number): number {

@@ -10,8 +10,17 @@ import { GroupType, metaFor } from './types.js';
 import { LAYOUT_PUBLIC_TYPE } from './data-charts.js';
 import { ACCENT_SOLID } from './defaults.js';
 import { buildDataLabelEntry, typeDefaultLabelPosition } from './dlabels.js';
-import { colorObjectToGetter, tokenToColorObject } from './tokens.js';
+import { colorObjectToGetter, tokenToColorObject, userColorToObject } from './tokens.js';
 import { DEFAULT_COLOR_LIST } from './color-schemes.js';
+import { resolveRefText } from './data.js';
+import { autoTrendlineName } from './trendlines.js';
+
+/** Resolved series display name (the trial's auto trendline names use it: "Linear(Q1)"). */
+function chartSeriesName(chart: ChartLike, ser: JsonRecord): string {
+  const f = ser.tx?.strRef?.f;
+  if (!f || !chart._sheet) return '';
+  try { return String(resolveRefText(chart._sheet, f) ?? ''); } catch { return ''; }
+}
 
 export interface ChartLike {
   chartType(value?: number): number | unknown;
@@ -200,6 +209,118 @@ function dataSeriesGetter(chart: ChartLike, region: JsonRecord, ser: JsonRecord,
   return out;
 }
 
+/** chartSpace `c:trendline` entry -> public TrendlineItem (idempotent). */
+function trendlineToPublic(tl: JsonRecord, seriesName = ''): JsonRecord {
+  if (tl.trendlineType === undefined && tl.type !== undefined) return { ...tl };
+  const ln = (tl.spPr?.ln ?? {}) as JsonRecord;
+  const out: JsonRecord = {
+    type: Number(tl.trendlineType ?? 1),
+    order: Number(tl.order ?? 2),
+    period: Number(tl.period ?? 2),
+  };
+  if (tl.intercept !== undefined) out.intercept = Number(tl.intercept);
+  if (tl.forward !== undefined) out.forward = Number(tl.forward);
+  if (tl.backward !== undefined) out.backward = Number(tl.backward);
+  out.displayEquation = tl.dispEq === true;
+  out.displayRSquared = tl.dispRSqr === true;
+  // The trial derives the display name when the entry has none (probe: "Linear(Q1)").
+  out.name = tl.name !== undefined ? String(tl.name) : autoTrendlineName(Number(tl.trendlineType ?? 1), tl.period, seriesName);
+  out.style = {
+    color: ln.solidFill ? colorObjectToGetter(ln.solidFill) : 'accent 1 0',
+    transparency: 0,
+    width: Number(ln.w ?? 2),
+    dashStyle: Number(ln.prstDash ?? 8),
+  };
+  out.fontFamily = 'Calibri';
+  out.fontSize = 13.33;
+  out.fontColor = 'rgb(89,89,89)';
+  return out;
+}
+
+/** public TrendlineItem -> chartSpace `c:trendline` entry. */
+function trendlineToOoxml(tl: JsonRecord): JsonRecord {
+  const o: JsonRecord = { trendlineType: Number(tl.type ?? 1) };
+  if (tl.order !== undefined) o.order = Number(tl.order);
+  if (tl.period !== undefined) o.period = Number(tl.period);
+  if (tl.intercept !== undefined) o.intercept = Number(tl.intercept);
+  if (tl.forward !== undefined) o.forward = Number(tl.forward);
+  if (tl.backward !== undefined) o.backward = Number(tl.backward);
+  o.dispEq = tl.displayEquation === true;
+  o.dispRSqr = tl.displayRSquared === true;
+  if (tl.name !== undefined) o.name = String(tl.name);
+  const style = (tl.style ?? {}) as JsonRecord;
+  const ln: JsonRecord = { w: Number(style.width ?? 2), prstDash: Number(style.dashStyle ?? 8) };
+  // TASK 94 bug 2: the trial parses any user colour token the chart API accepts — `style.color: 'red'`
+  // serialises as `srgbClr [255,0,0]` and reads back as `rgb(255,0,0)`. Scheme tokens still go through
+  // userColorToObject's token branch (schemeClr), so `accent N t` JSON stays identical.
+  const fill = userColorToObject(style.color);
+  if (fill) ln.solidFill = fill;
+  o.spPr = { ln };
+  return o;
+}
+
+/** chartSpace `c:errBars` entry -> public ErrorBarItem (idempotent). */
+function errBarItemToPublic(eb: JsonRecord): JsonRecord {
+  if (eb.errValType === undefined && eb.valueType !== undefined) return { ...eb };
+  const ln = (eb.spPr?.ln ?? {}) as JsonRecord;
+  const out: JsonRecord = {
+    type: Number(eb.errBarType ?? 0),
+    valueType: Number(eb.errValType ?? 1),
+    noEndCap: eb.noEndCap === true,
+  };
+  if (eb.errValType !== 0 && eb.val !== undefined) out.value = Number(eb.val);
+  if (eb.plus?.numRef?.f && eb.minus?.numRef?.f) out.custom = { positive: String(eb.plus.numRef.f), negative: String(eb.minus.numRef.f) };
+  out.style = {
+    color: ln.solidFill ? colorObjectToGetter(ln.solidFill) : 'rgb(89,89,89)',
+    transparency: 0,
+    width: Number(ln.w ?? 1),
+    dashStyle: Number(ln.prstDash ?? 0),
+  };
+  return out;
+}
+
+/** chartSpace `c:errBars[]` -> public ErrorBarItems {vertical, horizontal}. */
+function errBarsToPublic(list: JsonRecord[]): JsonRecord {
+  const out: JsonRecord = {};
+  for (const eb of list) {
+    const pub = errBarItemToPublic(eb);
+    if (Number(eb.errDir ?? 1) === 0) out.horizontal = pub;
+    else out.vertical = pub;
+  }
+  return out;
+}
+
+/** public ErrorBarItem -> chartSpace `c:errBars` entry. */
+function errBarItemToOoxml(item: JsonRecord, dir: number): JsonRecord {
+  const o: JsonRecord = {
+    errDir: dir,
+    errBarType: Number(item.type ?? 0),
+    errValType: Number(item.valueType ?? 1),
+    noEndCap: !!item.noEndCap,
+  };
+  if (item.value !== undefined) o.val = Number(item.value);
+  const style = (item.style ?? {}) as JsonRecord;
+  const ln: JsonRecord = { w: Number(style.width ?? 1) };
+  const fill = userColorToObject(style.color);
+  if (fill) ln.solidFill = fill;
+  if (style.dashStyle) ln.prstDash = Number(style.dashStyle);
+  o.spPr = { ln };
+  if (Number(item.valueType ?? 1) === 0 && item.custom) {
+    const c = item.custom as JsonRecord;
+    o.plus = { numRef: { f: String(c.positive ?? ''), numCache: { formatCode: 'General' } } };
+    o.minus = { numRef: { f: String(c.negative ?? ''), numCache: { formatCode: 'General' } } };
+  }
+  return o;
+}
+
+/** public ErrorBarItems {vertical, horizontal} -> chartSpace `c:errBars[]`. */
+function errBarsToOoxml(items: JsonRecord): JsonRecord[] {
+  const arr: JsonRecord[] = [];
+  if (items.vertical) arr.push(errBarItemToOoxml(items.vertical as JsonRecord, 1));
+  if (items.horizontal) arr.push(errBarItemToOoxml(items.horizontal as JsonRecord, 0));
+  return arr;
+}
+
 export function seriesGetter(chart: ChartLike, group: JsonRecord, ser: JsonRecord, points = 0): JsonRecord {
   if (group.plotSurface !== undefined) return dataSeriesGetter(chart, group, ser, points);
   const isBar = group.chartType === GroupType.bar;
@@ -220,8 +341,10 @@ export function seriesGetter(chart: ChartLike, group: JsonRecord, ser: JsonRecor
     ...(!isPie && !isDoughnut || idx === 0 || (isDoughnut ? idx > 0 : !!ser.dLbls?.spPr)
       ? { backColorTransparency: Number(ser.spPr?.solidFill?.alphaMod ? (100000 - ser.spPr.solidFill.alphaMod) / 1000 : 0) } : {}),
     border: borderFor(chart, group, ser),
-    errorBars: ser.errBars ? ser.errBars : null,
-    trendlines: ser.trendlines ? ser.trendlines.map((t: JsonRecord) => ({ ...t })) : null,
+    errorBars: Array.isArray(ser.errBars) && (ser.errBars as JsonRecord[]).length ? errBarsToPublic(ser.errBars as JsonRecord[]) : null,
+    trendlines: Array.isArray(ser.trendline) && (ser.trendline as JsonRecord[]).length
+      ? (ser.trendline as JsonRecord[]).map(t => trendlineToPublic(t, chartSeriesName(chart, ser)))
+      : (Array.isArray(ser.trendlines) && (ser.trendlines as JsonRecord[]).length ? (ser.trendlines as JsonRecord[]).map(t => trendlineToPublic(t, chartSeriesName(chart, ser))) : null),
     dataLabels: dataLabelsFor(chart, group, ser),
     dataPoints: {},
     plotVisibleOnly: chart._ignoreHidden !== undefined ? !!chart._ignoreHidden : ser.plotVisOnly !== false,
@@ -354,6 +477,19 @@ export function applySeriesOptions(chart: ChartLike, group: JsonRecord, ser: Jso
       existing: ser.dLbls, chartType: groupPublicType(group), idx: Number(ser.idx ?? 0),
       position: d.position, value: d, overwrite: true,
     });
+  }
+  // TASK 92: trendlines / error bars set through the public API are converted to
+  // the chartSpace `c:trendline` / `c:errBars` the trial stores (and renders).
+  if (options.trendlines !== undefined) {
+    if (!options.trendlines) delete ser.trendline;
+    else ser.trendline = (options.trendlines as JsonRecord[]).map(trendlineToOoxml);
+  }
+  if (options.errorBars !== undefined) {
+    if (!options.errorBars) delete ser.errBars;
+    else {
+      const arr = errBarsToOoxml(options.errorBars as JsonRecord);
+      if (arr.length) ser.errBars = arr; else delete ser.errBars;
+    }
   }
   if (typeof options.gapWidth === 'number') group.gapWidth = Math.round(options.gapWidth * 100);
   if (typeof options.overlap === 'number') group.overlap = Math.round(options.overlap * 100);

@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest';
 import { buildContextItems, tableAt, type ContextMenuState } from '../src/context-menu-items.js';
+import { resolveText } from '../src/resolve.js';
+import { englishResources } from '../src/resources.js';
+
+// TASK 87: labels are `${res.contextMenu.*}` placeholders; resolve them against the
+// English resources before comparing (the expected strings stay the trial's originals).
+const r = (value: unknown): string => resolveText(value, englishResources);
 
 /** Minimal stand-in for a core Worksheet: only what the menu builder reads. */
 function fakeSheet(over: Record<string, unknown> = {}): any {
@@ -67,8 +73,8 @@ function fakeDesigner(sheet: any): any {
   };
 }
 
-const labels = (items: { label: string }[]): string[] => items.map((item) => item.label);
-const entry = (items: any[], label: string): any => items.find((item) => item.label === label);
+const labels = (items: { label: string }[]): string[] => items.map((item) => r(item.label));
+const entry = (items: any[], label: string): any => items.find((item) => r(item.label) === label);
 
 const state = (kind: ContextMenuState['kind'], row = 8, col = 7, objectName?: string): ContextMenuState => ({ kind, row, col, objectName });
 
@@ -82,7 +88,7 @@ describe('cell context', () => {
     ]);
     const items = buildContextItems(d, state('cell'));
     expect(entry(items, 'Paste Options:').pasteRow).toHaveLength(6);
-    expect(entry(items, 'Sort').submenu?.map((sub: any) => sub.label)).toEqual(['Sort A to Z', 'Sort Z to A', 'Custom Sort...']);
+    expect(entry(items, 'Sort').submenu?.map((sub: any) => r(sub.label))).toEqual(['Sort A to Z', 'Sort Z to A', 'Custom Sort...']);
     expect(entry(items, 'Insert...').submenu).toBeUndefined();
   });
 
@@ -96,9 +102,9 @@ describe('cell context', () => {
     ]);
     expect(entry(items, 'Transform Cells...')).toBeUndefined();
     // Single cell B2 (not touching the right/bottom table edge): only Left + Above.
-    expect(entry(items, 'Insert').submenu?.map((sub: any) => sub.label)).toEqual(['Table Columns to the Left', 'Table Rows Above']);
-    expect(entry(items, 'Delete').submenu?.map((sub: any) => sub.label)).toEqual(['Table Columns', 'Table Rows']);
-    expect(entry(items, 'Table').submenu?.map((sub: any) => sub.label)).toEqual(['Totals Row', 'Convert to Range', 'Convert to Data Table']);
+    expect(entry(items, 'Insert').submenu?.map((sub: any) => r(sub.label))).toEqual(['Table Columns to the Left', 'Table Rows Above']);
+    expect(entry(items, 'Delete').submenu?.map((sub: any) => r(sub.label))).toEqual(['Table Columns', 'Table Rows']);
+    expect(entry(items, 'Table').submenu?.map((sub: any) => r(sub.label))).toEqual(['Totals Row', 'Convert to Range', 'Convert to Data Table']);
   });
 
   it('reveals the right/bottom table inserts when the selection touches those edges', () => {
@@ -107,7 +113,7 @@ describe('cell context', () => {
       getSelections: () => [{ row: 2, col: 3, rowCount: 1, colCount: 2 }], // ends at the last table column
     });
     const items = buildContextItems(fakeDesigner(sheet), state('cell', 2, 3));
-    expect(entry(items, 'Insert').submenu?.map((sub: any) => sub.label)).toEqual(['Table Columns to the Left', 'Table Columns to the Right', 'Table Rows Above']);
+    expect(entry(items, 'Insert').submenu?.map((sub: any) => r(sub.label))).toEqual(['Table Columns to the Left', 'Table Columns to the Right', 'Table Rows Above']);
   });
 
   it('switches to the clipboard variant after a copy', () => {
@@ -118,7 +124,7 @@ describe('cell context', () => {
       'New Threaded Comment', 'Insert Comment', 'Format Cells...', 'Transform Cells...', 'Link...', 'Rich text...',
       'Define Name...', 'Tag...', 'Default Value...', 'Create Cell Template...',
     ]);
-    expect(entry(items, 'Insert Copied Cells...').submenu?.map((sub: any) => sub.label)).toEqual(['Shift Cells Right', 'Shift Cells Down']);
+    expect(entry(items, 'Insert Copied Cells...').submenu?.map((sub: any) => r(sub.label))).toEqual(['Shift Cells Right', 'Shift Cells Down']);
   });
 
   it('keeps the plain in-table menu (no Insert Copied Cells) after a copy inside a table', () => {
@@ -141,7 +147,7 @@ describe('cell context', () => {
     const d = fakeDesigner(sheet);
     d.showConvertTableDialog = vi.fn();
     const items = buildContextItems(d, state('cell', 2, 1));
-    entry(items, 'Table').submenu!.find((sub: any) => sub.label === 'Convert to Range')!.action!();
+    entry(items, 'Table').submenu!.find((sub: any) => r(sub.label) === 'Convert to Range')!.action!();
     expect(d.showConvertTableDialog).toHaveBeenCalledWith('Sales');
   });
 
@@ -149,7 +155,7 @@ describe('cell context', () => {
     const sheet = fakeSheet({ _clipboardMode: () => 'cut' });
     const items = buildContextItems(fakeDesigner(sheet), state('cell'));
     expect(entry(items, 'Paste Special...')).toBeUndefined();
-    expect(entry(items, 'Insert Cut Cells...').submenu?.map((sub: any) => sub.label)).toEqual(['Shift Cells Right', 'Shift Cells Down']);
+    expect(entry(items, 'Insert Cut Cells...').submenu?.map((sub: any) => r(sub.label))).toEqual(['Shift Cells Right', 'Shift Cells Down']);
   });
 });
 
@@ -178,7 +184,7 @@ describe('header, corner, chart and shape contexts', () => {
     const tabled = fakeSheet({ tables: { all: () => [fakeTable(0, 0, 4, 5)] } });
     const tableCorner = buildContextItems(fakeDesigner(tabled), state('corner', -1, -1));
     expect(labels(tableCorner)).not.toContain('Transform Cells...');
-    expect(entry(tableCorner, 'Table')?.submenu?.map((sub: any) => sub.label)).toEqual(['Totals Row', 'Convert to Range', 'Convert to Data Table']);
+    expect(entry(tableCorner, 'Table')?.submenu?.map((sub: any) => r(sub.label))).toEqual(['Totals Row', 'Convert to Range', 'Convert to Data Table']);
   });
 
   it('matches the trial chart list with group/z-order submenus', () => {
@@ -186,7 +192,7 @@ describe('header, corner, chart and shape contexts', () => {
     // The trial names this row per hit zone (Format Chart Area / Plot Area / Data Series);
     // the stable default label the gate verifies is "Format Chart Area...".
     expect(labels(items)).toEqual(['Cut', 'Copy', 'Reset to Match Style', 'Change Chart Type...', 'Select Data...', 'Move Chart...', 'Format Chart Area...', 'Group', 'Bring Forward', 'Send Backward', 'Save as Picture']);
-    expect(entry(items, 'Bring Forward').submenu?.map((sub: any) => sub.label)).toEqual(['Bring Forward', 'Bring To Front']);
+    expect(entry(items, 'Bring Forward').submenu?.map((sub: any) => r(sub.label))).toEqual(['Bring Forward', 'Bring To Front']);
     expect(entry(items, 'Group').submenu?.every((sub: any) => sub.disabled)).toBe(true);
   });
 });

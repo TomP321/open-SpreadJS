@@ -9,6 +9,7 @@ import { internals, workbookOptionsRecord } from './core-internals.js';
 import { applyBuiltin, activeSheet, currentStyle, isUndoableAction, topCell } from './commands/actions.js';
 import { executeContextualCommand, isContextualCommand } from './contextual-actions.js';
 import { executePivotCommand, isPivotCommand } from './pivot-designer.js';
+import { messageText } from './resolve.js';
 
 export function executeDesignerCommand(d: Designer, commandName: string, propertyName?: string, value?: unknown): boolean {
   const command = d.getCommand(commandName) as ICommand | undefined;
@@ -46,7 +47,7 @@ export function executeDesignerCommand(d: Designer, commandName: string, propert
     return true;
   } catch (error) {
     console.error(error);
-    d.showMessageBox(String((error as Error)?.message ?? error), 'Error', 3);
+    d.showMessageBox(String((error as Error)?.message ?? error), messageText(d, 'error', 'Error'), 3);
     return false;
   }
 }
@@ -158,7 +159,7 @@ export function executeDesignerSpecial(d: Designer, name: string, value: unknown
     case 'moveChartDialog': d.showChartCommandDialog('moveChart'); return true;
     case 'formatMore': d.showFormatCells('number'); return true;
     case 'formatCellAlignment': d.showFormatCells('alignment'); return true;
-    case 'moreBorder': d.showMessageBox('More Borders is available through the Format Cells dialog.', 'Borders', 1); return true;
+    case 'moreBorder': d.showMessageBox(messageText(d, 'moreBordersNote', 'More Borders is available through the Format Cells dialog.'), messageText(d, 'borders', 'Borders'), 1); return true;
     case 'find': case 'editingFind': case 'findCommand': d.openFind('find'); return true;
     case 'replace': case 'replaceCommand': d.openFind('replace'); return true;
     case 'goto': d.showGoTo(); return true;
@@ -197,7 +198,7 @@ export function executeDesignerSpecial(d: Designer, name: string, value: unknown
     case 'clearCellType': d.clearSelectionCellType(); return true;
     case 'clearCellDropdown': d.clearSelectionCellDropdown(); return true;
     case 'workflowList': case 'multiColumnPicker': case 'namedCellTemplatesListContent':
-      d.showMessageBox('Cell templates and cell editors arrive in M6b.', 'SpreadJS Designer', 1); return true;
+      d.showMessageBox(messageText(d, 'cellEditorsNote', 'Cell templates and cell editors arrive in M6b.'), 'SpreadJS Designer', 1); return true;
     case 'undo': d.getWorkbook().undoManager().undo(); d.invalidate(); return true;
     case 'redo': d.getWorkbook().undoManager().redo(); d.invalidate(); return true;
     case 'formatTableListContent': d.runUndoable(name, { value }); return true;
@@ -226,13 +227,28 @@ export function executeDesignerSpecial(d: Designer, name: string, value: unknown
     case 'sparklinesHBarSparkline': d.showSparklineDialog('HBARSPARKLINE'); return true;
     case 'sparklinesVBarSparkline': d.showSparklineDialog('VBARSPARKLINE'); return true;
     case 'sparklinesPieSparkline': d.showSparklineDialog('PIESPARKLINE'); return true;
-    case 'sparklinesStackedSparkline': case 'sparklinesCascadeSparkline': case 'sparklinesParetoSparkline':
-    case 'sparklinesHistogramSparkline': case 'sparklinesScatterSparkline': case 'sparklinesSpreadsSparkline':
-    case 'sparklinesMonthSparkline': case 'sparklinesYearSparkline': case 'sparklinesBoxPlotSparkline':
-    case 'sparklinesBulletSparkline': case 'sparklinesVarianceSparkline': case 'sparklinesRangeBlockSparkline':
-    case 'sparklinesGaugeKPISparkline': case 'sparklineImageSparkline': case 'sparklinesLollipopVarianceSparkline':
-    case 'sparklinesProgressSparkline':
-      d.showMessageBox(`NotImplemented: ${name} requires the extended sparkline formula set.`, 'Create Sparklines', 1); return true;
+    /* TASK 93 item 3: the extended formula sparklines. The trial opens the
+     * generic Create Sparklines dialog for STACKED/CASCADE/PARETO/HISTOGRAM/
+     * SCATTER/SPREADS/BOXPLOT and a dedicated per-argument dialog for
+     * MONTH/YEAR/BULLET/GAUGE/PROGRESS/RANGEBLOCK/VARIANCE/LOLLIPOP/IMAGE
+     * (all sizes/fields measured black-box); OK writes the formula and the
+     * core draws it (features/sparkline-draw.ts). */
+    case 'sparklinesStackedSparkline': d.showSparklineDialog('STACKEDSPARKLINE'); return true;
+    case 'sparklinesCascadeSparkline': d.showSparklineDialog('CASCADESPARKLINE'); return true;
+    case 'sparklinesParetoSparkline': d.showSparklineDialog('PARETOSPARKLINE'); return true;
+    case 'sparklinesHistogramSparkline': d.showSparklineDialog('HISTOGRAMSPARKLINE'); return true;
+    case 'sparklinesScatterSparkline': d.showSparklineDialog('SCATTERSPARKLINE'); return true;
+    case 'sparklinesSpreadsSparkline': d.showSparklineDialog('SPREADSPARKLINE'); return true;
+    case 'sparklinesMonthSparkline': d.showSparklineDialog('MONTHSPARKLINE'); return true;
+    case 'sparklinesYearSparkline': d.showSparklineDialog('YEARSPARKLINE'); return true;
+    case 'sparklinesBoxPlotSparkline': d.showSparklineDialog('BOXPLOTSPARKLINE'); return true;
+    case 'sparklinesBulletSparkline': d.showSparklineDialog('BULLETSPARKLINE'); return true;
+    case 'sparklinesVarianceSparkline': d.showSparklineDialog('VARISPARKLINE'); return true;
+    case 'sparklinesRangeBlockSparkline': d.showSparklineDialog('RANGEBLOCKSPARKLINE'); return true;
+    case 'sparklinesGaugeKPISparkline': d.showSparklineDialog('GAUGEKPISPARKLINE'); return true;
+    case 'sparklineImageSparkline': d.showSparklineDialog('IMAGE'); return true;
+    case 'sparklinesLollipopVarianceSparkline': d.showSparklineDialog('LOLLIPOPVARISPARKLINE'); return true;
+    case 'sparklinesProgressSparkline': d.showSparklineDialog('PROGRESSSPARKLINE'); return true;
     case 'insertShapeGalleryItem': d.armDrawTool({ kind: 'shape', galleryId: String(value ?? 'rectangle') }); return true;
     case 'insertFormControlGalleryItem': d.armDrawTool({ kind: 'formControl', controlId: String(value ?? 'button') }); return true;
     case 'formatShapes': case 'editShapeText': case 'editShapeHyperlink': case 'removeShapeHyperlink':

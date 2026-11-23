@@ -14,7 +14,7 @@ function normalize(v: unknown): Norm {
   if (v === undefined || v === null) return null;
   if (typeof v === 'number') return Number.isFinite(v) ? v : { other: String(v) };
   if (typeof v === 'string' || typeof v === 'boolean') return v;
-  if (v instanceof Date) return { date: Number.isNaN(v.getTime()) ? 'Invalid' : v.toISOString() };
+  if (v instanceof Date) return { date: Number.isNaN(v.getTime()) ? 'Invalid' : new Date(v.getTime() - v.getTimezoneOffset() * 60000).toISOString() };
   const s = String(v);
   if (/^#[A-Z0-9/!?]+[!?A]?$/.test(s)) return { error: s };
   return { other: s };
@@ -31,7 +31,7 @@ function runCase(c: Case): Norm[][] {
   for (const [a, value] of Object.entries(c.cells ?? {})) {
     const [r, col] = addr(a);
     if (typeof value === 'string' && value.startsWith('=')) sheet.setFormula(r, col, value.slice(1));
-    else if (value && typeof value === 'object' && 'date' in value) sheet.setValue(r, col, new Date((value as { date: string }).date));
+    else if (value && typeof value === 'object' && 'date' in value) sheet.setValue(r, col, ((s => /Z$/.test(s) ? new Date(s.slice(0, -1)) : new Date(s))((value as { date: string }).date)));
     else sheet.setValue(r, col, value as never);
   }
   const at = addr(c.at ?? 'H1');

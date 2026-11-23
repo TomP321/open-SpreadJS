@@ -10,6 +10,7 @@ import {
   type Bounds, type SortLevel, type TextColumnFormat, type TextToColumnsData,
 } from '../data-engine.js';
 import { CustomCheckbox, CustomSelect } from './custom-widgets.js';
+import { T } from './t.js';
 
 export interface BodyProps {
   designer: Designer;
@@ -100,21 +101,21 @@ export function SortDialogBody({ designer, data, update }: BodyProps): React.Rea
   return (
     <div className="gc-custom-sort-dialog" data-testid="custom-sort-dialog">
       <div className="gc-custom-sort-toolbar gc-column-set">
-        <div className="gc-image-button" role="button" onClick={addLevel}>{addIcon}<span>Add Level</span></div>
-        <div className={`gc-image-button${levels.length ? '' : ' disable'}`} role="button" onClick={deleteLevel}>{removeIcon}<span>Delete Level</span></div>
-        <div className={`gc-image-button${levels.length ? '' : ' disable'}`} role="button" onClick={copyLevel}>{copyIcon}<span>Copy Level</span></div>
+        <div className="gc-image-button" role="button" onClick={addLevel}>{addIcon}<span>{T('addLevel', 'Add Level')}</span></div>
+        <div className={`gc-image-button${levels.length ? '' : ' disable'}`} role="button" onClick={deleteLevel}>{removeIcon}<span>{T('deleteLevel', 'Delete Level')}</span></div>
+        <div className={`gc-image-button${levels.length ? '' : ' disable'}`} role="button" onClick={copyLevel}>{copyIcon}<span>{T('copyLevel', 'Copy Level')}</span></div>
         <div className={`gc-image-button icon-only${selected > 0 ? '' : ' disable'}`} role="button" onClick={() => move(-1)}>{upIcon}</div>
         <div className={`gc-image-button icon-only${selected >= 0 && selected < levels.length - 1 ? '' : ' disable'}`} role="button" onClick={() => move(1)}>{downIcon}</div>
-        <div className="gc-image-button" role="button" onClick={() => update('optionsOpen', true)}>Options...</div>
+        <div className="gc-image-button" role="button" onClick={() => update('optionsOpen', true)}>{T('options', 'Options...')}</div>
         <span className="gc-custom-sort-header-spacer" />
-        <CustomCheckbox label="My data has headers" checked={hasHeaders} onChange={(value) => update('hasHeaders', value)} />
+        <CustomCheckbox label={T('myDataHasHeaders', 'My data has headers')} checked={hasHeaders} onChange={(value) => update('hasHeaders', value)} />
       </div>
       <div className="gc-custom-sort-list">
-        <div className="gc-custom-sort-row gc-custom-sort-head"><span>SortBy</span><span>SortOn</span><span>SortOrder</span></div>
+        <div className="gc-custom-sort-row gc-custom-sort-head"><span>{T('sortBy', 'SortBy')}</span><span>{T('sortOn', 'SortOn')}</span><span>{T('sortOrder', 'SortOrder')}</span></div>
         {levels.map((level, index) => (
           <div key={index} className={`gc-custom-sort-row${index === selected ? ' selected' : ''}`} onClick={() => update('selected', index)}>
             <span className="gc-custom-sort-by">
-              <span className="gc-custom-sort-label">{index === 0 ? 'Sort by' : 'Then by'}</span>
+              <span className="gc-custom-sort-label">{index === 0 ? T('sortByLabel', 'Sort by') : T('thenBy', 'Then by')}</span>
               <CustomSelect className="gc-sort-column" ariaLabel="SortBy" value={level.column} options={columnOptions} onChange={(value) => setLevel(index, { column: Number(value) })} />
             </span>
             <CustomSelect className="gc-sort-on" ariaLabel="SortOn" value={level.sortOn} options={['Values', 'Cell Color', 'Font Color'].map((text) => ({ text, value: text }))}
@@ -129,17 +130,17 @@ export function SortDialogBody({ designer, data, update }: BodyProps): React.Rea
         ))}
       </div>
       {data.optionsOpen === true && (
-        <div className="gc-sort-options-overlay" role="dialog" aria-label="Sort Options">
+        <div className="gc-sort-options-overlay" role="dialog" aria-label={T('sortOptions', 'Sort Options')}>
           <div className="gc-sort-options-dialog">
-            <div className="gc-dialog-header"><div className="gc-dialog-title">Sort Options</div>
+            <div className="gc-dialog-header"><div className="gc-dialog-title">{T('sortOptions', 'Sort Options')}</div>
               <button className="gc-dialog-close" aria-label="Close" onClick={() => update('optionsOpen', false)}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8" fill="none" stroke="currentColor" /></svg></button></div>
-            <fieldset className="gc-dialog-groupbox"><legend>Orientation</legend>
-              <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-sort-orientation" checked={data.byRows !== false} onChange={() => update('byRows', true)} /><span>Sort top to bottom</span></label>
-              <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-sort-orientation" checked={data.byRows === false} onChange={() => update('byRows', false)} /><span>Sort left to right</span></label>
+            <fieldset className="gc-dialog-groupbox"><legend>{T('orientation', 'Orientation')}</legend>
+              <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-sort-orientation" checked={data.byRows !== false} onChange={() => update('byRows', true)} /><span>{T('sortTopToBottom', 'Sort top to bottom')}</span></label>
+              <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-sort-orientation" checked={data.byRows === false} onChange={() => update('byRows', false)} /><span>{T('sortLeftToRight', 'Sort left to right')}</span></label>
             </fieldset>
             <div className="gc-dialog-footer">
               <button className="gc-dialog-button gc-dialog-button-primary" onClick={() => update('optionsOpen', false)}>OK</button>
-              <button className="gc-dialog-button" onClick={() => update('optionsOpen', false)}>Cancel</button>
+              <button className="gc-dialog-button" onClick={() => update('optionsOpen', false)}>{T('cancel', 'Cancel')}</button>
             </div>
           </div>
         </div>
@@ -172,14 +173,14 @@ export function RemoveDuplicatesBody({ designer, data, update }: BodyProps): Rea
   const toggle = (index: number): void => update('checked', checked.map((value, position) => (position === index ? !value : value)));
   return (
     <div className="gc-remove-duplicates" data-testid="remove-duplicates-dialog">
-      <div className="gc-dialog-text gc-rd-note">To delete duplicate values, select one or more columns that contain duplicates.</div>
+      <div className="gc-dialog-text gc-rd-note">{T('toDeleteDuplicateValuesSelectOneOrMoreColumnsThatContainDuplicates', 'To delete duplicate values, select one or more columns that contain duplicates.')}</div>
       <div className="gc-column-set gc-rd-buttons">
-        <div className="gc-image-button" role="button" onClick={() => setAll(true)}>{selectAllIcon}<span>Select All</span></div>
-        <div className="gc-image-button" role="button" onClick={() => setAll(false)}>{unselectAllIcon}<span>Unselect All</span></div>
+        <div className="gc-image-button" role="button" onClick={() => setAll(true)}>{selectAllIcon}<span>{T('selectAll', 'Select All')}</span></div>
+        <div className="gc-image-button" role="button" onClick={() => setAll(false)}>{unselectAllIcon}<span>{T('unselectAll', 'Unselect All')}</span></div>
         <span className="gc-rd-header-spacer" />
-        <label className="gc-dialog-checkbox"><input type="checkbox" checked={hasHeaders} onChange={(event) => update('hasHeaders', event.target.checked)} /><span>My data has headers</span></label>
+        <label className="gc-dialog-checkbox"><input type="checkbox" checked={hasHeaders} onChange={(event) => update('hasHeaders', event.target.checked)} /><span>{T('myDataHasHeaders', 'My data has headers')}</span></label>
       </div>
-      <div className="gc-dialog-text">Columns</div>
+      <div className="gc-dialog-text">{T('columns', 'Columns')}</div>
       <div className="gc-rd-list">
         {labels.map((label, index) => (
           <label key={index} className="gc-dialog-checkbox gc-rd-item"><input type="checkbox" checked={!!checked[index]} onChange={() => toggle(index)} /><span>{label}</span></label>
@@ -219,48 +220,48 @@ export function TextToColumnsWizard({ designer, data, update }: BodyProps): Reac
   const canFinish = step === 3;
   const goTo = (target: number): void => {
     update('step', target);
-    update('dialogTitle', `Convert Text to Columns Wizard - Step ${target} of 3`);
+    update('dialogTitle', T('textToColumnsWizardStep', 'Convert Text to Columns Wizard - Step {0} of 3').replace('{0}', String(target)));
   };
   const back = (): void => goTo(Math.max(1, step - 1));
   const next = (): void => goTo(Math.min(3, step + 1));
   return (
     <div className="gc-text-to-columns" data-testid="text-to-columns-wizard" data-step={step}>
       <div className="gc-dialog-text gc-t2c-intro">{step === 1
-        ? <>The Text Wizard has determined that your data is {String(data.mode)}.<br />If this is correct, choose Next, or choose the data type that best describes your data.</>
+        ? <>{T('theTextWizardHasDeterminedThatYourDataIs', 'The Text Wizard has determined that your data is')} {String(data.mode) === 'Delimited' ? T('delimited', 'Delimited') : T('fixedWidth', 'Fixed width')}.<br />{T('ifThisIsCorrectChooseNextOrChooseTheDataTypeThatBestDescribesYourData', 'If this is correct, choose Next, or choose the data type that best describes your data.')}</>
         : step === 2
-          ? <>This screen lets you set {String(data.mode) === 'Delimited' ? 'the delimiters your data contains' : 'field widths (column breaks)'}.<br />{String(data.mode) === 'Delimited' ? 'You can see how your text is affected in the preview below.' : <>Lines signify a column break.<br />To CREATE a break line, click at the desired position.<br />To DELETE a break line, double click on the line.<br />To MOVE a break line, click and drag it.</>}</>
-          : <>This screen lets you select each column and set the Data Format.</>}</div>
+          ? <>{T('thisScreenLetsYouSet', 'This screen lets you set')} {String(data.mode) === 'Delimited' ? T('theDelimitersYourDataContains', 'the delimiters your data contains') : T('fieldWidthsColumnBreaks', 'field widths (column breaks)')}.<br />{String(data.mode) === 'Delimited' ? T('youCanSeeHowYourTextIsAffectedInThePreviewBelow', 'You can see how your text is affected in the preview below.') : <>{T('linesSignifyAColumnBreak', 'Lines signify a column break.')}<br />{T('toCREATEABreakLineClickAtTheDesiredPosition', 'To CREATE a break line, click at the desired position.')}<br />{T('toDELETEABreakLineDoubleClickOnTheLine', 'To DELETE a break line, double click on the line.')}<br />{T('toMOVEABreakLineClickAndDragIt', 'To MOVE a break line, click and drag it.')}</>}</>
+          : <>{T('thisScreenLetsYouSelectEachColumnAndSetTheDataFormat', 'This screen lets you select each column and set the Data Format.')}</>}</div>
       {step === 1 && <>
-        <fieldset className="gc-dialog-groupbox gc-t2c-type"><legend>Original data type</legend>
-          <div className="gc-t2c-radio-row"><label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-mode" checked={data.mode === 'Delimited'} onChange={() => update('mode', 'Delimited')} /><span>Delimited</span></label><span className="gc-t2c-hint">-Characters such as commas or tabs separate each field.</span></div>
-          <div className="gc-t2c-radio-row"><label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-mode" checked={data.mode === 'Fixed width'} onChange={() => update('mode', 'Fixed width')} /><span>Fixed width</span></label><span className="gc-t2c-hint">-Fields are aligned in columns with spaces between each field.</span></div>
+        <fieldset className="gc-dialog-groupbox gc-t2c-type"><legend>{T('originalDataType', 'Original data type')}</legend>
+          <div className="gc-t2c-radio-row"><label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-mode" checked={data.mode === 'Delimited'} onChange={() => update('mode', 'Delimited')} /><span>{T('delimited', 'Delimited')}</span></label><span className="gc-t2c-hint">{T('charactersSuchAsCommasOrTabsSeparateEachField', '-Characters such as commas or tabs separate each field.')}</span></div>
+          <div className="gc-t2c-radio-row"><label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-mode" checked={data.mode === 'Fixed width'} onChange={() => update('mode', 'Fixed width')} /><span>{T('fixedWidth', 'Fixed width')}</span></label><span className="gc-t2c-hint">{T('fieldsAreAlignedInColumnsWithSpacesBetweenEachField', '-Fields are aligned in columns with spaces between each field.')}</span></div>
         </fieldset>
-        <div className="gc-dialog-text">Preview of selected data:</div>
+        <div className="gc-dialog-text">{T('previewOfSelectedData', 'Preview of selected data:')}</div>
         <div className="gc-t2c-preview gc-t2c-step1-preview">
           {texts.slice(0, 30).map((text, index) => <div key={index} className="gc-t2c-line"><span className="gc-t2c-line-number">{index + 1}</span><span className="gc-t2c-line-text">{text}</span></div>)}
         </div>
       </>}
       {step === 2 && String(data.mode) === 'Delimited' && <>
         <div className="gc-t2c-columns">
-          <fieldset className="gc-dialog-groupbox gc-t2c-delimiters"><legend>Delimiters</legend>
-            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.tab} onChange={(event) => update('delimiters', { ...wizard.delimiters, tab: event.target.checked })} /><span>Tab</span></label>
-            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.semicolon} onChange={(event) => update('delimiters', { ...wizard.delimiters, semicolon: event.target.checked })} /><span>Semicolon</span></label>
-            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.comma} onChange={(event) => update('delimiters', { ...wizard.delimiters, comma: event.target.checked })} /><span>Comma</span></label>
-            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.space} onChange={(event) => update('delimiters', { ...wizard.delimiters, space: event.target.checked })} /><span>Space</span></label>
-            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.other} onChange={(event) => update('delimiters', { ...wizard.delimiters, other: event.target.checked ? ' ' : '' })} /><span>Other</span></label>
+          <fieldset className="gc-dialog-groupbox gc-t2c-delimiters"><legend>{T('delimiters', 'Delimiters')}</legend>
+            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.tab} onChange={(event) => update('delimiters', { ...wizard.delimiters, tab: event.target.checked })} /><span>{T('tab', 'Tab')}</span></label>
+            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.semicolon} onChange={(event) => update('delimiters', { ...wizard.delimiters, semicolon: event.target.checked })} /><span>{T('semicolon', 'Semicolon')}</span></label>
+            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.comma} onChange={(event) => update('delimiters', { ...wizard.delimiters, comma: event.target.checked })} /><span>{T('comma', 'Comma')}</span></label>
+            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.space} onChange={(event) => update('delimiters', { ...wizard.delimiters, space: event.target.checked })} /><span>{T('space', 'Space')}</span></label>
+            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.delimiters.other} onChange={(event) => update('delimiters', { ...wizard.delimiters, other: event.target.checked ? ' ' : '' })} /><span>{T('other', 'Other')}</span></label>
             <input className="gc-dialog-input gc-t2c-other" type="text" maxLength={1} value={String(wizard.delimiters.other ?? '')} onChange={(event) => update('delimiters', { ...wizard.delimiters, other: event.target.value })} />
           </fieldset>
           <div className="gc-t2c-qualifier">
-            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.consecutive} onChange={(event) => update('consecutive', event.target.checked)} /><span>Treat consecutive delimiters as one</span></label>
-            <div className="gc-t2c-qualifier-row"><span>Text qualifier:</span>
-              <Combo className="gc-t2c-qualifier-combo" ariaLabel="Text qualifier:" value={wizard.qualifier} options={[{ text: '"', value: '"' }, { text: "'", value: "'" }, { text: '(none)', value: '' }]} onChange={(value) => update('qualifier', String(value))} /></div>
+            <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!wizard.consecutive} onChange={(event) => update('consecutive', event.target.checked)} /><span>{T('treatConsecutiveDelimitersAsOne', 'Treat consecutive delimiters as one')}</span></label>
+            <div className="gc-t2c-qualifier-row"><span>{T('textQualifier', 'Text qualifier:')}</span>
+              <Combo className="gc-t2c-qualifier-combo" ariaLabel="Text qualifier:" value={wizard.qualifier} options={[{ text: '"', value: '"' }, { text: "'", value: "'" }, { text: T('none2', '(none)'), value: '' }]} onChange={(value) => update('qualifier', String(value))} /></div>
           </div>
         </div>
-        <fieldset className="gc-dialog-groupbox gc-t2c-preview-group"><legend>Data preview</legend>
+        <fieldset className="gc-dialog-groupbox gc-t2c-preview-group"><legend>{T('dataPreview', 'Data preview')}</legend>
           <PreviewGrid fields={fields.slice(0, 10)} breaks={undefined} onBreakClick={undefined} /></fieldset>
       </>}
       {step === 2 && String(data.mode) === 'Fixed width' && <>
-        <fieldset className="gc-dialog-groupbox gc-t2c-preview-group"><legend>Data preview</legend>
+        <fieldset className="gc-dialog-groupbox gc-t2c-preview-group"><legend>{T('dataPreview', 'Data preview')}</legend>
           <PreviewGrid fields={null} lines={texts.slice(0, 10)} breaks={wizard.breaks ?? []} onBreakClick={(position, remove, replace) => {
             if (replace) { update('breaks', replace); return; }
             const current = [...(wizard.breaks ?? [])];
@@ -270,28 +271,28 @@ export function TextToColumnsWizard({ designer, data, update }: BodyProps): Reac
           }} /></fieldset>
       </>}
       {step === 3 && <>
-        <fieldset className="gc-dialog-groupbox gc-t2c-format"><legend>Column data format</legend>
-          <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-format" checked={(formats[wizard.selectedColumn] ?? formats[0])?.format === 'General'} onChange={() => setFormat({ format: 'General' })} /><span>General</span></label>
-          <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-format" checked={formats[wizard.selectedColumn]?.format === 'Text'} onChange={() => setFormat({ format: 'Text' })} /><span>Text</span></label>
-          <span className="gc-t2c-date-row"><label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-format" checked={formats[wizard.selectedColumn]?.format === 'Date'} onChange={() => setFormat({ format: 'Date' })} /><span>Date:</span></label>
+        <fieldset className="gc-dialog-groupbox gc-t2c-format"><legend>{T('columnDataFormat', 'Column data format')}</legend>
+          <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-format" checked={(formats[wizard.selectedColumn] ?? formats[0])?.format === 'General'} onChange={() => setFormat({ format: 'General' })} /><span>{T('general', 'General')}</span></label>
+          <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-format" checked={formats[wizard.selectedColumn]?.format === 'Text'} onChange={() => setFormat({ format: 'Text' })} /><span>{T('text', 'Text')}</span></label>
+          <span className="gc-t2c-date-row"><label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-format" checked={formats[wizard.selectedColumn]?.format === 'Date'} onChange={() => setFormat({ format: 'Date' })} /><span>{T('date', 'Date:')}</span></label>
           <Combo className="gc-t2c-date-type" ariaLabel="Date type" value={formats[wizard.selectedColumn]?.dateType ?? 'MDY'} options={DATE_TYPES.map((text) => ({ text, value: text }))} onChange={(value) => setFormat({ dateType: String(value) })} /></span>
-          <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-format" checked={formats[wizard.selectedColumn]?.format === 'Skip'} onChange={() => setFormat({ format: 'Skip' })} /><span>Do not import column (skip)</span></label>
+          <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-t2c-format" checked={formats[wizard.selectedColumn]?.format === 'Skip'} onChange={() => setFormat({ format: 'Skip' })} /><span>{T('doNotImportColumnSkip', 'Do not import column (skip)')}</span></label>
           <div className="gc-t2c-format-help">&apos;General&apos; converts numeric values to numbers, date values to dates, and all remaining values to text</div>
-          <button className="gc-dialog-secondary gc-t2c-advanced" onClick={() => update('advancedOpen', !data.advancedOpen)}>Advanced...</button>
+          <button className="gc-dialog-secondary gc-t2c-advanced" onClick={() => update('advancedOpen', !data.advancedOpen)}>{T('advanced', 'Advanced...')}</button>
         </fieldset>
         {data.advancedOpen === true && <div className="gc-t2c-advanced-panel">
-          <label className="gc-dialog-checkbox gc-t2c-advanced-field"><span>Thousands separator:</span><input className="gc-dialog-input" type="text" maxLength={1} value={String(formats[wizard.selectedColumn]?.thousandsSeparator ?? '')} onChange={(event) => setFormat({ thousandsSeparator: event.target.value })} /></label>
-          <label className="gc-dialog-checkbox gc-t2c-advanced-field"><span>Decimal symbol:</span><input className="gc-dialog-input" type="text" maxLength={1} value={String(formats[wizard.selectedColumn]?.decimalSeparator ?? '')} onChange={(event) => setFormat({ decimalSeparator: event.target.value })} /></label>
+          <label className="gc-dialog-checkbox gc-t2c-advanced-field"><span>{T('thousandsSeparator', 'Thousands separator:')}</span><input className="gc-dialog-input" type="text" maxLength={1} value={String(formats[wizard.selectedColumn]?.thousandsSeparator ?? '')} onChange={(event) => setFormat({ thousandsSeparator: event.target.value })} /></label>
+          <label className="gc-dialog-checkbox gc-t2c-advanced-field"><span>{T('decimalSymbol', 'Decimal symbol:')}</span><input className="gc-dialog-input" type="text" maxLength={1} value={String(formats[wizard.selectedColumn]?.decimalSeparator ?? '')} onChange={(event) => setFormat({ decimalSeparator: event.target.value })} /></label>
         </div>}
-        <div className="gc-t2c-destination-row"><span>Destination</span><input className="gc-dialog-input gc-t2c-destination" value={String(wizard.destination)} onChange={(event) => update('destination', event.target.value)} /><span className="gc-t2c-destination-glyph" role="button" onClick={() => update('destination', selectionAddress(designer))} /></div>
-        <fieldset className="gc-dialog-groupbox gc-t2c-preview-group"><legend>Data preview</legend>
+        <div className="gc-t2c-destination-row"><span>{T('destination', 'Destination')}</span><input className="gc-dialog-input gc-t2c-destination" value={String(wizard.destination)} onChange={(event) => update('destination', event.target.value)} /><span className="gc-t2c-destination-glyph" role="button" onClick={() => update('destination', selectionAddress(designer))} /></div>
+        <fieldset className="gc-dialog-groupbox gc-t2c-preview-group"><legend>{T('dataPreview', 'Data preview')}</legend>
           <PreviewGrid fields={fields.slice(0, 10)} formats={formats} selectedColumn={wizard.selectedColumn} onColumnClick={(index) => update('selectedColumn', index)} /></fieldset>
       </>}
       <div className="gc-dialog-footer gc-t2c-footer">
-        <button className="gc-dialog-button" onClick={() => designer.closeDialog(designer.dialog!.name, false)}>Cancel</button>
-        <button className={`gc-dialog-button${step === 1 ? ' disable' : ''}`} disabled={step === 1} onClick={back}>&lt; Back</button>
-        <button className={`gc-dialog-button${step === 3 ? ' disable' : ' gc-dialog-button-primary'}`} disabled={step === 3} onClick={next}>Next &gt;</button>
-        <button className={`gc-dialog-button${step === 3 ? ' gc-dialog-button-primary' : ' disable'}`} disabled={!canFinish} onClick={() => designer.closeDialog(designer.dialog!.name, true)}>Finish</button>
+        <button className="gc-dialog-button" onClick={() => designer.closeDialog(designer.dialog!.name, false)}>{T('cancel', 'Cancel')}</button>
+        <button className={`gc-dialog-button${step === 1 ? ' disable' : ''}`} disabled={step === 1} onClick={back}>{T('backWizard', '< Back')}</button>
+        <button className={`gc-dialog-button${step === 3 ? ' disable' : ' gc-dialog-button-primary'}`} disabled={step === 3} onClick={next}>{T('nextGt', 'Next >')}</button>
+        <button className={`gc-dialog-button${step === 3 ? ' gc-dialog-button-primary' : ' disable'}`} disabled={!canFinish} onClick={() => designer.closeDialog(designer.dialog!.name, true)}>{T('finish', 'Finish')}</button>
       </div>
     </div>
   );
@@ -375,7 +376,7 @@ export function textToColumnsDataFromSelection(designer: Designer): DialogData {
   const endAddress = `${String.fromCharCode(65 + selection.col + selection.colCount - 1)}${selection.row + selection.rowCount - 1}`;
   return {
     kind: 't2c', step: 1, mode: delimited ? 'Delimited' : 'Fixed width', region: selection,
-    dialogTitle: 'Convert Text to Columns Wizard - Step 1 of 3',
+    dialogTitle: T('textToColumnsWizardStep', 'Convert Text to Columns Wizard - Step {0} of 3').replace('{0}', '1'),
     delimiters: { tab: true, semicolon: false, comma: false, space: false, other: '' },
     consecutive: false, qualifier: '"', breaks: [] as number[],
     formats: [{ format: 'General', dateType: 'MDY' }] as TextColumnFormat[],
@@ -393,24 +394,24 @@ export function SubtotalDialogBody({ designer, data, update }: BodyProps): React
   const checked = data.checked as boolean[];
   return (
     <div className="gc-subtotal-dialog" data-testid="subtotal-dialog">
-      <div className="gc-dialog-text gc-dialog-label">At each change in:</div>
+      <div className="gc-dialog-text gc-dialog-label">{T('atEachChangeIn', 'At each change in:')}</div>
       <Combo className="gc-subtotal-group" ariaLabel="At each change in:" value={groupColumn} options={labels.map((label, index) => ({ text: label, value: index }))}
         onChange={(value) => {
           const index = Number(value);
           update('groupColumn', index);
           update('checked', labels.map((_, position) => position !== index));
         }} />
-      <div className="gc-dialog-text gc-dialog-label">Use function:</div>
+      <div className="gc-dialog-text gc-dialog-label">{T('useFunction', 'Use function:')}</div>
       <Combo className="gc-subtotal-function" ariaLabel="Use function:" value={data.fn ?? 'Sum'} options={['Sum', 'Count', 'Average', 'Max', 'Min', 'Product'].map((text) => ({ text, value: text }))} onChange={(value) => update('fn', String(value))} />
-      <div className="gc-dialog-text gc-dialog-label">Add subtotal to:</div>
+      <div className="gc-dialog-text gc-dialog-label">{T('addSubtotalTo', 'Add subtotal to:')}</div>
       <div className="gc-subtotal-columns">
         {labels.map((label, index) => (
           <label key={index} className="gc-dialog-checkbox"><input type="checkbox" checked={!!checked[index]} onChange={(event) => update('checked', checked.map((value, position) => (position === index ? event.target.checked : value)))} /><span>{label}</span></label>
         ))}
       </div>
-      <label className="gc-dialog-checkbox"><input type="checkbox" checked={data.replace !== false} onChange={(event) => update('replace', event.target.checked)} /><span>Replace current subtotals</span></label>
-      <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!data.pageBreak} onChange={(event) => update('pageBreak', event.target.checked)} /><span>Page break between groups</span></label>
-      <label className="gc-dialog-checkbox"><input type="checkbox" checked={data.summaryBelow !== false} onChange={(event) => update('summaryBelow', event.target.checked)} /><span>Summary below data</span></label>
+      <label className="gc-dialog-checkbox"><input type="checkbox" checked={data.replace !== false} onChange={(event) => update('replace', event.target.checked)} /><span>{T('replaceCurrentSubtotals', 'Replace current subtotals')}</span></label>
+      <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!data.pageBreak} onChange={(event) => update('pageBreak', event.target.checked)} /><span>{T('pageBreakBetweenGroups', 'Page break between groups')}</span></label>
+      <label className="gc-dialog-checkbox"><input type="checkbox" checked={data.summaryBelow !== false} onChange={(event) => update('summaryBelow', event.target.checked)} /><span>{T('summaryBelowData', 'Summary below data')}</span></label>
     </div>
   );
 }
@@ -433,15 +434,15 @@ export function ValidationHighlightBody({ designer, data, update }: BodyProps): 
   const position = Number(data.highlightPosition ?? 4);
   return (
     <div className="gc-dv-highlight">
-      <div className="gc-column-set gc-dv-row"><span className="gc-dialog-text">Style:</span>
-        <Combo className="gc-dv-highlight-type" ariaLabel="Style:" value={type} options={[{ text: 'Circle', value: 0 }, { text: 'Dogear', value: 1 }, { text: 'Icon', value: 2 }]} onChange={(value) => update('highlightType', Number(value))} /></div>
-      <div className="gc-column-set gc-dv-row"><span className="gc-dialog-text">Color:</span>
-        <span className="gc-dialog-color"><input type="color" aria-label="Color" value={normalizeHex(String(data.highlightColor ?? 'red'))} onChange={(event) => update('highlightColor', event.target.value)} /></span></div>
+      <div className="gc-column-set gc-dv-row"><span className="gc-dialog-text">{T('style2', 'Style:')}</span>
+        <Combo className="gc-dv-highlight-type" ariaLabel="Style:" value={type} options={[{ text: T('circle', 'Circle'), value: 0 }, { text: T('dogear', 'Dogear'), value: 1 }, { text: T('icon', 'Icon'), value: 2 }]} onChange={(value) => update('highlightType', Number(value))} /></div>
+      <div className="gc-column-set gc-dv-row"><span className="gc-dialog-text">{T('color2', 'Color:')}</span>
+        <span className="gc-dialog-color"><input type="color" aria-label={T('color', 'Color')} value={normalizeHex(String(data.highlightColor ?? 'red'))} onChange={(event) => update('highlightColor', event.target.value)} /></span></div>
       {type === 2 && <>
-        <div className="gc-column-set gc-dv-row"><span className="gc-dialog-text">Position:</span>
+        <div className="gc-column-set gc-dv-row"><span className="gc-dialog-text">{T('position', 'Position:')}</span>
           <Combo className="gc-dv-highlight-position" ariaLabel="Position:" value={position} options={HIGHLIGHT_POSITIONS.map((text, value) => ({ text, value }))} onChange={(value) => update('highlightPosition', Number(value))} /></div>
-        <div className="gc-column-set gc-dv-row"><span className="gc-dialog-text">Icon</span>
-          <span className="gc-dv-icon-row"><button className="gc-dialog-secondary gc-dv-select-icon" onClick={() => update('iconPickerOpen', true)}>Select Icon</button></span></div>
+        <div className="gc-column-set gc-dv-row"><span className="gc-dialog-text">{T('icon', 'Icon')}</span>
+          <span className="gc-dv-icon-row"><button className="gc-dialog-secondary gc-dv-select-icon" onClick={() => update('iconPickerOpen', true)}>{T('selectIcon', 'Select Icon')}</button></span></div>
       </>}
       {data.iconPickerOpen === true && <IconPicker designer={designer} data={data} update={update} />}
     </div>
@@ -465,17 +466,17 @@ function IconPicker({ data, update }: BodyProps): React.ReactElement {
   return (
     <div className="gc-dv-icon-overlay">
       <div className="gc-dv-icon-dialog">
-        <div className="gc-dialog-header"><div className="gc-dialog-title">Select Icon</div>
+        <div className="gc-dialog-header"><div className="gc-dialog-title">{T('selectIcon', 'Select Icon')}</div>
           <button className="gc-dialog-close" aria-label="Close" onClick={() => update('iconPickerOpen', false)}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8" fill="none" stroke="currentColor" /></svg></button></div>
         <div className="gc-dv-icon-grid">
-          <span className="gc-dv-icon-item" role="button" onClick={() => { update('highlightImage', ''); update('iconPickerOpen', false); }} title="Default" />
+          <span className="gc-dv-icon-item" role="button" onClick={() => { update('highlightImage', ''); update('iconPickerOpen', false); }} title={T('default', 'Default')} />
           {DV_ICONS.map((icon) => (
             <span key={icon.name} role="button" className="gc-dv-icon-item" title={icon.name} onClick={() => { update('highlightImage', iconDataUrl(icon.path, color)); update('iconPickerOpen', false); }}>
               <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d={icon.path} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </span>
           ))}
         </div>
-        <div className="gc-dialog-footer"><button className="gc-dialog-button" onClick={() => update('iconPickerOpen', false)}>Cancel</button></div>
+        <div className="gc-dialog-footer"><button className="gc-dialog-button" onClick={() => update('iconPickerOpen', false)}>{T('cancel', 'Cancel')}</button></div>
       </div>
     </div>
   );

@@ -398,7 +398,7 @@ export class DataChart extends FloatingObject {
                 }
                 if (event.button !== 0) return;
                 event.stopPropagation();
-                element.focus();
+                element.focus({ preventScroll: true });
                 element.setPointerCapture(event.pointerId);
                 if (!event.ctrlKey) for (const item of [...view.sheet!.charts.all(), ...(view.sheet!.dataCharts?.all() ?? [])]) if ((item as unknown) !== this) item.isSelected(false);
                 this.isSelected(true);

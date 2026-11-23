@@ -14,6 +14,9 @@ import type GC from '@mescius/spread-sheets';
 import { CustomSelect } from './custom-widgets.js';
 import type { DesignerApi as Designer } from '../designer-api.js';
 import { recordView, type Worksheet } from '../core-internals.js';
+import { getResources, resolveText, uiKey } from '../resolve.js';
+import { T } from './t.js';
+/** TASK 87: deferred dialog-label placeholder (resolved when the option renders). */
 
 /** The trial's combo entries, in its order, with the public `CellStatesType` value. */
 export const CELL_STATE_TYPES: { label: string; value: number }[] = [
@@ -128,20 +131,20 @@ export function CellStatesManagerBody({ designer, data, update }: Props): React.
   const selected = Number(data.selected ?? -1);
   return (
     <div className="gc-cell-states-manager">
-      <div className="gc-cell-states-title">Cell State list:</div>
+      <div className="gc-cell-states-title">{T('cellStateList', 'Cell State list:')}</div>
       <div className="gc-cell-states-toolbar">
         <button type="button" className="gc-dialog-secondary gc-cell-states-add" onClick={() => designer.addCellState()}>
-          <span className="gc-cell-states-icon add" aria-hidden="true" />Add Cell States
+          <span className="gc-cell-states-icon add" aria-hidden="true" />{T('addCellStates', 'Add Cell States')}
         </button>
         <button type="button" className="gc-dialog-secondary gc-cell-states-remove" onClick={() => designer.removeCellState()}>
-          <span className="gc-cell-states-icon remove" aria-hidden="true" />Remove Cell State
+          <span className="gc-cell-states-icon remove" aria-hidden="true" />{T('removeCellState', 'Remove Cell State')}
         </button>
       </div>
-      <div className="gc-cell-states-list" role="table" aria-label="Cell State list:">
+      <div className="gc-cell-states-list" role="table" aria-label={T('cellStateList', 'Cell State list:')}>
         <div className="gc-cell-states-row gc-cell-states-head" role="row">
-          <span role="columnheader" className="gc-cell-states-range">Range</span>
-          <span role="columnheader" className="gc-cell-states-style">Style</span>
-          <span role="columnheader" className="gc-cell-states-state">State</span>
+          <span role="columnheader" className="gc-cell-states-range">{T('range', 'Range')}</span>
+          <span role="columnheader" className="gc-cell-states-style">{T('style', 'Style')}</span>
+          <span role="columnheader" className="gc-cell-states-state">{T('state', 'State')}</span>
         </div>
         <div className="gc-cell-states-body">
           {rows.map((row, index) => (
@@ -150,9 +153,9 @@ export function CellStatesManagerBody({ designer, data, update }: Props): React.
               onClick={() => update('selected', index)}>
               <span role="cell" className="gc-cell-states-range">{rangeText(row)}</span>
               <span role="cell" className="gc-cell-states-style">
-                <span className="gc-cell-states-swatch" style={cellStateSwatchCss(row.style)}>AaBbCcYyZz</span>
+                <span className="gc-cell-states-swatch" style={cellStateSwatchCss(row.style)}>{T('aaBbCcYyZz', 'AaBbCcYyZz')}</span>
               </span>
-              <span role="cell" className="gc-cell-states-state">{cellStateTypeLabel(row.state)}</span>
+              <span role="cell" className="gc-cell-states-state">{T(uiKey(cellStateTypeLabel(row.state)), cellStateTypeLabel(row.state)) || cellStateTypeLabel(row.state)}</span>
             </div>
           ))}
         </div>
@@ -169,24 +172,24 @@ export function CreateCellStateBody({ designer, data, update }: Props): React.Re
   return (
     <div className="gc-create-cell-state">
       <div className="gc-create-cell-state-type">
-        <label className="gc-dialog-label">Select a cell state type</label>
+        <label className="gc-dialog-label">{T('selectACellStateType', 'Select a cell state type')}</label>
         <CustomSelect className="gc-dialog-select" ariaLabel="Select a cell state type"
-          value={String(data.state ?? 1)} options={CELL_STATE_TYPES.map((item) => ({ text: item.label, value: item.value }))} onChange={(next) => update('state', Number(next))} />
+          value={String(data.state ?? 1)} options={CELL_STATE_TYPES.map((item) => ({ text: resolveText(item.label, getResources()) || item.label, value: item.value }))} onChange={(next) => update('state', Number(next))} />
       </div>
       <fieldset className="gc-create-cell-state-range">
-        <legend>Choose Range</legend>
+        <legend>{T('chooseRange', 'Choose Range')}</legend>
         <div className="gc-create-cell-state-range-row">
-          <label className="gc-dialog-label" htmlFor="gc-cell-state-range">Range:</label>
-          <input id="gc-cell-state-range" className="gc-dialog-input" aria-label="Range:" value={String(data.range ?? '')} onChange={(event) => update('range', event.target.value)} />
-          <button type="button" className="gc-cell-states-picker" aria-label="Range Picker" onClick={() => designer.pickCellStateRange()}><span aria-hidden="true" /></button>
+          <label className="gc-dialog-label" htmlFor="gc-cell-state-range">{T('range2', 'Range:')}</label>
+          <input id="gc-cell-state-range" className="gc-dialog-input" aria-label={T('range2', 'Range:')} value={String(data.range ?? '')} onChange={(event) => update('range', event.target.value)} />
+          <button type="button" className="gc-cell-states-picker" aria-label={T('rangePicker', 'Range Picker')} onClick={() => designer.pickCellStateRange()}><span aria-hidden="true" /></button>
         </div>
       </fieldset>
       <fieldset className="gc-create-cell-state-style">
-        <legend>Set style</legend>
+        <legend>{T('setStyle', 'Set style')}</legend>
         <div className="gc-create-cell-state-style-row">
-          <span className="gc-dialog-label">Preview:</span>
-          <span className="gc-cell-states-swatch gc-create-cell-state-swatch" style={styled ? cellStateSwatchCss(style) : undefined}>AaBbCcYyZz</span>
-          <button type="button" className="gc-dialog-secondary gc-create-cell-state-format" onClick={() => designer.editCellStateStyle()}>Format...</button>
+          <span className="gc-dialog-label">{T('preview', 'Preview:')}</span>
+          <span className="gc-cell-states-swatch gc-create-cell-state-swatch" style={styled ? cellStateSwatchCss(style) : undefined}>{T('aaBbCcYyZz', 'AaBbCcYyZz')}</span>
+          <button type="button" className="gc-dialog-secondary gc-create-cell-state-format" onClick={() => designer.editCellStateStyle()}>{T('format', 'Format...')}</button>
         </div>
       </fieldset>
     </div>

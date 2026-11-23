@@ -10,6 +10,10 @@ import type { ThreadedComment, IContentBlock } from './threaded-comments.js';
 import { ContentType, blocksToText, userColor } from './threaded-comments.js';
 import { UserManager } from './user-manager.js';
 import { Events } from './events.js';
+import { ltext } from './localization.js';
+
+/** Comment/threaded-comment UI captions (`comments.*` language namespace). */
+const ctext = (key: string, fallback: string, ...args: (string | number)[]) => ltext(`comments.${key}`, fallback, ...args);
 
 interface CellPos { x: number; y: number; w: number; h: number }
 
@@ -143,6 +147,8 @@ function ensureEditorStyles(): void {
 
 export class CommentUi {
   private layer?: HTMLElement;
+  /** One SVG above the grid carrying every visible comment's connector line (TASK 92 item 3). */
+  private connectorSvg?: SVGSVGElement;
   private box?: { row: number; col: number; host: HTMLElement; textarea?: HTMLTextAreaElement; kind: 'comment' | 'thread' };
   private card?: HTMLElement;
   private cardCell?: { row: number; col: number };
@@ -161,6 +167,65 @@ export class CommentUi {
       this.view.root.append(this.layer);
     }
     return this.layer;
+  }
+
+  /**
+   * TASK 92 item 3 — the classic-comment connector (trial, `m4-comments` probe):
+   * a 1px black line from the comment box's top-left corner to the cell's
+   * top-right corner (the red indicator), with a small filled arrowhead at the
+   * cell end. Drawn in one layer-wide SVG kept under the boxes.
+   */
+  private paintConnectors(): void {
+    const targets: { row: number; col: number; left: number; top: number }[] = [];
+    if (this.box && this.box.kind === 'comment') {
+      targets.push({ row: this.box.row, col: this.box.col, left: parseFloat(this.box.host.style.left) || 0, top: parseFloat(this.box.host.style.top) || 0 });
+    }
+    for (const node of this.layer?.querySelectorAll<HTMLElement>('[data-os-always]') ?? []) {
+      if (node.style.display === 'none') continue;
+      targets.push({ row: Number(node.dataset.row), col: Number(node.dataset.col), left: parseFloat(node.style.left) || 0, top: parseFloat(node.style.top) || 0 });
+    }
+    if (!targets.length) { this.connectorSvg?.replaceChildren(); return; }
+    const layer = this.ensureLayer();
+    if (!this.connectorSvg) {
+      this.connectorSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      this.connectorSvg.setAttribute('class', 'os-comment-connector');
+      Object.assign(this.connectorSvg.style, { position: 'absolute', left: '0', top: '0', overflow: 'visible', pointerEvents: 'none' } as CSSStyleDeclaration);
+      layer.prepend(this.connectorSvg);
+    }
+    const width = this.view.root.clientWidth || 0;
+    const height = this.view.root.clientHeight || 0;
+    this.connectorSvg.setAttribute('width', String(width));
+    this.connectorSvg.setAttribute('height', String(height));
+    const parts: SVGPathElement[] = [];
+    for (const t of targets) {
+      const pos = this.cellPos(t.row, t.col);
+      if (!pos) continue;
+      // Tip of the arrowhead at the cell's top-right corner (trial: ~1px left of the right edge).
+      const tx = pos.x + pos.w - 1;
+      const ty = pos.y + 2;
+      const bx = t.left;
+      const by = t.top;
+      const dx = tx - bx;
+      const dy = ty - by;
+      const len = Math.hypot(dx, dy);
+      if (len < 6) continue;
+      const ux = dx / len;
+      const uy = dy / len;
+      // 7px-long, 8px-wide filled arrowhead pointing at the cell indicator.
+      const baseX = tx - ux * 7;
+      const baseY = ty - uy * 7;
+      const px = -uy * 4;
+      const py = ux * 4;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      line.setAttribute('d', `M${bx.toFixed(1)} ${by.toFixed(1)}L${baseX.toFixed(1)} ${baseY.toFixed(1)}`);
+      line.setAttribute('stroke', '#000000');
+      line.setAttribute('stroke-width', '1');
+      const head = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      head.setAttribute('d', `M${tx.toFixed(1)} ${ty.toFixed(1)}L${(baseX + px).toFixed(1)} ${(baseY + py).toFixed(1)}L${(baseX - px).toFixed(1)} ${(baseY - py).toFixed(1)}Z`);
+      head.setAttribute('fill', '#000000');
+      parts.push(line, head);
+    }
+    this.connectorSvg.replaceChildren(...parts);
   }
 
   private cellPos(row: number, col: number): CellPos | undefined {
@@ -334,11 +399,13 @@ export class CommentUi {
     this.positionBox();
     this.positionCard();
     this.refreshAlwaysShown();
+    this.paintConnectors();
   }
 
   destroy(): void {
     this.layer?.remove();
     this.layer = undefined;
+    this.connectorSvg = undefined;
     this.box = undefined;
     this.card = undefined;
   }
@@ -356,6 +423,7 @@ export class CommentUi {
     host.style.top = `${top}px`;
     this.ensureLayer().append(host);
     this.box = { row, col, host, kind: 'comment' };
+    this.paintConnectors();
   }
 
   private openEditor(row: number, col: number, state: number): void {
@@ -373,6 +441,7 @@ export class CommentUi {
     this.ensureLayer().append(host);
     const textarea = host.querySelector<HTMLTextAreaElement>('textarea.gc-comment-editor') ?? undefined;
     this.box = { row, col, host, textarea, kind: 'comment' };
+    this.paintConnectors();
   }
 
   private buildCommentHost(comment: Comment, edit?: string, onEditor?: (t: HTMLTextAreaElement) => void): HTMLElement {
@@ -410,9 +479,14 @@ export class CommentUi {
   private commentAnchor(row: number, col: number, boxWidth: number, boxHeight: number): { left: number; top: number } {
     const pos = this.cellPos(row, col);
     if (!pos) return { left: 0, top: 0 };
-    let left = pos.x + pos.w + 9;
-    let top = pos.y - 19;
-    if (left + boxWidth > this.view.viewWidth + this.view.viewportX) left = pos.x - boxWidth - 9;
+    // TASK 98 re-measure (t56-comments-box black-box, both always-shown comments): the
+    // trial's box top-left sits 17 px right of the host cell's right edge and 16 px above
+    // the cell's top edge (line-canvas ink corners: cell (6,23) -> box (23,7) in a 30x31
+    // canvas). Our previous constants were +9 / -19, putting the box 3 px too high and 8 px
+    // too far left; the connector line follows these anchors automatically.
+    let left = pos.x + pos.w + 17;
+    let top = pos.y - 16;
+    if (left + boxWidth > this.view.viewWidth + this.view.viewportX) left = pos.x - boxWidth - 17;
     if (top < this.view.viewportY) top = pos.y;
     if (top + boxHeight > this.view.viewportY + this.view.viewHeight) top = this.view.viewportY + this.view.viewHeight - boxHeight - 2;
     return { left, top };
@@ -423,13 +497,17 @@ export class CommentUi {
       this.box.host.remove();
       if (this.box.kind === 'comment' && !this.box.textarea) { /* hover box: no state change */ }
       this.box = undefined;
+      this.paintConnectors();
     }
   }
 
   private refreshAlwaysShown(): void {
     const sheet = this.sheet;
-    if (!sheet || !this.layer) return;
-    for (const node of [...this.layer.querySelectorAll('[data-os-always]')]) {
+    if (!sheet) return;
+    // Do not create the overlay layer just for sheets without visible comments (trial parity).
+    if (!this.layer && !sheet.comments.all().some(c => c.displayMode() === 1 && c.commentState() === 3)) return;
+    const layer = this.ensureLayer();
+    for (const node of [...layer.querySelectorAll('[data-os-always]')]) {
       const row = Number((node as HTMLElement).dataset.row), col = Number((node as HTMLElement).dataset.col);
       const comment = sheet.comments.get(row, col);
       const shown = !!comment && comment.displayMode() === 1 && comment.commentState() === 3;
@@ -438,7 +516,7 @@ export class CommentUi {
     for (const comment of sheet.comments.all()) {
       if (comment.displayMode() !== 1 || comment.commentState() !== 3) continue;
       const row = comment.rowIndex(), col = comment.colIndex();
-      if (this.layer.querySelector(`[data-os-always][data-row="${row}"][data-col="${col}"]`)) continue;
+      if (layer.querySelector(`[data-os-always][data-row="${row}"][data-col="${col}"]`)) continue;
       const host = this.buildCommentHost(comment);
       host.dataset.osAlways = '1';
       host.dataset.row = String(row);
@@ -446,8 +524,9 @@ export class CommentUi {
       const { left, top } = this.commentAnchor(row, col, 146, 86);
       host.style.left = `${left}px`;
       host.style.top = `${top}px`;
-      this.layer.append(host);
+      layer.append(host);
     }
+    this.paintConnectors();
   }
 
   private positionBox(): void {
@@ -495,10 +574,10 @@ export class CommentUi {
     });
     row.append(iconSvg('check', 16, '#242424'));
     const title = el('span', 'os-thread-resolved-title');
-    title.textContent = 'Resolved';
+    title.textContent = ctext('resolved', 'Resolved');
     row.append(title, el('span', 'os-thread-resolved-spacer', { flex: '1' }));
-    row.append(this.svgButton('pencil', 'Edit comment', () => this.editReply(thread)));
-    row.append(this.svgButton('trash', 'Delete thread', () => this.deleteThread()));
+    row.append(this.svgButton('pencil', ctext('editComment', 'Edit comment'), () => this.editReply(thread)));
+    row.append(this.svgButton('trash', ctext('deleteThreadTip', 'Delete thread'), () => this.deleteThread()));
     row.addEventListener('click', (event) => {
       if ((event.target as HTMLElement).closest('button')) return;
       thread.resolved(false);
@@ -530,7 +609,7 @@ export class CommentUi {
       ref.textContent = cellRef(thread.row(), thread.col());
       header.append(ref);
       if (!thread.resolved()) {
-        const gear = this.svgButton('gear', 'Comment options', (event) => this.showThreadMenu(event, thread));
+        const gear = this.svgButton('gear', ctext('commentOptions', 'Comment options'), (event) => this.showThreadMenu(event, thread));
         header.append(gear);
       }
     }
@@ -575,9 +654,9 @@ export class CommentUi {
       button.addEventListener('pointerleave', () => (button.style.background = 'transparent'));
       menu.append(button);
     };
-    item('Delete Thread', 'trash', () => this.deleteThread());
-    if (thread.resolved()) item('Reopen Thread', 'check', () => { thread.resolved(false); this.reopenCard(); });
-    else item('Resolve Thread', 'check', () => { thread.resolved(true); this.closeCard(); });
+    item(ctext('deleteThread', 'Delete Thread'), 'trash', () => this.deleteThread());
+    if (thread.resolved()) item(ctext('reopenThread', 'Reopen Thread'), 'check', () => { thread.resolved(false); this.reopenCard(); });
+    else item(ctext('resolveThread', 'Resolve Thread'), 'check', () => { thread.resolved(true); this.closeCard(); });
     this.ensureLayer().append(menu);
     const rect = this.view.root.getBoundingClientRect();
     const anchor = (event.currentTarget as HTMLElement | undefined)?.getBoundingClientRect();
@@ -620,7 +699,7 @@ export class CommentUi {
     input.setAttribute('contenteditable', 'true');
     // The placeholder is a CSS ::before visual (ensureEditorStyles): never editable content,
     // never counted by syncPostState()/post(), and it cannot swallow the first keypress.
-    input.dataset.placeholder = thread ? '@mention or reply' : '@mention or comment';
+    input.dataset.placeholder = thread ? ctext('mentionReply', '@mention or reply') : ctext('mentionComment', '@mention or comment');
     const refreshPlaceholder = (): void => {
       const text = input.textContent ?? '';
       // Browsers leave <br> or empty text nodes after backspacing to nothing; restore a
@@ -666,7 +745,7 @@ export class CommentUi {
       width: '42px', height: '20px', border: 'none', background: 'transparent', color: '#333',
       cursor: 'pointer', padding: '0', flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center',
     });
-    cancel.title = 'Cancel';
+    cancel.title = ctext('cancel', 'Cancel');
     cancel.append(iconSvg('close', 14, '#333333'));
     cancel.addEventListener('click', () => {
       delete input.dataset.editing;

@@ -5,14 +5,15 @@
  * `CellStateManagerTemplate`, `NewCellStateTemplate`) so an application can replace
  * them through `Designer.registerTemplate` exactly like the trial's. */
 import type { DesignerApi as Designer, DialogData } from './designer-api.js';
-import { emptyTableTheme, recordView, type Worksheet } from './core-internals.js';
+import { emptyTableTheme, pivotTableThemes, recordView, defaultThemeWorkbook, type Worksheet } from './core-internals.js';
 import { TemplateNames } from './names-generated.js';
 import { activeSheet, selectionBounds } from './commands/base.js';
+import { messageText } from './resolve.js';
 import { currentRegion } from './data-engine.js';
 import { buildFormatData } from './designer-dialogs.js';
 import { beginFormatStylePick, styleFromFormatData, takeFormatStyleTarget } from './dialogs/style-bridge.js';
 import {
-  TABLE_STYLE_ELEMENTS, buildTableTheme, emptyTableElementStyle, tableElementStyleFromJSON, type TableElementStyle,
+  PIVOT_STYLE_ELEMENTS, TABLE_STYLE_ELEMENTS, buildPivotTheme, buildTableTheme, emptyTableElementStyle, tableElementStyleFromJSON, type TableElementStyle,
 } from './dialogs/TableStyleDialogs.js';
 import { cellStateRows, commitCellStates, parseCellStateRange, rangeText, type CellStateRow } from './dialogs/CellStatesDialogs.js';
 
@@ -253,6 +254,115 @@ function tableElementStyleToRecord(style: TableElementStyle): Record<string, unk
 /** Element list key of the draft's current element (used by the dialog bodies). */
 export function tableStyleElementKey(index: number): string {
   return TABLE_STYLE_ELEMENTS[Math.max(0, index)]?.key ?? TABLE_STYLE_ELEMENTS[0].key;
+}
+
+/* --------------------------------------- TASK 93: New Pivot Table Style --- */
+
+/** The draft `showNewPivotTableStyleDialog` keeps across the Format... round-trip. */
+export interface PivotStyleDraft extends TableStyleDraft {
+  /** The custom theme being modified (undefined for a fresh style). */
+  original?: string;
+}
+
+export const PIVOT_STYLE_TEMPLATE = TemplateNames.PivotTableStyleDialogTemplate ?? 'pivoTtableStyleDialogTemplate';
+
+const nextPivotThemeName = (designer: Designer): string => {
+  const manager = pivotThemeManager(designer);
+  let index = 1;
+  while (manager.get?.(`New Pivot Table Style ${index}`)) index++;
+  return `New Pivot Table Style ${index}`;
+};
+
+function pivotThemeManager(designer: Designer): { add?: (v: unknown) => unknown; get?: (n: string) => unknown; remove?: (n: string) => void; update?: (oldName: string, theme: unknown) => void; all?: () => { name: () => string }[] } {
+  return recordView(designer.getWorkbook()).customPivotTableThemes as ReturnType<typeof pivotThemeManager>;
+}
+
+/** Draft styles/sizes read back from an existing theme (the Modify / Duplicate flow). */
+export function pivotThemeDraft(designer: Designer, name: string, builtIn = false): PivotStyleDraft {
+  const theme = builtIn
+    ? (pivotTableThemes(designer.gc) as Record<string, unknown>)[name.toLowerCase()]
+    : pivotThemeManager(designer).get?.(name);
+  const styles: Record<string, TableElementStyle> = {};
+  const sizes: Record<string, number> = {};
+  const json = recordView((theme as { toJSON?: () => unknown } | undefined)?.toJSON?.() ?? {});
+  for (const element of PIVOT_STYLE_ELEMENTS) if (json[element.key]) styles[element.key] = tableElementStyleFromJSON(json[element.key]);
+  for (const key of ['firstColumnStripSize', 'firstRowStripSize']) if (json[key] !== undefined) sizes[key] = Number(json[key]);
+  return { name, element: 0, styles, sizes, original: name };
+}
+
+/** Opens (or re-opens) the New/Modify Pivot Table Style dialog with the current draft. */
+export function showNewPivotTableStyleDialog(designer: Designer, draft?: PivotStyleDraft): void {
+  const current = draft ?? designer._pivotStyleDraft ?? { name: nextPivotThemeName(designer), element: 0, styles: {}, sizes: {} };
+  designer._pivotStyleDraft = current;
+  const data: DialogData = { name: current.name, element: current.element, styles: { ...current.styles }, sizes: { ...current.sizes } };
+  // Trial (measured): the dialog is titled "Modify Pivot Table Style" when editing an
+  // existing style and "New Pivot Table Style" for a fresh one.
+  if (current.original) data.dialogTitle = messageText(designer, 'modifyPivotTableStyle', 'Modify Pivot Table Style', []);
+  designer.showDialog(PIVOT_STYLE_TEMPLATE, data,
+    (submitted) => { const pending = designer._pivotStyleDraft; designer._pivotStyleDraft = undefined; applyNewPivotStyle(designer, submitted, pending?.original); },
+    () => { designer._pivotStyleDraft = undefined; });
+}
+
+/** OK: register (or re-register through `update`) the theme via the public API. */
+export function applyNewPivotStyle(designer: Designer, data: DialogData, original?: string): void {
+  const name = String(data.name ?? '').trim();
+  if (!name) return;
+  const styles = (data.styles ?? {}) as Record<string, TableElementStyle>;
+  const sizes = (data.sizes ?? {}) as Record<string, number>;
+  const theme = buildPivotTheme(designer.gc, name, styles, sizes);
+  const manager = pivotThemeManager(designer);
+  if (original && manager.get?.(original)) manager.update?.(original, theme);
+  else manager.add?.(theme);
+  designer.invalidate();
+}
+
+/** Format... of the pivot dialog: the Format Cells dialog for one element. */
+export function editPivotStyleElement(designer: Designer, key: string): void {
+  const draft = designer._pivotStyleDraft;
+  if (!draft) return;
+  const current = draft.styles[key] ?? emptyTableElementStyle();
+  openFormatCellsFor(designer, tableElementStyleToRecord(current), ['font', 'border', 'fill'], 'font', (style) => {
+    const pending = designer._pivotStyleDraft;
+    if (!pending) return;
+    if (style) pending.styles[key] = tableElementStyleFromJSON(style);
+    showNewPivotTableStyleDialog(designer, pending);
+  });
+}
+
+/** Clear of the pivot dialog: forget the selected element's style. */
+export function clearPivotStyleElement(designer: Designer, key: string): void {
+  const draft = designer._pivotStyleDraft;
+  if (!draft) return;
+  const styles = { ...draft.styles };
+  delete styles[key];
+  showNewPivotTableStyleDialog(designer, { ...draft, styles });
+}
+
+/** Duplicate... of the gallery context menu. Trial (measured): opens the style
+ *  editor (same dialog as Modify) pre-filled with the source theme clone and a
+ *  generated name; OK registers the copy as a custom style. */
+export function duplicatePivotTheme(designer: Designer, name: string, builtIn = false): void {
+  const draft = pivotThemeDraft(designer, name, builtIn);
+  const manager = pivotThemeManager(designer);
+  let index = 1;
+  let next = `${name} ${index}`;
+  while (manager.get?.(next)) { index += 1; next = `${name} ${index}`; }
+  showNewPivotTableStyleDialog(designer, { ...draft, name: next, original: undefined });
+}
+
+/** Delete of the gallery context menu. */
+export function deletePivotTheme(designer: Designer, name: string): void {
+  const manager = pivotThemeManager(designer);
+  manager.remove?.(name);
+  const workbook = defaultThemeWorkbook(designer.getWorkbook());
+  if (String(workbook.defaultPivotTableTheme?.()?.name?.() ?? '').toLowerCase() === name.toLowerCase()) workbook.defaultPivotTableTheme?.(null);
+  designer.invalidate();
+}
+
+/** Set As Default of the gallery context menu (the trial stores the name, lower case). */
+export function setDefaultPivotTheme(designer: Designer, name: string): void {
+  defaultThemeWorkbook(designer.getWorkbook()).defaultPivotTableTheme?.(name.toLowerCase());
+  designer.invalidate();
 }
 
 /** The sheet the cell-state dialogs read (exported for the unit tests). */

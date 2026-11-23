@@ -17,6 +17,9 @@ import React from 'react';
 import type { DesignerApi as Designer } from '../designer-api.js';
 import { CustomSelect } from './custom-widgets.js';
 import { cellStateTypeLabel, CELL_STATE_TYPES, cellStateSwatchCss } from './CellStatesDialogs.js';
+import { T } from './t.js';
+/** TASK 87: deferred dialog-label placeholder (resolved when the option renders). */
+import { uiKey } from '../resolve.js';
 
 /** The trial's "Select a Rule Type:" rows, in its order. */
 export const CF_RULE_TYPES = [
@@ -34,6 +37,13 @@ export const CF_RULE_TYPES = [
  * values" (measured from the running v19 trial). */
 export const CF_VALUE_FORMATS = ['2-Color Scale', '3-Color Scale', 'Data Bar', 'Icon Sets', 'Sparkline'];
 
+/* The dialogs.* resource keys of the operator captions (uiKey cannot derive them:
+ * 'equal to' -> `equalTo`, 'greater than or equal to' -> `greaterThanOrEqual`). */
+const OPERATOR_KEYS: Record<string, string> = {
+  between: 'between', 'not between': 'notBetween', 'equal to': 'equalTo', 'not equal to': 'notEqualTo',
+  'greater than': 'greaterThan', 'less than': 'lessThan', 'greater than or equal to': 'greaterThanOrEqual', 'less than or equal to': 'lessThanOrEqual',
+};
+
 /** The "cell value" comparison operators of the trial (its combo order). */
 export const CF_OPERATORS: { label: string; value: number }[] = [
   { label: 'between', value: 6 }, { label: 'not between', value: 7 },
@@ -46,7 +56,7 @@ export const CF_OPERATORS: { label: string; value: number }[] = [
 export const CF_SCALE_TYPES: { label: string; value: number }[] = [
   { label: 'Lowest Value', value: 1 }, { label: 'Highest Value', value: 2 },
   { label: 'Number', value: 0 }, { label: 'Percent', value: 3 },
-  { label: 'Percentile', value: 4 }, { label: 'Formula', value: 6 },
+  { label: 'Percentile', value: 4 }, { label: T('formula2', 'Formula'), value: 6 },
 ];
 
 /** The `IconSetType` families the manager lists by name (public enum, first members). */
@@ -88,9 +98,9 @@ const Sel = (props: { value: unknown; options: { text: string; value: unknown }[
 function FormatButton({ designer, style }: { designer: Designer; style?: Record<string, unknown> }): React.ReactElement {
   return (
     <span className="gc-cf-format-row">
-      <L>Format:</L>
-      <span className="gc-cell-states-swatch gc-cf-preview-swatch" style={style ? cellStateSwatchCss(style) : undefined}>AaBbCcYyZz</span>
-      <button type="button" className="gc-dialog-secondary gc-cf-format" onClick={() => designer.editConditionalRuleStyle()}>Format...</button>
+      <L>{T('format2', 'Format:')}</L>
+      <span className="gc-cell-states-swatch gc-cf-preview-swatch" style={style ? cellStateSwatchCss(style) : undefined}>{T('aaBbCcYyZz', 'AaBbCcYyZz')}</span>
+      <button type="button" className="gc-dialog-secondary gc-cf-format" onClick={() => designer.editConditionalRuleStyle()}>{T('format', 'Format...')}</button>
     </span>
   );
 }
@@ -98,14 +108,14 @@ function FormatButton({ designer, style }: { designer: Designer; style?: Record<
 /** TASK 68: the trial's scale editor grid: Minimum/(Midpoint)/Maximum columns
  *  with Type/Value/Color rows and a full-width gradient Preview bar. */
 function scaleGrid(columns: ('min' | 'mid' | 'max')[], data: Record<string, unknown>, update: (path: string | undefined, value: unknown) => void): React.ReactElement {
-  const titles = { min: 'Minimum', mid: 'Midpoint', max: 'Maximum' } as const;
-  const placeholders = { min: '(Lowest Value)', mid: '(Midpoint Value)', max: '(Highest Value)' } as const;
+  const titles = { min: T('scaleColumnMin', 'Minimum'), mid: T('scaleColumnMid', 'Midpoint'), max: T('scaleColumnMax', 'Maximum') } as const;
+  const placeholders = { min: T('scaleValueMinPlaceholder', '(Lowest Value)'), mid: T('scaleValueMidPlaceholder', '(Midpoint Value)'), max: T('scaleValueMaxPlaceholder', '(Highest Value)') } as const;
   const defaults = { min: '#f8696b', mid: '#ffeb84', max: '#63be7b' } as const;
   const type = (role: 'min' | 'mid' | 'max'): number => Number(data[`${role}Type`] ?? (role === 'min' ? 1 : role === 'max' ? 2 : 3));
   const editable = (role: 'min' | 'mid' | 'max'): boolean => [0, 3, 4, 6].includes(type(role));
   const cell = (role: 'min' | 'mid' | 'max', kind: 'type' | 'value' | 'color'): React.ReactElement => {
     if (kind === 'type') return (
-      <Sel key={role} className="gc-cf-scale-select" ariaLabel={`${titles[role]} type`} value={type(role)} options={CF_SCALE_TYPES.map((item) => ({ text: item.label, value: item.value }))} onChange={(next) => update(`${role}Type`, Number(next))} />
+      <Sel key={role} className="gc-cf-scale-select" ariaLabel={`${titles[role]} type`} value={type(role)} options={CF_SCALE_TYPES.map((item) => ({ text: T(uiKey(item.label), item.label) || item.label, value: item.value }))} onChange={(next) => update(`${role}Type`, Number(next))} />
     );
     if (kind === 'value') return (
       <input key={role} className="gc-dialog-input gc-cf-scale-value" aria-label={`${titles[role]} value`} disabled={!editable(role)}
@@ -122,10 +132,10 @@ function scaleGrid(columns: ('min' | 'mid' | 'max')[], data: Record<string, unkn
   const colors = columns.map((role) => (/^#([0-9a-f]{6})$/i.test(String(data[`${role}Color`])) ? String(data[`${role}Color`]) : defaults[role]));
   return <div className="gc-cf-scale-grid" style={{ gridTemplateColumns: `10px 76px repeat(${columns.length}, 1fr)` }}>
     <div className="gc-cf-scale-grid-row gc-cf-scale-grid-head"><span /><span />{columns.map((role) => <span key={role}>{titles[role]}</span>)}</div>
-    <div className="gc-cf-scale-grid-row"><span /><L>Type:</L>{columns.map((role) => cell(role, 'type'))}</div>
-    <div className="gc-cf-scale-grid-row"><span /><L>Value:</L>{columns.map((role) => cell(role, 'value'))}</div>
-    <div className="gc-cf-scale-grid-row"><span /><L>Color:</L>{columns.map((role) => cell(role, 'color'))}</div>
-    <div className="gc-cf-scale-grid-row"><span /><L>Preview:</L><span className="gc-cf-scale-preview" style={{ gridColumn: `span ${columns.length}`, background: `linear-gradient(90deg, ${colors.join(', ')})` }} /></div>
+    <div className="gc-cf-scale-grid-row"><span /><L>{T('type2', 'Type:')}</L>{columns.map((role) => cell(role, 'type'))}</div>
+    <div className="gc-cf-scale-grid-row"><span /><L>{T('value2', 'Value:')}</L>{columns.map((role) => cell(role, 'value'))}</div>
+    <div className="gc-cf-scale-grid-row"><span /><L>{T('color2', 'Color:')}</L>{columns.map((role) => cell(role, 'color'))}</div>
+    <div className="gc-cf-scale-grid-row"><span /><L>{T('preview', 'Preview:')}</L><span className="gc-cf-scale-preview" style={{ gridColumn: `span ${columns.length}`, background: `linear-gradient(90deg, ${colors.join(', ')})` }} /></div>
   </div>;
 }
 
@@ -139,7 +149,7 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
   const scaleRow = (role: 'min' | 'mid' | 'max', showValue: boolean): React.ReactElement => (
     <div className="gc-cf-scale-row" key={role}>
       <L>{role === 'min' ? 'Min:' : role === 'max' ? 'Max:' : 'Midpoint:'}</L>
-      <Sel ariaLabel={`${role} type`} value={String(data[`${role}Type`] ?? (role === 'min' ? 1 : role === 'max' ? 2 : 3))} options={CF_SCALE_TYPES.map((item) => ({ text: item.label, value: item.value }))} onChange={(next) => update(`${role}Type`, Number(next))} />
+      <Sel ariaLabel={`${role} type`} value={String(data[`${role}Type`] ?? (role === 'min' ? 1 : role === 'max' ? 2 : 3))} options={CF_SCALE_TYPES.map((item) => ({ text: T(uiKey(item.label), item.label) || item.label, value: item.value }))} onChange={(next) => update(`${role}Type`, Number(next))} />
       {showValue && <input className="gc-dialog-input gc-cf-scale-value" aria-label={`${role} value`} value={text(`${role}Value`)} onChange={(event) => update(`${role}Value`, event.target.value)} />}
       <input type="color" className="gc-cf-color" aria-label={`${role} color`} value={/^#([0-9a-f]{6})$/i.test(String(data[`${role}Color`])) ? String(data[`${role}Color`]) : role === 'min' ? '#f8696b' : role === 'max' ? '#63be7b' : '#ffeb84'}
         onChange={(event) => update(`${role}Color`, event.target.value)} />
@@ -148,23 +158,23 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
   return (
     <div className="gc-cf-rule-dialog">
       <fieldset className="gc-cf-rule-types">
-        <legend>Select a Rule Type:</legend>
-        <div className="gc-cf-rule-type-list" role="listbox" aria-label="Select a Rule Type:">
+        <legend>{T('selectARuleType', 'Select a Rule Type:')}</legend>
+        <div className="gc-cf-rule-type-list" role="listbox" aria-label={T('selectARuleType', 'Select a Rule Type:')}>
           {CF_RULE_TYPES.map((label, index) => (
             <div key={label} role="option" aria-selected={index === type} data-value={String(index)}
               className={`gc-cf-rule-type${index === type ? ' selected' : ''}`}
-              onClick={() => update('type', index)}>►{label}</div>
+              onClick={() => update('type', index)}>►{T(uiKey(label), label) || label}</div>
           ))}
         </div>
       </fieldset>
       <fieldset className="gc-cf-rule-description">
-        <legend>Edit the Rule Description:</legend>
+        <legend>{T('editTheRuleDescription', 'Edit the Rule Description:')}</legend>
         {type === 0 && (
-          <fieldset className="gc-cf-rule-group"><legend>{CF_RULE_TYPES[0]}:</legend>
+          <fieldset className="gc-cf-rule-group"><legend>{T(uiKey(CF_RULE_TYPES[0]), CF_RULE_TYPES[0]) || CF_RULE_TYPES[0]}:</legend>
           <div className="gc-cf-editor gc-cf-editor-values">
             <div className="gc-cf-line">
-              <L>Format style:</L>
-              <Sel className="gc-cf-value-format" ariaLabel="Format style:" value={valueFormat} options={CF_VALUE_FORMATS.map((label) => ({ text: label, value: label }))} onChange={(next) => update('valueFormat', String(next))} />
+              <L>{T('formatStyle', 'Format style:')}</L>
+              <Sel className="gc-cf-value-format" ariaLabel={T('formatStyle', 'Format style:')} value={valueFormat} options={CF_VALUE_FORMATS.map((label) => ({ text: T(uiKey(label), label), value: label }))} onChange={(next) => update('valueFormat', String(next))} />
             </div>
             {valueFormat === 'Style' && <FormatButton designer={designer} style={style} />}
             {valueFormat === 'Data Bar' && (
@@ -172,8 +182,8 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
                 {scaleRow('min', false)}
                 {scaleRow('max', false)}
                 <div className="gc-cf-scale-row">
-                  <L>Color:</L>
-                  <input type="color" className="gc-cf-color" aria-label="Bar color" value={/^#([0-9a-f]{6})$/i.test(text('barColor')) ? text('barColor') : '#638ec6'}
+                  <L>{T('color2', 'Color:')}</L>
+                  <input type="color" className="gc-cf-color" aria-label={T('barColor', 'Bar color')} value={/^#([0-9a-f]{6})$/i.test(text('barColor')) ? text('barColor') : '#638ec6'}
                     onChange={(event) => update('barColor', event.target.value)} />
                 </div>
                 <label className="gc-cf-check"><input type="checkbox" checked={!!data.showBarOnly} onChange={(event) => update('showBarOnly', event.target.checked)} /> Show Bar Only</label>
@@ -183,8 +193,8 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
             {(valueFormat === 'Icon Sets' || valueFormat === 'Icon Set') && (
               <div className="gc-cf-iconset">
                 <div className="gc-cf-line">
-                  <L>Icon Style:</L>
-                  <Sel ariaLabel="Icon Style" value={String(num('iconSetType', 0))} options={CF_ICON_SETS.map((item) => ({ text: item.label, value: item.value }))} onChange={(next) => update('iconSetType', Number(next))} />
+                  <L>{T('iconStyle', 'Icon Style:')}</L>
+                  <Sel ariaLabel="Icon Style" value={String(num('iconSetType', 0))} options={CF_ICON_SETS.map((item) => ({ text: T(uiKey(item.label), item.label) || item.label, value: item.value }))} onChange={(next) => update('iconSetType', Number(next))} />
                 </div>
                 <label className="gc-cf-check"><input type="checkbox" checked={!!data.showIconOnly} onChange={(event) => update('showIconOnly', event.target.checked)} /> Show Icon Only</label>
               </div>
@@ -192,12 +202,12 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
             {valueFormat === 'Sparkline' && (
               <div className="gc-cf-sparkline">
                 <div className="gc-cf-line">
-                  <L>Sparkline:</L>
+                  <L>{T('sparkline', 'Sparkline:')}</L>
                   <Sel ariaLabel="Sparkline" value={String(data.sparklineKind ?? 'Line')} options={['Line', 'Column', 'Win/Loss'].map((kind) => ({ text: kind, value: kind }))} onChange={(next) => update('sparklineKind', String(next))} />
                 </div>
                 <div className="gc-cf-line">
-                  <L>Color:</L>
-                  <input type="color" className="gc-cf-color" aria-label="Sparkline color" value={/^#([0-9a-f]{6})$/i.test(text('sparklineColor')) ? text('sparklineColor') : '#638ec6'}
+                  <L>{T('color2', 'Color:')}</L>
+                  <input type="color" className="gc-cf-color" aria-label={T('sparklineColor', 'Sparkline color')} value={/^#([0-9a-f]{6})$/i.test(text('sparklineColor')) ? text('sparklineColor') : '#638ec6'}
                     onChange={(event) => update('sparklineColor', event.target.value)} />
                 </div>
               </div>
@@ -208,10 +218,10 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
         {type === 1 && (
           <div className="gc-cf-editor gc-cf-editor-contain">
             <div className="gc-cf-line gc-cf-operator">
-              <L>Cell Value</L>
-              <Sel ariaLabel="operator" value={String(num('operator', 6))} options={CF_OPERATORS.map((item) => ({ text: item.label, value: item.value }))} onChange={(next) => update('operator', Number(next))} />
-              <input className="gc-dialog-input gc-cf-value" aria-label="value" value={text('value1')} onChange={(event) => update('value1', event.target.value)} />
-              {Number(data.operator ?? 6) <= 7 && <input className="gc-dialog-input gc-cf-value" aria-label="second value" value={text('value2')} onChange={(event) => update('value2', event.target.value)} />}
+              <L>{T('cellValue', 'Cell Value')}</L>
+              <Sel ariaLabel="operator" value={String(num('operator', 6))} options={CF_OPERATORS.map((item) => ({ text: T(OPERATOR_KEYS[item.label] ?? uiKey(item.label), item.label) || item.label, value: item.value }))} onChange={(next) => update('operator', Number(next))} />
+              <input className="gc-dialog-input gc-cf-value" aria-label={T('value3', 'value')} value={text('value1')} onChange={(event) => update('value1', event.target.value)} />
+              {Number(data.operator ?? 6) <= 7 && <input className="gc-dialog-input gc-cf-value" aria-label={T('secondValue', 'second value')} value={text('value2')} onChange={(event) => update('value2', event.target.value)} />}
             </div>
             <FormatButton designer={designer} style={style} />
           </div>
@@ -220,7 +230,7 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
           <div className="gc-cf-editor gc-cf-editor-rank">
             <div className="gc-cf-line">
               <Sel ariaLabel="top or bottom" value={data.isTop === false ? 'bottom' : 'top'} options={[{ text: 'top', value: 'top' }, { text: 'bottom', value: 'bottom' }]} onChange={(next) => update('isTop', String(next) === 'top')} />
-              <input className="gc-dialog-input gc-cf-rank" aria-label="rank" value={text('rank') || '10'} onChange={(event) => update('rank', event.target.value)} />
+              <input className="gc-dialog-input gc-cf-rank" aria-label={T('rank', 'rank')} value={text('rank') || '10'} onChange={(event) => update('rank', event.target.value)} />
               <label className="gc-cf-check"><input type="checkbox" checked={!!data.isPercent} onChange={(event) => update('isPercent', event.target.checked)} /> %</label>
             </div>
             <FormatButton designer={designer} style={style} />
@@ -229,8 +239,8 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
         {type === 3 && (
           <div className="gc-cf-editor gc-cf-editor-average">
             <div className="gc-cf-line">
-              <L>For cells in the selected range that are</L>
-              <Sel ariaLabel="average" value={String(data.average ?? 'above')} options={[{ text: 'above', value: 'above' }, { text: 'below', value: 'below' }]} onChange={(next) => update('average', String(next))} />
+              <L>{T('forCellsInTheSelectedRangeThatAre', 'For cells in the selected range that are')}</L>
+              <Sel ariaLabel="average" value={String(data.average ?? 'above')} options={[{ text: T('above', 'above'), value: 'above' }, { text: T('below', 'below'), value: 'below' }]} onChange={(next) => update('average', String(next))} />
               <L>the average</L>
             </div>
             <FormatButton designer={designer} style={style} />
@@ -239,8 +249,8 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
         {type === 4 && (
           <div className="gc-cf-editor gc-cf-editor-unique">
             <div className="gc-cf-line">
-              <L>All cells</L>
-              <Sel ariaLabel="unique or duplicate" value={String(data.uniqueOrDuplicate ?? 'duplicate')} options={[{ text: 'duplicate', value: 'duplicate' }, { text: 'unique', value: 'unique' }]} onChange={(next) => update('uniqueOrDuplicate', String(next))} />
+              <L>{T('allCells', 'All cells')}</L>
+              <Sel ariaLabel="unique or duplicate" value={String(data.uniqueOrDuplicate ?? 'duplicate')} options={[{ text: T('duplicate', 'duplicate'), value: 'duplicate' }, { text: T('unique', 'unique'), value: 'unique' }]} onChange={(next) => update('uniqueOrDuplicate', String(next))} />
               <L>values</L>
             </div>
             <FormatButton designer={designer} style={style} />
@@ -248,17 +258,17 @@ export function NewFormattingRuleBody({ designer, data, update }: Props): React.
         )}
         {type === 5 && (
           <div className="gc-cf-editor gc-cf-editor-formula">
-            <div className="gc-cf-line"><L>Format only values that result in</L></div>
-            <input className="gc-dialog-input gc-cf-formula" aria-label="formula" value={text('formula')} onChange={(event) => update('formula', event.target.value)} />
+            <div className="gc-cf-line"><L>{T('formatOnlyValuesThatResultIn', 'Format only values that result in')}</L></div>
+            <input className="gc-dialog-input gc-cf-formula" aria-label={T('formula3', 'formula')} value={text('formula')} onChange={(event) => update('formula', event.target.value)} />
             <FormatButton designer={designer} style={style} />
           </div>
         )}
         {type === 6 && (
           <div className="gc-cf-editor gc-cf-editor-state">
             <div className="gc-cf-line">
-              <Sel ariaLabel="rows or columns" value={String(data.stateScope ?? 'row')} options={[{ text: 'rows', value: 'row' }, { text: 'columns', value: 'column' }]} onChange={(next) => update('stateScope', String(next))} />
+              <Sel ariaLabel="rows or columns" value={String(data.stateScope ?? 'row')} options={[{ text: T('rows2', 'rows'), value: 'row' }, { text: T('columns2', 'columns'), value: 'column' }]} onChange={(next) => update('stateScope', String(next))} />
               <L>having the state</L>
-              <Sel ariaLabel="state" value={String(num('state', 1))} options={CELL_STATE_TYPES.map((item) => ({ text: item.label, value: item.value }))} onChange={(next) => update('state', Number(next))} />
+              <Sel ariaLabel="state" value={String(num('state', 1))} options={CELL_STATE_TYPES.map((item) => ({ text: T(uiKey(item.label), item.label) || item.label, value: item.value }))} onChange={(next) => update('state', Number(next))} />
             </div>
             <FormatButton designer={designer} style={style} />
           </div>
@@ -293,22 +303,22 @@ export function RuleManagerBody({ designer, data, update }: Props): React.ReactE
   return (
     <div className="gc-cf-manager">
       <div className="gc-cf-manager-scope">
-        <L>Show formatting rules for:</L>
-        <Sel ariaLabel="Show formatting rules for:" value={String(data.scope ?? 'selection')} options={[{ text: 'Current Selection', value: 'selection' }, { text: 'This Sheet', value: 'sheet' }]} onChange={(next) => designer.refreshConditionalRuleManager(String(next))} />
+        <L>{T('showFormattingRulesFor', 'Show formatting rules for:')}</L>
+        <Sel ariaLabel={T('showFormattingRulesFor', 'Show formatting rules for:')} value={String(data.scope ?? 'selection')} options={[{ text: T('currentSelection', 'Current Selection'), value: 'selection' }, { text: T('thisSheet', 'This Sheet'), value: 'sheet' }]} onChange={(next) => designer.refreshConditionalRuleManager(String(next))} />
       </div>
       <div className="gc-cf-manager-toolbar">
-        <button type="button" className="gc-dialog-secondary gc-cf-tool" onClick={() => designer.newConditionalRule()}>New Rule...</button>
-        {tool('Edit Rule...', selected < 0, () => designer.editConditionalRule(selectedIndex))}
-        {tool('Delete Rule', selected < 0, () => designer.deleteConditionalRule(selectedIndex))}
+        <button type="button" className="gc-dialog-secondary gc-cf-tool" onClick={() => designer.newConditionalRule()}>{T('newRule', 'New Rule...')}</button>
+        {tool(T('editRuleEllipsis', 'Edit Rule...'), selected < 0, () => designer.editConditionalRule(selectedIndex))}
+        {tool(T('deleteRule', 'Delete Rule'), selected < 0, () => designer.deleteConditionalRule(selectedIndex))}
         {tool('', selected < 0 || selected === 0, () => designer.moveConditionalRule(selectedIndex, 1), 'up')}
         {tool('', selected < 0 || selected >= shown.length - 1, () => designer.moveConditionalRule(selectedIndex, -1), 'down')}
       </div>
-      <div className="gc-cf-manager-list" role="table" aria-label="Conditional Formatting Rules">
+      <div className="gc-cf-manager-list" role="table" aria-label={T('conditionalFormattingRules', 'Conditional Formatting Rules')}>
         <div className="gc-cf-manager-row gc-cf-manager-head" role="row">
-          <span role="columnheader" className="gc-cf-manager-desc"><CfLabel label="Rule (applied in order shown)" /></span>
-          <span role="columnheader" className="gc-cf-manager-format"><CfLabel label="Format" /></span>
-          <span role="columnheader" className="gc-cf-manager-range"><CfLabel label="Applies to" /></span>
-          <span role="columnheader" className="gc-cf-manager-stop"><CfLabel label="Stop If True" /></span>
+          <span role="columnheader" className="gc-cf-manager-desc"><CfLabel label={T('ruleAppliedInOrderShown', 'Rule (applied in order shown)')} /></span>
+          <span role="columnheader" className="gc-cf-manager-format"><CfLabel label={T('format3', 'Format')} /></span>
+          <span role="columnheader" className="gc-cf-manager-range"><CfLabel label={T('appliesTo', 'Applies to')} /></span>
+          <span role="columnheader" className="gc-cf-manager-stop"><CfLabel label={T('stopIfTrue', 'Stop If True')} /></span>
         </div>
         <div className="gc-cf-manager-body">
           {shown.map((item, index) => (
@@ -318,12 +328,12 @@ export function RuleManagerBody({ designer, data, update }: Props): React.ReactE
               <span role="cell" className="gc-cf-manager-desc">{item.description}</span>
               <span role="cell" className="gc-cf-manager-format">
                 {item.style
-                  ? <span className="gc-cell-states-swatch gc-cf-format-swatch" style={cellStateSwatchCss(item.style)}>AaBbCcYyZz</span>
+                  ? <span className="gc-cell-states-swatch gc-cf-format-swatch" style={cellStateSwatchCss(item.style)}>{T('aaBbCcYyZz', 'AaBbCcYyZz')}</span>
                   : null}
               </span>
               <span role="cell" className="gc-cf-manager-range">{item.appliesTo}</span>
               <span role="cell" className="gc-cf-manager-stop">
-                <span role="checkbox" aria-label="stop if true" aria-checked={item.stopIfTrue}
+                <span role="checkbox" aria-label={T('stopIfTrue2', 'stop if true')} aria-checked={item.stopIfTrue}
                   className={`gc-cf-stop-box${item.stopIfTrue ? ' checked' : ''}`}
                   onClick={(event) => { event.stopPropagation(); designer.toggleConditionalRuleStop(item.index, !item.stopIfTrue); }} />
               </span>

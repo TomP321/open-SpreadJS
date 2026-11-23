@@ -1,0 +1,58 @@
+{
+  "name": "@opensheets/spread-sheets-resources-it",
+  "version": "0.1.0",
+  "description": "Italian (it-IT) culture and UI resource strings for the OpenSheets spreadsheet core, drop-in for the SpreadJS resources package.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "sideEffects": true,
+  "keywords": [
+    "spread-sheets",
+    "resources",
+    "localization",
+    "italian",
+    "it-IT",
+    "culture",
+    "spread-sheets-resources-it",
+    "javascript",
+    "excel",
+    "opensheets"
+  ],
+  "author": {
+    "name": "OpenSheets contributors"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsx scripts/clean.ts && tsup && tsx scripts/finalize.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "prepack": "node ../compat/scripts/publish-workspace-specs.mjs prepack",
+    "postpack": "node ../compat/scripts/publish-workspace-specs.mjs postpack"
+  },
+  "peerDependencies": {
+    "@mescius/spread-sheets": "*"
+  },
+  "devDependencies": {
+    "@mescius/spread-sheets": "workspace:@opensheets/spread-sheets@*"
+  }
+}

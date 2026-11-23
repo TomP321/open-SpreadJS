@@ -27,7 +27,7 @@ implemented (see the status table below). This recipe is verified end-to-end fro
 tarballs by `pnpm dropin:check` (apps/dropin-check).
 
 **Full migration guide:** [docs/MIGRATION.md](docs/MIGRATION.md) — the alias block for all
-17 packages, bundler/CJS/script-tag notes, license-key behaviour, theme CSS names and the
+18 packages (17 one-to-one aliases + the Italian core resources package), bundler/CJS/script-tag notes, license-key behaviour, theme CSS names and the
 known deviations. **Runnable apps:** [`examples/`](examples) (`vite-core`, `vite-react`,
 `vite-designer`, `script-tag-umd`).
 
@@ -146,6 +146,7 @@ All packages are version `0.1.0` and alias one-to-one (see
 | `spread-sheets-designer` | `@mescius/spread-sheets-designer` | Designer component (ribbon, dialogs, status bar, commands) |
 | `spread-sheets-designer-react` | `@mescius/spread-sheets-designer-react` | `<Designer>` React wrapper (official props) + script-tag UMD |
 | `spread-sheets-designer-resources-en` | `@mescius/spread-sheets-designer-resources-en` | English UI strings (side-effect import) |
+| `spread-sheets-resources-it` | *(no official package)* | Italian `it-it` culture + core UI strings (side-effect import, docs/MIGRATION.md § 7) |
 
 ## Performance
 

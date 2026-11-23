@@ -1045,3 +1045,124 @@ describe('ReportSheet pure horizontal axis trial observations', () => {
     expect(sheet.getSpan(0, 0)).toBeNull();
   });
 });
+
+describe('ReportSheet horizontal list axis trial observations (TASK 96)', () => {
+  const grid = (sheet: ReportSheet, rows: number, columns: number) =>
+    Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, col) => sheet.getValue(row, col)));
+
+  it('concatenates a horizontal List axis with its per-record list child inside each parent row (trial `xt-list`)', async () => {
+    // TASK 96 probe `xt-list` (.probe/report-residuals.json): a horizontal `List` is the axis;
+    // inside every row-group block its records run right, each followed by the child list
+    // values of that record.
+    const sheet = await report6ForAxes();
+    const template = sheet.getTemplate();
+    template.setTemplateCell(0, 0, { type: 'Group', binding: 'T[region]' });
+    template.setTemplateCell(0, 1, { type: 'List', binding: 'T[city]', spillDirection: 'Horizontal' });
+    template.setTemplateCell(0, 2, { type: 'List', binding: 'T[amount]', spillDirection: 'Horizontal',
+      context: { horizontal: 'B1' } });
+    sheet.refresh();
+    expect([sheet.getRange().rowCount, sheet.getRange().colCount]).toEqual([2, 7]);
+    expect(grid(sheet, 2, 7)).toEqual([['East', 'A', 1, 'B', 2, 'C', 3], ['West', 'A', 4, 'B', 5, 'C', 6]]);
+  });
+
+  it('concatenates the horizontal List axis on a free row below the row group, closed by the Summary (trial `xt-summary-h-list`)', async () => {
+    // TASK 96 probe `xt-summary-h-list`: the horizontal `List` axis does not repeat per row
+    // block here; all its records concatenate on one row below the stacked groups and the
+    // context-free Summary takes the row's last column, aggregating the whole axis.
+    const sheet = await report6ForAxes();
+    const template = sheet.getTemplate();
+    template.setTemplateCell(0, 0, { type: 'Group', binding: 'T[region]' });
+    template.setTemplateCell(1, 0, { type: 'List', binding: 'T[city]', spillDirection: 'Horizontal' });
+    template.setTemplateCell(1, 1, { type: 'Summary', binding: 'T[amount]', aggregate: 'Sum' });
+    sheet.refresh();
+    expect([sheet.getRange().rowCount, sheet.getRange().colCount]).toEqual([3, 7]);
+    expect(grid(sheet, 3, 7)).toEqual([['East', null, null, null, null, null, null],
+      ['West', null, null, null, null, null, null], ['A', 'B', 'C', 'A', 'B', 'C', 21]]);
+  });
+
+  it('pins a List bound to both axes to its own column block (trial `d4`)', async () => {
+    // TASK 96 probe `d4-list-both-axes`: on an independent axis a `List` carrying both
+    // contexts shows only the records shared with the axis instance owning its column.
+    const workbook = new Workbook(undefined, { sheetCount: 0 });
+    await workbook.dataManager().addTable('T', { data: [
+      { region: 'East', city: 'A', amount: 11, product: 'p1' }, { region: 'East', city: 'B', amount: 22, product: 'p2' },
+      { region: 'East', city: 'C', amount: 33, product: 'p3' }, { region: 'West', city: 'A', amount: 44, product: 'p4' },
+      { region: 'West', city: 'B', amount: 55, product: 'p5' }, { region: 'West', city: 'C', amount: 66, product: 'p6' },
+    ] }).fetch();
+    const sheet = workbook.addSheetTab(0, 'Report', 3) as ReportSheet;
+    const template = sheet.getTemplate();
+    template.setTemplateCell(0, 0, { type: 'Group', binding: 'T[region]' });
+    template.setTemplateCell(0, 1, { type: 'Group', binding: 'T[city]', spillDirection: 'Horizontal',
+      context: { vertical: 'None' } });
+    template.setTemplateCell(1, 1, { type: 'List', binding: 'T[amount]',
+      context: { vertical: 'A1', horizontal: 'B1' } });
+    sheet.refresh();
+    expect([sheet.getRange().rowCount, sheet.getRange().colCount]).toEqual([4, 4]);
+    expect(grid(sheet, 4, 4)).toEqual([['East', 'A', 'B', 'C'], [null, 11, null, null],
+      ['West', null, null, null], [null, 44, null, null]]);
+  });
+
+  it('feeds both a vertical list and the axis-bound list under a nested horizontal group (trial `v10`)', async () => {
+    // TASK 96 probe `v10-groups-different-tables`: a horizontal group nested in the row
+    // group repeats inside every block; a list bound to both axes then pairs with each of
+    // the block's own axis instances, spilling across the block's columns.
+    const sheet = await report6ForAxes();
+    const template = sheet.getTemplate();
+    template.setTemplateCell(0, 0, { type: 'Group', binding: 'T[region]' });
+    template.setTemplateCell(0, 1, { type: 'Group', binding: 'T[city]', spillDirection: 'Horizontal' });
+    template.setTemplateCell(1, 0, { type: 'List', binding: 'T[amount]', context: { vertical: 'A1' } });
+    template.setTemplateCell(1, 1, { type: 'List', binding: 'T[amount]',
+      context: { vertical: 'A1', horizontal: 'B1' } });
+    sheet.refresh();
+    expect([sheet.getRange().rowCount, sheet.getRange().colCount]).toEqual([8, 4]);
+    expect(grid(sheet, 8, 4)).toEqual([['East', 'A', 'B', 'C'], [1, 1, 2, 3], [2, null, null, null],
+      [3, null, null, null], ['West', 'A', 'B', 'C'], [4, 4, 5, 6], [5, null, null, null],
+      [6, null, null, null]]);
+  });
+
+  it('chains a second horizontal group inside the axis blocks and pins a list to its instance (trial `v9`)', async () => {
+    // TASK 96 probe `v9-two-horizontal-groups`: an independent horizontal group bound to the
+    // axis expands per axis instance inside the instance's block (widening it), and a list
+    // bound to that second group pins to the instance owning its column.
+    const sheet = await report6ForAxes();
+    const template = sheet.getTemplate();
+    template.setTemplateCell(0, 0, { type: 'Group', binding: 'T[region]' });
+    template.setTemplateCell(0, 1, { type: 'Group', binding: 'T[city]', spillDirection: 'Horizontal',
+      context: { vertical: 'None' } });
+    template.setTemplateCell(0, 2, { type: 'Group', binding: 'T[amount]', spillDirection: 'Horizontal',
+      context: { vertical: 'None', horizontal: 'B1' } });
+    template.setTemplateCell(1, 2, { type: 'List', binding: 'T[city]',
+      context: { vertical: 'A1', horizontal: 'C1' } });
+    sheet.refresh();
+    expect([sheet.getRange().rowCount, sheet.getRange().colCount]).toEqual([4, 10]);
+    expect(grid(sheet, 4, 10)).toEqual([['East', 'A', 1, 4, 'B', 2, 5, 'C', 3, 6],
+      [null, null, 'A', null, null, null, null, null, null, null],
+      ['West', null, null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null, null, null]]);
+  });
+
+  it('interleaves a nested Group/List bound to both axes across the axis columns (trial `d5`)', async () => {
+    // TASK 96 probe `d5-group-both-axes`: a Group bound to both axes pins to its own column
+    // block while the List bound under it interleaves one row per row-group block across all
+    // axis columns, right below the blocks.
+    const workbook = new Workbook(undefined, { sheetCount: 0 });
+    await workbook.dataManager().addTable('T', { data: [
+      { region: 'East', city: 'A', amount: 11, product: 'p1' }, { region: 'East', city: 'B', amount: 22, product: 'p2' },
+      { region: 'East', city: 'C', amount: 33, product: 'p3' }, { region: 'West', city: 'A', amount: 44, product: 'p4' },
+      { region: 'West', city: 'B', amount: 55, product: 'p5' }, { region: 'West', city: 'C', amount: 66, product: 'p6' },
+    ] }).fetch();
+    const sheet = workbook.addSheetTab(0, 'Report', 3) as ReportSheet;
+    const template = sheet.getTemplate();
+    template.setTemplateCell(0, 0, { type: 'Group', binding: 'T[region]' });
+    template.setTemplateCell(0, 1, { type: 'Group', binding: 'T[city]', spillDirection: 'Horizontal',
+      context: { vertical: 'None' } });
+    template.setTemplateCell(1, 1, { type: 'Group', binding: 'T[product]',
+      context: { vertical: 'A1', horizontal: 'B1' } });
+    template.setTemplateCell(2, 1, { type: 'List', binding: 'T[amount]',
+      context: { vertical: 'D1', horizontal: 'B1' } });
+    sheet.refresh();
+    expect([sheet.getRange().rowCount, sheet.getRange().colCount]).toEqual([4, 4]);
+    expect(grid(sheet, 4, 4)).toEqual([['East', 'A', 'B', 'C'], [null, 'p1', null, null],
+      ['West', 11, 22, 33], [null, 'p4', 55, 66]]);
+  });
+});

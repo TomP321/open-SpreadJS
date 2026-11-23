@@ -15,10 +15,11 @@ import React, { useEffect, useRef } from 'react';
 import type { DesignerApi as Designer } from '../designer-api.js';
 import { recordView } from '../core-internals.js';
 import { CustomSelect } from './custom-widgets.js';
+import { uiKey } from '../resolve.js';
+import { T } from './t.js';
 
 /** The table-theme style key of every element of the trial's element list. */
-export const TABLE_STYLE_ELEMENTS: { label: string; key: string; stripe?: string }[] = [
-  { label: 'Whole Table', key: 'wholeTableStyle' },
+export const TABLE_STYLE_ELEMENTS: { label: string; key: string; stripe?: string }[] = [  { label: 'Whole Table', key: 'wholeTableStyle' },
   { label: 'First Column Stripe', key: 'firstColumnStripStyle', stripe: 'firstColumnStripSize' },
   { label: 'Second Column Stripe', key: 'secondColumnStripStyle', stripe: 'secondColumnStripSize' },
   { label: 'First Row Stripe', key: 'firstRowStripStyle', stripe: 'firstRowStripSize' },
@@ -168,12 +169,15 @@ export interface PreviewTheme {
   styles: Record<string, TableElementStyle>;
   /** Optional stripe sizes: a size of N repeats the band every N rows/columns. */
   sizes?: Record<string, number>;
+  /** Optional cell matcher override (the pivot dialog paints a different grid). */
+  matches?: (key: string, row: number, col: number) => boolean;
 }
 
 /** Resolves the paint style of one preview cell (whole table first, element on top). */
 function cellPaint(theme: PreviewTheme, row: number, col: number, selected?: string): TableElementStyle | undefined {
   let paint: TableElementStyle | undefined;
-  const keys = Object.keys(theme.styles).filter((key) => previewCellMatches(key, row, col));
+  const matches = theme.matches ?? previewCellMatches;
+  const keys = Object.keys(theme.styles).filter((key) => matches(key, row, col));
   // The selected element paints last so the user sees exactly what they edit.
   if (selected && keys.includes(selected)) {
     keys.splice(keys.indexOf(selected), 1);
@@ -279,32 +283,32 @@ export function NewTableStyleBody({ designer, data, update }: Props): React.Reac
   return (
     <div className="gc-table-style-dialog">
       <div className="gc-table-style-name">
-        <label className="gc-dialog-label" htmlFor="gc-table-style-name-input">Name:</label>
+        <label className="gc-dialog-label" htmlFor="gc-table-style-name-input">{T('name2', 'Name:')}</label>
         <input id="gc-table-style-name-input" className="gc-dialog-input gc-table-style-name-input" value={String(data.name ?? '')} onChange={(event) => update('name', event.target.value)} />
       </div>
       <fieldset className="gc-table-style-elements">
-        <legend>Table Element:</legend>
-        <div className="gc-table-style-list" role="listbox" aria-label="Table Element:">
+        <legend>{T('tableElement', 'Table Element:')}</legend>
+        <div className="gc-table-style-list" role="listbox" aria-label={T('tableElement', 'Table Element:')}>
           {TABLE_STYLE_ELEMENTS.map((item, index) => (
             <div key={item.key} role="option" aria-selected={index === Number(data.element ?? 0)}
               className={`gc-table-style-list-item${styles[item.key] ? ' styled' : ''}${index === Number(data.element ?? 0) ? ' selected' : ''}`}
               data-value={item.key}
-              onClick={() => update('element', index)}>{item.label}</div>
+              onClick={() => update('element', index)}>{T(uiKey(item.label), item.label) || item.label}</div>
           ))}
         </div>
         <div className="gc-table-style-buttons">
-          <button type="button" className="gc-dialog-secondary gc-table-style-format" onClick={() => designer.editTableStyleElement(element.key)}>Format</button>
-          <button type="button" className="gc-dialog-secondary gc-table-style-clear" onClick={() => designer.clearTableStyleElement(element.key)}>Clear</button>
+          <button type="button" className="gc-dialog-secondary gc-table-style-format" onClick={() => designer.editTableStyleElement(element.key)}>{T('format3', 'Format')}</button>
+          <button type="button" className="gc-dialog-secondary gc-table-style-clear" onClick={() => designer.clearTableStyleElement(element.key)}>{T('clear', 'Clear')}</button>
         </div>
       </fieldset>
       <div className="gc-table-style-right">
         <fieldset className="gc-table-style-preview">
-          <legend>Preview</legend>
+          <legend>{T('preview2', 'Preview')}</legend>
           <TablePreview theme={preview} selected={element.key} width={121} height={101} />
         </fieldset>
         {element.stripe && (
           <fieldset className="gc-table-style-stripe">
-            <legend>Stripe Size</legend>
+            <legend>{T('stripeSize', 'Stripe Size')}</legend>
             <CustomSelect className="gc-dialog-select gc-table-style-stripe-size" ariaLabel="Stripe Size"
               value={String(sizes[element.stripe] ?? 1)}
               options={[1, 2, 3, 4, 5, 6, 7].map((value) => ({ text: String(value), value }))} onChange={(next) => update(`sizes.${element.stripe}`, Number(next))} />
@@ -333,4 +337,156 @@ export function customTableThemeTiles(designer: Designer): { name: string; theme
 export function clearCustomTableThemes(designer: Designer): void {
   const manager = designer.getWorkbook().customTableThemes;
   for (const theme of [...manager.all()]) manager.remove(String(theme.name()));
+}
+
+/* ------------------------------------------- TASK 93: New Pivot Style --- */
+
+/* The trial's "New Pivot Table Style" dialog (589 x 417, measured black-box):
+ * Name input (59,49 511x24), "Pivot Table Element:" list (22,116 394x208, 25
+ * rows of 24 px, scrollable), Format/Clear centred below (y324), a Preview
+ * grid and a Stripe Size combo for the four stripe elements, OK/Cancel. */
+export const PIVOT_STYLE_ELEMENTS: { label: string; key: string; stripe?: string }[] = [
+  { label: 'Whole Table', key: 'wholeTableStyle' },
+  { label: 'Report Filter Labels', key: 'reportFilterLabelsStyle' },
+  { label: 'Report Filter Values', key: 'reportFilterValuesStyle' },
+  { label: 'First Column stripe', key: 'firstColumnStripeStyle', stripe: 'firstColumnStripSize' },
+  { label: 'Second Column Stripe', key: 'secondColumnStripeStyle' },
+  { label: 'First Row Stripe', key: 'firstRowStripeStyle', stripe: 'firstRowStripSize' },
+  { label: 'Second Row Stripe', key: 'secondRowStripeStyle' },
+  { label: 'First Column', key: 'firstColumnStyle' },
+  { label: 'Header Row', key: 'headerRowStyle' },
+  { label: 'First Header Cell', key: 'firstHeaderCellStyle' },
+  { label: 'Subtotal Column 1', key: 'subtotalColumn1Style' },
+  { label: 'Subtotal Column 2', key: 'subtotalColumn2Style' },
+  { label: 'Subtotal Column 3', key: 'subtotalColumn3Style' },
+  { label: 'Blank Row', key: 'blankRowStyle' },
+  { label: 'Subtotal Row 1', key: 'subtotalRow1Style' },
+  { label: 'Subtotal Row 2', key: 'subtotalRow2Style' },
+  { label: 'Subtotal Row 3', key: 'subtotalRow3Style' },
+  { label: 'Column SubHeading 1', key: 'columnSubheading1Style' },
+  { label: 'Column SubHeading 2', key: 'columnSubheading2Style' },
+  { label: 'Column SubHeading 3', key: 'columnSubheading3Style' },
+  { label: 'Row SubHeading 1', key: 'rowSubheading1Style' },
+  { label: 'Row SubHeading 2', key: 'rowSubheading2Style' },
+  { label: 'Row SubHeading 3', key: 'rowSubheading3Style' },
+  { label: 'Grand Total Column', key: 'grandTotalColumnStyle' },
+  { label: 'Grand Total Row', key: 'grandTotalRowStyle' },
+];
+
+/** Builds the theme through the public `PivotTableTheme`/`PivotTableStyle` API. */
+export function buildPivotTheme(
+  gc: unknown, name: string,
+  styles: Record<string, TableElementStyle>,
+  sizes: Record<string, number> = {},
+): unknown {
+  const cast = (value: unknown): Record<string, unknown> => value as Record<string, unknown>;
+  const sheets = cast(cast(cast(gc).Spread).Sheets);
+  const pivot = cast(cast(cast(gc).Spread).Pivot);
+  const LineBorderCtor = sheets.LineBorder as new (color?: string, style?: number) => unknown;
+  if (!pivot?.PivotTableTheme || !pivot?.PivotTableStyle || !LineBorderCtor) throw new Error('NotImplemented: GC.Spread.Pivot.PivotTableTheme');
+  const theme = cast(new (pivot.PivotTableTheme as new () => unknown)());
+  (theme.name as (value?: string) => unknown)(name);
+  for (const element of PIVOT_STYLE_ELEMENTS) {
+    const stored = styles[element.key];
+    if (!stored) continue;
+    const borders = BORDER_KEYS.map((key) => new LineBorderCtor(stored.borders[key].color, stored.borders[key].style));
+    const style = cast(new (pivot.PivotTableStyle as new (...args: unknown[]) => unknown)(
+      stored.backColor, stored.foreColor,
+      `${stored.italic ? 'italic' : 'normal'} ${stored.bold ? 'bold' : 'normal'} ${stored.size} ${stored.family}`,
+      ...borders,
+    ));
+    style.fontStyle = stored.italic ? 'italic' : 'normal';
+    style.fontWeight = stored.bold ? 'bold' : 'normal';
+    style.fontSize = stored.size;
+    style.fontFamily = stored.family;
+    (theme[element.key] as (value: unknown) => unknown)(style);
+  }
+  for (const [key, value] of Object.entries(sizes)) (theme[key] as (size: number) => unknown)(value);
+  return theme;
+}
+
+/** True when the PIVOT element paints the preview cell (row, col) of the 5 x 6 grid. */
+export function pivotPreviewCellMatches(key: string, row: number, col: number): boolean {
+  const lastCol = PREVIEW_COLUMNS - 1;
+  const dataRow = row - 1;
+  switch (key) {
+    case 'wholeTableStyle': return true;
+    case 'headerRowStyle': return row === 0;
+    case 'firstHeaderCellStyle': return row === 0 && col === 0;
+    case 'firstColumnStyle': return col === 0;
+    case 'firstRowStripeStyle': return dataRow >= 0 && dataRow < 4 && dataRow % 2 === 0;
+    case 'secondRowStripeStyle': return dataRow >= 0 && dataRow < 4 && dataRow % 2 === 1;
+    case 'firstColumnStripeStyle': return col > 0 && col < lastCol && (col - 1) % 2 === 0;
+    case 'secondColumnStripeStyle': return col > 0 && col < lastCol && (col - 1) % 2 === 1;
+    case 'grandTotalRowStyle': return row === PREVIEW_ROWS - 1;
+    case 'grandTotalColumnStyle': return col === lastCol;
+    default: return false;
+  }
+}
+
+/** The dialog body's element style for a stored pivot theme slot. */
+export function pivotElementStyle(theme: unknown, key: string): TableElementStyle | undefined {
+  const source = recordView(theme as object);
+  const json = recordView((typeof source.toJSON === 'function' ? (source.toJSON as () => unknown)() : theme) as object);
+  const value = json[key];
+  return value ? tableElementStyleFromJSON(value) : undefined;
+}
+
+interface PivotProps { designer: Designer; data: Record<string, unknown>; update: (path: string | undefined, value: unknown) => void }
+
+export function NewPivotStyleBody({ designer, data, update }: PivotProps): React.ReactElement {
+  const element = PIVOT_STYLE_ELEMENTS[Math.max(0, Number(data.element ?? 0))] ?? PIVOT_STYLE_ELEMENTS[0];
+  const styles = (data.styles ?? {}) as Record<string, TableElementStyle>;
+  const sizes = (data.sizes ?? {}) as Record<string, number>;
+  const preview: PreviewTheme = { styles, sizes, matches: pivotPreviewCellMatches };
+  return (
+    <div className="gc-table-style-dialog">
+      <div className="gc-table-style-name">
+        <label className="gc-dialog-label" htmlFor="gc-pivot-style-name-input">{T('name2', 'Name:')}</label>
+        <input id="gc-pivot-style-name-input" className="gc-dialog-input gc-table-style-name-input" value={String(data.name ?? '')} onChange={(event) => update('name', event.target.value)} />
+      </div>
+      <fieldset className="gc-table-style-elements">
+        <legend>{T('pivotTableElement', 'Pivot Table Element:')}</legend>
+        <div className="gc-table-style-list" role="listbox" aria-label={T('pivotTableElement', 'Pivot Table Element:')}>
+          {PIVOT_STYLE_ELEMENTS.map((item, index) => (
+            <div key={item.key} role="option" aria-selected={index === Number(data.element ?? 0)}
+              className={`gc-table-style-list-item${styles[item.key] ? ' styled' : ''}${index === Number(data.element ?? 0) ? ' selected' : ''}`}
+              data-value={item.key}
+              onClick={() => update('element', index)}>{T(uiKey(item.label), item.label) || item.label}</div>
+          ))}
+        </div>
+        <div className="gc-table-style-buttons">
+          <button type="button" className="gc-dialog-secondary gc-table-style-format" onClick={() => designer.editPivotStyleElement(element.key)}>{T('format3', 'Format')}</button>
+          <button type="button" className="gc-dialog-secondary gc-table-style-clear" onClick={() => designer.clearPivotStyleElement(element.key)}>{T('clear', 'Clear')}</button>
+        </div>
+      </fieldset>
+      <div className="gc-table-style-right">
+        <fieldset className="gc-table-style-preview">
+          <legend>{T('preview2', 'Preview')}</legend>
+          <TablePreview theme={preview} selected={element.key} width={121} height={101} />
+        </fieldset>
+        {element.stripe && (
+          <fieldset className="gc-table-style-stripe">
+            <legend>{T('stripeSize', 'Stripe Size')}</legend>
+            <CustomSelect className="gc-dialog-select gc-table-style-stripe-size" ariaLabel="Stripe Size"
+              value={String(sizes[element.stripe] ?? 1)}
+              options={[1, 2, 3, 4, 5, 6, 7].map((value) => ({ text: String(value), value }))} onChange={(next) => update(`sizes.${element.stripe}`, Number(next))} />
+          </fieldset>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The pivot gallery's Custom section tiles (same painter as the dialog preview). */
+export function customPivotThemeTiles(designer: Designer): { name: string; theme: PreviewTheme }[] {
+  const manager = recordView(designer.getWorkbook()).customPivotTableThemes as { all?: () => unknown[] };
+  return (manager.all?.() ?? []).map((theme) => {
+    const json = recordView((theme as { toJSON?: () => unknown }).toJSON?.() ?? {});
+    const styles: Record<string, TableElementStyle> = {};
+    for (const element of PIVOT_STYLE_ELEMENTS) if (json[element.key]) styles[element.key] = tableElementStyleFromJSON(json[element.key]);
+    const sizes: Record<string, number> = {};
+    for (const key of ['firstColumnStripSize', 'firstRowStripSize']) if (json[key] !== undefined) sizes[key] = Number(json[key]);
+    return { name: String((theme as { name: () => string }).name()), theme: { styles, sizes, matches: pivotPreviewCellMatches } };
+  });
 }

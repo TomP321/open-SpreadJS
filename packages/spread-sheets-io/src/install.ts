@@ -1,4 +1,4 @@
-import { decryptXlsx, encryptXlsx } from './encryption.js';
+import { decryptXlsx } from './encryption.js';
 import { isCompound } from './compound.js';
 import { csvSheet, writeCsv } from './csv.js';
 import { arr, obj, type IoOptions, type IoState, type RecordValue } from './common.js';
@@ -60,7 +60,10 @@ function applyImportedMetadata(book:IoWorkbook,json:RecordValue,theme:string[]):
 }
 function report(messages:string[]):void {for(const message of new Set(messages))console.warn('NotImplemented: XLSX '+message);}
 function validateOptions(o:IoOptions):void {
-  for(const key of ['frozenColumnsAsRowHeaders','frozenRowsAsColumnHeaders','rowHeadersAsFrozenColumns','columnHeadersAsFrozenRows','includeAutoMergedCells','saveAsView','saveR1C1Formula','incrementalLoad','convertSheetTableToDataTable'])if(o[key])throw new Error(`NotImplemented: IO ${key}`);
+  // TASK 93: saveAsView / rowHeadersAsFrozenColumns / columnHeadersAsFrozenRows /
+  // includeAutoMergedCells are honoured on export (see writeXlsx); on import the
+  // official inverse options (frozenColumnsAsRowHeaders, ...) stay unsupported.
+  for(const key of ['frozenColumnsAsRowHeaders','frozenRowsAsColumnHeaders','saveR1C1Formula','incrementalLoad','convertSheetTableToDataTable'])if(o[key])throw new Error(`NotImplemented: IO ${key}`);
 }
 function jsonOptions(o:IoOptions):RecordValue {return {ignoreStyle:o.includeStyles===false,ignoreFormula:o.includeFormulas===false,includeBindingSource:o.includeBindingSource,_ioOwnedData:true,_ioArrayInfo:true};}
 function errorResult(error:unknown):RecordValue {if(error instanceof Error&&error.message.startsWith('NotImplemented:')){console.warn(error.message);return {errorCode:0,errorMessage:error.message};}return formatError();}
@@ -88,9 +91,8 @@ async function doExport(book:IoWorkbook,o:IoOptions):Promise<Blob> {
   if(kind===1)return new Blob([JSON.stringify(json)],{type:'text/plain;charset=utf-8'});
   if(kind!==0)throw new Error('Unknown file type');
   const previous=state.get(book);if(previous?.printInfo)Object.values(obj(json.sheets)).forEach((s,i)=>{if(Object.keys(previous.printInfo?.[i]??{}).length)obj(s).printInfo=previous.printInfo![i];});
-  const result=writeXlsx(json,{...o,password:undefined},o.losslessEditing===false?undefined:previous);report(result.warnings);
-  const bytes=o.password?encryptXlsx(result.bytes,o.password):result.bytes;
-  return new Blob([bytes as Uint8Array<ArrayBuffer>],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const result=writeXlsx(json,{...o,displayText:(si:number,row:number,col:number)=>{const sheet=book.getSheet(si);return sheet?sheet.getText(row,col):'';}},o.losslessEditing===false?undefined:previous);report(result.warnings);
+  return new Blob([result.bytes as Uint8Array<ArrayBuffer>],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 /** Install against the host constructor; no second core copy is bundled. */
 export function install(GC:IoGC):void {

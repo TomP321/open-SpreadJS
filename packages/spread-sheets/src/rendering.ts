@@ -3,7 +3,7 @@ import { canvasColor as resolveColor } from './colors.js';
 import { sheetChrome } from './sheet-chrome.js';
 import type { Workbook } from './workbook.js';
 import type { Worksheet } from './worksheet.js';
-import { Range, Style } from './primitives.js';
+import { Range, Style, canvasFont } from './primitives.js';
 import { Events } from './events.js';
 import { GeneralFormatter } from './formatter.js';
 import type { AxisLayout } from './structures.js';
@@ -11,6 +11,7 @@ import { Interaction } from './interaction.js';
 import { type ButtonRect } from './features/cell-extras.js';
 import { drawIconGlyph } from './features/glyphs.js';
 import { usingThemedDocument } from './features/tables.js';
+import { ltext } from './localization.js';
 
 import {
   axisSlots,
@@ -132,7 +133,7 @@ export class WorkbookRenderer {
     this.selectionContext = this.overlay.getContext('2d')!;
     this.tabContext = this.tabs.getContext('2d')!;
     this.editor = element('textarea', 'gc-cell-editor', this.root); this.editor.style.display = 'none';
-    this.editor.spellcheck = false; this.editor.setAttribute('aria-label', 'Cell editor');
+    this.editor.spellcheck = false; this.editor.setAttribute('aria-label', ltext('controls.cellEditor', 'Cell editor'));
     this.vertical = this.scrollControl(true); this.horizontal = this.scrollControl(false);
     const splitter = element('div', 'gc-hscrollbar-splitter', this.root);
     splitter.addEventListener('pointerdown', e => {
@@ -359,9 +360,13 @@ export class WorkbookRenderer {
   font(style: Style): string {
     const sheet = this.sheet;
     const fonts = sheet ? sheet._themeFonts() : ['Calibri', 'Calibri'];
-    const base = String(style.font ?? `11pt ${style.themeFont === 'Heading' ? fonts[0] : fonts[1]}`);
-    // Scale the numeric size without changing font family/fallback selection.
-    return base.replace(/([\d.]+)(px|pt)/, (_, size: string, unit: string) => `${Number((Number((Number(size) * (unit === 'pt' ? 4 / 3 : 1)).toFixed(4)) * this.zoom).toFixed(4))}px`);
+    // TASK 90: build the canvas value from the style's font PARTS through `canvasFont`, which
+    // guarantees a valid CSS shorthand (size in CSS pixels scaled by the zoom, family quoted and
+    // never missing). Handing the raw shorthand over was symptom A/B: a family-less `12pt` or a
+    // size-less `bold` is invalid for `ctx.font`, Chromium ignores it and the cell is drawn in the
+    // previous (default) font.
+    const base = canvasFont(style, 1, `11pt ${style.themeFont === 'Heading' ? fonts[0] : fonts[1]}`);
+    return canvasFont(style, this.zoom, base);
   }
   text(row: number, col: number, value: unknown, style: Style): string {
     return text(this, row, col, value, style);
@@ -448,52 +453,149 @@ export class WorkbookRenderer {
     const handle = element('div', 'gc-scroll-handle gc-scroll-bar', track);
     for (const [direction, increment] of [[vertical ? 'Up' : 'Left', -1], [vertical ? 'Down' : 'Right', 1]] as const) {
       const arrow = element('div', `gc-scroll-arrow gc-scroll-arrow${direction}`, root);
-      arrow.addEventListener('pointerdown', e => { e.preventDefault(); this.scroll(vertical ? increment * this.sheet!.defaults.rowHeight : 0, vertical ? 0 : increment * this.sheet!.defaults.colWidth); });
+      // TASK 90 C: one arrow click moves exactly one row/column, whatever its size is. The trial
+      // measured this on a sheet with a 110px first column (`.probe/t90/hbar-r1.json`): its first
+      // Right click already lands on column 1, ours scrolled `defaults.colWidth` (62px) and the
+      // half-scrolled column kept the reported origin at 0 — the arrow looked dead on the first
+      // click. `scrollItems` snaps the offset to the item boundary, like the trial.
+      arrow.addEventListener('pointerdown', event => { event.preventDefault(); this.scrollItems(vertical, increment); });
     }
     handle.addEventListener('pointerdown', event => {
-      event.preventDefault(); handle.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      /* TASK 90 C: the drag must follow the pointer wherever it goes, not only while it stays
+       * inside the 15px bar band (the user's pointer drifts sideways while the button is held).
+       * The trial/Excel capture the drag at the document level until the button is released —
+       * including releases outside the window — and scroll live on every move event. */
       const start = vertical ? event.clientY : event.clientX, old = vertical ? this.scrollY : this.scrollX;
+      let captured = false;
+      try { handle.setPointerCapture(event.pointerId); captured = true; } catch { captured = false; }
       const move = (e: PointerEvent) => {
-        const axis = vertical ? this.sheet!._rowLayout() : this.sheet!._columnLayout();
-        const extent = vertical ? this.viewHeight - this.headerHeight : this.viewWidth - this.headerWidth;
-        const trackLength = vertical ? track.clientHeight - handle.clientHeight : track.clientWidth - handle.clientWidth;
-        const delta = ((vertical ? e.clientY : e.clientX) - start) * Math.max(0, this.scrollTotal(axis, vertical) - extent / this.zoom) / Math.max(1, trackLength);
-        this.setScroll(vertical ? this.scrollX : old + delta, vertical ? old + delta : this.scrollY);
-        if (this.workbook.options.showScrollTip) handle.title = vertical ? `Row: ${this.rows[0]?.index + 1}` : `Column: ${columnLabel(this.cols[0]?.index ?? 0)}`;
+        /* TASK 90 C round 2-4 (`.probe/t90/scroll2-r5-snap.json`, `hfit-r3.json`): the trial maps
+         * the pointer's travelled pixels onto the scrollable ITEM-INDEX range — relative item =
+         * `round(deltaPx * (lastItem - frozenLead) / (trackLen - thumbLen))` whole items — and
+         * lands that whole item at the pane origin. Measured trial trails: `22/40/59/77/96` rows
+         * (frozen 3, 20px steps), `19/38/57/76/95` rows (plain, 20px steps), `2/5/7/9` cols
+         * (plain h, 30px steps) and `4/6/8/10` cols (frozen 2, 30px steps), identical at zoom 1
+         * and 1.5 — the item mapping is zoom-invariant, which is why both zooms give the same
+         * rows. Two details matter: the travel uses the DOM rects (`offsetHeight/offsetWidth` —
+         * the handle's 1px border must not shrink it the way `clientHeight` did: 213 vs the
+         * trial's 211, ours lagged a row per step), and the rounding is in ITEM COUNTS, not to
+         * the nearest pixel boundary: the boundary snap (round 3) reproduced the uniform-row
+         * trails but broke the non-uniform horizontal one (trial `2/5/7/9`, ours `2/4/6/9`). */
+        const s = this.sheet!;
+        const axis = vertical ? s._rowLayout() : s._columnLayout();
+        const lead = vertical ? s.frozenRowCount() : s.frozenColumnCount();
+        const travel = Math.max(1, vertical ? track.offsetHeight - handle.offsetHeight : track.offsetWidth - handle.offsetWidth);
+        const startItem = axis.indexAtOffset(axis.prefixSum(lead) + old);
+        const maxItem = axis.indexAtOffset(axis.prefixSum(lead) + this.maxScroll(vertical));
+        const deltaPx = (vertical ? e.clientY : e.clientX) - start;
+        const item = Math.max(lead, Math.min(maxItem, startItem + Math.round((deltaPx * (maxItem - lead)) / travel)));
+        const target = axis.prefixSum(item) - axis.prefixSum(lead);
+        this.setScroll(vertical ? this.scrollX : target, vertical ? target : this.scrollY);
+        if (this.workbook.options.showScrollTip) handle.title = vertical ? ltext('status.rowTip', 'Row: {0}', (this.rows[0]?.index ?? 0) + 1) : ltext('status.columnTip', 'Column: {0}', columnLabel(this.cols[0]?.index ?? 0));
       };
-      handle.addEventListener('pointermove', move);
-      handle.addEventListener('pointerup', () => handle.removeEventListener('pointermove', move), { once: true });
+      const stop = (): void => {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', stop);
+        document.removeEventListener('pointercancel', stop);
+        if (captured) { try { handle.releasePointerCapture(event.pointerId); } catch { /* already released */ } }
+      };
+      /* Document-level listeners catch every move/release regardless of what element the pointer
+       * ends up over; the capture above routes the events to the handle (they still bubble here). */
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', stop);
+      document.addEventListener('pointercancel', stop);
     });
     track.addEventListener('pointerdown', e => {
       if (e.target === handle) return;
       const r = handle.getBoundingClientRect();
       const dir = (vertical ? e.clientY < r.top : e.clientX < r.left) ? -1 : 1;
-      this.scroll(vertical ? dir * (this.viewHeight - this.headerHeight) / this.zoom : 0, vertical ? 0 : dir * (this.viewWidth - this.headerWidth) / this.zoom);
+      /* TASK 90 C round 4 (trial track click from row 3 lands on row 11 with a 171px scroll pane,
+       * ours used the full viewport 231px -> row 14): the trial pages by the scrollable pane's
+       * extent, the same quantity the thumb sizing uses — frozen/trailing blocks excluded. */
+      const page = this.visibleExtent(vertical);
+      this.scroll(vertical ? dir * page : 0, vertical ? 0 : dir * page);
     });
     return { root, track, handle };
   }
   updateScrollbars(): void {
-    const s = this.sheet!;
-    for (const [bar, axis, extent, offset, vertical] of [[this.vertical, s._rowLayout(), this.viewHeight - this.headerHeight, this.scrollY, true], [this.horizontal, s._columnLayout(), this.viewWidth - this.headerWidth, this.scrollX, false]] as const) {
+    for (const [bar, vertical] of [[this.vertical, true], [this.horizontal, false]] as const) {
       const length = Math.max(0, (vertical ? this.viewHeight : this.hscrollExtent) - 30);
-      const total = this.scrollTotal(axis, vertical), visible = extent / this.zoom;
-      const size = Math.min(length, Math.max(20, Math.floor(length * visible / Math.max(visible, total + (this.workbook.options.scrollbarShowMax && !this.workbook.options.scrollbarMaxAlign ? visible - axis.defaultSize : 0)))));
-      const pos = Math.max(0, (length - size) * offset / Math.max(1, total - visible));
+      // TASK 90 C round 2: the scroll pane's visible extent EXCLUDES the frozen blocks. The trial
+      // thumb measured 15x12 on the plain 221px track but 15x10 when 3 rows are frozen
+      // (`.probe/t90/scroll2-r2.json` dom dumps) — it shrinks the thumb for the scrollable pane
+      // only; ours kept the whole viewport and drew 12px in both cases.
+      const total = this.scrollRange(vertical), visible = this.visibleExtent(vertical);
+      /* TASK 90 C round 4 (`.probe/t90/hfit-r3.json`, trial thumbs rows5 41 / rows20 12 /
+       * rows40 10 / frozen 10; ours with the old `total + visible - defaultSize` denominator got
+       * 42): the trial sizes the thumb `floor(track * visible / (visible + content))`, floored at
+       * 10 px. Horizontal still lands 1-3 px off the trial on extreme column widths (trial 333 vs
+       * ours 330 at 10px columns, 98 vs 106 at 120px) — recorded in STATUS as the remaining
+       * sub-pixel-fit gap; the drag trails are quantized in ITEM units so they stay aligned. */
+      const size = Math.min(length, Math.max(10, Math.floor(length * visible / Math.max(1, visible + total))));
+      // The thumb stops at the track ends, and its position maps the FULL scroll range the
+      // `setScroll` clamp allows (trial: thumb bottom == track bottom exactly at row 199).
+      const pos = Math.max(0, Math.min(length - size, (length - size) * (vertical ? this.scrollY : this.scrollX) / Math.max(1, this.maxScroll(vertical))));
       Object.assign(bar.handle.style, vertical ? { height: `${size}px`, top: `${pos}px` } : { width: `${size}px`, left: `${pos}px` });
     }
+  }
+  /** Sheet pixels the scrollable pane actually shows: viewport minus chrome minus the frozen
+   *  blocks (TASK 90 C round 2, the trial's frozen-bar measurements). */
+  visibleExtent(vertical: boolean): number {
+    const s = this.sheet!;
+    const axis = vertical ? s._rowLayout() : s._columnLayout();
+    const extent = (vertical ? this.viewHeight - this.headerHeight : this.viewWidth - this.headerWidth) / this.zoom;
+    const trailing = vertical ? s.frozenTrailingRowCount() : s.frozenTrailingColumnCount();
+    return Math.max(0, extent - axis.prefixSum(vertical ? s.frozenRowCount() : s.frozenColumnCount()) - axis.sum(axis.count - trailing, trailing));
+  }
+  /** Total content extent (sheet pixels) the scrollbar covers, beyond the frozen blocks. */
+  scrollRange(vertical: boolean): number {
+    const s = this.sheet!;
+    const axis = vertical ? s._rowLayout() : s._columnLayout();
+    const trailing = vertical ? s.frozenTrailingRowCount() : s.frozenTrailingColumnCount();
+    return Math.max(0, this.scrollTotal(axis, vertical) - axis.prefixSum(vertical ? s.frozenRowCount() : s.frozenColumnCount()) - axis.sum(axis.count - trailing, trailing));
+  }
+  /** Largest scroll offset (pixels, relative to the frozen line): the trial lets the drag scroll
+   *  until the LAST row/column sits at the pane origin (drag to the track end -> topRow 199 of a
+   *  200-row sheet, `.probe/t90/scroll2-r2.json` dragMax); `scrollbarMaxAlign` instead keeps the
+   *  last full page visible. Before TASK 90 C round 2 the clamp ignored the frozen block, so a
+   *  long drag on a frozen sheet scrolled PAST the content and the viewport degraded to row 0. */
+  maxScroll(vertical: boolean): number {
+    const s = this.sheet!;
+    const axis = vertical ? s._rowLayout() : s._columnLayout();
+    const total = this.scrollRange(vertical);
+    if (this.workbook.options.scrollbarMaxAlign) return Math.max(0, total - this.visibleExtent(vertical));
+    return Math.max(0, total - axis.getSize(axis.indexAtOffset(Math.max(0, total - 1))));
   }
   scrollTotal(axis: AxisLayout, vertical: boolean): number {
     const count = this.workbook.options.scrollbarShowMax ? axis.count : Math.min(axis.count, ((this.used ??= this.sheet!._usedRange())[vertical ? 'row' : 'col']) + 1);
     return axis.prefixSum(count);
   }
   scroll(vPixels: number, hPixels: number): void { this.setScroll(this.scrollX + hPixels, this.scrollY + vPixels); }
+  /** TASK 90 C: the trial's wheel step is a whole-item step, not a pixel step — measured
+   *  `.probe/t90/wheel3-r1.json`: with explicit 40px rows and 120px columns one wheel event moves
+   *  exactly 3 rows (or 3 columns for deltaX / shift+wheel) whatever deltaY is (1, 4, 20, 100, 400,
+   *  1200 all give +3; -100 gives -3). A pixel-accumulator ignores the small deltas a touchpad
+   *  sends: ours scrolled 0 rows for deltaY 1..20, which is the user's "the wheel does not scroll".
+   *  Moves the scroll offset to the edge of the item `count` steps away from the first scrollable
+   *  row/column, so the viewport origin lands exactly on an item boundary like the trial's. */
+  scrollItems(vertical: boolean, count: number): void {
+    const s = this.sheet;
+    if (!s || !count) return;
+    const axis = vertical ? s._rowLayout() : s._columnLayout();
+    const leading = vertical ? s.frozenRowCount() : s.frozenColumnCount();
+    const slots = vertical ? this.rows : this.cols;
+    const current = slots.find((slot) => slot.index >= leading)?.index ?? leading;
+    const target = Math.max(leading, Math.min(axis.count - 1, current + count));
+    const offset = axis.prefixSum(target) - axis.prefixSum(leading);
+    this.setScroll(vertical ? this.scrollX : offset, vertical ? offset : this.scrollY);
+  }
   setScroll(x: number, y: number): void {
     const s = this.sheet; if (!s) return;
     const oldTop = this.rows.find(r => r.index >= s.frozenRowCount())?.index ?? 0;
     const oldLeft = this.cols.find(c => c.index >= s.frozenColumnCount())?.index ?? 0;
-    const max = (axis: AxisLayout, extent: number, vertical: boolean) => this.workbook.options.scrollbarMaxAlign ? Math.max(0, this.scrollTotal(axis, vertical) - extent / this.zoom) : Math.max(0, this.scrollTotal(axis, vertical) - axis.getSize(axis.indexAtOffset(Math.max(0, this.scrollTotal(axis, vertical) - 1))));
-    this.scrollX = Math.max(0, Math.min(x, max(s._columnLayout(), this.viewWidth - this.headerWidth, false)));
-    this.scrollY = Math.max(0, Math.min(y, max(s._rowLayout(), this.viewHeight - this.headerHeight, true)));
+    this.scrollX = Math.max(0, Math.min(Number.isFinite(x) ? x : 0, this.maxScroll(false)));
+    this.scrollY = Math.max(0, Math.min(Number.isFinite(y) ? y : 0, this.maxScroll(true)));
     this.computeSlots(); this.updateScrollbars();
     const newTop = this.rows.find(r => r.index >= s.frozenRowCount())?.index ?? 0;
     const newLeft = this.cols.find(c => c.index >= s.frozenColumnCount())?.index ?? 0;

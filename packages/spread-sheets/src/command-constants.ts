@@ -6,15 +6,19 @@
  * The `canUndo` values below were read from the 19.2.5 trial page through the
  * public API (probe segment `cmd:canundo-all`, 2026-11-16); `execute` return
  * values were captured isolated per command on a fresh workbook
- * (probe segment `cmd:isolated`). Twelve trial-core names (`DefineColumn`,
- * `ModifyColumn`, `RemoveColumn`, `ReportChartPreviewVisible`,
- * `ReportCollapseButtonToggle`, `reportSheet*`) are only registered when the
- * official add-ons are loaded and stay NotImplemented fallbacks in our core.
+ * (probe segment `cmd:isolated`). The twelve trial-core names that the official
+ * add-ons register (`DefineColumn`, `ModifyColumn`, `RemoveColumn`,
+ * `ReportChartPreviewVisible`, `ReportCollapseButtonToggle`, `reportSheet*`)
+ * run against our bundled TableSheet/ReportSheet implementations (TASK 99).
  *
  * Commands that the interactive view registers itself (navigation, selection,
  * editing, undo/redo, Delete key) are overridden by `interaction.ts` when a
  * view exists; the implementations here are the workbook-level (model)
  * defaults so `commandManager().execute({ cmd: ... })` works headless too.
+ * The report-sheet names (`ReportChartPreviewVisible`,
+ * `ReportCollapseButtonToggle`, `reportSheet*`) are the trial's Spread-Reports
+ * add-on commands; our core bundles `ReportSheet`, so they run against report
+ * sheets (like `DefineColumn` does for TableSheet) - TASK 99.
  */
 import { clone, Range } from './primitives.js';
 import { GC } from './generated/enums.js';
@@ -26,6 +30,7 @@ import type { Worksheet } from './worksheet.js';
 import { FloatingObject, Picture } from './features/floating-objects.js';
 import type { Workbook } from './workbook.js';
 import { TableSheet } from './tablesheet/index.js';
+import { ReportSheet } from './report/index.js';
 import { Events } from './events.js';
 import { object } from './serialization.js';
 
@@ -604,7 +609,9 @@ export const commandConstants: Record<string, SweepCommand> = {
             const row = fill.row + r, col = fill.col + c;
             if (!source) { clearCell(sheet, row, col, true, false); continue; }
             sheet.setValue(row, col, source.value ?? null);
-            if (typeof source.formula === 'string') sheet.setFormula(row, col, source.formula);
+            // The fill source is a STORED canonical formula: replay it through the canonical
+            // channel so an active calc language package does not re-read `,` as decimal comma.
+            if (typeof source.formula === 'string') sheet._setFormula(row, col, source.formula);
             else sheet.setFormula(row, col, null);
             if (source.style !== undefined) {
               const targetCell = area.cells.get(row, col) ?? {};
@@ -854,6 +861,135 @@ export const commandConstants: Record<string, SweepCommand> = {
       options._renamed = [sheet.name(), name];
       sheet.name(name);
       return true; // trial: true with { sheetName, name } (probe `cmd:rename-forms`)
+    },
+  },
+  // --- ReportSheet (Spread Reports) commands ---------------------------------
+  // The trial registers these for the report add-on; our core bundles ReportSheet,
+  // so they run against report sheets (like `DefineColumn` does for TableSheet)
+  // and report `false` for everything else (d.ts: execute(context, options, isUndo)).
+  ReportChartPreviewVisible: {
+    canUndo: true,
+    execute(context, options, isUndo) {
+      const sheet = reportAt(context, options);
+      if (!sheet) return false;
+      const row = num(options.row) ?? sheet.getActiveRowIndex();
+      const col = num(options.col) ?? sheet.getActiveColumnIndex();
+      if (isUndo) {
+        if (typeof options._previousVisible !== 'boolean') return false;
+        sheet._chartPreviewVisible(row, col, options._previousVisible);
+        return true;
+      }
+      options._previousVisible = sheet._chartPreviewVisible(row, col);
+      const visible = typeof options.visible === 'boolean' ? options.visible : !options._previousVisible;
+      sheet._chartPreviewVisible(row, col, visible);
+      return true;
+    },
+  },
+  ReportCollapseButtonToggle: {
+    canUndo: true,
+    execute(context, options, isUndo) {
+      const sheet = reportAt(context, options);
+      if (!sheet) return false;
+      const row = num(options.row) ?? sheet.getActiveRowIndex();
+      const col = num(options.col) ?? sheet.getActiveColumnIndex();
+      if (isUndo) {
+        if (typeof options._previousVisible !== 'boolean') return false;
+        sheet._collapseButtonVisible(row, col, options._previousVisible);
+        return true;
+      }
+      options._previousVisible = sheet._collapseButtonVisible(row, col);
+      sheet._collapseButtonVisible(row, col, !options._previousVisible);
+      return true;
+    },
+  },
+  reportSheetAddRecord: {
+    canUndo: true,
+    execute(context, options, isUndo) {
+      const sheet = reportAt(context, options);
+      if (!sheet) return false;
+      if (isUndo) {
+        const state = options._reportState as { json: Record<string, unknown>; changes: unknown } | undefined;
+        if (!state) return false;
+        sheet._restoreUndoState(state);
+        return true;
+      }
+      const row = num(options.activeRow) ?? sheet.getActiveRowIndex();
+      const col = num(options.activeCol) ?? sheet.getActiveColumnIndex();
+      if (!sheet._hasRecordCell(row, col)) return false;
+      options._reportState = sheet._undoState();
+      sheet.addRecordAt(row, col);
+      return true;
+    },
+  },
+  reportSheetDeleteRecord: {
+    canUndo: true,
+    execute(context, options, isUndo) {
+      const sheet = reportAt(context, options);
+      if (!sheet) return false;
+      if (isUndo) {
+        const state = options._reportState as { json: Record<string, unknown>; changes: unknown } | undefined;
+        if (!state) return false;
+        sheet._restoreUndoState(state);
+        return true;
+      }
+      const row = num(options.activeRow) ?? sheet.getActiveRowIndex();
+      const col = num(options.activeCol) ?? sheet.getActiveColumnIndex();
+      if (!sheet._hasRecordCell(row, col)) return false;
+      options._reportState = sheet._undoState();
+      sheet.deleteRecordAt(row, col);
+      return true;
+    },
+  },
+  reportSheetResetCellValue: {
+    canUndo: true,
+    execute(context, options, isUndo) {
+      const sheet = reportAt(context, options);
+      if (!sheet) return false;
+      if (isUndo) {
+        for (const entry of (options._resetValues as { row: number; col: number; value: unknown }[]) || [])
+          sheet.updateCellValue(entry.row, entry.col, entry.value);
+        return true;
+      }
+      const cells = reportSelectionCells(sheet, options.selections);
+      if (!cells.length) return false;
+      const saved: { row: number; col: number; value: unknown }[] = [];
+      for (const [row, col] of cells) {
+        const value = sheet.getValue(row, col);
+        sheet.resetCellValue(row, col);
+        if (!Object.is(value, sheet.getValue(row, col))) saved.push({ row, col, value });
+      }
+      options._resetValues = saved;
+      return true;
+    },
+  },
+  reportSheetSubmit: {
+    canUndo: false,
+    execute(context, options) {
+      const sheet = reportAt(context, options);
+      if (!sheet) return false;
+      sheet.submit();
+      return true;
+    },
+  },
+  reportSheetRegenerateReport: {
+    canUndo: false,
+    execute(context, options) {
+      const sheet = reportAt(context, options);
+      if (!sheet) return false;
+      sheet.regenerateReport();
+      return true;
+    },
+  },
+  reportSheetCollapseAll: {
+    canUndo: true,
+    execute(context, options, isUndo) {
+      return reportSetCollapseAll(context, options, isUndo, true);
+    },
+  },
+  reportSheetExpandAll: {
+    canUndo: true,
+    execute(context, options, isUndo) {
+      return reportSetCollapseAll(context, options, isUndo, false);
     },
   },
   resizeColumn: {
@@ -1107,6 +1243,45 @@ function readdFloating(sheet: Worksheet, data: Record<string, unknown>): Floatin
 function findTable(sheet: Worksheet | undefined, name: unknown) {
   if (!sheet || typeof name !== 'string') return undefined;
   return sheet.tables.findByName(name) ?? undefined;
+}
+
+function reportAt(context: unknown, options: CommandOptions): ReportSheet | undefined {
+  const sheet = sheetAt(context as Workbook, options);
+  return sheet instanceof ReportSheet ? sheet : undefined;
+}
+
+/** Existing record cells of a report inside the command's `selections` (whole sheet when absent). */
+function reportSelectionCells(sheet: ReportSheet, selections: unknown): [number, number][] {
+  const rects = Array.isArray(selections)
+    ? selections.filter(isRange).map((r) => [r.row, r.col, Math.max(1, r.rowCount), Math.max(1, r.colCount)] as [number, number, number, number])
+    : undefined;
+  const out: [number, number][] = [];
+  for (const [row, col] of sheet._recordCells())
+    if (!rects || rects.some(([r, c, rc, cc]) => row >= r && row < r + rc && col >= c && col < c + cc)) out.push([row, col]);
+  return out;
+}
+
+/** Collapses/expands every group instance in the selections; records the touched cells for undo. */
+function reportSetCollapseAll(context: unknown, options: CommandOptions, isUndo: boolean | undefined, collapse: boolean): boolean {
+  const sheet = reportAt(context, options);
+  if (!sheet) return false;
+  if (isUndo) {
+    for (const [row, col] of (options._touched as [number, number][]) || [])
+      if (sheet.getCollapseState(row, col) === collapse) sheet.toggleCollapseState(row, col, collapse ? 'Expanded' : 'Collapsed');
+    return true;
+  }
+  const rects = Array.isArray(options.selections)
+    ? (options.selections as unknown[]).filter(isRange).map((r) => [r.row, r.col, Math.max(1, r.rowCount), Math.max(1, r.colCount)] as [number, number, number, number])
+    : undefined;
+  const touched: [number, number][] = [];
+  for (const [row, col] of sheet._groupInstances()) {
+    if (rects && !rects.some(([r, c, rc, cc]) => row >= r && row < r + rc && col >= c && col < c + cc)) continue;
+    if (sheet.getCollapseState(row, col) === collapse) continue;
+    sheet.toggleCollapseState(row, col, collapse ? 'Collapsed' : 'Expanded');
+    touched.push([row, col]);
+  }
+  options._touched = touched;
+  return true;
 }
 
 function sameRect(fromRow: number, fromColumn: number, toRow: number, toColumn: number, rowCount: number, colCount: number): boolean {

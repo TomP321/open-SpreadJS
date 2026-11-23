@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { useDesigner, useDesignerVersion } from './store.js';
 import { DesignerIcon } from './icons.js';
 
+import { resolveText, getResources } from './resolve.js';
+
+/** TASK 87: panel captions (`panels` subtree of the loaded resources). */
+const P = (designer: { resources: Record<string, unknown> }, key: string, en: string): string => resolveText(`\${res.panels.${key}}`, designer.resources) || en;
+
 /* Command Palette ------------------------------------------------------------ */
 
 function PaletteSearchIcon(): React.ReactElement {
@@ -16,7 +21,10 @@ function PaletteSearchIcon(): React.ReactElement {
 const PALETTE_SUGGESTIONS = ['copy', 'pasteAll', 'formatPainter', 'insertPicture', 'insertChart'];
 
 /** Group titles the trial shows in the palette. */
-export const PALETTE_GROUPS = { recent: 'Recently Used Action', suggested: 'Suggested Actions', best: 'Best Action', rest: 'Actions', find: 'Find In Worksheet' } as const;
+export const PALETTE_GROUPS = {
+  recent: `\${res.panels.recentActions}`, suggested: `\${res.panels.suggestedActions}`,
+  best: `\${res.panels.bestAction}`, rest: `\${res.panels.actions}`, find: `\${res.panels.findInWorksheet}`,
+} as const;
 
 export interface PaletteItem { name: string; title: string; iconClass?: string }
 export interface PaletteGroup { label: string; items: (PaletteItem & { findText?: string })[] }
@@ -39,7 +47,7 @@ export function buildPaletteGroups(query: string, matched: PaletteItem[], recent
     groups.push({ label: PALETTE_GROUPS.best, items: matched.slice(0, 1) });
     if (matched.length > 1) groups.push({ label: PALETTE_GROUPS.rest, items: matched.slice(1) });
   }
-  groups.push({ label: PALETTE_GROUPS.find, items: [{ name: 'find', title: `Find With "${trimmed}"`, findText: trimmed }] });
+  groups.push({ label: PALETTE_GROUPS.find, items: [{ name: 'find', title: resolveText(`\${res.panels.findWith}`, getResources()).replace('{0}', trimmed), findText: trimmed }] });
   return groups;
 }
 
@@ -82,18 +90,18 @@ export function CommandPalette(): React.ReactElement {
             className="gc-text-editor"
             autoFocus
             maxLength={50}
-            aria-label="Search for actions, text, and more"
-            placeholder="Search for actions, text, and more"
+            aria-label={P(d, 'paletteSearch', 'Search for actions, text, and more')}
+            placeholder={P(d, 'paletteSearch', 'Search for actions, text, and more')}
             value={query}
             onChange={(event) => { setQuery(event.target.value); setIndex(0); }}
           />
-          {query && <button type="button" className="gc-designer-command-palette-clear" title="Clear" onClick={() => { setQuery(''); setIndex(0); }}>×</button>}
+          {query && <button type="button" className="gc-designer-command-palette-clear" title={resolveText('${res.clear}', d.resources) || 'Clear'} onClick={() => { setQuery(''); setIndex(0); }}>×</button>}
         </div>
         <div className="gc-command-palette-list-container">
-          <div className="gc-command-palette-list" role="listbox" aria-label="Command Palette">
+          <div className="gc-command-palette-list" role="listbox" aria-label={P(d, 'commandPalette', 'Command Palette')}>
             {groups.map((group) => (
               <div key={group.label} className="gc-command-palette-list-group-item" role="group">
-                <div className="gc-command-palette-list-group-item-title">{group.label}</div>
+                <div className="gc-command-palette-list-group-item-title">{resolveText(group.label, d.resources)}</div>
                 <div className="gc-command-palette-list-group-item-commands">
                   {group.items.map((item) => {
                     cursor++;
@@ -104,13 +112,13 @@ export function CommandPalette(): React.ReactElement {
                         className={`gc-command-palette-list-item${active ? ' gc-command-palette-list-item-highlight' : ''}`}
                         role="option"
                         aria-selected={active}
-                        aria-label={item.title}
+                        aria-label={resolveText(item.title, d.resources)}
                         onMouseEnter={() => setIndex(flat.indexOf(item))}
                         onClick={() => run(item)}
                       >
                         <div className={`gc-designer-ribbon-toolbar-group-list-item gc-command-palette-list-item-content${active ? ' gc-designer-cmd-palette-item-focus' : ''}`}>
                           <span className="gc-command-palette-list-item-icon">{item.iconClass ? <DesignerIcon className={item.iconClass} size={16} /> : null}</span>
-                          <span className="gc-command-palette-list-item-text">{item.title}</span>
+                          <span className="gc-command-palette-list-item-text">{resolveText(item.title, d.resources)}</span>
                         </div>
                       </div>
                     );

@@ -18,7 +18,8 @@ const TC = GC.Spread.Sheets.ThreadedComments;
 
 // Trial `canUndo` values from probe `cmd:canundo-all`; the trial core leaves the
 // reportSheet*/Report* names undefined (registered only by the reportsheet add-on)
-// - our core keeps them as documented NotImplemented fallbacks (see STATUS).
+// - our core bundles ReportSheet, so TASK 99 publishes real command objects for
+// them (see the report command test below and STATUS).
 const TRIAL_CAN_UNDO: Record<string, boolean> = {
   autoFitColumn: true, autoFitRow: true, cancelInput: false, changeEditorStatus: false,
   changeFormulaReference: false, clear: false, clearAndEditing: false, clearValues: true,
@@ -49,11 +50,18 @@ const TRIAL_CAN_UNDO: Record<string, boolean> = {
   TableSheetRemoveSortColumn: true, TableSheetSortColumn: true, tableSubmitChanges: false,
   undo: false, zoom: true,
 };
-// Trial core exposes only these as `undefined` (add-on-registered); our core keeps
-// the NotImplemented fallbacks for them (probe `cmd:canundo-all` -> "undef").
+// Trial core exposes only these as `undefined` (add-on-registered; re-probed on
+// 2026-11-23 in the running Designer, `?side=official`). Our core bundles
+// ReportSheet, so TASK 99 implements them as real commands (like DefineColumn
+// for TableSheet). `canUndo` marks which of our implementations record history.
 const ADDON_ONLY = ['ReportChartPreviewVisible', 'ReportCollapseButtonToggle', 'reportSheetAddRecord',
   'reportSheetCollapseAll', 'reportSheetDeleteRecord', 'reportSheetExpandAll', 'reportSheetRegenerateReport',
   'reportSheetResetCellValue', 'reportSheetSubmit'];
+const REPORT_CAN_UNDO: Record<string, boolean> = {
+  ReportChartPreviewVisible: true, ReportCollapseButtonToggle: true, reportSheetAddRecord: true,
+  reportSheetCollapseAll: true, reportSheetDeleteRecord: true, reportSheetExpandAll: true,
+  reportSheetRegenerateReport: false, reportSheetResetCellValue: true, reportSheetSubmit: false,
+};
 
 describe('GC.Spread.Sheets.Commands namespace constants', () => {
   for (const [name, canUndo] of Object.entries(TRIAL_CAN_UNDO)) {
@@ -64,9 +72,16 @@ describe('GC.Spread.Sheets.Commands namespace constants', () => {
       expect(typeof command.execute).toBe('function');
     });
   }
-  it('keeps the add-on-only command names as documented fallbacks', () => {
-    for (const name of ADDON_ONLY)
-      expect(() => CommandNames[name]).toThrow(/NotImplemented/);
+  it('runs the report-sheet commands as implemented command objects (TASK 99)', () => {
+    for (const name of ADDON_ONLY) {
+      const command = CommandNames[name];
+      expect(typeof command, name).toBe('object');
+      expect(command.canUndo, name).toBe(REPORT_CAN_UNDO[name]);
+      expect(typeof command.execute, name).toBe('function');
+      // On a non-report sheet every command reports failure instead of throwing.
+      const wb = new Workbook();
+      expect(wb.commandManager().execute({ cmd: name, sheetName: wb.getActiveSheet().name() }), name).toBe(false);
+    }
   });
 });
 

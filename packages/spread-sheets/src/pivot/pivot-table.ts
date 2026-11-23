@@ -13,7 +13,7 @@ import {
 } from './engine.js';
 import { LayoutCell, PivotLayoutModel } from './layout.js';
 import { PivotTableTheme, PivotTableStyle, CustomPivotTableThemeManager } from './theme.js';
-import { PivotTableThemes } from './theme-statics.js';
+import { builtInPivotTheme, builtInPivotThemeKey } from './theme-statics.js';
 import { ConditionRuleBase } from '../features/cf-base.js';
 import {
   DataPosition, GrandTotalPosition, PivotDataType, PivotTableFieldType, PivotTableLayoutType,
@@ -416,6 +416,15 @@ export class PivotTable {
       // Trial: a data field with missing cells reports an empty `start`.
       info.start = (cacheField.blanks ? '' : cacheField.min) as number;
       info.end = cacheField.max;
+    } else if (cacheField && (model.area === PivotTableFieldType.rowField || model.area === PivotTableFieldType.columnField || model.area === PivotTableFieldType.filterField)) {
+      // TASK 93: the documented IFieldInfo range for row/col/filter fields (the trial's
+      // Grouping dialog pre-fills Starting at / Ending at from these).
+      if (cacheField.dataType === PivotDataType.number && cacheField.min !== undefined) { info.start = cacheField.min; info.end = cacheField.max; }
+      else if (cacheField.dataType === PivotDataType.date && cacheField.items.length) {
+        let lo = Infinity, hi = -Infinity;
+        for (const key of cacheField.items) { const t = Number(key); if (Number.isFinite(t)) { if (t < lo) lo = t; if (t > hi) hi = t; } }
+        if (lo <= hi) { info.start = new Date(lo); info.end = new Date(hi); }
+      }
     }
     return info;
   }
@@ -1263,10 +1272,19 @@ export class PivotTable {
     this._apply();
   }
 
-  /** Removes the groups of an origin field (accepts the group name too). */
+  /**
+   * Removes the groups of an origin field (accepts the group name too).
+   * TASK 93 trial parity: ungrouping any date unit ungroups the whole date
+   * grouping of the origin (`ungroup('Months (Date)')` removes Years/Quarters/Months).
+   */
   ungroup(fieldName: string): void {
     const name = String(fieldName);
-    const match = (group: { name: string; origin: string }): boolean => group.origin === name || group.name === name;
+    let match = (group: { name: string; origin: string; kind: string }): boolean => group.origin === name || group.name === name;
+    const direct = this.groups.filter(match);
+    if (direct.some(group => group.kind === 'date')) {
+      const origins = new Set(direct.filter(group => group.kind === 'date').map(group => group.origin));
+      match = group => (group.kind === 'date' ? origins.has(group.origin) : group.origin === name || group.name === name);
+    }
     const removed = this.groups.filter(match);
     if (!removed.length) return;
     this.groups = this.groups.filter(group => !match(group));
@@ -2351,6 +2369,13 @@ export class PivotTable {
     const valueFields = this.areaFields(PivotTableFieldType.valueField);
     const pageFields = this.areaFields(PivotTableFieldType.filterField);
     const options = this.options;
+    // TASK 93: date items display as m/d/yyyy in the trial (the cache keys stay
+    // the raw times for filtering/drill), so label text renders through the same
+    // formatter the slicer items use. The CACHE type decides: derived group
+    // fields (Years/Qtr1/Jan, '50-99') are string items even though the field
+    // metadata keeps the origin's date type.
+    const label = (field: PivotFieldModel | undefined, key: string | undefined): string =>
+      key === undefined ? '' : field && this.cacheType(field.sourceName) === PivotDataType.date ? String(usDateFromKey(key)) : String(key);
     const compact = this.layout === PivotTableLayoutType.compact;
     const tabular = this.layout === PivotTableLayoutType.tabular;
     const showFilter = options.showFilter !== false;
@@ -2458,10 +2483,10 @@ export class PivotTable {
           const key = `${groupOf.get(leaf.value)}\u0000${level}\u0000${leaf.path.slice(0, level + 1).join('\u0001')}`;
           if (!captioned.has(key)) {
             captioned.add(key);
-            headerText[row]![index] = leaf.path[level] ?? '';
+            headerText[row]![index] = label(colFields[level], leaf.path[level]);
           }
         } else if (leaf.kind === 'subtotal') {
-          if (level === leaf.level) headerText[row]![index] = `${leaf.path[level] ?? ''} Total`;
+          if (level === leaf.level) headerText[row]![index] = `${label(colFields[level], leaf.path[level])} Total`;
         } else if (!showValuesRow && level === 0) headerText[row]![index] = GRAND_TOTAL_CAPTION;
       }
     });
@@ -2515,7 +2540,7 @@ export class PivotTable {
     pageFields.forEach((model, i) => {
       cells.push({ row: pageOffset + i, col: 0, kind: 'pageLabel', text: model.displayName, slot: 'reportFilterLabelsStyle' });
       cells.push({
-        row: pageOffset + i, col: 1, kind: 'pageValue', text: this.pageSelection(model),
+        row: pageOffset + i, col: 1, kind: 'pageValue', text: label(model, this.pageSelection(model)),
         slot: 'reportFilterValuesStyle', filterButton: showFilter,
       });
     });
@@ -2573,19 +2598,19 @@ export class PivotTable {
       for (let c = 0; c < labelCols; c++) {
         let text = '';
         if (entry.kind === 'grand') text = c === 0 ? GRAND_TOTAL_CAPTION : '';
-        else if (entry.kind === 'subtotal') text = c === own ? `${entry.path[entry.level] ?? ''} Total` : '';
-        else if (entry.kind === 'group') text = c === own ? String(entry.path[entry.level] ?? '') : '';
+        else if (entry.kind === 'subtotal') text = c === own ? `${label(rowFields[entry.level], entry.path[entry.level])} Total` : '';
+        else if (entry.kind === 'group') text = c === own ? label(rowFields[entry.level], entry.path[entry.level]) : '';
         else if (!rowFields.length)
           text = rowIndex === 0 && c === 0 && colFields.length > 0 && !showValuesRow && valueFields.length === 1
             ? valueFields[0]!.displayName : '';
-        else if (compact) text = String(entry.path[entry.path.length - 1] ?? '');
+        else if (compact) text = label(rowFields[entry.path.length - 1], entry.path[entry.path.length - 1]);
         else {
           const item = entry.path[c];
           // Outline: the group row carries the parent label. Tabular has no group
           // rows, so the first item of a group repeats it (`fillDownLabels` all).
           const firstOfGroup = entry.firstOf.slice(c + 1).every(Boolean);
           text = item == null ? missingText(options)
-            : c === rowFields.length - 1 || options.fillDownLabels || (tabular && firstOfGroup) ? String(item) : '';
+            : c === rowFields.length - 1 || options.fillDownLabels || (tabular && firstOfGroup) ? label(rowFields[c], item) : '';
         }
         // Drill buttons: group rows carry them; tabular has no group rows, so the
         // first row of a group carries the button of each of its parent levels.
@@ -2900,22 +2925,18 @@ export function resolveTheme(style: string | PivotTableTheme | undefined, sheet:
   if (!style) return undefined;
   if (style instanceof PivotTableTheme) return style;
   const name = String(style).toLowerCase().replace(/\s+/g, '');
-  const builtIn = asRecord(PivotTableThemes)[name] as PivotTableTheme | undefined;
+  const builtIn = builtInPivotTheme(name);
   if (builtIn) return builtIn;
   const custom = sheet?.parent?.customPivotTableThemes;
   return custom?.get(name) ?? custom?.get(String(style));
 }
 
 export function themeKeyOf(theme: PivotTableTheme): string {
-  const name = String(theme.name() ?? '').toLowerCase();
-  const entries = asRecord(PivotTableThemes) as Record<string, PivotTableTheme | undefined>;
-  for (const key of Object.keys(entries))
-    if (key !== 'prototype' && key !== 'name' && key !== 'length' && entries[key] === theme) return key;
-  return name;
+  return builtInPivotThemeKey(theme) ?? String(theme.name() ?? '').toLowerCase();
 }
 
 export function getBuiltInTheme(key: string): PivotTableTheme | undefined {
-  return asRecord(PivotTableThemes)[String(key).toLowerCase()] as PivotTableTheme | undefined;
+  return builtInPivotTheme(key);
 }
 
 function paletteOf(sheet: PivotSheet): { getColor(name: string): string } | undefined {

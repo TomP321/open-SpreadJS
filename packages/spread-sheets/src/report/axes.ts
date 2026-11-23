@@ -33,6 +33,12 @@ function aggregate(rows: Row[], field: string, operation: TemplateCell['aggregat
   return sum;
 }
 
+/** The values a bound `List`/`Group` cell shows for a pair instance: records or distinct keys. */
+function pairValues(node: Node, rows: Row[]): unknown[] {
+  const values = rows.map(row => row[node.field]);
+  return node.cell.type === 'List' ? values : [...new Set(values)];
+}
+
 /**
  * Cross-axis (cross-tab) expansion: the template mixes the two axes — a group spills
  * horizontally while another group stacks instances downwards, and cells select a parent on
@@ -58,13 +64,14 @@ export function expandAxes(entries: Entry[], dataRows: Row[], parameters: Row = 
       (cell.spillDirection && !['Vertical', 'Horizontal'].includes(cell.spillDirection))) return undefined;
     table = binding[1];
     const node: Node = { row, col, cell, field: binding[2]!,
-      axis: cell.spillDirection === 'Horizontal' && cell.type !== 'Summary', children: [] };
+      axis: cell.spillDirection === 'Horizontal' && cell.type !== 'Summary' && !cell.context?.horizontal,
+      children: [] };
     nodes.push(node);
     byAddress.set(cellAddress(row, col), node);
   }
   if (nodes.filter(node => node.axis).length !== 1) return undefined;
   const axis = nodes.find(node => node.axis)!;
-  if (axis.cell.type !== 'Group' || axis.cell.context?.horizontal) return undefined;
+  if ((axis.cell.type !== 'Group' && axis.cell.type !== 'List') || axis.cell.context?.horizontal) return undefined;
 
   const previousAt = (node: Node): Node | undefined => nodes.filter(item => item !== node &&
     item.cell.type !== 'Summary' && (item.row < node.row || item.row === node.row && item.col < node.col)).pop();
@@ -77,13 +84,22 @@ export function expandAxes(entries: Entry[], dataRows: Row[], parameters: Row = 
       node.vParent = nearest && nearest.axis && node.cell.type === 'Summary' ? undefined : nearest;
     } else if (vertical !== 'None') {
       const parent = byAddress.get(vertical.toUpperCase());
-      if (!parent || parent === node || parent.cell.type === 'Summary' || parent.row > node.row) return undefined;
-      node.vParent = parent;
+      if (!parent) {
+        // TASK 96 probe `d5-group-both-axes` (`vertical: 'D1'` names no template cell): the
+        // trial falls back to the default nearest data cell above such a context.
+        const nearest = previousAt(node);
+        node.vParent = nearest && nearest.axis && node.cell.type === 'Summary' ? undefined : nearest;
+      } else if (parent === node || parent.cell.type === 'Summary' || parent.row > node.row) return undefined;
+      else node.vParent = parent;
     }
     const horizontal = node.cell.context?.horizontal;
     if (horizontal !== undefined && horizontal !== 'None') {
-      if (byAddress.get(horizontal.toUpperCase()) !== axis) return undefined;
-      node.hParent = axis;
+      const target = byAddress.get(horizontal.toUpperCase());
+      // The horizontal context must name a horizontally spilling data cell (TASK 96 probe
+      // `v9-two-horizontal-groups` also allows the second, chained horizontal group).
+      if (!target || target === node || target.cell.type === 'Summary' ||
+        target.cell.spillDirection !== 'Horizontal') return undefined;
+      node.hParent = target;
     } else if (horizontal === undefined && node.cell.type === 'Summary' && node.vParent === undefined) {
       // A context-free Summary in a cross-tab template defaults to the axis group (probe
       // `v7-summary-no-context`): it expands once per axis instance as a free summary row.
@@ -91,8 +107,18 @@ export function expandAxes(entries: Entry[], dataRows: Row[], parameters: Row = 
     }
   }
   const rowNodes = nodes.filter(node => !node.axis);
+  const axisItems = (subset: Row[]): Row[][] =>
+    axis.cell.type === 'List' ? selectRows(subset, axis.cell, parameters).map(row => [row]) : groups(subset, axis.field);
+  // A second independent horizontal group chained to the axis (TASK 96 probe
+  // `v9-two-horizontal-groups`): it expands per axis instance inside the instance's block.
+  const chained = rowNodes.filter(node => node.hParent === axis && !node.vParent && node.cell.type !== 'Summary' &&
+    node.cell.spillDirection === 'Horizontal');
+  if (chained.length > 1) return undefined;
+  const secondary = chained[0];
+  if (nodes.some(node => node.hParent && node.hParent !== axis && node.hParent !== secondary)) return undefined;
   for (const node of nodes) if (node.vParent) node.vParent.children.push(node);
-  const roots = rowNodes.filter(node => !node.vParent && !(node.cell.type === 'Summary' && node.hParent));
+  const roots = rowNodes.filter(node => !node.vParent && !(node.cell.type === 'Summary' && node.hParent) &&
+    !(node.hParent && node.cell.spillDirection === 'Horizontal'));
   const chainToAxis = (node: Node): boolean => {
     for (let parent = node.vParent; parent; parent = parent.vParent) if (parent === axis) return true;
     return false;
@@ -148,39 +174,77 @@ export function expandAxes(entries: Entry[], dataRows: Row[], parameters: Row = 
       width: axis.col + instances.length * pureSpan,
     };
   }
+  // A `List` hanging directly under the axis `List` (TASK 96 probe `xt-list`) is concatenated
+  // right behind every axis instance column.
+  const axisChildren = rowNodes.filter(node => node.cell.type === 'List' && node.vParent === axis && node.hParent === axis);
   for (const node of nodes) {
-    if (node.vParent && node.vParent.axis) return undefined;
+    if (node.vParent === axis && !axisChildren.includes(node)) return undefined;
     if (node === axis) continue;
     // Row-tree cells stand left of the axis; axis-bound cells (and any Summary, which the
-    // trial resolves per axis column - probes `v4`/`d4`) stand on the axis columns.
-    if (node.hParent || node.cell.type === 'Summary' ? node.col < axis.col : node.col >= axis.col) return undefined;
+    // trial resolves per axis column - probes `v4`/`d4`) stand on the axis columns. A root
+    // standing in the axis column above the axis row is allowed (TASK 96 `xt-summary-h-list`).
+    if (node.hParent || node.cell.type === 'Summary' ? node.col < axis.col :
+      node.col >= axis.col && !(node.row < axis.row && node.col === axis.col)) return undefined;
   }
   if (roots.length !== 1 || roots[0]!.cell.type === 'Summary' ||
     nodes.some(node => node.cell.type === 'Summary' && node.children.length) ||
-    rowNodes.some(node => node.hParent && node.cell.type !== 'Summary') ||
+    rowNodes.some(node => node.hParent && node.cell.type !== 'Summary' && !axisChildren.includes(node) &&
+      !chained.includes(node) && (!node.vParent || node.vParent === axis)) ||
     nodes.some(node => node.axis && node.hParent)) return undefined;
   if (axis.vParent && axis.vParent !== roots[0]) return undefined;
+  if (axis.cell.type === 'List' && axis.vParent === roots[0] && axisChildren.length === 0 &&
+    rowNodes.filter(node => node.cell.type === 'Summary' && node.hParent === axis && !node.vParent).length === 1 &&
+    rowNodes.every(node => node === axis || node === roots[0] ||
+      (node.cell.type === 'Summary' && node.hParent === axis && !node.vParent))) {
+    // TASK 96 probe `xt-summary-h-list`: with a free Summary on the axis row, the horizontal
+    // `List` axis is not repeated inside the row blocks; its records concatenate on the axis
+    // row below all blocks and the Summary closes that row, aggregating the whole axis.
+    const regions = groups(selectRows(dataRows, roots[0]!.cell, parameters), roots[0]!.field);
+    const instances = axisItems(dataRows);
+    const summary = rowNodes.find(node => node.cell.type === 'Summary')!;
+    const cells: AxisCell[] = regions.map((regionRows, index) => ({ row: index, col: roots[0]!.col,
+      rowCount: 1, colCount: 1, extent: 1, colExtent: 1, value: regionRows[0]![roots[0]!.field],
+      source: roots[0]!.cell, from: [roots[0]!.row, roots[0]!.col] }));
+    instances.forEach((rows, index) => cells.push({ row: regions.length, col: axis.col + index,
+      rowCount: 1, colCount: 1, extent: 1, colExtent: 1, value: rows[0]![axis.field],
+      source: axis.cell, from: [axis.row, axis.col] }));
+    cells.push({ row: regions.length, col: axis.col + instances.length, rowCount: 1, colCount: 1,
+      extent: 1, colExtent: 1, value: aggregate(selectRows(dataRows, summary.cell, parameters),
+        summary.field, summary.cell.aggregate), source: summary.cell, from: [summary.row, summary.col] });
+    return { cells, height: regions.length + 1, width: axis.col + instances.length + 1 };
+  }
 
-  const blockWidth = 1 + Math.max(0, ...nodes.filter(node => node.hParent).map(node => node.col - axis.col));
-  const globalAxis: AxisInstance[] = groups(axisRows, axis.field)
+  const secondaryItems = (subset: Row[]): Row[][] =>
+    secondary ? groups(selectRows(subset, secondary.cell, parameters), secondary.field) : [];
+  const blockWidth = secondary
+    ? 1 + (secondary.col - axis.col) +
+      Math.max(0, ...axisItems(axisRows).map(rows => secondaryItems(rows).length - 1))
+    : 1 + Math.max(0, ...nodes.filter(node => node.hParent).map(node => node.col - axis.col));
+  const globalAxis: AxisInstance[] = axisItems(axisRows)
     .map((group, index) => ({ value: group[0]![axis.field], rows: group, col: axis.col + index * blockWidth }));
-  const axisInstances = (subset: Row[]): AxisInstance[] => groups(selectRows(subset, axis.cell, parameters), axis.field)
+  const axisInstances = (subset: Row[]): AxisInstance[] => axisItems(selectRows(subset, axis.cell, parameters))
     .map((group, index) => ({ value: group[0]![axis.field], rows: group, col: axis.col + index * blockWidth }));
+  const sInstances: AxisInstance[] = secondary ? globalAxis.flatMap(instance =>
+    secondaryItems(instance.rows).map((rows, index) => ({ value: rows[0]![secondary.field], rows,
+      col: instance.col + (secondary.col - axis.col) + index }))) : [];
   const cells: AxisCell[] = [];
   if (!axis.vParent) {
     for (const instance of globalAxis) cells.push({ row: axis.row, col: instance.col, rowCount: 1, colCount: 1, extent: 1,
       colExtent: blockWidth,
       value: instance.value, source: axis.cell, from: [axis.row, axis.col] });
+    for (const item of sInstances) cells.push({ row: axis.row, col: item.col, rowCount: 1, colCount: 1, extent: 1,
+      colExtent: 1, value: item.value, source: secondary!.cell, from: [secondary!.row, secondary!.col] });
   }
 
   let cursor = 0;
+  const subBandRows = new Map<Node, number>();
   function visit(node: Node, subset: Row[]): void {
     const selected = selectRows(subset, node.cell, parameters);
     const instances = node.cell.type === 'List' ? selected.map(row => [row]) : groups(selected, node.field);
     if (!instances.length) { cursor++; return; }
     for (const instance of instances) {
       const start = cursor;
-      const below = node.children.filter(child => !child.axis && child.cell.type !== 'Summary');
+      const below = node.children.filter(child => !child.axis && child.cell.type !== 'Summary' && !child.hParent);
       let end = start + 1;
       for (const child of below) {
         cursor = start + Math.max(0, child.row - node.row);
@@ -193,8 +257,15 @@ export function expandAxes(entries: Entry[], dataRows: Row[], parameters: Row = 
       cells.push({ row: start, col: node.col, rowCount: end - start > 1 && below.some(child => child.row === node.row)
         ? end - start : 1, colCount: 1, extent: depth, colExtent: 1, value: instance[0]![node.field],
         source: node.cell, from: [node.row, node.col] });
-      if (block) for (const item of block) cells.push({ row: start + Math.max(0, axis.row - node.row), col: item.col,
-        rowCount: 1, colCount: 1, extent: depth, colExtent: blockWidth, value: item.value, source: axis.cell, from: [axis.row, axis.col] });
+      if (block) for (const item of block) {
+        cells.push({ row: start + Math.max(0, axis.row - node.row), col: item.col,
+          rowCount: 1, colCount: 1, extent: depth, colExtent: blockWidth, value: item.value, source: axis.cell, from: [axis.row, axis.col] });
+        for (const child of axisChildren)
+          selectRows(item.rows, child.cell, parameters).forEach((record, index) => cells.push({
+            row: start + Math.max(0, axis.row - node.row), col: item.col + (child.col - axis.col) + index,
+            rowCount: 1, colCount: 1, extent: depth, colExtent: 1, value: record[child.field],
+            source: child.cell, from: [child.row, child.col] }));
+      }
       for (const summary of node.children.filter(child => child.cell.type === 'Summary')) {
         const row = start + Math.max(0, summary.row - node.row);
         const selected = selectRows(instance, summary.cell, parameters);
@@ -219,6 +290,45 @@ export function expandAxes(entries: Entry[], dataRows: Row[], parameters: Row = 
           extent: depth, value: aggregate(item.rows, summary.field, summary.cell.aggregate),
           source: summary.cell, from: [summary.row, summary.col], phantoms });
       }
+      // A `List`/`Group` bound to the axis (TASK 96 probes `d4-list-both-axes`,
+      // `v10-groups-different-tables`): paired per (row instance, axis instance); on the
+      // independent axis only the instance owning its template column is laid out, on a
+      // nested axis every instance column of the block is.
+      for (const pairNode of node.children.filter(child => child.hParent && child.cell.type !== 'Summary')) {
+        const hp = pairNode.hParent!;
+        const row = start + Math.max(0, pairNode.row - node.row);
+        const selected = selectRows(instance, pairNode.cell, parameters);
+        // A second axis-bound cell under a pair Group (TASK 96 probe `d5-group-both-axes`):
+        // its records interleave as one row per row-instance band across all axis columns,
+        // packed right below the blocks, and the pair Group drawn after it wins its own cell.
+        for (const sub of pairNode.children.filter(child => !child.axis && child.cell.type !== 'Summary' && child.hParent)) {
+          const bandRow = subBandRows.get(sub) ?? roots[0]!.row + (sub.row - roots[0]!.row);
+          subBandRows.set(sub, bandRow + 1);
+          for (const item of block ?? globalAxis)
+            selectRows(instance, sub.cell, parameters)
+              .filter(data => Object.is(data[axis.field], item.value))
+              .forEach((record, index) => cells.push({ row: bandRow + index, col: item.col + (sub.col - axis.col),
+                rowCount: 1, colCount: 1, colExtent: 1, extent: 1, value: record[sub.field], source: sub.cell,
+                from: [sub.row, sub.col] }));
+        }
+        const axisList = hp === axis ? block ?? globalAxis : sInstances;
+        if (!axisList.length) continue;
+        const ownIndex = Math.max(0, Math.min(axisList.length - 1, hp === axis
+          ? Math.floor((pairNode.col - axis.col) / blockWidth)
+          : axisList.findIndex(item => item.col === pairNode.col)));
+        const inAxisBand = !axis.vParent && pairNode.col >= axis.col;
+        const items = axisList.map(item => ({ ...item, col: inAxisBand ? pairNode.col : item.col + (pairNode.col - hp.col),
+          rows: selected.filter(data => Object.is(data[hp.field], item.value)) }));
+        const laidOut = inAxisBand ? [items[ownIndex]!] : items;
+        const phantomValues = pairValues(pairNode, laidOut.length === items.length ? [] :
+          items.filter(item => !laidOut.includes(item)).flatMap(item => item.rows));
+        for (const item of laidOut)
+          pairValues(pairNode, item.rows).forEach((value, index) => cells.push({ row: row + index, col: item.col,
+            rowCount: 1, colCount: 1, colExtent: 1, extent: depth, value, source: pairNode.cell,
+            from: [pairNode.row, pairNode.col],
+            phantoms: index === 0 && phantomValues.length
+              ? phantomValues.map(value => ({ value, rowCount: 0, colCount: 1 })) : undefined }));
+      }
     }
   }
   cursor = roots[0]!.row;
@@ -241,7 +351,9 @@ export function expandAxes(entries: Entry[], dataRows: Row[], parameters: Row = 
   }
   return {
     cells,
-    height: Math.max(axis.row + 1, ...cells.map(cell => cell.row + cell.rowCount)),
+    // `cursor` is the row after the last block of the row tree: blocks reserve their full
+    // depth even when their last rows hold no value (TASK 96 probe `v9-two-horizontal-groups`).
+    height: Math.max(axis.row + 1, cursor, ...cells.map(cell => cell.row + cell.rowCount)),
     width: Math.max(axis.col + globalAxis.length * blockWidth, ...cells.map(cell => cell.col + cell.colCount)),
   };
 }

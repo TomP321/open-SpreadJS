@@ -7,6 +7,7 @@ import type { DesignerApi as Designer } from './designer-api.js';
 import { TemplateNames } from './names-generated.js';
 import { activeRanges, activeSheet, topCell } from './commands/actions.js';
 import { cellTypesNamespace, internals } from './core-internals.js';
+import { messageText } from './resolve.js';
 import {
   applySettings, namedPatternEdits, readSettings, settingsTabForCommand, sheetSettingTabs, spreadSettingTabs,
   userCustomLists, workbookSettingsOwner, worksheetSettingsOwner, type SettingValue,
@@ -30,7 +31,7 @@ export function showProtectSheet(d: Designer): void {
       d.showConfirmPassword((confirmed) => {
         if (confirmed === null) return;
         if (confirmed !== password) {
-          d.showMessageBox('Confirmation password is not identical.', 'SpreadJS Designer', 3);
+          d.showMessageBox(messageText(d, 'confirmPasswordMismatch', 'Confirmation password is not identical.'), 'SpreadJS Designer', 3);
           return;
         }
         applySheetProtection(d, data, password);
@@ -62,7 +63,7 @@ export function showUnprotectSheet(d: Designer): void {
   const sheet = activeSheet(d);
   d.showDialog(TemplateNames.UnprotectSheetDialogTemplate ?? 'unprotectSheetDialogTemplate', { password: '' }, (data) => {
     if (sheet.unprotect(String(data.password ?? ''))) { d.invalidate(); return; }
-    d.showMessageBox('The password you supplied is not correct. Verify that the CAPS LOCK key is off and be sure to use the correct capitalization.', 'SpreadJS Designer', 3);
+    d.showMessageBox(messageText(d, 'wrongPassword', 'The password you supplied is not correct. Verify that the CAPS LOCK key is off and be sure to use the correct capitalization.'), 'SpreadJS Designer', 3);
   });
 }
 /**
@@ -74,7 +75,7 @@ export function showProtectWorkbook(d: Designer): void {
   if (d._structureProtection.protected) {
     d.showDialog('protectWorkbookDialog', { password: '', structure: true, windows: false }, (data) => {
       if (String(data.password ?? '') !== d._structureProtection.password) {
-        d.showMessageBox('The password you supplied is not correct. Verify that the CAPS LOCK key is off and be sure to use the correct capitalization.', 'SpreadJS Designer', 3);
+        d.showMessageBox(messageText(d, 'wrongPassword', 'The password you supplied is not correct. Verify that the CAPS LOCK key is off and be sure to use the correct capitalization.'), 'SpreadJS Designer', 3);
         return;
       }
       d._structureProtection = { protected: false, password: '' };
@@ -97,11 +98,19 @@ export function clearSelectionCellType(d: Designer): void {
         internals(sheet)._setStyleProperty(row, col, 'cellType', null);
   d.invalidate();
 }
-/** Gallery names of the Cell Types dropdown that map to a core cell type (the rest of the
- * trial's gallery lives in the cell-editors add-in). */
+/** Gallery names of the Cell Types dropdown that map to a core cell type.
+ *  TASK 93: the d.ts contract lists CheckBoxList/RadioButtonList/ButtonList/
+ *  Diagonal/DataObject/RangeTemplate as core `CellTypes` classes (implemented in
+ *  the core long ago), so the whole "Cell Types" gallery applies real types now.
+ *  Only the "Cell Dropdowns" gallery (calculator/color picker/date-time picker/
+ *  list/month picker/slider/time picker/workflow/multi-column) lives in the
+ *  cell-editors add-in package, which no drop-in app loads. */
 const GALLERY_CELL_TYPES: Record<string, string> = {
   checkboxCellType: 'CheckBox', ribbonButtonButtonCellType: 'Button', comboBoxCellType: 'ComboBox',
-  hyperlinkCellType: 'HyperLink', fileUploadCellType: 'FileName',
+  hyperlinkCellType: 'HyperLink', fileUploadCellType: 'FileUpload',
+  rangeTemplateCellType: 'RangeTemplate', dataObjectCellType: 'DataObject',
+  diagonalCellType: 'Diagonal', checkboxListCellType: 'CheckBoxList',
+  radioListCellType: 'RadioButtonList', buttonListCellType: 'ButtonList',
 };
 /** Ribbon path of the Cell Types gallery (TASK 75): inserts the type over the selection;
  * types from the cell-editors add-in keep the M6b notice. */
@@ -110,7 +119,7 @@ export function applySelectionCellType(d: Designer, commandName: string): void {
   const cellTypes = cellTypesNamespace(d.gc);
   const CellTypeCtor = className ? cellTypes[className] : undefined;
   if (typeof CellTypeCtor !== 'function') {
-    d.showMessageBox(`NotImplemented: ${commandName} requires the cell editors add-in.`, 'SpreadJS Designer', 1);
+    d.showMessageBox(messageText(d, 'cellEditorsAddin', `NotImplemented: {0} requires the cell editors add-in.`, [commandName]), 'SpreadJS Designer', 1);
     return;
   }
   const sheet = activeSheet(d);
@@ -340,6 +349,6 @@ export function pickWorksheetBackground(d: Designer): void {
 /** Returns false (and explains why) while structure protection blocks sheet lifecycle edits. */
 export function ensureStructureEditable(d: Designer): boolean {
   if (!d._structureProtection?.protected) return true;
-  d.showMessageBox('The workbook structure is protected. Unprotect the workbook to add, delete, rename, move or hide sheets.', 'SpreadJS Designer', 2);
+  d.showMessageBox(messageText(d, 'structureProtected', 'The workbook structure is protected. Unprotect the workbook to add, delete, rename, move or hide sheets.'), 'SpreadJS Designer', 2);
   return false;
 }

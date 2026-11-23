@@ -11,6 +11,93 @@
  */
 
 import { functionCatalog } from '@mescius/spread-sheets/dist/gc.spread.sheets.internals.js';
+import type { LanguagePackage } from '@mescius/spread-sheets/dist/gc.spread.sheets.internals.js';
+import { designerCore } from './core-internals.js';
+import { getPath, getResources } from './resolve.js';
+const fc = (key: string): string => `\${res.ribbon.functionCategories.${key}}`;
+
+/* ---------------------------------------------------------------------------
+ * TASK 89: localization of the function UI through the active calc language
+ * package. The data (category lists, dialog state, command names) stays
+ * canonical English; only display names, argument separators and descriptions
+ * follow the package, so everything round-trips through the engine unchanged.
+ * The live registry lives in the core bundle, so the package object is read
+ * from `GC.Spread.CalcEngine.LanguagePackages._activeLanguagePackage()`.
+ * ------------------------------------------------------------------------- */
+
+/** View of the core's hidden language-package accessors (our extension of the d.ts surface). */
+interface LanguagePackagesAccess {
+  _activeLanguagePackage?: () => LanguagePackage | undefined;
+  _addDescriptions?: (languageName: string, descriptions: Record<string, string>) => boolean;
+}
+
+function languagePackagesAccess(): LanguagePackagesAccess | undefined {
+  const calcEngine = designerCore()?.Spread?.CalcEngine as { LanguagePackages?: LanguagePackagesAccess } | undefined;
+  return calcEngine?.LanguagePackages;
+}
+
+/** The active calc language package (undefined = plain English). */
+export function activeCalcLanguage(): LanguagePackage | undefined {
+  const language = languagePackagesAccess()?._activeLanguagePackage?.();
+  if (language) syncCalcLanguageDescriptions(language);
+  return language;
+}
+
+/** The resource subtree each package's descriptions were last filled from (changed subtree re-syncs). */
+const syncedDescriptions = new WeakMap<LanguagePackage, object>();
+
+/**
+ * The autocomplete popup renders inside the CORE, so the loaded resource language's
+ * `functionDescriptions` subtree must be merged into the active calc language package once —
+ * through the core's own `_addDescriptions` accessor, which keeps everything in the core
+ * bundle's live registry (importing the mutator value here would inline a SECOND registry).
+ * Resource keys spell dots as underscores (`STDEV_P`); only names that the catalog really
+ * writes with a dot are reversed, so genuine underscore names (`BC_CODABAR`) survive untouched.
+ */
+export function syncCalcLanguageDescriptions(language: LanguagePackage): void {
+  const subtree = getPath(getResources(), 'functionDescriptions');
+  if (!subtree || typeof subtree !== 'object') return;
+  if (syncedDescriptions.get(language) === subtree) return;
+  syncedDescriptions.set(language, subtree);
+  const dotted = new Map<string, string>();
+  for (const key of Object.keys(functionCatalog)) {
+    const under = key.replace(/\./g, '_');
+    if (under !== key) dotted.set(under, key);
+  }
+  const map: Record<string, string> = {};
+  for (const [key, text] of Object.entries(subtree as Record<string, unknown>)) {
+    if (typeof text !== 'string' || text === '') continue;
+    map[dotted.get(key) ?? key] = text;
+  }
+  languagePackagesAccess()?._addDescriptions?.(language.languageName, map);
+}
+
+/** Eager entry point used at Designer startup (no-op while no package is active). */
+export function syncCalcLanguageDescriptionsForActivePackage(): void {
+  activeCalcLanguage();
+}
+
+/** The name a gallery/dialog shows and inserts (`SUM` -> `SOMMA` under `it`). */
+export function functionDisplayName(name: string, language = activeCalcLanguage()): string {
+  return (language?.englishToFunction(name) ?? name).toUpperCase();
+}
+
+/** The character that separates arguments in the active grammar (`,` or `;`). */
+export function functionListSeparator(language = activeCalcLanguage()): string {
+  return language?.listSeparator ?? ',';
+}
+
+/**
+ * Localized one-line description: the loaded resource language's
+ * `functionDescriptions.<NAME>` subtree (Italian strings ship with
+ * `-designer-resources-it`) wins; the English catalog is the fallback.
+ * Dots in function names (`STDEV.P`) become underscores in the resource keys,
+ * because the resource tree addresses leaves by dotted paths.
+ */
+export function functionDescriptionLocalized(resources: unknown, name: string): string {
+  const found = getPath(resources, `functionDescriptions.${name.replace(/\./g, '_')}`);
+  return typeof found === 'string' && found !== '' ? found : functionDescription(name);
+}
 
 /** Categories of the Insert Function dialog, in the trial's order. */
 export const functionCategories: string[] = [
@@ -22,6 +109,24 @@ export const functionCategories: string[] = [
 export const recommendedCategory = 'Recommended';
 /** The dialog's "everything" category. */
 export const allCategory = 'All';
+
+/**
+ * TASK 87: display labels for the (data-bearing, English) category names through
+ * the `ribbon.functionCategories` resource subtree, so a language package relabels
+ * the Insert Function dialog and the Formulas tab galleries without touching keys.
+ */
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+  All: 'all', Recommended: 'recommended', Database: 'database', 'Date and Time': 'dateTime',
+  Engineering: 'engineering', Financial: 'financial', Information: 'information', Logical: 'logical',
+  'Lookup and Reference': 'lookupReference', 'Math and Trigonometry': 'mathTrig',
+  Statistical: 'statistical', Text: 'text', Web: 'web',
+};
+export function functionCategoryDisplay(resources: unknown, category: string): string {
+  const key = CATEGORY_LABEL_KEYS[category];
+  if (!key) return category;
+  const found = getPath(resources, `ribbon.functionCategories.${key}`);
+  return typeof found === 'string' && found !== '' ? found : category;
+}
 
 /**
  * Functions the Formulas tab galleries leave out although the Insert Function
@@ -36,21 +141,21 @@ export const ribbonHiddenFunctions: string[] = [
 
 /** Gallery of a Formulas tab button: ribbon command name to dialog category. */
 export const ribbonCategories: { command: string; category: string; label: string }[] = [
-  { command: 'formulaFinancial', category: 'Financial', label: 'Financial' },
-  { command: 'logicalFormula', category: 'Logical', label: 'Logical' },
-  { command: 'formulaText', category: 'Text', label: 'Text' },
-  { command: 'formulaDateTime', category: 'Date and Time', label: 'Date & Time' },
-  { command: 'formulaLookupReference', category: 'Lookup and Reference', label: 'Lookup & Reference' },
-  { command: 'formulaMathTrig', category: 'Math and Trigonometry', label: 'Math & Trig' },
+  { command: 'formulaFinancial', category: 'Financial', label: fc('financial') },
+  { command: 'logicalFormula', category: 'Logical', label: fc('logical') },
+  { command: 'formulaText', category: 'Text', label: fc('text') },
+  { command: 'formulaDateTime', category: 'Date and Time', label: fc('dateTime') },
+  { command: 'formulaLookupReference', category: 'Lookup and Reference', label: fc('lookupReference') },
+  { command: 'formulaMathTrig', category: 'Math and Trigonometry', label: fc('mathTrig') },
 ];
 
 /** Categories behind the Formulas tab's More Functions gallery. */
 export const moreFunctionCategories: { command: string; category: string; label: string }[] = [
-  { command: 'formulaStatistical', category: 'Statistical', label: 'Statistical' },
-  { command: 'formulaEngineering', category: 'Engineering', label: 'Engineering' },
-  { command: 'formulaInformation', category: 'Information', label: 'Information' },
-  { command: 'formulaDatabase', category: 'Database', label: 'Database' },
-  { command: 'formulaWeb', category: 'Web', label: 'Web' },
+  { command: 'formulaStatistical', category: 'Statistical', label: fc('statistical') },
+  { command: 'formulaEngineering', category: 'Engineering', label: fc('engineering') },
+  { command: 'formulaInformation', category: 'Information', label: fc('information') },
+  { command: 'formulaDatabase', category: 'Database', label: fc('database') },
+  { command: 'formulaWeb', category: 'Web', label: fc('web') },
 ];
 
 /** Every command that opens a function gallery, mapped to its dialog category. */
@@ -380,13 +485,15 @@ export function ribbonFunctions(category: string): string[] {
 export function searchFunctions(search: string): string[] {
   const needle = String(search ?? '').trim().toLowerCase();
   if (!needle) return [...allFunctions];
+  const language = activeCalcLanguage();
   const prefix: string[] = [];
   const inside: string[] = [];
   const described: string[] = [];
   for (const name of allFunctions) {
     const lower = name.toLowerCase();
-    if (lower.startsWith(needle)) prefix.push(name);
-    else if (lower.includes(needle)) inside.push(name);
+    const localized = language ? (language.englishToFunction(name) ?? name).toLowerCase() : lower;
+    if (lower.startsWith(needle) || localized.startsWith(needle)) prefix.push(name);
+    else if (lower.includes(needle) || localized.includes(needle)) inside.push(name);
     else if ((functionCatalog[name]?.description ?? '').toLowerCase().includes(needle)) described.push(name);
   }
   return [...prefix, ...inside, ...described];
@@ -436,19 +543,23 @@ export function functionDescription(name: string): string {
   return functionCatalog[name]?.description ?? '';
 }
 
-/** Signature line, for example `ABS(number)`: optional markers are dropped. */
+/**
+ * Signature line, for example `ABS(number)` or `ASS(numero)`: optional markers are
+ * dropped; the name and separators follow the active calc language package.
+ */
 export function functionSignature(name: string): string {
   const parameters = functionParameters(name)
     .map((parameter) => parameter.replace(/^\[|\]$/g, ''))
     .filter((parameter) => parameter && parameter !== '...');
-  return `${name}(${parameters.join(',')})`;
+  return `${functionDisplayName(name)}(${parameters.join(functionListSeparator())})`;
 }
 
 /**
  * Preview line of the Function Arguments dialog: only the filled arguments are
- * shown, without the `=` the trial puts in front of every field.
+ * shown, without the `=` the trial puts in front of every field. The name and
+ * the separator follow the active calc language package (TASK 89).
  */
 export function formulaFromArguments(name: string, args: (string | undefined)[]): string {
   const values = args.map((value) => String(value ?? '').replace(/^=/, '').trim()).filter((value) => value.length > 0);
-  return `${name}(${values.join(',')})`;
+  return `${functionDisplayName(name)}(${values.join(functionListSeparator())})`;
 }

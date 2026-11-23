@@ -58,8 +58,42 @@ export function themeToCss(theme: ITheme): Record<string, string> {
   return out;
 }
 
+/**
+ * TASK 87: sanitized resource key for a UI string (identical algorithm to the
+ * migration scripts that generated the English values).
+ */
+export function uiKey(text: string): string {
+  let out = text.replace(/[^A-Za-z0-9]+(.)/g, (_m, c: string) => c.toUpperCase()).replace(/[^A-Za-z0-9]/g, '');
+  out = out.charAt(0).toLowerCase() + out.slice(1);
+  return /^[0-9]/.test(out) ? `n${out}` : out;
+}
+
+/** Display text for a value that doubles as DATA (shape names, style payloads…):
+ *  looks up `<subtree>.<uiKey(text)>` and falls back to the raw value. */
+export function localizedText(resources: unknown, text: string, subtree: string): string {
+  if (!text) return text;
+  const found = getPath(resources, `${subtree}.${uiKey(text)}`);
+  return typeof found === 'string' ? found : text;
+}
+
 export function cssName(key: string): string {
   if (key.startsWith('borderRadius')) return `--sjs-border-radius-${key.slice('borderRadius'.length).toLowerCase()}`;
   if (key.startsWith('shadow')) return `--sjs-shadow-${key.slice('shadow'.length)}`;
   return `--sjs-${key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`;
+}
+
+/**
+ * TASK 87: message-box text resolved from the `messages` subtree of the loaded
+ * resources; `{0}`-style slots are filled from `args`, and the English fallback
+ * keeps today's wording when a language package has no entry.
+ */
+export function messageText(
+  designer: { resources?: Record<string, unknown> } | undefined,
+  key: string,
+  fallback: string,
+  args: (string | number)[] = [],
+): string {
+  let text = resolveText(`\${res.messages.${key}}`, designer?.resources) || fallback;
+  args.forEach((value, index) => { text = text.split(`{${index}}`).join(String(value)); });
+  return text;
 }

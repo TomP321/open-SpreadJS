@@ -70,7 +70,9 @@ import worksheetDefaults from './worksheet-defaults.json';
 import { type AreaData, type CellData, type DirtyCell, type LiveWorkbookOptions, type SerializationOptions, type WorksheetOptions, Batching, coordinate } from './sheet-common.js';
 import { worksheetFromJSON, worksheetToJSON } from './sheet-serialization.js';
 import { _arrayFormula, _attach, _autoExpandTables, area as areaImpl, _defaultSheetSettings, _defaultsProxy, _fastValue, _flushPaint, _getFormula, _getValue, _invalidatingProxy, _isEditableCell, _isFreshHyperlink, _isSelectableCell, _onInvalidate, _resumeWorkbookCalc, _setCalculatedValue, _setCalcEngine, _setValue, _setFormulaText, _tag, _translateFormula, _usedRange, _viewCellStore, a1Cell, addCustomFunction, addCustomName, addNamedStyle, axisChanged, axisInfo, bindColumns, cell, changed, clearCustomFunctions, clearCustomNames, clearPendingChanges, ensure, flushCalc, markDirty, prune, getArray, getCell, getCustomFunction, getCustomName, getDependents, getDirtyCells, getFormulaInformation, getHyperlink, getNamedStyle, getNamedStyles, getPrecedents, getRange, getSpan, getSpans, getText, hasPassword, hasPendingChanges, invalidateLayout, isDirty, isDirtySuspended, isPaintSuspended, loadBinding, name, getParent, protect, queueCalc, recalcAll, removeCustomFunction, removeCustomName, resumeCalcService, resumePaint, removeNamedStyle, repaint, rowFilter, setArray, setArrayFormula, setDataSource, setFormula, setHyperlink, setText, resumeDirty, suspendCalcService, suspendDirty, suspendPaint, unprotect } from './sheet-cells.js';
-import { _setDataValidator, _setStyleProperty, _setValidatorRecord, _tableStyleAt, fillStyleRecord, getActualStyle, getAltText, getBindingPath, getCellType, getDataValidator, getDefaultStyle, getDefaultValue, getFormatter, getStyle, getStyleName as getStyleNameImpl, getTag, isValid, setAltText, setCellType, setDefaultStyle, setDefaultValue, setFormatter, setStyle, setStyleName, setTag } from './sheet-styles.js';
+import { _setDataValidator, _setStyleProperty, _setValidatorRecord, _tableStyleAt, _themeFontRaw, fillStyleRecord, getActualStyle, getAltText, getBindingPath, getCellType, getDataValidator, getDefaultStyle, getDefaultValue, getFormatter, getStyle, getStyleName as getStyleNameImpl, getTag, isValid, setAltText, setCellType, setDefaultStyle, setDefaultValue, setFormatter, setStyle, setStyleName, setTag } from './sheet-styles.js';
+import { getActiveCalcLanguagePackage } from './calc/language-packages.js';
+import { localizeFormulaText } from './calc/parser.js';
 import { addSpan, autoFitColumn, autoFitRow, axisMetadata, frozenColumnCount, frozenRowCount, frozenTrailingColumnCount, frozenTrailingRowCount, getCellRect, measureContext, removeSpan, setAxisMetadata, setDimension, _columnCount, _outlineGutters, _rowCount, _setColumnVisible, _setRowVisible } from './sheet-layout.js';
 import { _backgroundImageJSON, _clearPrintAreaName, _manualPageBreaks, _pageBreakIndices, _setPrintAreaRange, _themeFonts, _themePalette, _themeValue, backgroundImage, currentTheme, getBackgroundImageInfo, getColumnPageBreak, getRowPageBreak, isPrintLineVisible, printInfo, setColumnPageBreak, setRowPageBreak, showColumnOutline, showRowOutline, tabColor, visible, zoom } from './sheet-print.js';
 import { _clipboardMode, _clipboardSource, _setUserSelections, addSelection, clearSelection, getActiveColumnIndex, getActiveRowIndex, getSelections, setActiveCell, setSelection, updateSelections } from './sheet-selection.js';
@@ -299,11 +301,26 @@ export class Worksheet {
     setText(this, row, col, value, area);
   }
   getFormula(row: number, col: number, area = VIEW): string | null {
+    const raw = _getFormula(this, row, col, area);
+    if (raw === null) return raw;
+    // TASK 89: with an active calc language package this is the localized DISPLAY form
+    // (editor/formula bar/showFormulas read it); storage, toJSON and XLSX stay canonical.
+    const language = getActiveCalcLanguagePackage();
+    if (!language) return raw;
+    return localizeFormulaText(raw, language, this.calcEngine?.isR1C1?.() ?? false);
+  }
+  /** The cell's STORED canonical (English) formula — internal machinery, never display text. */
+  _getFormula(row: number, col: number, area = VIEW): string | null {
     return _getFormula(this, row, col, area);
   }
   setFormula(row: number, col: number, value: string | null, area = VIEW): void {
     if (this._collabRecord) this.parent?.collaboration?._recordValue(this.name(), row, col, value);
     setFormula(this, row, col, value, area);
+  }
+  /** Internal write of STORED canonical text (bypasses the localized user grammar). */
+  _setFormula(row: number, col: number, value: string | null, area = VIEW): void {
+    if (this._collabRecord) this.parent?.collaboration?._recordValue(this.name(), row, col, value);
+    setFormula(this, row, col, value, area, true);
   }
   _setCalcEngine(engine?: ICalcEngine): void {
     _setCalcEngine(this, engine);
@@ -434,6 +451,10 @@ export class Worksheet {
   }
   _setStyleProperty(row: number, col: number, property: string, value: unknown, area = VIEW): void {
     _setStyleProperty(this, row, col, property, value, area);
+  }
+  /** @internal Trial-parity raw themeFont walk for the `CellRange.themeFont()` getter (TASK 90). */
+  _themeFontRaw(row: number, col: number, area = VIEW): unknown {
+    return _themeFontRaw(this, row, col, area);
   }
   getFormatter(row: number, col: number, area = VIEW): unknown {
     return getFormatter(this, row, col, area);
@@ -945,10 +966,38 @@ export class Worksheet {
   showCell(row: number, col: number, verticalPosition = 3, horizontalPosition = 3): void { this._view()?.showCell(row, col, verticalPosition, horizontalPosition); }
   showRow(row: number, position = 0): void { this.showCell(row, this.getViewportLeftColumn(1), position, 3); }
   showColumn(col: number, position = 0): void { this.showCell(this.getViewportTopRow(1), col, 3, position); }
-  getViewportTopRow(_index: number): number { return this._view()?.rows.find(r => r.index >= this.frozenRowCount())?.index ?? 0; }
-  getViewportBottomRow(_index: number): number { return this._view()?.rows.filter(r => r.index < this.rows.count - this.frozenTrailingRowCount()).at(-1)?.index ?? 0; }
-  getViewportLeftColumn(_index: number): number { return this._view()?.cols.find(c => c.index >= this.frozenColumnCount())?.index ?? 0; }
-  getViewportRightColumn(_index: number): number { return this._view()?.cols.filter(c => c.index < this.cols.count - this.frozenTrailingColumnCount()).at(-1)?.index ?? 0; }
+  /* TASK 90 C (measured on the trial, `.probe/t90/viewport-r1.json` and `.probe/t90/viewport2-r1.json`
+   * with leading, trailing and no frozen panes): the viewport index addresses the frozen blocks —
+   * 0 is the leading block (top 0, bottom `frozenCount - 1`, empty `-1` when nothing is frozen
+   * there), 1 is the scrolling area, 2 is the trailing block (top `count - trailingCount`, bottom
+   * `count - 1`, and `count`/`count - 1` — an empty range — when there is no trailing freeze).
+   * Ours answered every index with the scrolling area, so `getViewportTopRow(0)` reported a scrolled
+   * position for the frozen block that cannot scroll (the frozen rows the user sees). */
+  private _frozenViewportRange(index: number, count: number, leading: number, trailing: number): [number, number] | undefined {
+    if (index === 0) return [0, leading - 1];
+    if (index >= 2) return [trailing > 0 ? count - trailing : count, count - 1];
+    return undefined;
+  }
+  getViewportTopRow(index: number): number {
+    const frozen = this._frozenViewportRange(index, this.rows.count, this.frozenRowCount(), this.frozenTrailingRowCount());
+    if (frozen) return frozen[0];
+    return this._view()?.rows.find(r => r.index >= this.frozenRowCount())?.index ?? 0;
+  }
+  getViewportBottomRow(index: number): number {
+    const frozen = this._frozenViewportRange(index, this.rows.count, this.frozenRowCount(), this.frozenTrailingRowCount());
+    if (frozen) return frozen[1];
+    return this._view()?.rows.filter(r => r.index < this.rows.count - this.frozenTrailingRowCount()).at(-1)?.index ?? 0;
+  }
+  getViewportLeftColumn(index: number): number {
+    const frozen = this._frozenViewportRange(index, this.cols.count, this.frozenColumnCount(), this.frozenTrailingColumnCount());
+    if (frozen) return frozen[0];
+    return this._view()?.cols.find(c => c.index >= this.frozenColumnCount())?.index ?? 0;
+  }
+  getViewportRightColumn(index: number): number {
+    const frozen = this._frozenViewportRange(index, this.cols.count, this.frozenColumnCount(), this.frozenTrailingColumnCount());
+    if (frozen) return frozen[1];
+    return this._view()?.cols.filter(c => c.index < this.cols.count - this.frozenTrailingColumnCount()).at(-1)?.index ?? 0;
+  }
   getViewportHeight(_index: number): number { const view = this._view(); return view ? view.viewHeight - view.headerHeight : 0; }
   getViewportWidth(_index: number): number { const view = this._view(); return view ? view.viewWidth - view.headerWidth : 0; }
   /**

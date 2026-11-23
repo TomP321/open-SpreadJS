@@ -5,6 +5,7 @@
  */
 import type { Worksheet } from '../../worksheet.js';
 import type { Table } from '../tables.js';
+import { ltext } from '../../localization.js';
 
 export interface ISlicerRangeConditional {
   min: number;
@@ -71,6 +72,8 @@ export const SLICER_ITEM_RIGHT = 15;
 export const SLICER_TEXT_INSET = 5;
 export const SLICER_BUTTON_RADIUS = 3;
 export const SLICER_BLANK_TEXT = '(blank)';
+/** Culture-localised label shown for empty slicer items (`slicer.*` namespace); the internal marker stays the English constant. */
+export const slicerBlankLabel = (): string => ltext('slicer.blank', SLICER_BLANK_TEXT);
 
 export interface SlicerItem {
   text: string;

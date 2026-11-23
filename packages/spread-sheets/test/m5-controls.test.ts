@@ -14,6 +14,14 @@ describe('M5 external controls', () => {
     expect(sheet.getValue(0, 0)).toBe(5); expect(sheet.getFormula(0, 0)).toBe('SUM(2,3)');
     workbook.undoManager().undo(); expect(sheet.getValue(0, 0)).toBeNull();
     sheet.setValue(2, 2, 'Hello'); sheet.setActiveCell(2, 2); box.refresh(); expect(box.text()).toBe('Hello');
+    // TASK 91: a selected formula cell shows the text WITH the leading `=` (the trial keeps it
+    // for a non-editing selection), an array formula gets the trial's `{=...}` braces, a plain
+    // number shows its General text.
+    sheet.setArrayFormula(3, 3, 2, 1, 'SUM(B2:B3)'); sheet.setActiveCell(3, 3); box.refresh();
+    expect(box.text()).toBe('{=SUM(B2:B3)}');
+    sheet.setActiveCell(5, 5); sheet.setFormula(5, 5, 'SUM(2,3)'); box.refresh(); expect(box.text()).toBe('=SUM(2,3)');
+    sheet.setValue(4, 4, 396.5); sheet.setFormatter(4, 4, new GC.Spread.Formatter.GeneralFormatter('#,##0.00'));
+    sheet.setActiveCell(4, 4); box.refresh(); expect(box.text(), 'the bar shows the General text, not the formatted one').toBe('396.5');
     box.destroy(); expect(host.children.length).toBe(0); expect(GC.Spread.Sheets.FormulaTextBox.findControl(host)).toBeUndefined(); host.remove();
   });
   it('navigates ranges from the name box and disposes its subscriptions', () => {
@@ -67,7 +75,10 @@ describe('M5 input masks', () => {
     expect(M.validatePattern('9')).toEqual({ success: false, message: 'No Restriction Can Be Entered' });
     M.namedPattern('phone', '000-000'); expect(M.getNamedPatterns()).toContainEqual({ name: 'phone', pattern: '000-000' });
     expect(applyMask('123456', { pattern: 'phone' })).toBe('123-456'); M.namedPattern('phone', null);
-    expect(M.namedPattern('phone')).toBeUndefined();
+    // Trial answer (TASK 100 probe .probe/t100, browser probe of the official core): after `null`
+    // removal the name is gone from `getNamedPatterns()` but `namedPattern(name)` reads back `null`.
+    expect(M.namedPattern('phone')).toBeNull();
+    expect(M.getNamedPatterns()).not.toContainEqual({ name: 'phone', pattern: '000-000' });
   });
   it('restricts input, applies letter case, literals and placeholders', () => {
     expect(applyMask('12x34', { pattern: '000-000' })).toBe('123-4__');

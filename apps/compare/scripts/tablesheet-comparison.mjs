@@ -44,6 +44,8 @@ const scenarios = [
   'trialWorkbookImport', 'trialSortedWorkbookImport', 'trialImportsOurWorkbook', 'trialImportsOurSortedWorkbook', 'sortedWorkbookJSON',
   'trialFilteredWorkbookImport', 'trialImportsOurFilteredWorkbook',
   'richJSONTrialImport', 'richJSONImportsOurWorkbook', 'richJSONShape',
+  // TASK 97 (TS-1): hierarchy + filter + sort combined JSON interchange.
+  'richJSONHierarchyTrialImport', 'richJSONHierarchyImportsOurWorkbook', 'richJSONHierarchyShape',
   // Print scenarios last: they load the trial's print add-on once (prototype-wide
   // extension) and must not perturb the other scenarios' trial behavior.
   'printInfo', 'tableSheetPageInfo',
@@ -296,6 +298,78 @@ for (const scenario of scenarios.filter(name => (!wanted || wanted.includes(name
             views: views.map(viewShape),
           };
         };
+        // TASK 97 (TS-1): hierarchy + filter + sort + pinned combined workbook builders
+        // for the trial<->ours JSON interchange scenarios (black-box, public API only).
+        const hierBuild = async sourceGC => {
+          const wb = new sourceGC.Spread.Sheets.Workbook(undefined, { sheetCount: 0 });
+          const data = Array.from({ length: 12 }, (_, i) => ({
+            id: i + 1, parentId: i >= 4 && i < 8 ? (i - 3) : null, level: i >= 4 && i < 8 ? 1 : 0,
+            name: `N${i + 1}`, city: i % 3 === 0 ? 'Paris' : 'Rome', score: (i + 1) * 5, order: i,
+          }));
+          const table = wb.dataManager().addTable('hier', { data, schema: {
+            hierarchy: { type: 'Parent', column: 'parentId' },
+            columns: { id: { isPrimaryKey: true }, parentId: {}, level: {}, name: {}, city: {}, score: {},
+              order: { dataType: 'rowOrder' } },
+          } });
+          const view = table.addView('hierV', [
+            { value: 'id', caption: 'ID', width: 80 },
+            { value: 'name', caption: 'Name', width: 130, outlineColumn: true },
+            { value: 'city', caption: 'City', width: 100 }, { value: 'score', caption: 'Score', width: 90 },
+            { value: 'order', caption: 'Order', width: 70 },
+          ]);
+          await view.fetch();
+          const sheet = wb.addSheetTab(0, 'Hier', sourceGC.Spread.Sheets.SheetType.tableSheet);
+          sheet.setDataView(view);
+          sheet.sort([{ field: 'score', ascending: false }]);
+          sheet.filter([{ field: 'city', values: [{ value: 'Rome' }] }]);
+          sheet.togglePinnedRows([1]);
+          await new Promise(r => setTimeout(r, 300));
+          const json = JSON.parse(JSON.stringify(wb.toJSON({ includeBindingSource: true })));
+          wb.destroy();
+          return json;
+        };
+        const hierState = async (targetGC, json) => {
+          const wb = new targetGC.Spread.Sheets.Workbook(undefined, { sheetCount: 0 });
+          await wb.fromJSON(json);
+          await new Promise(r => setTimeout(r, 300));
+          const tab = wb.getSheetTab?.('Hier') ?? wb.getSheetFromName?.('Hier');
+          const v = tab?.getDataView?.();
+          const out = {
+            rows: Array.from({ length: v?.visibleLength() ?? 0 }, (_, i) => v.getRowData(i)?.id),
+            sort: JSON.parse(JSON.stringify(tab?.sort?.() ?? null)),
+            filter: JSON.parse(JSON.stringify(tab?.filter?.() ?? null)),
+            rowCount: tab?.getRowCount?.() ?? null,
+            columnCount: tab?.getColumnCount?.() ?? null,
+            pinnedRows: wb.toJSON(true).dataManager?.tables?.[0]?.views?.[0]?.pinnedRows ?? null,
+          };
+          wb.destroy();
+          return out;
+        };
+        const hierDigest = json => {
+          const sheetTab = json.sheetTabs?.Hier ?? {};
+          const table = json.dataManager?.tables?.[0] ?? {};
+          const view = table.views?.[0] ?? {};
+          return {
+            sheetKeys: Object.keys(sheetTab).sort(),
+            rowFilterKeys: Object.keys(sheetTab.rowFilter ?? {}).sort(),
+            sortMap: sheetTab.rowFilter?.sortMap ?? null,
+            multiSortOrder: sheetTab.rowFilter?.multiSortOrder ?? null,
+            filteredOutRows: sheetTab.rowFilter?.filteredOutRows ?? null,
+            additionKeys: Object.keys(sheetTab.addition ?? {}).sort(),
+            additionRowFilter: sheetTab.addition?.rowFilter ?? null,
+            schemaKeys: Object.keys(table.schema ?? {}).sort(),
+            hierarchy: table.schema?.hierarchy ?? null,
+            columnKeys: Object.keys(table.columns ?? {}).sort(),
+            viewKeys: Object.keys(view).sort(),
+            viewColumns: (view.columns ?? []).map(c => String(c.value ?? c.name ?? '')
+              + (c.outlineColumn ? '(outline)' : '') + (c.visible === false ? '(hid)' : '')),
+            columnIndexMap: view.columnIndexMap ?? null,
+            pinnedRows: view.pinnedRows ?? null,
+            pinnedColumns: view.pinnedColumns ?? null,
+            sortInfo: view.sortInfo ?? null,
+            filterInfo: view.filterInfo ?? null,
+          };
+        };
         const loadPrintAddon = async () => {
           if (kind !== 'official' || window.__printAddon) return;
           // The trial print pipeline is an add-on extending the global GC namespace.
@@ -461,6 +535,15 @@ for (const scenario of scenarios.filter(name => (!wanted || wanted.includes(name
             return { loaded: await richState(GC, json) };
           },
           richJSONShape: async () => ({ kindJson: richDigest(await richBuild(GC)) }),
+          richJSONHierarchyTrialImport: async () => {
+            const json = await hierBuild(window.dataManagerLibraries.official);
+            return { loaded: await hierState(GC, json) };
+          },
+          richJSONHierarchyImportsOurWorkbook: async () => {
+            const json = await hierBuild(window.dataManagerLibraries.ours);
+            return { loaded: await hierState(GC, json) };
+          },
+          richJSONHierarchyShape: async () => ({ kindJson: hierDigest(await hierBuild(GC)) }),
           // TASK 49 item 3: TableSheet print pagination rectangles through Workbook.pageInfo.
           tableSheetPageInfo: async () => {
             await loadPrintAddon();

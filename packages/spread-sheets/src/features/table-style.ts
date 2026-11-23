@@ -320,14 +320,16 @@ for (const name of THEME_NAMES) {
   const theme = new TableTheme(data);
   Object.defineProperty(TableThemes, name, { enumerable: true, value: theme, writable: true });
 }
-// The trial carries the 24 `professional` themes as real (non-enumerable)
-// theme objects (probe f40b-professional-full: `professional1` is a TableTheme
-// with `name`, `headerRowStyle` and `wholeTableStyle`).
+// TASK 97 CH-2: the trial exposes all 24 `professional` themes as real theme objects
+// AND lists them in `Object.keys(TableThemes)` after the 60 light/dark/medium entries
+// (indices 60..83; re-probed black-box in .probe/tablesheet-comparison runs 2026-11-23 —
+// the older probe f40b-professional-full claim of non-enumerability was wrong).
+// `professional25` and beyond stay undefined on both sides.
 for (let i = 1; i <= 24; i++) {
   const name = `professional${i}`;
   const data = TABLE_THEME_JSON[name];
   if (!data) continue;
-  Object.defineProperty(TableThemes, name, { enumerable: false, value: new TableTheme(data), writable: true });
+  Object.defineProperty(TableThemes, name, { enumerable: true, value: new TableTheme(data), writable: true });
 }
 
 export function themeByName(name: string): TableTheme | undefined {

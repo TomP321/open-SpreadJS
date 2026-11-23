@@ -11,9 +11,14 @@ import { DesignerIcon } from '../icons.js';
 import { cellStyleGroups, customCellStyles, formatList } from '../commands/actions.js';
 import { currentPaperName } from '../designer-state.js';
 import { MARGIN_PRESETS, PAPER_ITEMS } from '../page-setup.js';
-import { functionGalleryCategories, moreFunctionCategories, ribbonFunctions } from '../function-library.js';
+import { functionCategoryDisplay, functionDisplayName, functionGalleryCategories, moreFunctionCategories, ribbonFunctions } from '../function-library.js';
 import { FormControlGalleryMenu, ShapeGalleryMenu, SparklineGalleryMenu } from '../insert-ui.js';
 import { commandOf, commandText, commandTitle, currentRibbon, resource } from '../app-helpers.js';
+import { localizedText, resolveText, uiKey } from '../resolve.js';
+import { ribbonGroupLabelResources } from './label-resources.js';
+
+
+/** TASK 87: labels rendered inside ribbon popups (`ribbon.menus` subtree). */
 import { colorSwatches } from './colors.js';
 import { ConfigNode, GroupFlyoutContext, groupItems, nodeKey, ShapeStyleTileControl } from './controls.js';
 import { dismissRibbonMenu } from './menu-dismissal.js';
@@ -31,6 +36,8 @@ const submenuWidths: Record<string, number> = { highlightCellsRules: 169.06, top
  *  the five category rows of the Conditional Formatting menu). */
 const LARGE_ICON_SUBMENU_ITEMS = new Set(['highlightCellsRules', 'topBottomRules', 'dataBar', 'colorScalesList', 'iconSetList', 'cellType', 'cellDropdowns']);
 
+const mk = (key: string): string => `\${res.ribbon.menus.${key}}`;
+const mt = (designer: Designer, key: string, en: string): string => resolveText(mk(key), designer.resources) || en;
 export function RibbonMenu(): React.ReactElement | null {
   const d = useDesigner();
   useDesignerVersion();
@@ -194,14 +201,14 @@ function ShapeSizeMenu(): React.ReactElement {
     </div>
   );
   return (
-    <div className="gc-shape-size-menu" role="group" aria-label="Size">
-      {field('Height', 'height', height, setHeight)}
-      {field('Width', 'width', width, setWidth)}
+    <div className="gc-shape-size-menu" role="group" aria-label={mt(d, 'size', 'Size')}>
+      {field(mt(d, 'height', 'Height'), 'height', height, setHeight)}
+      {field(mt(d, 'width', 'Width'), 'width', width, setWidth)}
       <div className="gc-shape-size-lock" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px' }}>
-        <input type="checkbox" checked={lock} onChange={(event) => setLock(event.target.checked)} aria-label="Lock aspect ratio" />
-        <span>Lock aspect ratio</span>
+        <input type="checkbox" checked={lock} onChange={(event) => setLock(event.target.checked)} aria-label={mt(d, 'lockAspect', 'Lock aspect ratio')} />
+        <span>{mt(d, 'lockAspect', 'Lock aspect ratio')}</span>
       </div>
-      <div className="gc-designer-ribbon-dropdown-group-title" style={{ textAlign: 'center', padding: '2px 8px 6px' }}>Size</div>
+      <div className="gc-designer-ribbon-dropdown-group-title" style={{ textAlign: 'center', padding: '2px 8px 6px' }}>{mt(d, 'size', 'Size')}</div>
     </div>
   );
 }
@@ -212,15 +219,19 @@ function GroupMenu({ command }: { command: string }): React.ReactElement {
   const label = labelParts.join(':');
   const group = findGroup(d, panelId, label);
   if (!group) return <div className="gc-designer-ribbon-menu-list" />;
+  const groupLabel = (en: string): string => {
+    const path = ribbonGroupLabelResources[en];
+    return (path ? resource(d, `\${res.${path}}`) : '') || en;
+  };
   const layout = groupItems(group);
   return (
-    <div className="gc-designer-group-dropdown" role="menu" aria-label={group.label}>
+    <div className="gc-designer-group-dropdown" role="menu" aria-label={groupLabel(group.label ?? group.buttonGroupName ?? '')}>
       <GroupFlyoutContext.Provider value={true}>
       <div className={`gc-designer-group-dropdown-content gc-designer-component-container gc-designer-flex-default${layout.direction === 'vertical' ? ' gc-designer-component-container-vertical' : ''}${layout.className ? ` ${layout.className}` : ''}`} data-direction={layout.direction}>
         {layout.items.map((item, index) => <ConfigNode key={nodeKey(item, index)} node={item} />)}
       </div>
       </GroupFlyoutContext.Provider>
-      <div className="gc-designer-group-dropdown-title">{group.label}</div>
+      <div className="gc-designer-group-dropdown-title">{groupLabel(group.label ?? group.buttonGroupName ?? '')}</div>
     </div>
   );
 }
@@ -232,6 +243,7 @@ function GroupMenu({ command }: { command: string }): React.ReactElement {
  * opens the Function Arguments dialog instead of typing into the cell.
  */
 function FunctionGalleryMenu({ command, left, top }: { command: string; left: number; top: number }): React.ReactElement | null {
+  const d = useDesigner();
   const wrap = (children: React.ReactNode, label: string): React.ReactElement => (
     <div className="gc-designer-root en gc-designer-ribbon-dropdown gc-designer-function-menu sd-fit-content" style={{ left, top, zIndex: 10000 }} role="menu" aria-label={label}>{children}</div>
   );
@@ -242,13 +254,13 @@ function FunctionGalleryMenu({ command, left, top }: { command: string; left: nu
         {moreFunctionCategories.map((entry) => (
           <div key={entry.command}
             className="gc-designer-ribbon-list-item-container gc-list-control-hassubitem gc-designer-function-category gc-designer-list-content-item-focusable"
-            role="menuitem" title={entry.label} aria-label={entry.label} data-command={`ribbon.${command}`} data-value={entry.category}
+            role="menuitem" title={resource(d, entry.label)} aria-label={resource(d, entry.label)} data-command={`ribbon.${command}`} data-value={entry.category}
             onMouseEnter={() => setHovered(entry.category)} onMouseLeave={() => setHovered((current) => (current === entry.category ? null : current))}>
             <div className="gc-designer-ribbon-list-item-left"><div className="gc-designer-ribbon-icon ribbon-button-insertfunction"><DesignerIcon className="ribbon-button-insertfunction" /></div></div>
-            <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{entry.label}</div></div>
+            <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{resource(d, entry.label)}</div></div>
             <div className="gc-designer-ribbon-list-item-arrow" />
             {hovered === entry.category ? (
-              <div className="gc-designer-ribbon-dropdown gc-designer-submenu gc-designer-function-menu sd-fit-content" style={{ left: 'calc(100% + 1px)', top: -5 }} role="menu" aria-label={entry.label}
+              <div className="gc-designer-ribbon-dropdown gc-designer-submenu gc-designer-function-menu sd-fit-content" style={{ left: 'calc(100% + 1px)', top: -5 }} role="menu" aria-label={resource(d, entry.label)}
                 onMouseEnter={() => setHovered(entry.category)} onMouseLeave={() => setHovered((current) => (current === entry.category ? null : current))}>
                 <FunctionGalleryList command={command} category={entry.category} flyout />
               </div>
@@ -256,12 +268,12 @@ function FunctionGalleryMenu({ command, left, top }: { command: string; left: nu
           </div>
         ))}
       </div>,
-      'More Functions',
+      mt(d, 'moreFunctions', 'More Functions'),
     );
   }
   const category = functionGalleryCategories[command];
   if (!category) return null;
-  return wrap(<FunctionGalleryList command={command} category={category} />, category);
+  return wrap(<FunctionGalleryList command={command} category={category} />, functionCategoryDisplay(d.resources, category));
 }
 
 function FunctionGalleryList({ command, category, flyout }: { command: string; category: string; flyout?: boolean }): React.ReactElement {
@@ -270,9 +282,9 @@ function FunctionGalleryList({ command, category, flyout }: { command: string; c
     <div className={`gc-designer-ribbon-menu-list gc-designer-function-list${flyout ? ' gc-designer-function-flyout-list' : ''}`} role="menu">
       {ribbonFunctions(category).map((name) => (
         <div key={name} className="gc-designer-ribbon-list-item-container gc-designer-function-item gc-designer-list-content-item-focusable" role="menuitem"
-          title={name} aria-label={name} data-command={`ribbon.${command}`} data-value={name} data-text={name}
+          title={functionDisplayName(name)} aria-label={functionDisplayName(name)} data-command={`ribbon.${command}`} data-value={name} data-text={functionDisplayName(name)}
           onClick={() => { d.openMenu = null; d.openFunctionArguments(name); d.invalidate(); }}>
-          <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{name}</div></div>
+          <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{functionDisplayName(name)}</div></div>
         </div>
       ))}
     </div>
@@ -295,7 +307,7 @@ function ListDropdownMenu({ command }: { command: string }): React.ReactElement 
             key={index}
             className={`gc-designer-ribbon-list-item-container gc-designer-combo-icon-item gc-designer-list-content-item-focusable${selected ? ' gc-designer-ribbon-list-item-selected' : ''}`}
             role="menuitem"
-            aria-label={String(entry.text ?? value)}
+            aria-label={resource(d, String(entry.text ?? value))}
             onClick={() => {
               d.openMenu = null;
               if (functionCategoryCommands.has(command)) d.insertFunctionText(value);
@@ -305,7 +317,7 @@ function ListDropdownMenu({ command }: { command: string }): React.ReactElement 
             }}
           >
             <div className="gc-designer-ribbon-list-item-left"><div className={`gc-designer-ribbon-icon ${entry.iconClass ?? ''}`}>{entry.iconClass ? <DesignerIcon className={entry.iconClass} /> : null}</div></div>
-            <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{entry.text}</div></div>
+            <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{resource(d, String(entry.text ?? value))}</div></div>
           </div>
         );
       })}
@@ -398,7 +410,7 @@ function MarginsMenu(): React.ReactElement {
   return (
     <div className="gc-designer-ribbon-menu-list sd-margins-menu">
       {presets.map((preset) => (
-        <div key={preset.name} className="sd-margins-item" role="menuitem" aria-label={preset.name} title={preset.name}
+        <div key={preset.name} className="sd-margins-item" role="menuitem" aria-label={mt(d, `margin${preset.name}`, preset.name)} title={mt(d, `margin${preset.name}`, preset.name)}
           data-command={`menu.${preset.command}`} onClick={(event) => { event.stopPropagation(); run(preset.command); }}>
           <div className="sd-margins-thumb" aria-hidden="true">
             {/* TASK 69: the trial draws a page frame with the margin rules crossing the page. */}
@@ -412,13 +424,13 @@ function MarginsMenu(): React.ReactElement {
           </div>
           {/* 1px label hit-target (TASK 51): a real clickable element carrying the preset name so
               tests/users can address the card by caption, like the trial addresses its canvas rows. */}
-          <span className="gc-designer-ribbon-list-item-container sd-gallery-hit" aria-hidden="true">{preset.name}</span>
+          <span className="gc-designer-ribbon-list-item-container sd-gallery-hit" aria-hidden="true">{mt(d, `margin${preset.name}`, preset.name)}</span>
           <div className="sd-margins-info">
-            <div className="sd-margins-name">{preset.name}</div>
+            <div className="sd-margins-name">{mt(d, `margin${preset.name}`, preset.name)}</div>
             <div className="sd-margins-grid">
-              <span>Top:</span><span>{inch(preset.values.top)}</span><span>Bottom:</span><span>{inch(preset.values.bottom)}</span>
-              <span>Left:</span><span>{inch(preset.values.left)}</span><span>Right:</span><span>{inch(preset.values.right)}</span>
-              <span>Header:</span><span>{inch(preset.values.header)}</span><span>Footer:</span><span>{inch(preset.values.footer)}</span>
+              <span>{mt(d, 'top', 'Top:')}</span><span>{inch(preset.values.top)}</span><span>{mt(d, 'bottom', 'Bottom:')}</span><span>{inch(preset.values.bottom)}</span>
+              <span>{mt(d, 'left', 'Left:')}</span><span>{inch(preset.values.left)}</span><span>{mt(d, 'right', 'Right:')}</span><span>{inch(preset.values.right)}</span>
+              <span>{mt(d, 'header', 'Header:')}</span><span>{inch(preset.values.header)}</span><span>{mt(d, 'footer', 'Footer:')}</span><span>{inch(preset.values.footer)}</span>
             </div>
           </div>
         </div>
@@ -426,7 +438,7 @@ function MarginsMenu(): React.ReactElement {
       <div className="gc-designer-ribbon-separator-horizontal" />
       <div className="gc-designer-ribbon-list-item-container gc-designer-combo-icon-item gc-designer-list-content-item-focusable" role="menuitem"
         data-command="menu.customMargins" onClick={(event) => { event.stopPropagation(); d.executeCommand('customMargins', 'customMargins'); d.openMenu = null; d.invalidate(); }}>
-        <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">Custom Margins...</div></div>
+        <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{resource(d, '${res.ribbon.commands.customMargins}') || 'Custom Margins...'}</div></div>
       </div>
     </div>
   );
@@ -451,12 +463,13 @@ function PaperSizeMenu(): React.ReactElement {
         const wIn = dims ? Number.parseFloat(dims[1]) : 8.5;
         const hIn = dims ? Number.parseFloat(dims[2]) : 11;
         const k = 36 / Math.max(wIn, hIn);
+        const paperName = localizedText(d.resources, item.text, 'ribbon.papers');
         return (
           <div key={item.text} className={`sd-paper-item${selected ? ' gc-designer-ribbon-list-item-selected' : ''}`} role="menuitem"
-            aria-label={`${item.text} ${item.size}`} title={`${item.text} ${item.size}`} data-command={`menu.paperKind.${item.text}`}
+            aria-label={`${paperName} ${item.size}`} title={`${paperName} ${item.size}`} data-command={`menu.paperKind.${item.text}`}
             onClick={(event) => { event.stopPropagation(); d.executeCommand('paperKindSelector', 'paperKindSelector', item.text); d.openMenu = null; d.invalidate(); }}>
             <span className="sd-paper-check"><svg className="sd-paper-page" width="24" height="40" viewBox="0 0 24 40" role="presentation"><rect x={(24 - wIn * k) / 2} y={(40 - hIn * k) / 2} width={wIn * k} height={hIn * k} fill="#ffffff" stroke="#8a8a8a" strokeWidth={1.8} /></svg></span>
-            <span className="sd-paper-text"><span className="sd-paper-name">{item.text}</span><span className="sd-paper-size">{item.size}</span></span><span className="gc-designer-ribbon-list-item-container sd-gallery-hit" aria-hidden="true">{item.text}</span>
+            <span className="sd-paper-text"><span className="sd-paper-name">{paperName}</span><span className="sd-paper-size">{item.size}</span></span><span className="gc-designer-ribbon-list-item-container sd-gallery-hit" aria-hidden="true">{paperName}</span>
           </div>
         );
       })}
@@ -580,7 +593,7 @@ function ComboMenu({ command }: { command: string }): React.ReactElement {
   // TASK 74: the Sparkline Weight list lives with the tab behaviour (the trial
   // keeps it out of the command map too — gallery18-official.json shows
   // sparklineWeight with dropdownList null).
-  const list: IListGroupItemData[] = (command === 'sparklineWeight' ? sparklineWeightItems : item?.dropdownList) ?? (command === 'ribbonNumberFormat' ? formatList : []);
+  const list: IListGroupItemData[] = ((command === 'sparklineWeight' ? sparklineWeightItems : item?.dropdownList) ?? (command === 'ribbonNumberFormat' ? formatList : [])).map((entry) => (entry.text == null ? entry : { ...entry, text: resolveText(localizedText(d.resources, entry.text, 'dialogs'), d.resources) }));
   const simple = command === 'fontFamily' || command === 'fontSize';
   const isCalculation = command === 'calculationOptionsPanel';
   if (simple) {
@@ -597,7 +610,7 @@ function ComboMenu({ command }: { command: string }): React.ReactElement {
               aria-selected={selected}
               onClick={() => { d.executeCommand(command, command, value); d.openMenu = null; d.invalidate(); }}
             >
-              {entry.text}
+              {resource(d, String(entry.text ?? value))}
             </div>
           );
         })}
@@ -619,7 +632,7 @@ function ComboMenu({ command }: { command: string }): React.ReactElement {
             <div className="gc-designer-ribbon-list-item-left">
               <div className={`gc-designer-ribbon-icon ${entry.iconClass ?? ''}`}>{entry.iconClass ? <DesignerIcon className={entry.iconClass} /> : isCalculation && selected ? <DesignerIcon className="context-check-green" /> : <span className="gc-designer-menu-spacer" />}</div>
             </div>
-            <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{entry.text}</div></div>
+            <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{resource(d, String(entry.text ?? value))}</div></div>
           </div>
         );
       })}
@@ -627,7 +640,7 @@ function ComboMenu({ command }: { command: string }): React.ReactElement {
         <div className="gc-designer-ribbon-separator-horizontal" />
         <div className="gc-designer-ribbon-list-item-container gc-designer-combo-icon-item gc-designer-list-content-item-focusable" role="menuitem" onClick={() => { d.openMenu = null; d.showFormatCells('number'); }}>
           <div className="gc-designer-ribbon-list-item-left"><div className="gc-designer-ribbon-icon" /></div>
-          <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">More Number Formats...</div></div>
+          <div className="gc-designer-ribbon-list-item-center"><div className="gc-designer-ribbon-text">{resource(d, '${res.ribbon.home.moreNumberFormat}') || 'More Number Formats...'}</div></div>
         </div>
       </>}
     </div>
@@ -638,21 +651,21 @@ function ColorMenu({ command }: { command: string }): React.ReactElement {
   const d = useDesigner();
   return (
     <div className="gc-designer-color-menu">
-      <div className="gc-designer-color-menu-title">Theme Colors</div>
+      <div className="gc-designer-color-menu-title">{mt(d, 'themeColors', 'Theme Colors')}</div>
       <div className="gc-designer-color-grid">
         {colorSwatches.flat().map((color, index) => (
           <div key={index} className="gc-designer-color-cell" style={{ background: color }} onClick={() => { d.executeCommand(command, command, color); d.openMenu = null; d.invalidate(); }} />
         ))}
       </div>
-      <div className="gc-designer-color-menu-title">Standard Colors</div>
+      <div className="gc-designer-color-menu-title">{mt(d, 'standardColors', 'Standard Colors')}</div>
       <div className="gc-designer-color-grid">
         {['#c00000', '#ff0000', '#ffc000', '#ffff00', '#92d050', '#00b050', '#00b0f0', '#0070c0', '#002060', '#7030a0'].map((color) => (
           <div key={color} className="gc-designer-color-cell" style={{ background: color }} onClick={() => { d.executeCommand(command, command, color); d.openMenu = null; d.invalidate(); }} />
         ))}
       </div>
       {command === 'focusCellColor'
-        ? <div className="gc-designer-color-menu-footer sd-more-colors" onClick={() => { d.openMenu = null; d.showDialog('tabColorDialog', { red: '', green: '', blue: '', current: '#FFFFFF' }, () => undefined); }}>More Colors...</div>
-        : <div className="gc-designer-color-menu-footer" onClick={() => { d.executeCommand(command, command, 'transparent'); d.openMenu = null; d.invalidate(); }}>No Fill</div>}
+        ? <div className="gc-designer-color-menu-footer sd-more-colors" onClick={() => { d.openMenu = null; d.showDialog('tabColorDialog', { red: '', green: '', blue: '', current: '#FFFFFF' }, () => undefined); }}>{mt(d, 'moreColors', 'More Colors...')}</div>
+        : <div className="gc-designer-color-menu-footer" onClick={() => { d.executeCommand(command, command, 'transparent'); d.openMenu = null; d.invalidate(); }}>{mt(d, 'noFill', 'No Fill')}</div>}
     </div>
   );
 }
@@ -676,7 +689,7 @@ function TableGallery(): React.ReactElement {
     <div className="gc-designer-gallery gc-designer-table-gallery">
       {sections.map((section) => (
         <div key={section.title} className="gc-designer-gallery-section gc-designer-table-section">
-          <div className="gc-designer-gallery-title">{section.title}</div>
+          <div className="gc-designer-gallery-title">{mt(d, section.title.toLowerCase(), section.title)}</div>
           <div className="gc-designer-gallery-grid">
             {section.title === 'Custom' && customs.map((tile) => <CustomTableThemeTile key={tile.name} name={tile.name} preview={tile.theme} />)}
             {section.themes.map((theme) => <TableThemeTile key={theme} theme={theme} />)}
@@ -684,7 +697,7 @@ function TableGallery(): React.ReactElement {
         </div>
       ))}
       <div className="gc-designer-gallery-footer" onClick={() => { d.openMenu = null; d.invalidate(); d.showNewTableStyleDialog(); }}>
-        <DesignerIcon className="ribbon-button-new-table-style-element" size={16} /> <span>New Table Style...</span>
+        <DesignerIcon className="ribbon-button-new-table-style-element" size={16} /> <span>{resource(d, '${res.ribbon.home.newTableStyle}') || 'New Table Style...'}</span>
       </div>
     </div>
   );
@@ -766,14 +779,16 @@ function CellStylesGallery(): React.ReactElement {
   const d = useDesigner();
   const custom = customCellStyles(d);
   const apply = (value: string): void => { d.executeCommand('cellStylesListContent', 'cellStylesListContent', value); d.openMenu = null; d.invalidate(); };
+  /** TASK 87: built-in style/group captions (the payload names stay English data). */
+  const cs = (en: string): string => localizedText(d.resources, en, 'ribbon.cellStyles');
   return (
     <div className="gc-designer-gallery gc-designer-cell-styles-gallery">
       {custom.length > 0 && (
         <div key="Custom" className="gc-designer-gallery-section">
-          <div className="gc-designer-gallery-title">Custom</div>
+          <div className="gc-designer-gallery-title">{mt(d, 'custom', 'Custom')}</div>
           <div className="gc-designer-cell-style-grid gc-designer-cell-style-grid-6">
             {custom.map((style) => (
-              <div key={style.name} className="gc-designer-cell-style-tile" title={style.name} data-value={style.name} onClick={() => apply(style.name)}>
+              <div key={style.name} className="gc-designer-cell-style-tile" title={cs(style.name)} data-value={style.name} onClick={() => apply(style.name)}>
                 <div className="gc-designer-cell-style-preview" style={{ background: style.backColor ?? '#ffffff', color: style.foreColor ?? '#000000', font: style.font ?? undefined }}>{style.name}</div>
               </div>
             ))}
@@ -782,7 +797,7 @@ function CellStylesGallery(): React.ReactElement {
       )}
       {cellStyleGroups.map((group) => (
         <div key={group.name} className="gc-designer-gallery-section">
-          <div className="gc-designer-gallery-title">{group.name}</div>
+          <div className="gc-designer-gallery-title">{cs(group.name)}</div>
           <div className={`gc-designer-cell-style-grid gc-designer-cell-style-grid-${group.columns}`}>
             {group.styles.map((style) => {
               const value = (style.style ?? {}) as Record<string, unknown>;
@@ -800,11 +815,11 @@ function CellStylesGallery(): React.ReactElement {
                 ...(previewCss ?? {}),
               };
               return (
-                <div key={style.name} className={`gc-designer-cell-style-tile${style.kind === 'cellType' ? ' gc-designer-cell-type-tile' : ''}`} title={style.name} data-value={payload} onClick={() => apply(payload)}>
+                <div key={style.name} className={`gc-designer-cell-style-tile${style.kind === 'cellType' ? ' gc-designer-cell-type-tile' : ''}`} title={cs(style.name)} data-value={payload} onClick={() => apply(payload)}>
                   {style.kind === 'cellType' ? (
-                    <span className="gc-designer-cell-type-row"><CellTypeIcon name={style.name} /><span className="gc-designer-cell-type-label">{style.name}</span></span>
+                    <span className="gc-designer-cell-type-row"><CellTypeIcon name={style.name} /><span className="gc-designer-cell-type-label">{cs(style.name)}</span></span>
                   ) : (
-                    <div className={`gc-designer-cell-style-preview${plain || previewCss ? ' sd-style-plain' : ''}`} style={textStyle}>{style.preview ?? 'Aa'}</div>
+                    <div className={`gc-designer-cell-style-preview${plain || previewCss ? ' sd-style-plain' : ''}`} style={textStyle}>{style.preview ? cs(style.preview) : 'Aa'}</div>
                   )}
                 </div>
               );
@@ -812,8 +827,8 @@ function CellStylesGallery(): React.ReactElement {
           </div>
         </div>
       ))}
-      <div className="gc-designer-gallery-footer" onClick={() => { d.openMenu = null; d.invalidate(); d.showNewCellStyleDialog(); }}><DesignerIcon className="gallery-new-cell-style" size={16} /><span>New Cell Style...</span></div>
-      <div className="gc-designer-gallery-footer" onClick={() => { d.openMenu = null; d.invalidate(); d.showManageCellStatesDialog(); }}><DesignerIcon className="gallery-manage-cell-states" size={16} /><span>Manage Cell States</span></div>
+      <div className="gc-designer-gallery-footer" onClick={() => { d.openMenu = null; d.invalidate(); d.showNewCellStyleDialog(); }}><DesignerIcon className="gallery-new-cell-style" size={16} /><span>{resource(d, '${res.ribbon.home.newCellStyle}') || 'New Cell Style...'}</span></div>
+      <div className="gc-designer-gallery-footer" onClick={() => { d.openMenu = null; d.invalidate(); d.showManageCellStatesDialog(); }}><DesignerIcon className="gallery-manage-cell-states" size={16} /><span>{mt(d, 'manageCellStates', 'Manage Cell States')}</span></div>
     </div>
   );
 }
@@ -915,12 +930,12 @@ function ConditionalFormattingFlyout({ command }: { command: string }): React.Re
   );
   const more = (name: string): React.ReactElement => (
     <div className="sd-cf-more gc-designer-ribbon-list-item-container gc-designer-list-content-item-focusable" role="menuitem"
-      aria-label="More Rules..." title="More Rules..." data-command={`menu.${name}`} onClick={(event) => { event.stopPropagation(); run(name); }}>More Rules...</div>
+      aria-label={resource(d, `\${res.ribbon.home.${name}}`) || 'More Rules...'} title={resource(d, `\${res.ribbon.home.${name}}`) || 'More Rules...'} data-command={`menu.${name}`} onClick={(event) => { event.stopPropagation(); run(name); }}>{resource(d, `\${res.ribbon.home.${name}}`) || 'More Rules...'}</div>
   );
   if (command === 'dataBar') {
     const section = (title: string, kind: 'gradientFill' | 'solidFill'): React.ReactElement => (
       <div className="sd-cf-section" key={kind}>
-        <div className="gc-designer-ribbon-menu-group-title">{title}</div>
+        <div className="gc-designer-ribbon-menu-group-title">{resource(d, `\${res.ribbon.home.${kind}}`) || title}</div>
         <div className="sd-cf-tile-row sd-cf-databar-row">
           {dataBarColors.map(([label, solid, grad]) => {
             // Trial tile: a mini cell table (blue-grey border, 4 rows x 3 columns, grey value
@@ -955,7 +970,7 @@ function ConditionalFormattingFlyout({ command }: { command: string }): React.Re
     // top-to-bottom, fourth row white, grey value dashes right) — our own drawing (TASK 55).
     return (
       <div className="sd-cf-flyout sd-cf-colorscales">
-        <div className="gc-designer-ribbon-menu-group-title">Color Scales</div>
+        <div className="gc-designer-ribbon-menu-group-title">{resource(d, '${res.ribbon.home.colorScalesList2}') || 'Color Scales'}</div>
         <div className="sd-cf-tile-grid">{colorScalePairs.map(([name, colors], i) => {
           const mix = (a: string, b: string): string => {
             const p = (h: string) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
@@ -989,7 +1004,7 @@ function ConditionalFormattingFlyout({ command }: { command: string }): React.Re
     <div className="sd-cf-flyout sd-cf-iconsets">
       {groups.map(([title, ids]) => (
         <div className="sd-cf-section" key={title}>
-          <div className="gc-designer-ribbon-menu-group-title">{title}</div>
+          <div className="gc-designer-ribbon-menu-group-title">{resource(d, `\${res.ribbon.home.${title[0].toLowerCase()}${title.slice(1)}}`) || title}</div>
           <div className="sd-cf-tile-row sd-cf-iconset-row">
             {ids.map((id, i) => tile(id, i, <IconSetPreview id={id} />))}
           </div>
@@ -1055,11 +1070,12 @@ const namedTemplates: Array<{ title: string; cards: Array<[string, string, Templ
 ];
 
 function NamedCellTemplatesMenu(): React.ReactElement {
+  const d = useDesigner();
   return (
     <div className="gc-designer-ribbon-menu-list sd-named-templates">
       {namedTemplates.map((section) => (
         <div key={section.title}>
-          <div className="gc-designer-ribbon-menu-group-title">{section.title}</div>
+          <div className="gc-designer-ribbon-menu-group-title">{mt(d, uiKey(section.title), section.title)}</div>
           <div className="sd-named-template-grid">
             {section.cards.map(([name, value, preview]) => (
               <div key={name} className="sd-named-template-card" role="menuitem" aria-label={name} title={name} data-command={`menu.namedCellTemplatesListContent.${name}`} data-value={name}>

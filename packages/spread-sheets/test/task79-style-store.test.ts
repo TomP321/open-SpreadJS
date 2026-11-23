@@ -37,7 +37,10 @@ describe('TASK 79 Style font storage', () => {
   it('a later plain shorthand clears previously parsed weight/style parts', () => {
     const st = new Style();
     st.font = 'bold italic 12px Arial';
-    expect(st.font).toBe('bold italic 12px Arial'); // unusual order is preserved verbatim
+    // TASK 90 (`.probe/t90/odd-fonts.json`, `bold italic 11px Calibri`): the trial recomposes the
+    // shorthand from the parsed members in its own canonical order — style, weight, size, family —
+    // so a pre-size keyword run in the unusual order reads back normalised.
+    expect(st.font).toBe('italic bold 12px Arial');
     st.font = '12px Arial';
     expect(st.font).toBe('12px Arial');
     expect(st.fontWeight).toBeUndefined();
@@ -57,13 +60,18 @@ describe('TASK 79 Style font storage', () => {
     expect(Object.hasOwn(st, 'font')).toBe(false);
     expect(st.toJSON()).toEqual({ font: 'inherit' });
   });
-  it('font = undefined keeps the getter silent even with parsed parts still carried', () => {
+  it('font = undefined clears the font members it cannot express', () => {
     const st = new Style();
     st.font = 'bold 12px Arial';
     st.font = undefined;
     expect(st.font).toBeUndefined();
-    expect(st.fontSize).toBe('12px'); // the pre-undefined part retention is the documented pre-TASK 79 behaviour
-    expect(st.toJSON()).toEqual({ fontWeight: 'bold', fontSize: '12px', fontFamily: 'Arial' });
+    // TASK 90 (`.probe/t90/odd-fonts.json`, `clear-undefined`): the trial clears the members a
+    // shorthand cannot carry — after `font = undefined` its fontSize/fontFamily/fontWeight all
+    // read null, they do not keep the previously parsed values.
+    expect(st.fontSize).toBeUndefined();
+    expect(st.fontFamily).toBeUndefined();
+    expect(st.fontWeight).toBeUndefined();
+    expect(st.toJSON()).toBeUndefined();
   });
   it('constructor object options parse the shorthand like the setter', () => {
     const st = new Style({ font: 'bold 9px Verdana', backColor: 'x' });
@@ -72,7 +80,7 @@ describe('TASK 79 Style font storage', () => {
     expect(st.fontFamily).toBe('Verdana');
     expect(st.toJSON()).toEqual({ backColor: 'x', font: 'bold 9px Verdana', fontWeight: 'bold', fontSize: '9px', fontFamily: 'Verdana' });
   });
-  it('clone() carries the font through, including a value that does not round-trip', () => {
+  it('clone() carries the font through, including a value the parser normalises', () => {
     const canonical = new Style();
     canonical.font = '11px Calibri';
     const odd = new Style();
@@ -81,14 +89,15 @@ describe('TASK 79 Style font storage', () => {
       b = odd.clone();
     expect(a).not.toBe(canonical);
     expect(a.font).toBe('11px Calibri');
-    expect(b.font).toBe('bold italic 12px Arial');
+    expect(b.font).toBe('italic bold 12px Arial'); // the trial's canonical composition (TASK 90 probe)
     expect(b.toJSON()).toEqual(odd.toJSON());
   });
   it('interned font parts share one string instance across styles', () => {
     const a = new Style(),
       b = new Style();
     a.font = 'bold 11px Calibri';
-    b.font = (0 + 'bold 11px ' + 'Calibri') as string; // fresh non-identical source string
+    // Same content as the literal above, built at run time so it is a different string instance.
+    b.font = ['bold', '11px', 'Calibri'].join(' ') as string;
     expect(a.fontSize).toBe(b.fontSize);
     // Same slice content and, since TASK 79 interns the parsed parts, the same string instance.
     expect(a.fontFamily === b.fontFamily).toBe(true);
@@ -136,14 +145,14 @@ describe('TASK 79 cell style records', () => {
     const viaName = s.getStyle(2, 2)!;
     expect(viaName.toJSON()).toEqual({ font: 'italic 10px Consolas', name: 'T79Named', fontStyle: 'italic', fontSize: '10px', fontFamily: 'Consolas' });
     expect(s.getActualStyle(2, 2).font).toBe('italic 10px Consolas');
-    // a non-canonical shorthand order survives the named-style resolution copy (TASK 79)
+    // a non-canonical shorthand order is recomposed by both sides (TASK 90 trial probe)
     const odd = new Style();
     odd.name = 'T79Odd';
     odd.font = 'bold italic 12px Arial';
     s.addNamedStyle(odd);
     s.setStyleName(2, 3, 'T79Odd');
-    expect(s.getStyle(2, 3)!.font).toBe('bold italic 12px Arial');
-    expect(s.getActualStyle(2, 3).font).toBe('bold italic 12px Arial');
+    expect(s.getStyle(2, 3)!.font).toBe('italic bold 12px Arial');
+    expect(s.getActualStyle(2, 3).font).toBe('italic bold 12px Arial');
   });
   it('used-range counts a style that only carries an unparseable font', () => {
     const wb = new Workbook(),
@@ -179,14 +188,17 @@ describe('TASK 79 cell style records', () => {
       fontSize: '12px',
       fontFamily: 'Arial',
     });
-    expect(s2.getStyle(1, 1)?.font).toBe('bold italic 12px Arial');
-    expect(s2.getActualStyle(1, 1).font).toBe('bold italic 12px Arial');
-    expect(wb2.getNamedStyle('T79RoundTrip')?.font).toBe('10.5pt Times New Roman');
-    expect(wb2.getNamedStyle('T79RoundTrip')?.toJSON()?.font).toBe('10.5pt Times New Roman');
+    expect(s2.getStyle(1, 1)?.font).toBe('italic bold 12px Arial');
+    expect(s2.getActualStyle(1, 1).font).toBe('italic bold 12px Arial');
+    // TASK 90 (`.probe/t90/family-r1.json`): the trial quotes a multi-word family in the composed
+    // shorthand and stores it quoted in `fontFamily` (`10.5pt Times New Roman` ->
+    // `10.5pt 'Times New Roman'`), and ours now produces the same value for the same input.
+    expect(wb2.getNamedStyle('T79RoundTrip')?.font).toBe("10.5pt 'Times New Roman'");
+    expect(wb2.getNamedStyle('T79RoundTrip')?.toJSON()?.font).toBe("10.5pt 'Times New Roman'");
     // styleToJSON fills the parsed parts from the shorthand (official fixture shape)
     const out = (wb2.toJSON().namedStyles as Record<string, unknown>[])[0];
     expect(out.fontSize).toBe('10.5pt');
-    expect(out.fontFamily).toBe('Times New Roman');
+    expect(out.fontFamily).toBe("'Times New Roman'");
   });
   it('undo/redo through a store-snapshot command restores a font-carrying style exactly', () => {
     const wb = new Workbook(),
@@ -200,24 +212,24 @@ describe('TASK 79 cell style records', () => {
     // `dragDrop` (move) round-trips the cell record through the transaction
     // snapshot's clone() — the exact path the memory work touches.
     expect(cm.execute({ cmd: 'dragDrop', sheetName: s.name(), fromRow: 2, fromColumn: 1, toRow: 5, toColumn: 1, copy: false })).toBe(true);
-    expect(s.getStyle(5, 1)?.font).toBe('bold italic 12px Arial');
+    expect(s.getStyle(5, 1)?.font).toBe('italic bold 12px Arial');
     expect(s.getStyle(2, 1)).toBeNull();
     um.undo();
     const restored = s.getStyle(2, 1)!;
-    expect(restored.font).toBe('bold italic 12px Arial');
+    expect(restored.font).toBe('italic bold 12px Arial');
     expect(restored.fontSize).toBe('12px');
     expect(restored.fontFamily).toBe('Arial');
     expect(s.getStyle(5, 1)).toBeNull();
     expect(restored.toJSON()).toEqual({
       backColor: 'red',
-      font: 'bold italic 12px Arial',
+      font: 'italic bold 12px Arial',
       fontStyle: 'italic',
       fontWeight: 'bold',
       fontSize: '12px',
       fontFamily: 'Arial',
     });
     um.redo();
-    expect(s.getStyle(5, 1)?.font).toBe('bold italic 12px Arial');
+    expect(s.getStyle(5, 1)?.font).toBe('italic bold 12px Arial');
     expect(s.getStyle(2, 1)).toBeNull();
   });
   it('row and column level styles keep reference identity like cells', () => {

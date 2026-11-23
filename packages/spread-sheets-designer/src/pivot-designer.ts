@@ -16,6 +16,8 @@ import type { Worksheet } from './core-internals.js';
 import type GC from '@mescius/spread-sheets';
 import { activeSheet, topCell } from './commands/base.js';
 import { CommandNames, TemplateNames } from './names-generated.js';
+import { messageText } from './resolve.js';
+import { T } from './dialogs/t.js';
 
 export type PivotTable = GC.Spread.Pivot.PivotTable;
 export type PivotFieldInfo = GC.Spread.Pivot.IFieldInfo;
@@ -353,7 +355,10 @@ export function executePivotCommand(d: Designer, name: string, value: unknown): 
       // The gallery's Clear entry resets the report to the neutral style.
       return withPivot(d, (pivot) => pivot.theme('light0'));
     case CommandNames.NewPivotTableStyle:
-      d.showMessageBox('NotImplemented: creating custom pivot styles is not part of this milestone.', 'SpreadJS Designer', 1);
+      /* TASK 93: opens the trial's New Pivot Table Style dialog (custom themes are
+       * registered through `workbook.customPivotTableThemes`). Called through the API
+       * to keep the module graph free of a `designer-custom-styles` import cycle. */
+      d.showNewPivotTableStyleDialog();
       return true;
     case CommandNames.PivotTableOptions:
       d.showPivotTableOptions();
@@ -379,7 +384,9 @@ export function executePivotCommand(d: Designer, name: string, value: unknown): 
       return true;
     case CommandNames.PivotTableGroupSelection:
     case CommandNames.PivotTableGroupField:
-      d.showMessageBox('NotImplemented: the pivot grouping dialog is not part of this milestone.', 'SpreadJS Designer', 1);
+      /* TASK 93: the trial's Group opens the Grouping dialog (date units or
+       * number buckets) for the active pivot field. */
+      showPivotGrouping(d);
       return true;
     case CommandNames.PivotTableUnGroup:
       return withPivot(d, (pivot) => {
@@ -607,13 +614,13 @@ export function validatePivotSource(d: Designer, data: Record<string, unknown>):
 
 export function showInsertPivotTable(d: Designer): void {
   d.showDialog(TemplateNames.InsertPivotTableDialogTemplate ?? 'insertPivotTableDialogTemplate', {
-    dialogTitle: 'Create PivotTable',
+    dialogTitle: T('createPivotTable', 'Create PivotTable'),
     range: defaultSourceRef(d),
     placement: 'new',
     location: 'A1',
   }, (data) => {
     createPivot(d, { source: String(data.range ?? ''), placement: String(data.placement ?? 'new'), location: String(data.location ?? 'A1') });
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Create PivotTable', 3); }, (data) => validatePivotSource(d, data as Record<string, unknown>));
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), T('createPivotTable', 'Create PivotTable'), 3); }, (data) => validatePivotSource(d, data as Record<string, unknown>));
 }
 
 export function showChangeDataSource(d: Designer): void {
@@ -621,13 +628,13 @@ export function showChangeDataSource(d: Designer): void {
   if (!pivot) return;
   const source = pivot.getSource();
   d.showDialog(TemplateNames.PivotTableChangeDataSourceTemplate ?? 'PivotTableChangeDataSourceTemplate', {
-    dialogTitle: 'Change Data Source',
+    dialogTitle: T('changeDataSource', 'Change Data Source'),
     range: typeof source === 'string' ? source : String(source.source ?? ''),
   }, (data) => {
     const normalized = normalizeSourceRef(d, String(data.range ?? ''));
     if (!normalized) return;
     withPivot(d, (item) => item.updateSource(normalized as never));
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Change Data Source', 3); });
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), T('changeDataSource', 'Change Data Source'), 3); });
 }
 
 export function showMovePivotTable(d: Designer): void {
@@ -635,12 +642,12 @@ export function showMovePivotTable(d: Designer): void {
   if (!pivot) return;
   const pos = pivot.position() as { row: number; col: number } | undefined;
   d.showDialog(TemplateNames.MovePivotTableDialogTemplate ?? 'movePivotTableDialogTemplate', {
-    dialogTitle: 'Move PivotTable',
+    dialogTitle: T('movePivotTable', 'Move PivotTable'),
     placement: 'new',
     location: `$${columnName(Math.max(0, pos?.col ?? 0))}$${Math.max(0, pos?.row ?? 0) + 1}`,
   }, (data) => {
     movePivot(d, { placement: String(data.placement ?? 'new'), location: String(data.location ?? 'A1') });
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Move PivotTable', 3); });
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), T('movePivotTable', 'Move PivotTable'), 3); });
 }
 
 /** Options dialog of the active pivot (PivotTable Analyze > Options). */
@@ -648,7 +655,7 @@ export function showPivotTableOptions(d: Designer): void {
   const pivot = pivotPanelTable(d) ?? activePivot(d);
   if (!pivot) return;
   d.showDialog(TemplateNames.PivotTableOptionsDialogTemplate ?? 'pivotTableOptionsDialogTemplate', {
-    dialogTitle: 'PivotTable Options',
+    dialogTitle: T('pivotTableOptions', 'PivotTable Options'),
     pivotName: pivot.name(),
     printExpandCollapse: false,
     repeatRowLabels: false,
@@ -660,16 +667,110 @@ export function showPivotTableOptions(d: Designer): void {
   });
 }
 
+/* TASK 93: the trial's Grouping dialog (measured 315x360, `.probe` notes):
+ * date fields get Auto/Starting at/Ending at checkboxes + a multi-select
+ * Seconds..Years list + Number of days; number fields get the same header
+ * rows with a single By number input. Both map onto `pivotTable.group`. */
+export function showPivotGrouping(d: Designer): void {
+  const pivot = pivotPanelTable(d) ?? activePivot(d);
+  if (!pivot) return;
+  const field = pivotActiveFieldName(d) || pivot.getFieldsByArea().find(f => f.pivotArea === 1 || f.pivotArea === 2)?.fieldName || '';
+  if (!field) return;
+  const info = pivot.getField(field);
+  const kind = info?.dataType === 2 ? 'date' : info?.dataType === 0 ? 'number' : '';
+  if (!kind) {
+    d.showMessageBox(T('groupingNotSupported', 'Grouping is available for date and number fields.'), T('grouping', 'Grouping'), 1);
+    return;
+  }
+  const fmt = (v: unknown): string => v instanceof Date ? `${v.getMonth() + 1}/${v.getDate()}/${v.getFullYear()}` : String(v ?? '');
+  // The trial pre-fills "By" with a rounded step of about 15 buckets.
+  let by = '10';
+  if (kind === 'number') {
+    const s = Number(info?.start), e = Number(info?.end);
+    if (Number.isFinite(s) && Number.isFinite(e) && e > s) {
+      const raw = (e - s) / 15, m = Math.pow(10, Math.floor(Math.log10(raw)));
+      by = String([m, 2 * m, 5 * m, 10 * m].find(f => raw <= f) ?? 10 * m);
+    }
+  }
+  d.showDialog('pivotGroupingDialogTemplate', {
+    dialogTitle: T('grouping', 'Grouping'),
+    kind,
+    fieldName: field,
+    startEnabled: true, endEnabled: true,
+    start: fmt(info?.start), end: fmt(info?.end),
+    bys: [false, false, false, false, true, true, true],
+    by,
+    interval: '1',
+  }, (data) => applyPivotGrouping(d, data));
+}
+
+/** Turn the Grouping dialog payload into the public `pivotTable.group(...)` call. */
+export function applyPivotGrouping(d: Designer, data: Record<string, unknown>): void {
+  const pivot = pivotPanelTable(d) ?? activePivot(d);
+  if (!pivot) return;
+  const field = String(data.fieldName ?? '');
+  if (!field) return;
+  const parseDate = (text: unknown): Date | undefined => {
+    const m = /(\d{1,4})[/-](\d{1,2})[/-](\d{1,4})/.exec(String(text ?? '').trim());
+    if (!m) return undefined;
+    const a = m[1].length === 4 ? [Number(m[3]), Number(m[2]) - 1, Number(m[1])] : [Number(m[3]), Number(m[1]) - 1, Number(m[2])];
+    const d = new Date(a[0], a[1], a[2]);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  };
+  d.getWorkbook().suspendPaint();
+  try {
+    if (data.kind === 'date') {
+      const bys = Array.isArray(data.bys) ? data.bys : [];
+      const start = data.startEnabled === false ? undefined : parseDate(data.start);
+      const end = data.endEnabled === false ? undefined : parseDate(data.end);
+      const interval = Math.max(1, Math.round(Number(data.interval) || 1));
+      const selected: number[] = [];
+      for (let by = 0; by < 7; by++) if (bys[by]) selected.push(by);
+      if (selected.length) {
+        const info = pivot.getField(field);
+        const area = info?.pivotArea ?? 1;
+        pivot.group({ originFieldName: field, dateGroups: selected.map((by) => {
+          const spec: { by: number; start?: Date; end?: Date; groupInterval?: number } = { by };
+          if (start) spec.start = start;
+          if (end) spec.end = end;
+          if (by === 3) spec.groupInterval = interval;
+          return spec;
+        }) } as never);
+        // The trial removes the origin field and appends the new unit fields at
+        // the end of its area, newest unit first (measured: Amount, Years, Quarters, Months).
+        const UNITS = ['Seconds', 'Minutes', 'Hours', 'Days', 'Months', 'Quarters', 'Years'];
+        pivot.remove(field);
+        for (const by of selected.reverse()) {
+          const name = `${UNITS[by]} (${field})`;
+          if (pivot.getSourceFields().some((f: { name: string }) => f.name === name)) pivot.add(name, name, area);
+        }
+      }
+    } else {
+      const by = Math.abs(Number(data.by));
+      if (by > 0) {
+        const group: { by: number; start?: number; end?: number } = { by };
+        const s = Number(data.start), e = Number(data.end);
+        if (data.startEnabled !== false && Number.isFinite(s)) group.start = s;
+        if (data.endEnabled !== false && Number.isFinite(e)) group.end = e;
+        pivot.group({ originFieldName: field, numberGroup: group } as never);
+      }
+    }
+    reapply(pivot);
+  } finally {
+    d.getWorkbook().resumePaint();
+  }
+  d.invalidate();
+}
+
 /** Field Settings (non-value field) for one field of the panel menu. */
-export function showPivotFieldSettings(d: Designer, fieldName: string): void {
-  const pivot = pivotPanelTable(d);
+export function showPivotFieldSettings(d: Designer, fieldName: string): void {  const pivot = pivotPanelTable(d);
   if (!pivot) return;
   const info = pivot.getField(fieldName);
   const dimension = info ? pivot.dimensionSubtotals(fieldName) as { show?: boolean; position?: number } | undefined : undefined;
   const visible = dimension?.show !== false;
   const position = dimension?.position;
   d.showDialog('pivotFieldSettingsDialogTemplate', {
-    dialogTitle: 'Field Settings',
+    dialogTitle: T('fieldSettings', 'Field Settings'),
     sourceName: info?.sourceName ?? fieldName,
     customName: fieldName,
     area: info?.pivotArea ?? 1,
@@ -686,7 +787,7 @@ export function showValueFieldSettings(d: Designer, fieldName: string): void {
   const info = pivot.getField(fieldName);
   const shown = pivot.showDataAs(fieldName) as { showDataAs?: number; baseFieldName?: string; baseFieldItem?: string } | undefined;
   d.showDialog('pivotValueFieldSettingsDialogTemplate', {
-    dialogTitle: 'Value Field Settings',
+    dialogTitle: T('valueFieldSettings', 'Value Field Settings'),
     sourceName: info?.sourceName ?? fieldName,
     customName: fieldName,
     subtotal: subtotalOfType(pivot, fieldName),
@@ -758,24 +859,26 @@ export function applyValueFieldSettings(d: Designer, fieldName: string, data: Re
   d.invalidate();
 }
 
-/** The trial's summarize list, in the dialog's order (GC.Pivot.SubtotalType values). */
+/** The trial's summarize list, in the dialog's order (GC.Pivot.SubtotalType values).
+ * `text` stays the stable identity stored in the pivot model; `labelKey` is the
+ * `dialogs.*` resource slot of the display caption (TASK 87). */
 export const SUBTOTAL_ITEMS = [
-  { text: 'Sum', value: 8 }, { text: 'Count', value: 1 }, { text: 'Average', value: 0 },
-  { text: 'Max', value: 3 }, { text: 'Min', value: 4 }, { text: 'Product', value: 5 },
-  { text: 'Count Numbers', value: 2 }, { text: 'StdDev', value: 6 }, { text: 'StdDevp', value: 7 },
-  { text: 'Var', value: 9 }, { text: 'Varp', value: 10 },
+  { text: 'Sum', value: 8, labelKey: 'sum' }, { text: 'Count', value: 1, labelKey: 'count' }, { text: 'Average', value: 0, labelKey: 'average' },
+  { text: 'Max', value: 3, labelKey: 'max' }, { text: 'Min', value: 4, labelKey: 'min' }, { text: 'Product', value: 5, labelKey: 'product' },
+  { text: 'Count Numbers', value: 2, labelKey: 'countNumbers' }, { text: 'StdDev', value: 6, labelKey: 'stdDev' }, { text: 'StdDevp', value: 7, labelKey: 'stdDevp' },
+  { text: 'Var', value: 9, labelKey: 'var' }, { text: 'Varp', value: 10, labelKey: 'varp' },
 ];
 
 /** The trial's `Show Value As` list (dialog captions; GC.Pivot.PivotShowDataAs values). */
 export const SHOW_DATA_AS_ITEMS = [
-  { text: 'No Calculation', value: 0 }, { text: '% of Grand Total', value: 1 },
-  { text: '% of Column Total', value: 3 }, { text: '% of Row Total', value: 2 },
-  { text: '% Of ...', value: 4 }, { text: '% of Parent Row Total', value: 5 },
-  { text: '% of Parent Column Total', value: 6 }, { text: '% of Parent Total ...', value: 7 },
-  { text: 'Difference From ...', value: 8 }, { text: '% Difference From ...', value: 9 },
-  { text: 'Running Total In ...', value: 10 }, { text: '% Running Total In ...', value: 11 },
-  { text: 'Rank Smallest to Largest ...', value: 12 }, { text: 'Rank Largest to Smallest ...', value: 13 },
-  { text: 'Index', value: 14 },
+  { text: 'No Calculation', value: 0, labelKey: 'noCalculation' }, { text: '% of Grand Total', value: 1, labelKey: 'percentOfGrandTotal' },
+  { text: '% of Column Total', value: 3, labelKey: 'percentOfColumnTotal' }, { text: '% of Row Total', value: 2, labelKey: 'percentOfRowTotal' },
+  { text: '% Of ...', value: 4, labelKey: 'percentOf' }, { text: '% of Parent Row Total', value: 5, labelKey: 'percentOfParentRowTotal' },
+  { text: '% of Parent Column Total', value: 6, labelKey: 'percentOfParentColumnTotal' }, { text: '% of Parent Total ...', value: 7, labelKey: 'percentOfParentTotal' },
+  { text: 'Difference From ...', value: 8, labelKey: 'differenceFrom' }, { text: '% Difference From ...', value: 9, labelKey: 'percentDifferenceFrom' },
+  { text: 'Running Total In ...', value: 10, labelKey: 'runningTotalIn' }, { text: '% Running Total In ...', value: 11, labelKey: 'percentRunningTotalIn' },
+  { text: 'Rank Smallest to Largest ...', value: 12, labelKey: 'rankSmallestToLargest' }, { text: 'Rank Largest to Smallest ...', value: 13, labelKey: 'rankLargestToSmallest' },
+  { text: 'Index', value: 14, labelKey: 'index' },
 ];
 
 function subtotalOfType(pivot: PivotTable, fieldName: string): number {
@@ -898,7 +1001,7 @@ export function applyCalcFieldAdd(d: Designer, name: string, formula: string): s
   const src = String(formula ?? '').trim();
   if (!pivot || !field || !src) return null;
   if (calcFieldEntries(pivot).some((item) => item.name === field || item.name === `Sum of ${field}`)) {
-    d.showMessageBox(`Calculated item or field could not be created because another calculated item or field with the same name already exists: "${field}".`, 'Insert Calculated Field', 2);
+    d.showMessageBox(messageText(d, 'calcDup', `Calculated item or field could not be created because another calculated item or field with the same name already exists: "{0}".`, [field]), messageText(d, 'insertCalcField', 'Insert Calculated Field'), 2);
     return null;
   }
   d.getWorkbook().suspendPaint();
@@ -954,7 +1057,7 @@ export function applyCalcItemAdd(d: Designer, sourceName: string, name: string, 
   const src = String(formula ?? '').trim();
   if (!pivot || !source || !item || !src) return null;
   if (pivot.getCalcItems(source).some((entry) => String(entry.calcItemName) === item)) {
-    d.showMessageBox(`Calculated item or field could not be created because another calculated item or field with the same name already exists: "${item}".`, 'Insert Calculated Item', 2);
+    d.showMessageBox(messageText(d, 'calcDup', `Calculated item or field could not be created because another calculated item or field with the same name already exists: "{0}".`, [item]), messageText(d, 'insertCalcItem', 'Insert Calculated Item'), 2);
     return null;
   }
   d.getWorkbook().suspendPaint();
@@ -1089,7 +1192,7 @@ export function showReportFilterPages(d: Designer): void {
    * dialog; a pivot without one changes nothing on either side and no dialog appears. */
   if (!filterFields.length) return;
   d.showDialog(TemplateNames.PivotShowReportFilterDialogTemplate ?? 'pivotShowReportFilterDialogTemplate', {
-    dialogTitle: 'Show Report Filter Pages',
+    dialogTitle: T('showReportFilterPages', 'Show Report Filter Pages'),
     filterFields: filterFields.map((field) => String(field.fieldName)),
   }, () => {
     /* Trial (measured, probe 11): with the report filter at (All) the confirmed dialog leaves the
@@ -1103,7 +1206,7 @@ export function showCalculatedField(d: Designer): void {
   const pivot = dialogPivot(d);
   if (!pivot) return;
   d.showDialog(TemplateNames.CalculatedFieldsDialogTemplate ?? 'calculatedFieldsDialogTemplate', {
-    dialogTitle: 'Insert Calculated Field',
+    dialogTitle: T('insertCalculatedField', 'Insert Calculated Field'),
     name: 'Field1',
     formula: '= 0',
     sourceFields: sourceFieldNames(pivot),
@@ -1131,7 +1234,7 @@ export function showCalcItemSolveOrder(d: Designer): void {
   const pivot = dialogPivot(d);
   if (!pivot) return;
   d.showDialog(TemplateNames.CalculatedItemSolveOrderDialogTemplate ?? 'calculatedItemSolveOrderDialogTemplate', {
-    dialogTitle: 'Calculated Item Solve Order',
+    dialogTitle: T('calculatedItemSolveOrder', 'Calculated Item Solve Order'),
     entries: solveOrderEntries(pivot),
   }, () => undefined);
 }

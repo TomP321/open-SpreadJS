@@ -8,6 +8,7 @@ import {
   ReferenceValue,
   ScalarValue,
   Value,
+  dateToSerial,
   error,
   isError,
   numberToText,
@@ -20,7 +21,7 @@ function scalarText(value: ScalarValue): string {
   if (typeof value === 'string') return value;
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
   if (typeof value === 'number') return numberToText(value);
-  if (value instanceof Date) return numberToText((value.getTime() - Date.UTC(1899, 11, 30)) / 86400000);
+  if (value instanceof Date) return numberToText(dateToSerial(value));
   if (isError(value)) raiseError(value);
   return '';
 }
@@ -231,7 +232,7 @@ export const TEXT_FUNCTIONS: DefinedFunction[] = [
     const value = args.value(0);
     if (isError(value)) return value;
     if (typeof value === 'number') return value;
-    if (value instanceof Date) return (value.getTime() - Date.UTC(1899, 11, 30)) / 86400000;
+    if (value instanceof Date) return dateToSerial(value);
     if (typeof value === 'boolean') return error(ErrorCode.value);
     const text = textArg(args, 0).trim();
     if (!text) return error(ErrorCode.value);
@@ -250,7 +251,7 @@ export const TEXT_FUNCTIONS: DefinedFunction[] = [
       if (parsed === undefined) return value;
     }
     const format = textArg(args, 1);
-    const numeric = value instanceof Date ? (value.getTime() - Date.UTC(1899, 11, 30)) / 86400000 : args.number(0);
+    const numeric = value instanceof Date ? dateToSerial(value) : args.number(0);
     if (/^general$/i.test(format)) return numberToText(numeric);
     if (!format) return '';
     try {
@@ -346,7 +347,7 @@ export function parseDateText(input: string): number | undefined {
   const patterns: { regexp: RegExp; map: (match: RegExpExecArray) => [number, number, number] }[] = [
     { regexp: /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/, map: (m) => [Number(m[1]), Number(m[2]), Number(m[3])] },
     { regexp: /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/, map: (m) => [normalizeYear(Number(m[3])), Number(m[1]), Number(m[2])] },
-    { regexp: /^(\d{1,2})[-/](\d{1,2})$/, map: (m) => [new Date().getUTCFullYear(), Number(m[1]), Number(m[2])] },
+    { regexp: /^(\d{1,2})[-/](\d{1,2})$/, map: (m) => [new Date().getFullYear(), Number(m[1]), Number(m[2])] },
   ];
   for (const pattern of patterns) {
     const match = pattern.regexp.exec(text);

@@ -6,7 +6,7 @@
  */
 import { GC } from './generated/enums.js';
 import { notImplemented } from './not-implemented.js';
-import { Range } from './primitives.js';
+import { Range, canvasFont } from './primitives.js';
 import type { JsonRecord } from './serialization.js';
 import { coordinate, count } from './sheet-common.js';
 import { _expandSelectionToSpans } from './sheet-selection.js';
@@ -109,7 +109,7 @@ export function autoFitRow(sheet: Worksheet, row: number): void {
     coordinate(row);
     const ctx = sheet.measureContext(); let height = 20;
     for (const [r, col] of sheet.area().cells.entries()) if (r === row && !sheet.getSpan(row, col)) {
-      const style = sheet.getActualStyle(row, col); ctx.font = String(style.font);
+      const style = sheet.getActualStyle(row, col); ctx.font = canvasFont(style);
       const size = Number((ctx.font.match(/([\d.]+)px/) ?? [0, 14.6667])[1]);
       const text = sheet.getText(row, col), width = Math.max(1, sheet.cols.getSize(col) - 6);
       const lines = style.wordWrap ? text.split('\n').reduce((sum, line) => sum + Math.max(1, Math.ceil(ctx.measureText(line).width / width)), 0) : text.split('\n').length;
@@ -124,7 +124,7 @@ export function autoFitColumn(sheet: Worksheet, col: number): void {
     coordinate(col);
     const ctx = sheet.measureContext(); let width = 0;
     for (const [row, c] of sheet.area().cells.entries()) if (c === col && !sheet.getSpan(row, col)) {
-      const style = sheet.getActualStyle(row, col); ctx.font = String(style.font);
+      const style = sheet.getActualStyle(row, col); ctx.font = canvasFont(style);
       // Trial (TASK 75 r4, side-by-side canvas probe): the fitted width is the measured
       // text plus 3 px (not 8), and empty text lines do not participate.
       for (const text of sheet.getText(row, col).split('\n'))

@@ -72,20 +72,29 @@ describe('tables', () => {
     expect(sheet.getValue(2, 0)).toBe(9);
   });
 
-  it('exposes the 60 built-in table themes', () => {
+  it('exposes the 60 built-in and 24 professional table themes', () => {
     expect(AnyThemes.medium2).toBeDefined();
     expect(AnyThemes.light21).toBeDefined();
     expect(TableThemes.dark11).toBeDefined();
-    // Trial value (probe f40b-professional-full): the `professional` themes are
-    // real TableTheme objects (hidden from enumeration, `getTheme` still resolves
-    // them); the previous "undefined" expectation was self-derived and is replaced.
+    // TASK 97 CH-2 (black-box re-probe 2026-11-23, core with the tablesheet
+    // feature loaded): the trial resolves all 24 `professional` themes as real
+    // TableTheme objects AND enumerates them after the 60 built-ins (Object.keys
+    // length 84, professional1 at index 60, professional24 last); professional25
+    // stays undefined; the theme toJSON digests match ours byte-for-byte.
+    // The earlier "hidden from enumeration" expectation (probe
+    // f40b-professional-full) was wrong for this configuration.
     type ThemeView = { toJSON(): { name: string } & Record<string, unknown> };
     const rawProfessional = (TableThemes as unknown as Record<string, ThemeView | undefined>).professional1;
     expect(rawProfessional).toBeDefined();
     const professional = rawProfessional as ThemeView;
     expect(professional.toJSON().name).toBe('professional1');
-    expect(Object.prototype.propertyIsEnumerable.call(TableThemes, 'professional1')).toBe(false);
+    expect(Object.prototype.propertyIsEnumerable.call(TableThemes, 'professional1')).toBe(true);
     expect(professional.toJSON().headerRowStyle).toBeTruthy();
+    const keys = Object.keys(TableThemes as unknown as object);
+    expect(keys.length).toBe(84);
+    expect(keys[60]).toBe('professional1');
+    expect(keys[83]).toBe('professional24');
+    expect((TableThemes as unknown as Record<string, unknown>).professional25).toBeUndefined();
     const tokens = (TableThemes as unknown as { medium2: { toJSON(): { name: string } } }).medium2.toJSON();
     expect(tokens.name).toBe('Medium2');
     expect(JSON.stringify(tokens)).toContain('Accent 1 20');

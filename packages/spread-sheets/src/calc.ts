@@ -5,8 +5,12 @@ import type { CellsInfo, FormulaInfo } from './calc/engine-introspect.js';
 export interface ICalcEngine {
   /** Parses and validates a formula, returning its canonical text. */
   parseFormula?(sheet: Worksheet, row: number, col: number, formula: string): string;
+  /** Parses with an explicit grammar (no language = invariant English) and returns canonical text. */
+  parseFormulaText?(sheet: Worksheet, formula: string, r1c1?: boolean, language?: import('./calc/language-packages.js').LanguagePackage): string;
+  /** Whether the workbook uses the R1C1 reference style. */
+  isR1C1?(): boolean;
   /** The formula compiled by the newest `parseFormula`/`compile` call. */
-  lastParsed?: { text: string; r1c1: boolean; ast: import('./calc/parser.js').AstNode } | undefined;
+  lastParsed?: { text: string; r1c1: boolean; ast: import('./calc/parser.js').AstNode; language?: string } | undefined;
   formulaChanged(
     sheet: Worksheet,
     row: number,

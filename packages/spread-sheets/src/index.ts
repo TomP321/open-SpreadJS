@@ -15,6 +15,8 @@ import { TableSheetPanel } from './tablesheet/panel.js';
 import { ReportSheet, TemplateSheet } from './report/index.js';
 import { getNamedPatterns, namedPattern, validatePattern } from './features/input-mask.js';
 import { FormulaTextBox, NameBox, StatusBar, StatusItem, findControl, findSheetControl } from './features/controls.js';
+import { colorFormula } from './features/formula-color.js';
+import { setGeneralFitLog } from './general-fit.js';
 import { Commands as formulaPanelCommands, FormulaEditor as FormulaPanelEditor, findControl as formulaPanelFindControl } from './features/formula-panel.js';
 import { ioNamespace } from './io-core.js';
 import { Collaboration } from './collaboration.js';
@@ -345,6 +347,34 @@ export { userColor, blocksToText } from './threaded-comments.js';
 // (our Designer, the `@opensheets/spread-sheets-barcode` add-in) call it once at load.
 Object.defineProperty(Spread.Sheets, '_registerBarcodeFunctions', {
   value: registerBarcodeFunctions,
+  enumerable: false,
+  configurable: true,
+  writable: true,
+});
+// TASK 91: the Designer formula bar colourises its text with the SAME tokenizer as the cell
+// editor and `FormulaTextBox` (features/formula-color.ts), so the colouring of a selected
+// formula matches the editor exactly. Hidden, non-enumerable internal hook (not part of the
+// public contract); returns the `colorFormula` segments for a text.
+Object.defineProperty(Spread.Sheets, '_formulaColorSegments', {
+  value: (text: string) => colorFormula(text).segments,
+  enumerable: false,
+  configurable: true,
+  writable: true,
+});
+// TASK 91: the Designer formula bar shows a non-formula cell's value as its `General` text —
+// `String(value)` with the culture's separators, `TRUE`/`FALSE`, dates like the sheet paints
+// them — regardless of the cell's own formatter (the trial shows the raw `250` for a `#,##0.00`
+// cell). Hidden internal hook (not part of the public contract).
+Object.defineProperty(Spread.Sheets, '_generalText', {
+  value: (value: unknown) => new GeneralFormatter('General').format(value),
+  enumerable: false,
+  configurable: true,
+  writable: true,
+});
+// TASK 91: opt-in recorder of the fitted `General` texts the renderer actually paints (see
+// general-fit.ts). Hidden internal hook for the Designer-compare text gate; disabled = free.
+Object.defineProperty(Spread.Sheets, '_generalFitLog', {
+  value: (on?: boolean) => setGeneralFitLog(on !== false),
   enumerable: false,
   configurable: true,
   writable: true,

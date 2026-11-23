@@ -1,6 +1,6 @@
 import { CalcError, BarcodeExValue, ErrorCodeValueMap, ImageExValue, SparklineExValue, isErrorString } from './calc/values.js';
 import { GeneralFormatter, dateToSerial, serialToDate } from './formatter.js';
-import { LineBorder, Style, getFont, styleProperties } from './primitives.js';
+import { LineBorder, Style, getFont, parseFontParts, styleProperties } from './primitives.js';
 export type JsonRecord = Record<string, unknown>;
 export function object(value: unknown): JsonRecord {
   return value && typeof value === 'object' ? (value as JsonRecord) : {};
@@ -66,16 +66,12 @@ export function styleToJSON(style: Style | string | null | undefined): unknown {
   // (official-model.json's named style keeps both the composed `font` and the parsed parts).
   const shorthand = getFont(style);
   if (shorthand !== undefined) result.font = serializeValue(shorthand);
-  if (typeof style.font === 'string') {
-    const font = style.font.match(/^(.*?)\s*(\d+(?:\.\d+)?(?:px|pt|em|rem|%))(?:\/[\d.]+)?\s+(.+)$/);
-    if (font) {
-      if (/italic|oblique/.test(font[1]) && result.fontStyle === undefined)
-        result.fontStyle = font[1].match(/italic|oblique/)![0];
-      if (/bold|[1-9]00/.test(font[1]) && result.fontWeight === undefined)
-        result.fontWeight = font[1].match(/bold|[1-9]00/)![0];
-      result.fontSize ??= font[2];
-      result.fontFamily ??= font[3];
-    }
+  const font = parseFontParts(style.font)?.parts;
+  if (font) {
+    if (font.fontStyle !== undefined && result.fontStyle === undefined) result.fontStyle = font.fontStyle;
+    if (font.fontWeight !== undefined && result.fontWeight === undefined) result.fontWeight = font.fontWeight;
+    if (font.fontSize !== undefined) result.fontSize ??= font.fontSize;
+    if (font.fontFamily !== undefined) result.fontFamily ??= font.fontFamily;
   }
   return result;
 }

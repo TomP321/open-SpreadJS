@@ -1,4 +1,5 @@
 /** Shared formula syntax colouring for the cell editor and the formula text box (M5f). */
+import { activeCalcLanguage } from './formula-hints.js';
 
 /** Reference colours assigned to distinct references in order of first appearance, cycling every seven. */
 export const referencePalette = ['#0000ff', '#008000', '#9900cc', '#800000', '#00cc33', '#cc6600', '#cc0099'];
@@ -6,8 +7,8 @@ export const referencePalette = ['#0000ff', '#008000', '#9900cc', '#800000', '#0
 export interface FormulaSegment { text: string; color?: string }
 export interface FormulaReference { text: string; color: string; start: number; sheetName?: string; row1: number; col1: number; row2: number; col2: number }
 
-const wordStart = /[A-Za-z_$]/;
-const wordChar = /[A-Za-z0-9_.$]/;
+const wordStart = /[A-Za-z_$\u0080-\uffff]/;
+const wordChar = /[A-Za-z0-9_.$\u0080-\uffff]/;
 
 /** Convert A, B, ... AA to a zero-based column index, or -1 when out of range. */
 function columnIndex(letters: string): number {
@@ -74,7 +75,10 @@ export function colorFormula(text: string): { segments: FormulaSegment[], refere
       }
       const word = text.slice(start, index);
       const upper = word.toUpperCase();
-      if (numberTail || upper === 'TRUE' || upper === 'FALSE' || (text[index] === '(' && !word.includes('!'))) { plain(word); continue; }
+      const language = activeCalcLanguage();
+      const booleanLiteral = upper === 'TRUE' || upper === 'FALSE'
+        || (language !== undefined && (upper === language.trueValue.toUpperCase() || upper === language.falseValue.toUpperCase()));
+      if (numberTail || booleanLiteral || (text[index] === '(' && !word.includes('!'))) { plain(word); continue; }
       const key = upper.replaceAll('$', '');
       let color = colors.get(key);
       if (!color) { color = referencePalette[colors.size % referencePalette.length]; colors.set(key, color); }

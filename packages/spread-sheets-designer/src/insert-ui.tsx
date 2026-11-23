@@ -8,6 +8,10 @@ import { paintFormControl, paintShape } from '@mescius/spread-sheets/dist/gc.spr
 import { useDesigner, useDesignerVersion } from './store.js';
 import { shapeGalleryGroups, shapeGalleryIconSize, sparklineGroups, formControls } from './commands/insert.js';
 import { shapeGalleryLabels } from './commands/insert-shape-names.js';
+import { localizedText, resolveText } from './resolve.js';
+import { resource } from './app-helpers.js';
+
+const fs = (designer: { resources: Record<string, unknown> }, key: string, en: string): string => resolveText(`\${res.ribbon.formatShape.${key}}`, designer.resources) || en;
 import { shapeGalleryThumbBox } from './commands/insert-shape-aspect.js';
 import type { DesignerShape, Worksheet } from './core-internals.js';
 import { internals, shapesOf } from './core-internals.js';
@@ -330,15 +334,15 @@ export function ShapeGalleryMenu(): React.ReactElement {
   const d = useDesigner();
   const run = (id: string): void => { d.drawTool = { kind: 'shape', galleryId: id }; d.openMenu = null; d.invalidate(); };
   return (
-    <div className="gc-shape-gallery gc-list-control-container" role="menu" aria-label="Shapes">
+    <div className="gc-shape-gallery gc-list-control-container" role="menu" aria-label={resource(d, '${res.ribbon.commands.insertShapeText}') || 'Shapes'}>
       {shapeGalleryGroups.map(group => {
         const size = shapeGalleryIconSize(group.title);
         return (
           <div className="gc-list-control-group" key={group.title}>
-            <div className="gc-list-control-group-text">{group.title}</div>
+            <div className="gc-list-control-group-text">{resource(d, group.title)}</div>
             <div className="gc-list-control-item-wrap gc-list-alignment-horizontal">
               {group.items.map(item => {
-                const label = shapeGalleryLabels[item.id] ?? item.id;
+                const label = resource(d, String(shapeGalleryLabels[item.id] ?? item.id));
                 return (
                 <div key={item.id} className="gc-list-control-item gc-designer-list-content-item-focusable" role="menuitem" title={label} aria-label={label}
                   onClick={() => run(item.id)}>
@@ -368,15 +372,15 @@ const sparklineKinds: Record<string, string> = {
 export function SparklineGalleryMenu(): React.ReactElement {
   const d = useDesigner();
   return (
-    <div className="gc-sparkline-gallery sparklineGallery-dropdown-container" role="menu" aria-label="Sparklines">
+    <div className="gc-sparkline-gallery sparklineGallery-dropdown-container" role="menu" aria-label={resource(d, '${res.ribbon.commands.sparklineGalleryText}') || 'Sparklines'}>
       {sparklineGroups.map(group => (
-        <GalleryGroup key={group.title} title={group.title}>
+        <GalleryGroup key={group.title} title={resource(d, group.title)}>
           {group.items.map(item => {
             const kind = sparklineKinds[item.command] ?? 'line';
             return (
-              <div key={item.command} className="sparkline-insert-item" role="menuitem" title={item.title} aria-label={item.title}
+              <div key={item.command} className="sparkline-insert-item" role="menuitem" title={resource(d, item.title)} aria-label={resource(d, item.title)}
                 onClick={() => { d.openMenu = null; d.executeCommand(item.command); }}>
-                <ThumbCanvas paint={sparklinePainter(kind)} size={50} className=" gc-sparkline-thumb gc-designer-ribbon-icon" title={item.title} />
+                <ThumbCanvas paint={sparklinePainter(kind)} size={50} className=" gc-sparkline-thumb gc-designer-ribbon-icon" title={resource(d, item.title)} />
               </div>
             );
           })}
@@ -389,15 +393,15 @@ export function SparklineGalleryMenu(): React.ReactElement {
 export function FormControlGalleryMenu(): React.ReactElement {
   const d = useDesigner();
   return (
-    <div className="gc-form-control-gallery gc-list-control-container" role="menu" aria-label="Form Controls">
+    <div className="gc-form-control-gallery gc-list-control-container" role="menu" aria-label={fs(d, 'formControls', 'Form Controls')}>
       <div className="gc-list-control-group">
-        <div className="gc-list-control-group-text">Form Controls</div>
+        <div className="gc-list-control-group-text">{fs(d, 'formControls', 'Form Controls')}</div>
         <div className="gc-list-control-item-wrap gc-list-alignment-horizontal">
           {formControls.map(control => (
-            <div key={control.id} className="gc-list-control-item gc-designer-list-content-item-focusable" role="menuitem" title={control.label} aria-label={control.label}
+            <div key={control.id} className="gc-list-control-item gc-designer-list-content-item-focusable" role="menuitem" title={localizedText(d.resources, control.label, 'ribbon.galleries')} aria-label={localizedText(d.resources, control.label, 'ribbon.galleries')}
               onClick={() => { d.drawTool = { kind: 'formControl', controlId: control.id }; d.openMenu = null; d.invalidate(); }}>
               <div className={`insert-form-control-item insert-form-control-item-${control.id} gc-list-control-item-icon`}>
-                <ThumbCanvas paint={formControlPainter(control.objectType)} size={20} title={control.label} />
+                <ThumbCanvas paint={formControlPainter(control.objectType)} size={20} title={localizedText(d.resources, control.label, 'ribbon.galleries')} />
               </div>
             </div>
           ))}
@@ -476,36 +480,36 @@ export function ShapeFormatPanel(): React.ReactElement | null {
     <div className="gc-format-shape-row"><span className="gc-format-shape-label">{label}</span><span className="gc-format-shape-field">{node}</span></div>
   );
   return (
-    <div className="gc-designer-root en gc-format-shape-panel" role="complementary" aria-label="Format Shape" data-shape={name}>
+    <div className="gc-designer-root en gc-format-shape-panel" role="complementary" aria-label={fs(d, 'title', 'Format Shape')} data-shape={name}>
       <div className="gc-format-shape-title">
-        <span>Format Shape</span>
-        <button className="gc-format-shape-close" aria-label="Close" onClick={() => { d._formatShapePanel = null; d.invalidate(); }}>×</button>
+        <span>{fs(d, 'title', 'Format Shape')}</span>
+        <button className="gc-format-shape-close" aria-label={resolveText('${res.close}', d.resources) || 'Close'} onClick={() => { d._formatShapePanel = null; d.invalidate(); }}>×</button>
       </div>
-      <div className="gc-format-shape-tabs"><span className="gc-format-shape-tab selected">Shape Options</span><span className="gc-format-shape-tab">Text Options</span></div>
+      <div className="gc-format-shape-tabs"><span className="gc-format-shape-tab selected">{fs(d, 'shapeOptions', 'Shape Options')}</span><span className="gc-format-shape-tab">{fs(d, 'textOptions', 'Text Options')}</span></div>
       <div className="gc-format-shape-body">
-        <div className="gc-format-shape-section">Fill</div>
-        {row('Fill', (
+        <div className="gc-format-shape-section">{fs(d, 'fill', 'Fill')}</div>
+        {row(fs(d, 'fill', 'Fill'), (
           <select value={fill.visible === false ? 'none' : 'solid'} onChange={(event) => apply({ fill: { ...fill, visible: event.target.value === 'solid' } })}>
-            <option value="none">No fill</option><option value="solid">Solid fill</option>
+            <option value="none">{fs(d, 'noFill', 'No fill')}</option><option value="solid">{fs(d, 'solidFill', 'Solid fill')}</option>
           </select>
         ))}
-        {fill.visible !== false && row('Color', <input type="color" value={/^#([0-9a-f]{6})$/i.test(String(fill.color ?? '#4472c4')) ? String(fill.color) : '#4472c4'} onChange={(event) => apply({ fill: { ...fill, color: event.target.value } })} />)}
-        {row('Transparency', <input type="number" min={0} max={100} value={Number(fill.transparency ?? 0)} onChange={(event) => apply({ fill: { ...fill, transparency: Number(event.target.value) } })} />)}
-        <div className="gc-format-shape-section">Line</div>
-        {row('Border', (
+        {fill.visible !== false && row(fs(d, 'color', 'Color'), <input type="color" value={/^#([0-9a-f]{6})$/i.test(String(fill.color ?? '#4472c4')) ? String(fill.color) : '#4472c4'} onChange={(event) => apply({ fill: { ...fill, color: event.target.value } })} />)}
+        {row(fs(d, 'transparency', 'Transparency'), <input type="number" min={0} max={100} value={Number(fill.transparency ?? 0)} onChange={(event) => apply({ fill: { ...fill, transparency: Number(event.target.value) } })} />)}
+        <div className="gc-format-shape-section">{fs(d, 'line', 'Line')}</div>
+        {row(fs(d, 'border', 'Border'), (
           <select value={line.visible === false ? 'none' : 'solid'} onChange={(event) => apply({ line: { ...line, visible: event.target.value === 'solid' } })}>
-            <option value="none">No line</option><option value="solid">Solid line</option>
+            <option value="none">{fs(d, 'noLine', 'No line')}</option><option value="solid">{fs(d, 'solidLine', 'Solid line')}</option>
           </select>
         ))}
-        {line.visible !== false && row('Color', <input type="color" value={/^#([0-9a-f]{6})$/i.test(String(line.color ?? '#3465a4')) ? String(line.color) : '#3465a4'} onChange={(event) => apply({ line: { ...line, color: event.target.value } })} />)}
-        {row('Width', <input type="number" min={0} step={0.5} value={Number(line.width ?? 2)} onChange={(event) => apply({ line: { ...line, width: Number(event.target.value) } })} />)}
-        <div className="gc-format-shape-section">Size &amp; Properties</div>
-        {row('Position X', <input type="number" value={Math.round(Number(shape.x()))} onChange={(event) => apply({ position: { x: Number(event.target.value) } })} />)}
-        {row('Position Y', <input type="number" value={Math.round(Number(shape.y()))} onChange={(event) => apply({ position: { y: Number(event.target.value) } })} />)}
-        {row('Size W', <input type="number" min={1} value={Math.round(Number(shape.width()))} onChange={(event) => apply({ position: { width: Number(event.target.value) } })} />)}
-        {row('Size H', <input type="number" min={1} value={Math.round(Number(shape.height()))} onChange={(event) => apply({ position: { height: Number(event.target.value) } })} />)}
-        {row('Rotation', <input type="number" min={0} max={359} value={Math.round(Number(shape.rotation?.() ?? 0))} onChange={(event) => apply({ rotation: Number(event.target.value) })} />)}
-        {!shape.control?.() && !shape.isCamera?.() && !shape.isPicture?.() ? row('Text', <input type="text" value={String(shape.text?.() ?? '')} onChange={(event) => apply({ text: event.target.value })} />) : null}
+        {line.visible !== false && row(fs(d, 'color', 'Color'), <input type="color" value={/^#([0-9a-f]{6})$/i.test(String(line.color ?? '#3465a4')) ? String(line.color) : '#3465a4'} onChange={(event) => apply({ line: { ...line, color: event.target.value } })} />)}
+        {row(fs(d, 'width', 'Width'), <input type="number" min={0} step={0.5} value={Number(line.width ?? 2)} onChange={(event) => apply({ line: { ...line, width: Number(event.target.value) } })} />)}
+        <div className="gc-format-shape-section">{fs(d, 'sizeProperties', 'Size & Properties')}</div>
+        {row(fs(d, 'positionX', 'Position X'), <input type="number" value={Math.round(Number(shape.x()))} onChange={(event) => apply({ position: { x: Number(event.target.value) } })} />)}
+        {row(fs(d, 'positionY', 'Position Y'), <input type="number" value={Math.round(Number(shape.y()))} onChange={(event) => apply({ position: { y: Number(event.target.value) } })} />)}
+        {row(fs(d, 'sizeW', 'Size W'), <input type="number" min={1} value={Math.round(Number(shape.width()))} onChange={(event) => apply({ position: { width: Number(event.target.value) } })} />)}
+        {row(fs(d, 'sizeH', 'Size H'), <input type="number" min={1} value={Math.round(Number(shape.height()))} onChange={(event) => apply({ position: { height: Number(event.target.value) } })} />)}
+        {row(fs(d, 'rotation', 'Rotation'), <input type="number" min={0} max={359} value={Math.round(Number(shape.rotation?.() ?? 0))} onChange={(event) => apply({ rotation: Number(event.target.value) })} />)}
+        {!shape.control?.() && !shape.isCamera?.() && !shape.isPicture?.() ? row(fs(d, 'text', 'Text'), <input type="text" value={String(shape.text?.() ?? '')} onChange={(event) => apply({ text: event.target.value })} />) : null}
       </div>
     </div>
   );

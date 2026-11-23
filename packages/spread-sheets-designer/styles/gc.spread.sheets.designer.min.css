@@ -44,7 +44,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
+  background: var(--sjs-color-background-2); /* TASK 86: tokenised — light value unchanged (#f5f5f5), dark now follows the theme */
   position: relative;
 }
 
@@ -148,7 +148,7 @@
 /* Combo boxes ------------------------------------------------------------ */
 .gc-designer-ribbon-comboBox {
   height: 26px; display: flex; flex-direction: row; align-items: center; justify-content: space-between;
-  border: 1px solid var(--sjs-color-stroke); background: #fff; border-radius: 4px; position: relative;
+  border: 1px solid var(--sjs-color-stroke); background: var(--sjs-color-background); border-radius: 4px; position: relative;
   flex: 0 0 auto; overflow: visible;
 }
 .gc-designer-ribbon-comboBox-editable .spinner-input { border: 0; outline: none; height: 22px; padding: 0 4px; font-size: 12px; }
@@ -168,7 +168,7 @@
 .gc-designer-ribbon-comboBox-size { width: 100px; }
 
 .gc-designer-ribbon-editable-select { height: 26px; flex: 0 0 auto; }
-.gc-designer-ribbon-editable-select .gc-edit-select { height: 26px; display: flex; align-items: center; border: 1px solid var(--sjs-color-stroke); background: #fff; border-radius: 0 4px 4px 0; }
+.gc-designer-ribbon-editable-select .gc-edit-select { height: 26px; display: flex; align-items: center; border: 1px solid var(--sjs-color-stroke); background: var(--sjs-color-background); border-radius: 0 4px 4px 0; }
 .gc-designer-ribbon-comboBox[data-command="ribbon.fontFamily"] { border-radius: 4px 0 0 4px; }
 .gc-designer-ribbon-editable-select .gc-designer-ribbon-list-btn { width: 16px; height: 22px; }
 .gc-designer-ribbon-editable-select .spinner-input { border: 0; outline: none; height: 22px; width: 100%; padding: 1px 2px 1px 4px; margin-left: -1px; font-size: 12px; box-sizing: content-box; color: var(--sjs-color-foreground); caret-color: var(--sjs-color-foreground); user-select: none; vertical-align: middle; text-wrap-mode: nowrap; } /* TASK 57 DPR-2 pass: trial input fills the combo (outer 24px at y+1, text at container x+4) */
@@ -478,23 +478,23 @@
 .gc-designer-formula-panel { flex: 0 0 37px; }
 .gc-designer-formula-panel .gc-designer-panel { height: 37px; }
 .gc-designer-formula-bar { display: flex; flex-direction: row; align-items: flex-start; height: 22px; margin-top: 3px; padding: 0 8px; }
-.gc-designer-formula-bar-nameBox { width: 100px; height: 23px; flex: 0 0 100px; display: flex; align-items: center; border: 1px solid var(--sjs-color-stroke); background: #fff; }
+.gc-designer-formula-bar-nameBox { width: 100px; height: 23px; flex: 0 0 100px; display: flex; align-items: center; border: 1px solid var(--sjs-color-stroke); background: var(--sjs-color-background); }
 .gc-name-box-selector {
-  width: 80px; height: 21px; border: 0; background: #fff; font-size: 13.3333px; padding: 2px 2px 1px; outline: none; color: var(--sjs-color-foreground);
+  width: 80px; height: 21px; border: 0; background: var(--sjs-color-background); font-size: 13.3333px; padding: 2px 2px 1px; outline: none; color: var(--sjs-color-foreground);
 }
 .gc-designer-namebox-arrow { width: 18px; height: 21px; display: flex; align-items: center; justify-content: center; flex: 0 0 18px; }
 .gc-designer-namebox-arrow .gc-designer-ribbon-list-triangle { transform: scale(.8); }
 .gc-designer-formula-bar-splitter { width: 32px; height: 24px; flex: 0 0 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin-top: 1px; }
 .gc-designer-formula-bar-splitter i { width: 3px; height: 3px; border-radius: 50%; background: #666; display: block; }
-.gc-designer-formula-bar-button-group { height: 25px; width: 66px; flex: 0 0 66px; display: flex; background: #fff; border: 1px solid var(--sjs-color-stroke); padding: 0 2px; box-sizing: border-box; }
+.gc-designer-formula-bar-button-group { height: 25px; width: 66px; flex: 0 0 66px; display: flex; background: var(--sjs-color-background); border: 1px solid var(--sjs-color-stroke); padding: 0 2px; box-sizing: border-box; }
 .gc-designer-formula-button {
   width: 20px; height: 23px; padding: 0; border: 0; background: transparent; font-size: 15px; color: #333; cursor: default;
 }
 .gc-designer-formula-button:hover { background: var(--sjs-color-background-hover); }
 .gc-designer-formula-button.fx { font-family: Georgia, serif; font-style: italic; font-size: 14px; }
-.gc-designer-formula-bar-text-box { flex: 1 1 auto; height: 24px; margin-left: 4px; margin-right: 0; margin-top: 1px; border: 1px solid var(--sjs-color-stroke); background: #fff; padding: 2px 0 0 3px; box-sizing: border-box; }
+.gc-designer-formula-bar-text-box { flex: 1 1 auto; height: 24px; margin-left: 4px; margin-right: 0; margin-top: 1px; border: 1px solid var(--sjs-color-stroke); background: var(--sjs-color-background); padding: 2px 0 0 3px; box-sizing: border-box; }
 .gc-designer-formula-input {
-  width: 100%; height: 20px; border: 0; background: #fff; font-size: 12px; padding: 0; outline: none; color: var(--sjs-color-foreground);
+  width: 100%; height: 20px; border: 0; background: var(--sjs-color-background); font-size: 12px; padding: 0; outline: none; color: var(--sjs-color-foreground);
 }
 .gc-designer-resize-container-vertical-handle { height: 10px; position: relative; cursor: row-resize; }
 .gc-designer-resize-container-vertical-handle::after { content: ""; position: absolute; left: 50%; top: 4px; width: 30px; height: 2px; background: #dfe3e6; transform: translateX(-50%); }
@@ -506,7 +506,7 @@
 .gc-designer-status-panel { flex: 0 0 22px; }
 .gc-designer-status-panel .gc-designer-panel { height: 22px; }
 .gc-designer-statusbar { height: 22px; }
-.gc-statusbar { height: 22px; background: var(--sjs-color-brand-background); color: #eef5f1; position: relative; font-family: "Segoe UI", Calibri, Thonburi, Arial, Verdana, sans-serif, "Mongolian Baiti", "Microsoft Yi Baiti", "Javanese Text"; font-size: 10.6667px; overflow: hidden; }
+.gc-statusbar { height: 22px; background: #217346; color: #eef5f1; position: relative; font-family: "Segoe UI", Calibri, Thonburi, Arial, Verdana, sans-serif, "Mongolian Baiti", "Microsoft Yi Baiti", "Javanese Text"; font-size: 10.6667px; overflow: hidden; }
 .gc-statusbar-statusitem-container { position: absolute; top: 0; height: 22px; line-height: 22px; }
 .gc-statusbar-ready { left: 10px; }
 .gc-statusbar-zoom-value { right: 10px; width: 30px; text-align: left; }
@@ -526,18 +526,18 @@
 
 /* Backstage -------------------------------------------------------------- */
 .gc-designer-backstage {
-  position: absolute; inset: 0; z-index: 9000; background: #fff; display: flex; flex-direction: row;
+  position: absolute; inset: 0; z-index: 9000; background: var(--sjs-color-background); display: flex; flex-direction: row;
 }
-.gc-designer-backstage-menu { width: 180px; background: #f5f5f5; height: 100%; flex: 0 0 180px; position: relative; }
+.gc-designer-backstage-menu { width: 180px; background: var(--sjs-color-background-2); height: 100%; flex: 0 0 180px; position: relative; }
 .gc-designer-backstage-menu::after { content: ''; position: absolute; right: 0; top: 0; width: 3px; height: 100%; background: linear-gradient(to right, #f1f1f1 0 1px, #ebebeb 1px 2px, #dddddd 2px 3px); }
 .gc-designer-backstage-back { height: 50px; position: relative; cursor: default; }
 .gc-designer-backstage-back-icon { position: absolute; left: 15px; top: 5px; width: 40px; height: 40px; border: 2px solid #1a1a1a; border-radius: 50%; color: #1a1a1a; display: flex; align-items: center; justify-content: center; }
 .gc-designer-backstage-back-icon svg { width: 28px; height: 28px; }
 .gc-designer-backstage-items { padding: 0; }
 .gc-designer-backstage-menu { padding-top: 5px; }
-.gc-designer-backstage-item { height: 40px; line-height: 40px; padding: 0 17px; font-size: 14px; color: #242424; cursor: default; margin: 0 8px; border-radius: 2px; }
+.gc-designer-backstage-item { height: 40px; line-height: 40px; padding: 0 17px; font-size: 14px; color: var(--sjs-color-foreground); cursor: default; margin: 0 8px; border-radius: 2px; }
 .gc-designer-backstage-item:hover { background: #eaeaea; }
-.gc-designer-backstage-item.selected { background: #e0e0e0; }
+.gc-designer-backstage-item.selected { background: var(--sjs-color-background-2-selected); }
 .gc-designer-backstage-separator { height: 12.7px; margin: 5px 17px 0; }
 .gc-designer-backstage-separator fieldset { border: 0; border-top: 1px solid var(--sjs-color-stroke); margin: 0; padding: 0; height: 0; width: 100%; }
 .gc-designer-backstage-content { flex: 1 1 auto; padding: 0; overflow: auto; }
@@ -566,9 +566,10 @@
 }
 .gc-designer-dialog {
   -webkit-font-smoothing: antialiased;
-  margin-top: 111px; background: #fff; width: 672px; max-width: calc(100% - 40px); height: 578px; min-height: 578px;
-  box-shadow: 0 0 2px rgba(0, 0, 0, .12), 0 4px 8px rgba(0, 0, 0, .14); display: flex; flex-direction: column;
-  font-size: 12px; border-radius: 2px;
+  margin-top: 111px; background: var(--sjs-color-background); border: 1px solid var(--sjs-color-stroke);
+  width: 672px; max-width: calc(100% - 40px); height: 578px; min-height: 578px;
+  box-shadow: var(--sjs-shadow-8); display: flex; flex-direction: column;
+  font-size: 12px; border-radius: 8px;
 }
 .gc-dialog-header { height: 48px; display: flex; align-items: flex-start; justify-content: center; position: relative; flex: 0 0 48px; padding-top: 9px; box-sizing: border-box; }
 .gc-dialog-title { font-size: 14.5px; font-weight: 400; line-height: 18px; }
@@ -576,9 +577,9 @@
 .gc-dialog-close:hover { background: #f0f0f0; }
 .gc-dialog-content { flex: 1 1 auto; padding: 0 20px; overflow: auto; min-height: 0; }
 .gc-dialog-footer { flex: 0 0 64px; display: flex; align-items: flex-end; justify-content: flex-end; gap: 12px; padding: 0 12px 5px; }
-.gc-dialog-button { width: 79px; height: 32px; border: 1px solid #d1d1d1; background: #fff; font-size: 13px; cursor: default; padding: 0; }
-.gc-dialog-button:hover { background: #f5f5f5; }
-.gc-dialog-button-primary { background: var(--sjs-color-brand-background); border-color: var(--sjs-color-brand-background); color: #fff; }
+.gc-dialog-button { width: 79px; height: 32px; border: 1px solid var(--sjs-color-stroke); background: var(--sjs-color-background); font-size: 13px; cursor: default; padding: 0; border-radius: 4px; }
+.gc-dialog-button:hover { background: var(--sjs-color-background-hover); }
+.gc-dialog-button-primary { background: var(--sjs-color-brand-background); border-color: var(--sjs-color-stroke); color: #fff; }
 .gc-dialog-button-primary:hover { background: var(--sjs-color-brand-background-hover); }
 .gc-dialog-tabs { height: 100%; display: flex; flex-direction: column; }
 .gc-dialog-tab-bar { display: flex; flex-direction: row; border-bottom: 0; margin: 2px 0 3px; flex: 0 0 auto; }
@@ -591,19 +592,19 @@
 .gc-dialog-column-set { display: flex; flex-direction: row; align-items: flex-start; gap: 18px; }
 .gc-dialog-column { min-width: 0; }
 .gc-dialog-container { display: flex; flex-direction: column; gap: 8px; }
-.gc-dialog-input, .gc-dialog-select { height: 28px; border: 1px solid #b3b3b3; padding: 0 6px; font-size: 12px; background: #fff; min-width: 80px; }
+.gc-dialog-input, .gc-dialog-select { height: 28px; border: 1px solid #b3b3b3; padding: 0 6px; font-size: 12px; background: var(--sjs-color-background); min-width: 80px; }
 .gc-dialog-number { width: 80px; }
 .gc-dialog-checkbox, .gc-dialog-radio { display: flex; align-items: center; gap: 6px; font-size: 12px; min-height: 24px; }
 .gc-dialog-checkbox input, .gc-dialog-radio input { margin: 0; }
 .gc-dialog-color { display: flex; align-items: center; gap: 6px; }
 .gc-dialog-color input[type="color"] { width: 28px; height: 28px; padding: 0; border: 1px solid #b3b3b3; background: #fff; }
 .gc-dialog-color .gc-dialog-input { width: 96px; }
-.gc-dialog-list { border: 1px solid #d1d1d1; height: 300px; overflow-y: auto; padding: 4px; }
+.gc-dialog-list { border: 1px solid var(--sjs-color-stroke); height: 300px; overflow-y: auto; padding: 4px; }
 .gc-dialog-list-item { height: 28px; display: flex; align-items: center; padding: 0 9px; font-size: 12px; cursor: default; }
-.gc-dialog-list-item:hover { background: #f5f5f5; }
-.gc-dialog-list-item.selected { background: #ebebeb; color: inherit; }
+.gc-dialog-list-item:hover { background: var(--sjs-color-background-hover); }
+.gc-dialog-list-item.selected { background: var(--sjs-color-background-selected); color: inherit; }
 .gc-unhide-sheet-list { width: 320px; height: 180px; }
-.gc-dialog-secondary { height: 28px; border: 1px solid #d1d1d1; background: #fff; font-size: 12px; }
+.gc-dialog-secondary { height: 28px; border: 1px solid var(--sjs-color-stroke); background: var(--sjs-color-background); font-size: 12px; }
 .gc-dialog-label-line { height: 1px; background: #e1e1e1; margin: 4px 0; }
 .gc-dialog-border-preview { width: 160px; height: 90px; border: 1px solid #b3b3b3; display: flex; align-items: center; justify-content: center; }
 .gc-dialog-border-preview span { width: 90px; height: 46px; border: 1px solid #333; }
@@ -729,7 +730,7 @@
 .gc-designer-ribbon-check-box-large .gc-designer-ribbon-text { font-size: 12px; line-height: 14px; text-align: center; white-space: normal; max-width: 68px; padding: 1px 2px; }
 .gc-designer-ribbon-label { display: flex; align-items: center; gap: 3px; height: 28px; padding: 0 4px; font-size: 12px; color: var(--sjs-color-foreground); white-space: nowrap; }
 .gc-designer-ribbon-label .gc-designer-ribbon-icon { width: 16px; height: 16px; flex-basis: 16px; }
-.gc-designer-ribbon-spinner { display: flex; align-items: center; width: 80px; height: 24px; border: 1px solid var(--sjs-color-stroke); background: #fff; border-radius: 2px; box-sizing: border-box; }
+.gc-designer-ribbon-spinner { display: flex; align-items: center; width: 80px; height: 24px; border: 1px solid var(--sjs-color-stroke); background: var(--sjs-color-background); border-radius: 2px; box-sizing: border-box; }
 .gc-designer-ribbon-spinner .spinner-input { width: 60px; height: 20px; border: 0; outline: none; font-size: 12px; padding: 0 3px; background: transparent; }
 .gc-designer-spinner-arrows { width: 16px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 22px; gap: 3px; }
 .gc-designer-spinner-arrows .up, .gc-designer-spinner-arrows .down { width: 0; height: 0; border-left: 3px solid transparent; border-right: 3px solid transparent; }
@@ -2649,6 +2650,13 @@ label.gc-fs-check input { margin: 0; width: 13px; height: 13px; }
 .gc-find-options-row { justify-content: flex-end; margin-top: 4px; }
 .gc-find-options-row .gc-dialog-column { flex: 0 0 auto; }
 
+/* TASK 67 — Paste-gallery tiles: the 24px clipboard glyphs must render at full size and full
+   opacity for every enabled tile (only .gc-designer-paste-tile-disabled dims, at .5). This
+   re-asserts the tile-box svg size with higher specificity than the generic 16px ribbon-icon
+   rules so the gallery icons can never fall back to 16px, and keeps enabled art at 100%. */
+.gc-designer-paste-tile > .gc-designer-ribbon-icon { width: 24px; height: 24px; flex: 0 0 24px; }
+.gc-designer-paste-tile > .gc-designer-ribbon-icon > svg { width: 24px; height: 24px; }
+.gc-designer-paste-tile:not(.gc-designer-paste-tile-disabled) { opacity: 1; }
 /* TASK 65 */
 /* New Table Style dialog (Format Table gallery footer): 589 x 422, a name row,
  * the Table Element list (24 px rows, 394 x 208), Format/Clear under it, and a
@@ -2769,6 +2777,15 @@ label.gc-fs-check input { margin: 0; width: 13px; height: 13px; }
 .gc-chart-type-series-row > :nth-child(2) { flex: 0 0 150px; }
 .gc-chart-type-series-row > :nth-child(3) { flex: 0 0 90px; }
 .gc-chart-type-series-axis { display: flex; justify-content: center; }
+
+/* TASK 69 — ribbon/menu icon pass: Size menu shows proportional page outlines;
+   Margins menu thumbnails carry the trial's page frame + margin guide rules;
+   Orientation menu rows use the trial's 24px fold-corner glyphs at 40px rows. */
+.sd-orientation-item { min-height: 40px; }
+.sd-orientation-item .gc-designer-ribbon-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.sd-orientation-item .gc-designer-ribbon-icon svg { width: 24px; height: 24px; }
+.sd-margins-thumb .sd-margins-svg { display: block; margin: 4px auto; }
+.sd-paper-item .sd-paper-check { width: 24px; height: 40px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 /* TASK 67 — Paste-gallery tiles: the 24px clipboard glyphs must render at full size and full
    opacity for every enabled tile (only .gc-designer-paste-tile-disabled dims, at .5). This
    re-asserts the tile-box svg size with higher specificity than the generic 16px ribbon-icon
@@ -3025,14 +3042,6 @@ label.gc-fs-check input { margin: 0; width: 13px; height: 13px; }
 .gc-designer-dialog[data-template="pasteSpecialDialogTemplate"] .gc-custom-radio { display: flex; height: 19px; min-height: 0; margin-left: 9px; }
 .gc-designer-dialog[data-template="pasteSpecialDialogTemplate"] .gc-custom-checkbox { height: 19px; margin-left: 8px; }
 
-/* TASK 69 — ribbon/menu icon pass: Size menu shows proportional page outlines;
-   Margins menu thumbnails carry the trial's page frame + margin guide rules;
-   Orientation menu rows use the trial's 24px fold-corner glyphs at 40px rows. */
-.sd-orientation-item { min-height: 40px; }
-.sd-orientation-item .gc-designer-ribbon-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
-.sd-orientation-item .gc-designer-ribbon-icon svg { width: 24px; height: 24px; }
-.sd-margins-thumb .sd-margins-svg { display: block; margin: 4px auto; }
-.sd-paper-item .sd-paper-check { width: 24px; height: 40px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 /* TASK 74 */
 /* Contextual tabs (Table Design / Chart Design / Sparkline / Shape Design):
    the trial wraps the big-button captions inside the button box (2-3 lines),
@@ -3138,3 +3147,515 @@ label.gc-fs-check input { margin: 0; width: 13px; height: 13px; }
 .gc-designer-dv-stack-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
 .gc-designer-dv-stack-icon svg { width: 20px; height: 20px; }
 .gc-designer-formula-editor-panel { position: absolute; left: 0; right: 0; bottom: 22px; z-index: 40; flex: 0 0 auto; border: 1px solid #d4d4d4; border-bottom: none; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08); }
+/* TASK 74 */
+/* Contextual tabs (Table Design / Chart Design / Sparkline / Shape Design):
+   the trial wraps the big-button captions inside the button box (2-3 lines),
+   unlike the Home captions; scoped to the TASK 74 groups so the existing tabs
+   keep their single-line captions. */
+.rb-chart-layouts .gc-designer-fixed-caption, .rb-chart-styles .gc-designer-fixed-caption,
+.rb-chart-data .gc-designer-fixed-caption, .rb-chart-type .gc-designer-fixed-caption,
+.rb-chart-location .gc-designer-fixed-caption, .rb-chart-accessibility .gc-designer-fixed-caption,
+.rb-chart-format-pane .gc-designer-fixed-caption { white-space: normal; text-align: center; }
+/* Sparkline ▸ Style: the colour rows are 24px icon+label+swatch rows (trial geometry). */
+.gc-designer-ribbon-colorPicker-labeled { height: 24px; }
+.gc-designer-ribbon-colorPicker-labeled .gc-designer-color-picker-button { display: flex; align-items: center; gap: 5px; flex: 1 1 auto; min-width: 0; }
+.gc-designer-ribbon-colorPicker-labeled .gc-designer-ribbon-text { white-space: nowrap; overflow: hidden; }
+.gc-designer-ribbon-colorPicker-labeled .gc-designer-color-preview { width: 13px; height: 13px; flex: 0 0 auto; align-self: center; }
+/* Sparkline ▸ Style ▸ weight combo: the trial shows a static "¾ pt" label (no editor). */
+.gc-designer-ribbon-combo-static { height: 22px; line-height: 22px; padding-left: 4px; white-space: nowrap; overflow: hidden; cursor: default; }
+/* Chart Design galleries — popup geometry measured on the trial (measure29-official.json):
+   quick layout 61×54 tiles in rows of 3; color rows 224×38; style tiles 216×136 ×4/row. */
+.gc-quick-layout-gallery { width: 190px; display: flex; flex-wrap: wrap; padding: 6px 0 0 0; }
+.gc-quick-layout-gallery .gc-quick-layout-tile { width: 61px; height: 54px; padding: 2px; margin: 0; box-sizing: border-box; }
+.gc-quick-layout-tile svg { display: block; }
+.gc-change-colors-gallery { width: 225px; }
+.gc-change-colors-gallery .gc-designer-gallery-section { width: 225px; }
+.gc-change-colors-gallery .gc-designer-gallery-title { height: 19px; line-height: 19px; }
+/* The trial row is 224×38 with six stacked color bands filling it (measure29-official.json). */
+.gc-color-items-container { display: flex; flex-direction: column; }
+.gc-designer-color-palette-row { width: 224px; height: 38px; padding: 0; border: 1px solid transparent; cursor: default; margin: 1px 0; box-sizing: border-box; }
+.gc-designer-color-palette-row:hover { border-color: var(--sjs-color-brand-background); }
+.gc-color-item { flex: 1 1 0; min-height: 0; }
+.gc-chart-style-gallery { width: 910px; display: flex; flex-wrap: wrap; padding: 11px 0 0 5px; }
+.gc-chart-style-gallery .gc-chart-style-tile { width: 216px; height: 136px; padding: 0; margin: 0 10px 10px 0; box-sizing: border-box; }
+.gc-chart-style-tile svg { display: block; }
+/* Sparkline ▸ Clear split button: the trial row is 86px wide (icon + "Clear" + caret). */
+.gc-designer-ribbon-list[data-command="ribbon.clearSparkline"] { width: 86px; max-width: 86px; }
+.gc-designer-ribbon-list[data-command="ribbon.clearSparkline"] .ribbon-split-btn { flex: 1 1 auto; min-width: 0; }
+/* The Resize Table + Alt Text dialogs reuse the shared dialog widgets (TASK 74 templates). */
+.gc-designer-dialog[data-template="resizeTableDialogTemplate"] .gc-resize-table-question { padding-bottom: 6px; }
+.gc-designer-dialog[data-template="resizeTableDialogTemplate"] .gc-resize-table-note { font-size: 11px; color: #666; padding-top: 10px; }
+.gc-designer-dialog[data-template="chartAltTextDialogTemplate"] .gc-alt-text-question { max-width: 320px; }
+/* TASK 69 — ribbon/menu icon pass: Size menu shows proportional page outlines;
+   Margins menu thumbnails carry the trial's page frame + margin guide rules;
+   Orientation menu rows use the trial's 24px fold-corner glyphs at 40px rows. */
+.sd-orientation-item { min-height: 40px; }
+.sd-orientation-item .gc-designer-ribbon-icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.sd-orientation-item .gc-designer-ribbon-icon svg { width: 24px; height: 24px; }
+.sd-margins-thumb .sd-margins-svg { display: block; margin: 4px auto; }
+.sd-paper-item .sd-paper-check { width: 24px; height: 40px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+
+/* TASK 77: PivotTable Analyze ▸ Fields, Items & Sets dialogs and the Show Report Filter Pages
+ * confirmation. Dialog boxes sized to the trial's measured geometry (measured on the running
+ * trial: Insert Calculated Field 451x357, Insert Calculated Item 538x341, Calculated Item Solve
+ * Order 458x393, Show Report Filter Pages 378x252 — probe .probe/t77/run/t77-dialog-geometry.json);
+ * the label/input/list/button layout is our own markup and CSS. */
+.gc-designer-dialog[data-template="calculatedFieldsDialogTemplate"] { width: 451px; height: 357px; min-height: 357px; margin-top: 181px; }
+.gc-designer-dialog[data-template="calculatedItemsDialogTemplate"] { width: 538px; height: 341px; min-height: 341px; margin-top: 189px; }
+.gc-designer-dialog[data-template="calculatedItemSolveOrderDialogTemplate"] { width: 458px; height: 393px; min-height: 393px; margin-top: 163px; }
+.gc-designer-dialog[data-template="pivotShowReportFilterDialogTemplate"] { width: 378px; height: 252px; min-height: 252px; margin-top: 234px; }
+.gc-calc-dialog { display: flex; flex-direction: column; padding: 4px 14px 0; font-size: 12px; }
+.gc-calc-dialog .gc-pivot-dialog-row { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
+.gc-calc-dialog .gc-pivot-dialog-label { flex: 0 0 auto; width: 56px; min-width: 56px; }
+.gc-calc-dialog .gc-dialog-input { height: 24px; border: 1px solid #d1d1d1; font-size: 12px; padding: 0 6px; }
+.gc-calc-field-dialog .gc-calc-name { width: 289px; }
+.gc-calc-field-dialog .gc-calc-formula { width: 310px; }
+.gc-calc-item-dialog .gc-calc-name { width: 299px; }
+.gc-calc-item-dialog .gc-calc-formula { width: 320px; }
+.gc-calc-btn { position: static; border: 1px solid #d1d1d1; background: #fff; font-size: 12px; cursor: default; padding: 0; }
+.gc-calc-dialog .gc-calc-add, .gc-calc-dialog .gc-calc-delete { flex: 0 0 auto; width: 74px; height: 24px; }
+.gc-calc-field-dialog .gc-calc-add, .gc-calc-field-dialog .gc-calc-delete { margin-left: 8px; }
+.gc-calc-label { font-size: 12px; }
+.gc-calc-fields-label, .gc-calc-items-label { margin-bottom: 4px; }
+.gc-calc-list { border: 1px solid #d1d1d1; overflow: auto; }
+.gc-calc-field-dialog .gc-calc-list { height: 160px; }
+.gc-calc-item-dialog .gc-calc-list { height: 112px; width: 250px; }
+.gc-calc-item-dialog .gc-calc-columns { display: flex; gap: 10px; }
+.gc-calc-column { display: flex; flex-direction: column; }
+.gc-calc-list-item { padding: 5px 6px; min-height: 18px; cursor: default; }
+.gc-calc-list-item.selected { background: #e4e4e4; }
+.gc-calc-insert-field, .gc-calc-insert-item { position: static; width: 102px; height: 24px; margin-top: 4px; }
+.gc-calc-item-dialog .gc-calc-insert-row { display: flex; gap: 10px; }
+.gc-solve-head { margin-bottom: 4px; }
+.gc-solve-list { height: 220px; }
+.gc-solve-note { margin-top: 8px; line-height: 18px; }
+.gc-solve-up, .gc-solve-down, .gc-solve-delete, .gc-solve-close { position: static; width: 86px; height: 24px; }
+.gc-solve-order-dialog .gc-solve-buttons { display: flex; gap: 10px; margin-top: 10px; }
+.gc-report-filter-label { margin-bottom: 6px; }
+.gc-report-filter-list { border: 1px solid #d1d1d1; height: 120px; padding: 4px 6px; }
+.gc-report-filter-field { display: block; padding: 5px 6px; }
+
+/* TASK 77 (dock stack): the Selection pane, the threaded comments panel and the pivot field list
+ * share one right dock, reproducing the layout measured on the running trial: one open pane keeps
+ * its 315px flush right (compare frame: sheet host 325, grid viewport 263); with two or more open
+ * panes the visible pane keeps 315px and a 39px vertical tab rail sits right of it (stack 354,
+ * sheet host 286, grid viewport 224). Rail tabs are 40x40 with a 20x20 icon top-down; the visible
+ * pane's tab carries the trial's 3px green left bar. Before this layout two open panels each took
+ * their own dock slot and crushed the sheet viewport (the TASK 75 zoomSelection artifact). The
+ * Formula Editor panel floats over the sheet area instead: the trial's toggle leaves the grid
+ * viewport untouched (measured: viewport height unchanged, no dock row appears). */
+.gc-designer-dv-stack-container { display: flex; flex-direction: row; flex: 0 0 auto; min-width: 0; min-height: 0; }
+.gc-designer-dv-stack-tab-container { width: 39px; flex: 0 0 39px; background: #fff; display: flex; flex-direction: column; }
+.gc-designer-dv-stack-tab { width: 39px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: default; }
+.gc-designer-dv-stack-tab:hover { background: #f5f5f5; }
+.gc-designer-dv-stack-tab-selected { box-shadow: inset 3px 0 0 #107c41; }
+.gc-designer-dv-stack-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+.gc-designer-dv-stack-icon svg { width: 20px; height: 20px; }
+.gc-designer-formula-editor-panel { position: absolute; left: 0; right: 0; bottom: 22px; z-index: 40; flex: 0 0 auto; border: 1px solid #d4d4d4; border-bottom: none; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08); }
+
+/* TASK 86 -----------------------------------------------------------------
+ * Dark theme parity with the official dark designer stylesheet. All values below
+ * were measured from the running official dark page (screenshots + computed
+ * styles of the live DOM + the public Designer.getTheme() API), never read from
+ * official CSS files. The [data-theme="dark"] gate is activated when the dark
+ * stylesheet is loaded; rules here follow the official palette:
+ *   host/chrome #141414 (colorBackground2), panels #292929 (colorBackground),
+ *   hover #3d3d3d, selected #383838, backstage-selected #242424,
+ *   stroke #666666, brand #60bd81, foreground #ffffff, shadows .24/.28 alpha.
+ * Core-owned chrome (cell context menus, sheet tab strip, status bar, sheet
+ * canvas) stays light in the official dark theme, so it is kept light here too.
+ */
+.gc-designer-container[data-theme="dark"] {
+  --sjs-color-foreground: #ffffff;
+  --sjs-color-foreground-disabled: #b3b3b3;
+  --sjs-color-background: #292929;
+  --sjs-color-background-hover: #3d3d3d;
+  --sjs-color-background-selected: #383838;
+  --sjs-color-background-disabled: #141414;
+  --sjs-color-background-2: #141414;
+  --sjs-color-background-2-hover: #292929;
+  --sjs-color-background-2-selected: #242424;
+  --sjs-color-brand-foreground: #ffffff;
+  --sjs-color-brand-background: #60bd81;
+  --sjs-color-brand-background-hover: #1e683f;
+  --sjs-color-brand-background-selected: #1a5c38;
+  --sjs-color-stroke: #666666;
+  --sjs-color-stroke-hover: #757575;
+  --sjs-color-stroke-selected: #707070;
+  --sjs-color-stroke-disabled: #464646;
+  --sjs-shadow-4: rgba(0, 0, 0, .24) 0px 0px 2px, rgba(0, 0, 0, .28) 0px 2px 4px;
+  --sjs-shadow-8: rgba(0, 0, 0, .24) 0px 0px 2px, rgba(0, 0, 0, .28) 0px 4px 8px;
+}
+
+/* Shell ------------------------------------------------------------------ */
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-tabs-content { background: var(--sjs-color-background); }
+/* Ribbon combos: the trial keeps their wrappers transparent (the #292929 content band shows
+ * through); our token fill computed to the same colour but is matched for exactness. */
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-comboBox { background: transparent; }
+.gc-designer-container[data-theme="dark"] .gc-designer-fileMenuButton:hover { background: var(--sjs-color-background-selected); }
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-toolbar-group { border-right-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-toolbar-overflow { color: var(--sjs-color-foreground); }
+/* Tab hover on the #141414 band: the trial paints nothing there (row scans: hovered tab pixels stay
+ * #141414; in light its hover fill #f5f5f5 equals the host band so it is invisible in both themes). */
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-tab-nav-text:hover { background: transparent; }
+
+/* Glyphs that must flip to the foreground colour in the dark chrome ------- */
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-list-triangle::after { border-top-color: #ffffff; }
+/* The name-box arrow is the exception: the trial draws it mid-gray on the #292929 box (screenshot
+ * pixels ~#6e6e6e), while the ribbon combo arrows stay light. */
+.gc-designer-container[data-theme="dark"] .gc-designer-namebox-arrow .gc-designer-ribbon-list-triangle::after { border-top-color: #6e6e6e; }
+.gc-designer-container[data-theme="dark"] .gc-designer-fontsize-arrow::after { border-top-color: #ffffff; }
+.gc-designer-container[data-theme="dark"] .gc-designer-spinner-arrows .up { border-bottom-color: #ffffff; }
+.gc-designer-container[data-theme="dark"] .gc-designer-spinner-arrows .down { border-top-color: #ffffff; }
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-list-item-arrow { border-left-color: #ffffff; }
+.gc-designer-container[data-theme="dark"] .gc-designer-formula-button { color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-designer-resize-container-vertical-handle::after { background: var(--sjs-color-stroke); }
+
+/* Open group buttons: the trial's flat fill follows the theme ------------ */
+.gc-designer-container[data-theme="dark"] .gcd-ribbon-group .gc-designer-ribbon-list-selected,
+.gc-designer-container[data-theme="dark"] .gcd-ribbon-group .gc-designer-ribbon-list-selected > .gc-designer-ribbon-list-hover-item-selected { background: var(--sjs-color-background-selected); }
+
+/* Ribbon menu captions ----------------------------------------------------- */
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-menu-group-title { color: var(--sjs-color-foreground-disabled); }
+.gc-designer-container[data-theme="dark"] .gc-designer-paste-section-title { color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-designer-group-dropdown-title { color: var(--sjs-color-foreground); }
+
+/* Color-picker and gallery labels ------------------------------------------ */
+.gc-designer-container[data-theme="dark"] .gc-designer-color-cell { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-designer-color-preview { border-color: var(--sjs-color-background); }
+.gc-designer-container[data-theme="dark"] .sd-margins-name, .gc-designer-container[data-theme="dark"] .sd-margins-grid,
+.gc-designer-container[data-theme="dark"] .sd-paper-name { color: var(--sjs-color-foreground); }
+
+/* Formula bar --------------------------------------------------------------- */
+.gc-designer-container[data-theme="dark"] .gc-designer-formula-bar-splitter i { background: var(--sjs-color-stroke); }
+/* The editable font-size combo and the Page Layout Scale field: the trial's ribbon inputs sit
+ * transparent on their #292929 frames with white text (measured: official .gc-designer-text-input
+ * "100%" color #ffffff on transparent bg); without an explicit color our inherited #242424 label
+ * vanishes into the dark frame. Scoped to the ribbon so white-body areas (CF manager list) never
+ * get white-on-white fields. */
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-editable-select .spinner-input,
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-tabs-content .spinner-input,
+.gc-designer-container[data-theme="dark"] .gc-designer-ribbon-tabs-content .gc-designer-text-input { background: transparent; color: #ffffff; }
+/* Name box (screenshot rows): in dark the trial paints the whole 100x22 block #292929 with no
+ * visible outline (#666 border pixels: official 17 = glyph noise, ours before the fix 142 = a full
+ * outline); the border therefore blends into the fill. */
+.gc-designer-container[data-theme="dark"] .gc-designer-formula-bar-nameBox { border-color: var(--sjs-color-background); }
+
+/* Name-box dropdown: the trial keeps its core menu light in the dark theme. */
+.gc-designer-container[data-theme="dark"] .gc-name-box-dropdown { background: #ffffff; border-color: #7a7a7a; color: #000000; }
+.gc-designer-container[data-theme="dark"] .gc-name-box-dropdown-item { color: #000000; }
+.gc-designer-container[data-theme="dark"] .gc-name-box-dropdown-item:hover { background: #f0f8f4; }
+.gc-designer-container[data-theme="dark"] .gc-name-box-dropdown-empty { color: #777777; }
+
+/* Cell/tab context menus are core-owned in the trial: light in both themes. Measured from the
+ * live trial pages (dark and light probes agree): #fff on #c6c6c6 border, radius 0,
+ * shadow 1px 2px 5px rgba(0,0,0,.40), item text #444444 (NOT the container default #242424),
+ * hover band #d3f0e0 (the same light-green token the CF Rule column uses), group band #dddddd
+ * with #444444 bold text, item font the trial's "Segoe UI, Calibri, Thonburi, ..." stack.
+ * The item/band/geometry values are theme-independent, so the shared rules below apply to the
+ * light theme too (the previous light values #242424 text, #333 label, #d9d9d9 band, 4px corner
+ * radius and the .12/.14 layered shadow were measured off our own page, not the trial's). */
+.gc-designer-container[data-theme="dark"] .gc-designer-context-menu,
+.gc-designer-container[data-theme="dark"] .gc-designer-context-submenu { background: #ffffff; border-color: #c6c6c6; box-shadow: 1px 2px 5px rgba(0, 0, 0, 0.4); color: #444444; }
+.gc-designer-container[data-theme="dark"] .gc-designer-context-item { color: #444444; }
+.gc-designer-container[data-theme="dark"] .gc-designer-context-item:hover { background: #d3f0e0; }
+/* Shared (light + dark) context-menu chrome, scoped to the generic cell menu (the tab menu's
+ * own Task 26/61 measurements already use the same border/shadow pair). */
+.gc-designer-context-menu:not(.gc-designer-context-menu-tab):not(.gc-designer-context-menu-shape) { border-radius: 0; box-shadow: 1px 2px 5px rgba(0, 0, 0, 0.4); }
+/* The trial items carry an explicit transparent border (computed border-top-color rgba(0,0,0,0));
+ * without it the initial `currentColor` would resolve the probe to the #444 ink. */
+.gc-designer-context-menu .gc-designer-context-item:not(.gc-designer-ribbon-list-item-disabled) { color: #444444; border-color: transparent; font-family: "Segoe UI", Calibri, Thonburi, Arial, Verdana, sans-serif, "Mongolian Baiti", "Microsoft Yi Baiti", "Javanese Text"; }
+.gc-designer-context-menu .gc-designer-paste-options-label { color: #444444; border-color: transparent; background: #dddddd; }
+/* Paste-options block geometry (trial-measured, theme-independent): the trial's #ddd band is a
+ * 242x28 box inset 2 px from the row (x3, y55..83) with 5 px padding, a 16 px icon at x9 and the
+ * bold caption starting at x37; the six option buttons are flush 34x34 boxes stepping 34 px from
+ * x36 (their 24 px icons centre at x41). Ours had a flush 246x30 band (icon x7, ink x29) and
+ * 33.2 px buttons stepping 36.2 with 3 px gaps, so every icon edge and the band border landed on
+ * different pixels than the trial's. */
+.gc-designer-context-menu .gc-designer-paste-options-label { margin: 2px 2px 0 2px; height: 28px; padding: 6px 5px 5px 6px; gap: 12px; align-items: flex-start; line-height: normal; }
+.gc-designer-context-menu .gc-designer-paste-options-row { padding-left: 35px; gap: 0; }
+.gc-designer-context-menu .gc-designer-paste-options-row .gc-designer-paste-option { flex: 0 0 34px; width: 34px; }
+/* Cell-menu row metrics (trial-measured, theme-independent; the trial nests text in a span with
+ * a 16px line box — ink y6 in a 26px row — reserves the 16x16 icon slot even on icon-less rows
+ * and keeps a 12px icon-to-text gap so every caption starts at menu-x34; ours had a 6px gap,
+ * no slot without an icon (the `Insert...` row's ink landed at x7) and a 14px line box (ink y7). */
+.gc-designer-context-menu:not(.gc-designer-context-menu-tab):not(.gc-designer-context-menu-shape) > .gc-designer-context-item { gap: 11px; align-items: flex-start; padding-top: 5px; padding-bottom: 5px; }
+.gc-designer-context-menu:not(.gc-designer-context-menu-tab):not(.gc-designer-context-menu-shape) > .gc-designer-context-item > span[data-label] { flex: 1 1 auto; min-width: 0; }
+.gc-designer-context-icon-blank { width: 16px; flex: 0 0 16px; }
+.gc-designer-context-menu:not(.gc-designer-context-menu-tab):not(.gc-designer-context-menu-shape) > .gc-designer-context-item > .gc-designer-context-icon-blank { flex: 0 0 16px; line-height: normal; }
+.gc-designer-container[data-theme="dark"] .gc-designer-context-menu .gc-designer-ribbon-list-item-arrow,
+.gc-designer-container[data-theme="dark"] .gc-designer-context-submenu .gc-designer-ribbon-list-item-arrow { border-left-color: #444444; }
+.gc-designer-container[data-theme="dark"] .gc-designer-context-menu .gc-designer-ribbon-separator-horizontal,
+.gc-designer-container[data-theme="dark"] .gc-designer-context-submenu .gc-designer-ribbon-separator-horizontal { border-top-color: #d1d1d1; }
+.gc-designer-container[data-theme="dark"] .gc-designer-context-menu .gc-designer-ribbon-menu-group-title,
+.gc-designer-container[data-theme="dark"] .gc-designer-context-submenu .gc-designer-ribbon-menu-group-title { color: #555555; }
+
+/* Backstage -----------------------------------------------------------------
+ * Official measurement (dark): the backstage fills `.gc-designer-full-panels` with #292929
+ * (= colorBackground) and the 180px category column is #141414 (= colorBackground2) — the same
+ * tokens the shell uses, so the stale flat #252526 rule is overridden back to the token values. */
+.gc-designer-container[data-theme="dark"] .gc-designer-backstage { background: var(--sjs-color-background); }
+.gc-designer-container[data-theme="dark"] .gc-designer-backstage-menu { background: var(--sjs-color-background-2); }
+.gc-designer-container[data-theme="dark"] .gc-designer-backstage-menu::after { background: linear-gradient(to right, #1e1e1e 0 1px, #242424 1px 2px, #2f2f2f 2px 3px); }
+.gc-designer-container[data-theme="dark"] .gc-designer-backstage-item:hover { background: var(--sjs-color-background-2-hover); }
+.gc-designer-container[data-theme="dark"] .gc-designer-backstage-back-icon { border-color: var(--sjs-color-foreground); color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-designer-new-template:hover { background: var(--sjs-color-background-hover); border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-designer-backstage-action { border-color: var(--sjs-color-stroke); background: var(--sjs-color-background); }
+.gc-designer-container[data-theme="dark"] .gc-designer-backstage-action:hover { background: var(--sjs-color-background-hover); }
+
+/* Dialogs ------------------------------------------------------------------- */
+/* Dialog text wildcard (the biggest single lever): every dialog-template block in the stylesheet
+ * was tuned against the official LIGHT page with hardcoded near-black labels
+ * (~184 `#242424`/`rgb(36,36,36)` rules); the official dark page flips them all to its
+ * #ffffff foreground while keeping the token-driven fills. Specificity (0,3,0) beats the
+ * two-class template rules, dynamic inline styles (cell-style previews, selected font colours)
+ * still win over this rule because they are inline. */
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog,
+.gc-designer-container[data-theme="dark"] .gc-messagebox,
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog *,
+.gc-designer-container[data-theme="dark"] .gc-messagebox * { color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog-overlay,
+.gc-designer-container[data-theme="dark"] .gc-designer-messagebox-overlay { background: rgba(20, 20, 20, .3); } /* official dark: opaque #141414 at opacity .3 */
+.gc-designer-container[data-theme="dark"] .gc-dialog-close { color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-dialog-close:hover { background: var(--sjs-color-background-hover); }
+.gc-designer-container[data-theme="dark"] .gc-dialog-input, .gc-designer-container[data-theme="dark"] .gc-dialog-select { border-color: var(--sjs-color-stroke); color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-dialog-color input[type="color"] { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-dialog-label-line { background: var(--sjs-color-stroke-disabled); }
+.gc-designer-container[data-theme="dark"] .gc-dialog-border-preview { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-dialog-border-preview span { border-color: var(--sjs-color-foreground-disabled); }
+.gc-designer-container[data-theme="dark"] .gc-format-orientation-preview { background: var(--sjs-color-background); border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-format-font-preview { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-format-protection-note { color: var(--sjs-color-foreground-disabled); }
+.gc-designer-container[data-theme="dark"] .gc-find-options, .gc-designer-container[data-theme="dark"] .gc-find-results-list { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-find-result-row:nth-child(odd) { background: #202020; }
+.gc-designer-container[data-theme="dark"] .gc-format-custom-list { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-theme-setting-icon-border { border-color: var(--sjs-color-stroke); background: var(--sjs-color-background); }
+.gc-designer-container[data-theme="dark"] .gc-format-tab-bar .gc-dialog-tab.selected::after { background: var(--sjs-color-brand-background); }
+
+/* Format Cells (formatDialogTemplate) --------------------------------------
+ * The trial-geometry rules at lines 1144/1145/1193/1324/1376/1384 hardcode the light palette
+ * (measured from the official LIGHT page); in dark the trial swaps to its dark tokens, measured
+ * live on the official dark page: header/close #292929, tab + button text #ffffff,
+ * tab underline #60bd81, dialog/button borders #666666, shadow = --sjs-shadow-8 (.24/.28). */
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog[data-template="formatDialogTemplate"] { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog[data-template="formatDialogTemplate"] .gc-dialog-header { background: var(--sjs-color-background); }
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog[data-template="formatDialogTemplate"] .gc-dialog-close { background: var(--sjs-color-background); color: #d6d6d6; } /* trial dark: X glyph pixels ~#d6d6d6 on #292929 */
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog[data-template="formatDialogTemplate"] .gc-dialog-close:hover { background: var(--sjs-color-background-hover); }
+.gc-designer-container[data-theme="dark"] .gc-format-tab-bar .gc-dialog-tab { color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog[data-template="formatDialogTemplate"] .gc-dialog-button { color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog[data-template="formatDialogTemplate"] .gc-dialog-button-primary { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog-overlay[data-template="formatDialogTemplate"]::before { box-shadow: var(--sjs-shadow-8); }
+/* Row scans of the trial dialog (identical in light and dark): the selected-tab underline spans the
+ * LABEL width (Number: local x24..63 of the 14..74 tab), not the full tab box; left inset 10 matches
+ * the trial's tab padding-left. */
+.gc-designer-container[data-theme="dark"] .gc-format-tab-bar .gc-dialog-tab.selected::after { left: 10px; right: 11px; }
+
+/* Format Cells > Number tab layout (trial coordinates, dark palette) -------- */
+.gc-designer-container[data-theme="dark"] .gc-num-cat-label, .gc-designer-container[data-theme="dark"] .gc-num-cat-item,
+.gc-designer-container[data-theme="dark"] .gc-num-sample legend, .gc-designer-container[data-theme="dark"] .gc-num-sample-text,
+.gc-designer-container[data-theme="dark"] .gc-num-comment, .gc-designer-container[data-theme="dark"] .gc-num-label,
+.gc-designer-container[data-theme="dark"] .gc-num-list-row, .gc-designer-container[data-theme="dark"] .gc-num-desc,
+.gc-designer-container[data-theme="dark"] .gc-num-custom-input { color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-num-cat-frame, .gc-designer-container[data-theme="dark"] .gc-num-list,
+.gc-designer-container[data-theme="dark"] .gc-num-custom-list { background: var(--sjs-color-background); border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-num-sample { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-num-cat-item:hover, .gc-designer-container[data-theme="dark"] .gc-num-list-row:hover { background: var(--sjs-color-background-hover); }
+.gc-designer-container[data-theme="dark"] .gc-num-cat-item.selected, .gc-designer-container[data-theme="dark"] .gc-num-list-row.selected { background: var(--sjs-color-background-selected); }
+.gc-designer-container[data-theme="dark"] .gc-num-delete { border-color: var(--sjs-color-stroke); background: var(--sjs-color-background); color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-num-delete:disabled { color: var(--sjs-color-foreground-disabled); }
+
+/* Custom combo boxes (TASK 68) in the dark palette --------------------------- */
+.gc-designer-container[data-theme="dark"] .gc-custom-select-field { background: var(--sjs-color-background); border-color: var(--sjs-color-stroke); color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-custom-select.disabled .gc-custom-select-field { background: var(--sjs-color-background-disabled); color: var(--sjs-color-foreground-disabled); }
+.gc-designer-container[data-theme="dark"] .gc-custom-select-arrow { background: var(--sjs-color-background-hover); border-left-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-custom-select-arrow i { border-top-color: var(--sjs-color-foreground); }
+.gc-designer-container[data-theme="dark"] .gc-custom-select-list { border-color: var(--sjs-color-stroke); box-shadow: var(--sjs-shadow-8); }
+.gc-designer-container[data-theme="dark"] .gc-custom-select-list .gc-dialog-list-item:hover { background: #2f3a33; }
+.gc-designer-container[data-theme="dark"] .gc-custom-select-list .gc-dialog-list-item.selected { background: #37483e; }
+
+/* Conditional-Formatting Rules Manager (official dark row scans): the rules table body stays white
+ * in both themes; the frame turns #666666; the head row band is #292929 (= dialog fill, distinct
+ * from the white body — in light the band is #ffffff so it blends), the first ("Rule") column keeps
+ * its #d3f0e0 band with #217346 green label in both themes, and the column captions are white text. */
+.gc-designer-container[data-theme="dark"] .gc-cf-manager-list { border-color: var(--sjs-color-stroke); }
+.gc-designer-container[data-theme="dark"] .gc-cf-manager-head { background: var(--sjs-color-background); }
+.gc-designer-container[data-theme="dark"] .gc-cf-manager-head > .gc-cf-manager-desc { background: #d3f0e0; color: #217346; }
+
+/* Formula editor panel and the data-validation stack tabs ------------------- */
+.gc-designer-container[data-theme="dark"] .gc-designer-formula-editor-panel { border-color: var(--sjs-color-stroke); background: var(--sjs-color-background); box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.4); }
+.gc-designer-container[data-theme="dark"] .gc-designer-dv-stack-tab:hover { background: var(--sjs-color-background-hover); }
+
+/* Page Layout > Themes group geometry (trial-measured, theme-independent): the trial combo sits
+ * 2 px lower in its slot (45.3 vs our 43.3), its 47x68 inner container starts 3.7 px below the
+ * combo top (49), the 30x30 icon frame 7 px below the container (56), the caption at 91 and the
+ * dropdown triangle at 105. Our chain stacked the container flush to the combo top, so the icon
+ * frame landed at 47 (9 px high) and the triangle at 102. The bottom margin (120.3-117=3.3 px)
+ * matches too. */
+.gc-designer-combo-container.gc-theme-setting-icon { margin-top: 2px; }
+.gc-theme-setting-icon-container { margin-top: 3.7px; padding-top: 7px; }
+.gc-theme-setting-icon-text { margin-top: 5px; }
+
+/* Format Cells dialog tabs — the trial's own tab model (measured live on both themes; the
+ * boxes and ink positions are theme-independent): fixed border-box slots (the nth-child
+ * widths above), padding 0 10px, text-align center, 60px floor; the trial lets a caption
+ * slightly wider than its content window sit left-anchored inside the box (Chromium's
+ * center-overflow behavior — confirmed identical on both pages). A blanket min-width:
+ * max-content floor would expand those English captions (Alignment +3.6, Cell Button
+ * +4 px), shifting every following tab, so the expansion is kept only for the tabs the
+ * renderer marks `gc-dialog-tab-wide` (caption text wider than the whole fixed slot —
+ * longer-language labels), which preserves the TASK 87 no-overlap behavior. */
+.gc-format-dialog-content .gc-format-tab-bar .gc-dialog-tab { flex: 0 0 auto; min-width: 60px; padding: 0 10px; text-align: center; }
+.gc-format-dialog-content .gc-format-tab-bar .gc-dialog-tab.gc-dialog-tab-wide { min-width: max-content; }
+
+/* Find & Replace dialog geometry (TASK 86; trial-measured on the live dark page, collapsed state
+ * 508 x 204.7 — the geometry is theme-independent, dark only swaps the palette, so these apply to
+ * both themes; every number is a dialog-local box from the trial's DOM dump):
+ *  header 34 (trial title box h30 lh30 14.5px/500 padding-left 5, centred box 194.7..313.4);
+ *  tabs at x14 y45: h30 lh30 pad 0 10 centred — Find w60 (min-width; window 40), Replace w64
+ *    (ink 44 + 20); selected underline spans the tab window (trial rows 71..72 x24..63 →
+ *    left 10 right 11 bottom 2, the same model the format dialog tabs use);
+ *  Find what row at x24 y85 w460 gap 0: fixed 80px label column (lh 14, no padding, top-aligned),
+ *    input 104..484 (w380 h24, border #666, radius 4, pad 1 5);
+ *  Option button 409..481.5 y116 72.5x25 (font 13.3333px, pad 4 6, radius 4, right inset 2.5) in a
+ *    114..143 row with padding 2 0; two input rows sit 12px apart in the trial (5 container gap + 7);
+ *  footer y158 h45.7 pad 8 gap 10 justify-end, buttons stretched to 29.7 high; the trial wraps the
+ *    caption in a span with padding 5.3333px 13.3333px (display block) so the button is naturally
+ *    ink + 40.67px wide with a 80px floor (Find All 84.4, Find Next 97.7, Close 80), Close right
+ *    inset 13 → margin-right 5 after the footer padding 8. */
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-header { height: 34px; flex: 0 0 34px; padding-top: 2px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-title { font-weight: 500; line-height: 30px; padding-left: 5px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-content { padding: 10px 13px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-tab-bar { margin: 0; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-tab { height: 30px; line-height: 30px; padding: 0 10px; min-width: 60px; text-align: center; border-bottom: 0; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-tab.selected::after { left: 10px; right: 11px; bottom: 2px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-tab-panel > .gc-dialog-container { padding: 10px 10px 0; gap: 5px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-container > .gc-dialog-column-set { gap: 0; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-container > .gc-dialog-column-set:not(.gc-find-options-row):not(:first-child) { margin-top: 7px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-container > .gc-dialog-column-set > .gc-dialog-text.gc-dialog-label { flex: 0 0 80px; width: 80px; line-height: 14px; padding: 0; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-find-input { height: 24px; padding: 1px 5px; border-radius: 4px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-find-options-row { padding: 0; margin-top: 0; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-find-options-button { height: 25px; padding: 4px 6px; font-size: 13.3333px; border-radius: 4px; margin-right: 2.5px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-footer { height: 45.7px; flex: 0 0 45.7px; align-items: stretch; gap: 10px; padding: 8px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-footer > .gc-dialog-button { width: auto; min-width: 80px; height: auto; padding: 1px 19.3333px; font-size: 13.3333px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-footer > .gc-dialog-button:last-child { margin-right: 5px; }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-find-options-button { margin-top: 2px; }
+/* The trial centers the Find dialog in the viewport ((800-204.7)/2 = y297.65) and its height is
+ * content-driven at 204.7 px; the previous fixed 205px box anchored at margin-top 220 sat 78 px
+ * higher, so every glyph and border rendered at different fractional device-pixels than the
+ * trial's and the strict-RGB gate lit up all text edges. Same size + same centering → the two
+ * pages rasterize the dialog at identical sub-pixel positions. */
+.gc-designer-dialog[data-template="findDialogTemplate"] { height: 204.7px; min-height: 204.7px; margin-top: 0; }
+.gc-designer-dialog-overlay[data-template="findDialogTemplate"] { align-items: center; background: transparent; }
+/* The trial's Find & Replace is modeless: with it open the sheet pixels stay 255 (light) and
+ * the ribbon 20,20,20 (dark) — NO dimming overlay at all (measured open-vs-closed on both
+ * themes), while its modal dialogs dim (dark sheet 184, light 250 — ours matches those).
+ * Ours painted the rgba dim everywhere; for the find template only the dim is dropped (both
+ * themes; the second rule beats the dark `overlay` palette rule). The modal click-blocking
+ * behavior itself is recorded as a residual in docs/STATUS.md. */
+.gc-designer-container[data-theme="dark"] .gc-designer-dialog-overlay[data-template="findDialogTemplate"] { background: transparent; }
+/* Blink renders text with grayscale AA (no subpixel fringes) when the blocks around it carry
+ * transparent backgrounds inside the dialog's stacking context — our entire find dialog text
+ * rendered gray while the trial's is subpixel-fringed. Measured on the trial (both themes): its
+ * header/content/tab blocks paint the dialog fill (#fff light, #292929 dark); ours left them
+ * transparent. Adding the same token-driven fills is visually identical (same color below) but
+ * restores LCD text, and the title then matches the trial exactly (gray 48 / fringe 716 px). */
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-header { background: var(--sjs-color-background); }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-content { background: var(--sjs-color-background); }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-tabs { background: var(--sjs-color-background); }
+.gc-designer-dialog[data-template="findDialogTemplate"] .gc-dialog-tab { background: var(--sjs-color-background); }
+
+/* TASK 87: language packages with longer strings (Italian) must not clip or overlap.
+   The format-dialog title used to carry the English text's measured 87.2px width;
+   keep it as a floor so the English pixel layout is untouched, but let longer
+   titles stay on one line. The tab strip keeps its exact per-tab widths and scrolls
+   (scrollbar hidden, like the trial's ribbon rail) instead of squeezing captions. */
+.gc-designer-dialog[data-template="formatDialogTemplate"] .gc-dialog-title { width: auto; min-width: 87.2px; white-space: nowrap; }
+.gc-format-tab-bar { overflow-x: auto; scrollbar-width: none; }
+.gc-format-tab-bar .gc-dialog-tab { flex: 0 0 auto; min-width: max-content; }
+
+/* TASK 87 */
+/* Italian (and other long-word) ribbon captions: when the caption ink clearly
+ * exceeds the button slot the renderer adds `gc-designer-fixed-caption-wrap`
+ * so the caption wraps inside the button instead of overlapping its neighbours. */
+.gc-designer-ribbon-big-command .gc-designer-fixed-caption-wrap { white-space: normal; overflow-wrap: break-word; line-height: 12px; }
+
+/* TASK 91 */
+/* Formula bar syntax colouring: the coloured segments render in a layer behind the input;
+ * while the text is a formula (`=` / `{=`) the input's own glyphs are transparent so the
+ * layer shows through. Both share one explicit font so the overlay aligns glyph-for-glyph. */
+.gc-designer-formula-bar-text-box { position: relative; overflow: hidden; }
+.gc-designer-formula-input,
+.gc-designer-formula-color-layer { font-family: "Segoe UI", Calibri, Thonburi, Arial, Verdana, sans-serif; font-size: 12px; }
+.gc-designer-formula-color-layer {
+  position: absolute; left: 3px; top: 2px; right: 0; height: 20px; line-height: 20px;
+  white-space: pre; overflow: hidden; pointer-events: none; background: transparent;
+  color: var(--sjs-color-foreground); box-sizing: border-box;
+}
+.gc-designer-formula-input.colored { color: transparent; caret-color: var(--sjs-color-foreground); }
+
+/* TASK 93: PivotTable Grouping dialog (315x360 like the trial; rows and the
+   By list sized from the measured dialog geometry). */
+.gc-designer-dialog[data-template="pivotGroupingDialogTemplate"] { width: 315px; height: 360px; min-height: 360px; }
+.gc-pivot-grouping-dialog { display: flex; flex-direction: column; font-size: 12px; color: var(--sjs-color-foreground, #444); padding: 13px 17px 0; }
+.gc-pivot-grouping-auto { height: 21px; line-height: 21px; background: #fff; width: 31px; }
+.gc-pivot-grouping-row { display: flex; align-items: center; margin-top: 7px; }
+.gc-pivot-grouping-check { width: 13px; height: 13px; margin: 0 3px 0 0; flex: 0 0 auto; }
+.gc-pivot-grouping-label { min-width: 72px; margin-left: 3px; }
+.gc-pivot-grouping-input { width: 183px; height: 19px; margin-left: 19px; }
+.gc-pivot-grouping-by-label { margin-top: 10px; background: #fff; width: 21px; }
+.gc-pivot-grouping-list { margin: 7px 0 0 13px; height: 113px; overflow-y: auto; border: 1px solid var(--sjs-color-border, #d0d0d0); }
+.gc-pivot-grouping-item { height: 15px; line-height: 15px; padding: 0 0 0 7px; cursor: pointer; white-space: nowrap; }
+.gc-pivot-grouping-item-selected { background: rgba(127, 187, 235, 0.7); color: #000; }
+.gc-pivot-grouping-interval { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.gc-pivot-grouping-interval-label { text-align: right; }
+.gc-pivot-grouping-interval-input { width: 60px; height: 20px; }
+.gc-pivot-grouping-by-row .gc-pivot-grouping-by-indent { margin-left: 31px; min-width: 30px; }
+.gc-pivot-grouping-by-row .gc-pivot-grouping-input { margin-left: 20px; }
+/* TASK 93: PivotTable Styles gallery — Custom section tiles + the tile
+   right-click menu (61x49 canvas thumbs, 160px menu like the trial's). */
+.gc-pivot-style-tile > canvas { display: block; margin: 0; }
+.gc-pivot-style-tile-menu { width: 160px; overflow: visible; }
+/* TASK 93: the per-type formula-sparkline dialogs (field rows like the trial's
+   label + 19px input + range picker; widths per measured dialog size). */
+.gc-formula-sparkline-dialog { display: flex; flex-direction: column; font-size: 12px; color: var(--sjs-color-foreground, #444); padding: 10px 16px; }
+.gc-formula-sparkline-row { display: flex; align-items: center; margin-top: 6px; }
+.gc-formula-sparkline-label { min-width: 120px; }
+.gc-formula-sparkline-input { width: 180px; height: 19px; }
+.gc-sparklines-formula-check { margin-top: 8px; }
+/* TASK 93: the New/Modify Pivot Table Style dialog is 589x417 in the trial
+   (the table variant above is 589x422); the 25-item list scrolls. */
+.gc-designer-dialog[data-template="pivoTtableStyleDialogTemplate"] { width: 589px; height: 417px; min-height: 417px; }
+.gc-designer-dialog[data-template="pivoTtableStyleDialogTemplate"] .gc-dialog-content { padding: 10px 12px; }
+/* TASK 94 */
+/* Format Cells tab strip: the trial keeps the fixed per-tab widths (the F50 nth-child
+   rules) and lets a caption wider than the box overflow into its own 10px padding —
+   the trial's EN "Decoration" already renders that way (text 58.03 in a 54.09 content
+   box). TASK 87's `min-width: max-content` instead widened every caption by ~1 px,
+   which shifted each following tab and failed the 0.5 % Format Cells precision gate.
+   Restore the trial behaviour; the language-package safety net (overflow-x scroll on
+   the bar) stays. */
+.gc-format-tab-bar .gc-dialog-tab { min-width: 0; }
+/* Format ribbon long captions ("Filter Connections"): the trial never breaks a word
+   mid-word; it sizes the caption to its longest word (min-content, spilling symmetrically
+   over the 70 px slot — centred ink stays identical) and wraps lines on 14 px. TASK 87's
+   overflow-wrap: break-word broke "Connections" into "Connection"/"s", shifting the text
+   3 px and failing pivot-designer item 3. Restore the trial behaviour (line-height
+   matches the trial's measured 14 px line boxes). */
+.gc-designer-ribbon-big-command .gc-designer-fixed-caption-wrap { white-space: normal; overflow-wrap: normal; word-break: normal; min-width: min-content; line-height: 14px; }
+
+/* TASK 98 */
+/* Format Cells Font tab — final geometry alignment measured black-box against the trial
+   (paired probes 2026-11-23): the trial list windows are 132 px tall with 30 px item
+   pitch (ours were 130/28), and its Preview fieldset measures 346x96 at x=607 while the
+   Color bar spans 350 px at x=605 (ours had the fieldset flush at 280/350/101).
+   The Font/Style/Size list-editors, the full-width Color combo and the bordered Effects
+   fieldset were already at parity (task 90); only these three measurements still differed. */
+.gc-font-list { top: 42px; height: 132px; }
+.gc-font-list-item { height: 30px; line-height: 30px; }
+/* The trial's Preview wrapper (.gc-font-preview) is 350x101 at the Color-bar width and
+   holds the bordered fieldset inset 2 px left/right at its top (346x96, bottom 5 px free).
+   Keep our wrapper flush for the paired geometry spec and move the visible border onto the
+   inset box via an own pseudo-element. */
+.gc-font-preview-group { border: 0; }
+.gc-font-preview-group::before { content: ''; position: absolute; left: 2px; top: 0; width: 346px; height: 96px; box-sizing: border-box; border: 1px solid #d1d1d1; border-radius: 4px; }
+.gc-font-preview-group legend { margin-left: 8px; background: #fff; }

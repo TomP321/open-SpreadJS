@@ -719,7 +719,10 @@ export class View {
       visible = flattened;
     }
     const ordered = groupRows(visible, this.groups, (row, field) => this.table!.resolveValue(row, field));
-    this.cachedRows = this.pinnedRows.size
+    // TASK 97 TS-1: pinned rows keep their natural position on hierarchy views
+    // (the trial lists raw pinnedRows in JSON but never moves them, probe
+    // .probe/hier-probe3.json case L / richJSONHierarchyImportsOurWorkbook).
+    this.cachedRows = this.pinnedRows.size && !this.hasHierarchy()
       ? [...ordered.filter(row => this.pinnedRows.has(row)), ...ordered.filter(row => !this.pinnedRows.has(row))] : ordered;
     this.summaryValues = new WeakMap();
     this.cachedRevision = this.table?.revision ?? -1;
@@ -1101,7 +1104,11 @@ export class View {
     this.groups = groups.map(group => ({ ...group }));
   }
   removeGroupBy(): void { this.groups = []; this.cachedRows = undefined; }
-  togglePinnedRows(indexes: number[]): number {
+  togglePinnedRows(indexes: number[]): number | undefined {
+    // TASK 97 TS-1: on hierarchy views the trial's pinned-rows feature is inert —
+    // togglePinnedRows changes nothing and returns undefined, while flat views
+    // return the pinned-row count (probe .probe/hier-probe2.json cases F/G).
+    if (this.hasHierarchy()) return undefined;
     const rows = this.orderedRows();
     for (const index of new Set(indexes)) {
       const row = rows[index];

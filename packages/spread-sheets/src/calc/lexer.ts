@@ -8,6 +8,7 @@
 /** FormulaParseError is re-exported for callers that want position details. */
 import { FormulaParseError } from './errors.js';
 import { looksExternal, splitExternalReference } from '../external-refs.js';
+import type { LanguagePackage } from './language-packages.js';
 export { FormulaParseError };
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,7 @@ export type TokenType =
   | 'semicolon'
   | 'lbrace'
   | 'rbrace'
+  | 'backslash'
   | 'colon'
   | 'op'
   | 'percent'
@@ -83,9 +85,14 @@ const ERROR_LITERALS = [
 
 export interface LexOptions {
   r1c1?: boolean;
+  /** Active calc language package; undefined keeps the invariant English grammar. */
+  language?: LanguagePackage;
 }
 
 const NUMBER_RE = /(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/y;
+// With a ',' decimal separator a comma directly after digits continues the number ("1,5");
+// the invariant '.' form keeps parsing so English literals stay valid.
+const COMMA_NUMBER_RE = /(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:[eE][+-]?\d+)?/y;
 const SHEET_RE = /[A-Za-z_\\][A-Za-z0-9_.]*(?:[ \t]+[A-Za-z0-9_.]+)*!/y;
 const ROW_RANGE_RE = /\$?(\d+):\$?(\d+)(?![A-Za-z0-9_(])/y;
 const COL_RANGE_RE = /(\$?)([A-Za-z]{1,3}):(\$?)([A-Za-z]{1,3})(?![A-Za-z0-9_(])/y;
@@ -105,12 +112,14 @@ export class Lexer {
   private readonly tokens: Token[] = [];
   private readonly hasSheetSeparator: boolean;
   private readonly hasRangeSeparator: boolean;
+  private readonly decimalComma: boolean;
   constructor(
     private readonly text: string,
     private readonly options: LexOptions = {},
   ) {
     this.hasSheetSeparator = text.includes('!');
     this.hasRangeSeparator = text.includes(':');
+    this.decimalComma = options.language?.numberDecimalSeparator === ',';
   }
   tokenize(): Token[] {
     let ws = false;
@@ -149,6 +158,11 @@ export class Lexer {
       return { type: 'spill', text: ch, start: this.pos, end: this.pos, wsBefore: false };
     }
     if (ch === "'") return this.scanQuotedSheet();
+    if (ch === '\\' && this.options.language?.arrayGroupSeparator === '\\') {
+      // Array-row separator of a ';' culture ({1;2\3;4}); English mode keeps '\' inside names.
+      this.pos++;
+      return { type: 'backslash', text: ch, start: this.pos, end: this.pos, wsBefore: false };
+    }
     const nextCode = text.charCodeAt(this.pos + 1);
     if ((code >= 48 && code <= 57) || (ch === '.' && nextCode >= 48 && nextCode <= 57)) {
       const rowRange = this.hasRangeSeparator && this.hasRowRangeStart() ? this.scanRowRange() : undefined;
@@ -337,16 +351,19 @@ export class Lexer {
   private scanNumber(): Token {
     const text = this.text;
     const start = this.pos;
-    const match = matchAt(NUMBER_RE, text, this.pos);
+    const match = matchAt(this.decimalComma ? COMMA_NUMBER_RE : NUMBER_RE, text, this.pos);
     if (!match) throw new FormulaParseError('Invalid number', start, text);
     this.pos += match[0].length;
+    const literal = this.decimalComma ? match[0].replace(',', '.') : match[0];
     return {
       type: 'number',
-      text: match[0],
+      // Canonical (English) literal: a localized `1,5` is stored/rendered as `1.5`, so the
+      // AST, toJSON and XLSX stay invariant in any language.
+      text: literal,
       start,
       end: this.pos,
       wsBefore: false,
-      value: Number(match[0]),
+      value: Number(literal),
     };
   }
   private scanRowRange(): Token | undefined {

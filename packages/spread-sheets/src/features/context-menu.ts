@@ -1,11 +1,32 @@
 import defaultData from './context-menu-data.json';
 import { clone } from '../primitives.js';
 import { menuIcon } from './menu-icons.js';
+import { ltext } from '../localization.js';
 export interface MenuItemData {
   name?: string; text?: string; command?: string | ((...args: unknown[]) => unknown); disable?: boolean;
   iconClass?: string; group?: string; subMenu?: MenuItemData[]; type?: string; workArea?: string;
   visible?: boolean; menuContent?: string; status?: unknown; placeholder?: string; commandOptions?: unknown;
   itemClass?: string; title?: string; needKeepFocus?: boolean; metaData?: object;
+}
+/** Built-in (English) menu texts, keyed by menu item name. */
+const menuDefaults = new Map<string, string>(
+  (defaultData as MenuItemData[]).flatMap((item): [string, string][] =>
+    item.name && item.text
+      ? [[item.name, item.text], ...(item.subMenu ?? []).flatMap((sub): [string, string][] => sub.name && sub.text ? [[sub.name, sub.text]] : [])]
+      : []),
+);
+/**
+ * Culture-localised caption for a menu item. The item's built-in English text
+ * doubles as the fallback; an item whose text was customised through
+ * `contextMenu.menuData` keeps that text, exactly like the reference keeps the
+ * author's override instead of its language pack.
+ */
+export function menuText(item: MenuItemData): string {
+  const text = item.text ?? '';
+  if (!item.name) return text;
+  const localized = ltext(`contextMenu.${item.name}`, text);
+  if (menuDefaults.get(item.name) !== undefined && text !== menuDefaults.get(item.name)) return text;
+  return localized;
 }
 export class MenuView {
   private height?: number;
@@ -27,7 +48,7 @@ export class MenuView {
     if (item.disable) element.classList.add('gc-ui-contextmenu-disabled');
     const icon = document.createElement('span'); icon.className = `gc-ui-contextmenu-icon ${item.iconClass ?? ''}`;
     if (item.iconClass) icon.append(menuIcon(item.iconClass, item.group ? 24 : 16));
-    const text = document.createElement('span'); text.className = 'gc-ui-contextmenu-text'; text.textContent = item.text ?? '';
+    const text = document.createElement('span'); text.className = 'gc-ui-contextmenu-text'; text.textContent = menuText(item);
     content.append(icon, text); element.append(content);
     if (item.title) content.title = item.title;
     if (item.subMenu) { content.setAttribute('aria-haspopup', 'true'); content.setAttribute('aria-expanded', 'false'); const arrow = document.createElement('span'); arrow.className = 'opensheets-menu-arrow'; content.append(arrow); }
@@ -51,7 +72,7 @@ export function renderMenu(menu: ContextMenu, items: MenuItemData[], execute: (i
     if (item.visible === false) continue;
     const element = menu.menuView.createMenuItemElement(item);
     if (item.type === 'groupHeader') { group = document.createElement('div'); group.className = 'gc-ui-contextmenu-groupitems-container'; element.append(group); }
-    if (item.group && group) { element.classList.add('gc-ui-contextmenu-groupitem'); element.title = item.text ?? ''; element.querySelector('.gc-ui-contextmenu-text')?.remove(); group.append(element); }
+    if (item.group && group) { element.classList.add('gc-ui-contextmenu-groupitem'); element.title = menuText(item); element.querySelector('.gc-ui-contextmenu-text')?.remove(); group.append(element); }
     else root.append(element);
     if (item.type === 'separator' || item.type === 'groupHeader') continue;
     const content = element.querySelector<HTMLElement>('[role=menuitem]') ?? element;

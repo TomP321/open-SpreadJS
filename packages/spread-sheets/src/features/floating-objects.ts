@@ -101,7 +101,10 @@ export class FloatingObject {
         const protection = this._sheet?.options.protectionOptions as { allowEditObjects?: boolean } | undefined;
         const objectEditBlocked = !!this._sheet?.options.isProtected && (protection?.allowEditObjects !== true || this.isLocked());
         if (event.button !== 0 || objectEditBlocked) return;
-        event.stopPropagation(); const element = this.element!; element.focus(); element.setPointerCapture(event.pointerId);
+        // TASK 94 bug 1: `focus()` makes Chromium auto-scroll the nearest scrollable ancestor; the
+        // floating layer is overflow:hidden but programmatically scrollable, so clicking a chart whose
+        // bottom reaches the layer edge scrolled the whole layer and shifted every floating object up.
+        event.stopPropagation(); const element = this.element!; element.focus({ preventScroll: true }); element.setPointerCapture(event.pointerId);
         if (!event.ctrlKey) for (const item of [...view.sheet!.floatingObjects.all(), ...view.sheet!.pictures.all(), ...(view.sheet!.shapes?.all() ?? []), ...view.sheet!.charts.all(), ...(view.sheet!.dataCharts?.all() ?? [])]) if (item !== this) item.isSelected(false);
         if (!event.ctrlKey) for (const slicer of view.sheet!.slicers?.all() ?? []) slicer.isSelected(false);
         this.isSelected(true);

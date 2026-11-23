@@ -26,12 +26,13 @@ import { saveWorkbookPdf, type SavePdfOptions } from './pdf/export.js';
 import { Worksheet } from './worksheet.js';
 import { CalcEngine } from './calc/engine.js';
 import { assertCustomFunction } from './calc/functions-api.js';
-import { INVALID_CUSTOM_NAME, assertCustomName, assertNameFormula } from './calc/custom-names.js';
+import { INVALID_CUSTOM_NAME, assertCustomName, assertNameFormula, normalizeNameFormula } from './calc/custom-names.js';
 import type { CellsInfo } from './calc/engine-introspect.js';
 import { ExternalReferenceStore } from './external-refs.js';
 import { SearchCondition, SearchResult, searchWorkbook } from './search.js';
 import { CustomTableThemeManager, TableTheme, TableThemes, themeByName } from './features/tables.js';
 import { CustomPivotTableThemeManager, PivotTableTheme } from './pivot/theme.js';
+import { builtInPivotTheme } from './pivot/theme-statics.js';
 import { SlicerStyle, TimelineStyle, SlicerStyles, TimelineStyles } from './features/slicers/styles.js';
 import { GC } from './generated/enums.js';
 import { ScenarioManager } from './features/scenarios.js';
@@ -460,13 +461,15 @@ export class Workbook {
    * non-string argument fails inside the trial, which lower-cases it.
    */
   defaultTableTheme(): TableTheme | null | undefined;
-  defaultTableTheme(themeName: string): void;
+  defaultTableTheme(themeName: string): TableTheme | null;
   defaultTableTheme(themeName?: string): TableTheme | null | undefined {
     if (themeName === undefined) return this.defaultTheme;
     const name = themeName.toLowerCase();
     const found = themeByName(name) ?? this.customTableThemes.get(name);
     this.defaultTheme = found ?? null;
-    return undefined;
+    // TASK 97 CH-2 (trial probe 2026-11-23, core with the tablesheet feature):
+    // setting answers the resolved theme object, not undefined.
+    return this.defaultTheme;
   }
   clearSheetTabs(): void {
     const tabs = this.tabSheets();
@@ -776,8 +779,11 @@ export class Workbook {
     const out: { pivot?: PivotTableTheme; slicer?: SlicerStyle; timeline?: TimelineStyle } = {};
     const stored = this._defaultThemes.pivot;
     if (typeof stored === 'string') {
+      // TASK 93: the gallery's Set As Default stores a theme name; resolve both
+      // custom themes (`customPivotTableThemes`) and built-in theme keys.
       const custom = this.customPivotTableThemes.get(stored);
-      if (custom) out.pivot = custom;
+      const builtIn = custom ? undefined : builtInPivotTheme(stored);
+      if (custom ?? builtIn) out.pivot = custom ?? builtIn;
     } else if (stored) out.pivot = stored;
     const storedSlicer = this._defaultThemes.slicer;
     if (typeof storedSlicer === 'string') {
@@ -825,12 +831,13 @@ export class Workbook {
     isReadOnly?: boolean,
   ): void {
     assertCustomName(name, formula);
-    assertNameFormula(formula.replace(/^=/, ''), this.options?.referenceStyle === 1);
+    const nameR1c1 = this.options?.referenceStyle === 1;
+    assertNameFormula(formula.replace(/^=/, ''), nameR1c1);
     const key = name.toLowerCase();
     // Workbook scope enforces the same rules as the sheet scope, including case-insensitive uniqueness.
     const taken = this.names.get(key);
     if (taken) throw new Error(INVALID_CUSTOM_NAME);
-    const info = new NameInfo(name, formula.replace(/^=/, ''), baseRow, baseCol, comment, isReadOnly);
+    const info = new NameInfo(name, normalizeNameFormula(formula.replace(/^=/, ''), nameR1c1), baseRow, baseCol, comment, isReadOnly);
     info._onRename = (previous, next) => {
       const existing = this.names.get(next.toLowerCase());
       if (existing && existing !== info) throw new Error('Name already exists');
@@ -1068,8 +1075,10 @@ export class Workbook {
       result.namedStyles = this.getNamedStyles().map(styleToJSON);
     // TASK 46: the trial add-on writes the resolved default theme objects; we keep the
     // core-only key layout (the keys appear only once a default theme is registered).
+    // TASK 93 (trial parity): a default stored as a NAME serializes as the lower-case
+    // name string ("medium2" / "my pivot style" — measured in the trial's toJSON()).
     const defaultThemes = this._resolvedDefaultThemes();
-    if (defaultThemes.pivot) result.defaultPivotTableStyle = defaultThemes.pivot.toJSON();
+    if (defaultThemes.pivot) result.defaultPivotTableStyle = typeof this._defaultThemes.pivot === 'string' ? this._defaultThemes.pivot : defaultThemes.pivot.toJSON();
     if (defaultThemes.slicer) result.defaultSlicerStyle = defaultThemes.slicer.toJSON();
     if (defaultThemes.timeline) result.defaultTimelineStyle = defaultThemes.timeline.toJSON();
     if (this.names.size) result.names = this.getCustomNames().map((n) => n.toJSON());
@@ -1136,6 +1145,9 @@ export class Workbook {
         const theme = new PivotTableTheme();
         theme.fromJSON(json.defaultPivotTableStyle as Record<string, unknown>);
         this._defaultThemes.pivot = theme;
+      } else if (typeof json.defaultPivotTableStyle === 'string') {
+        // TASK 93: the trial writes the gallery Set As Default as a name string.
+        this._defaultThemes.pivot = json.defaultPivotTableStyle;
       }
       if (json.defaultSlicerStyle && typeof json.defaultSlicerStyle === 'object') {
         const style = new SlicerStyle();
@@ -1257,7 +1269,10 @@ export class Workbook {
               return typeof field === 'string' ? [{ field, ascending: entry.ascending !== false }] : [];
             });
           })();
-          if (sorts?.length) sheet.sort(sorts as Parameters<TableSheet['sort']>[0]);
+          // TASK 97 TS-1: filters are restored BEFORE the sorts below. On a hierarchy
+          // view with an active filter the trial reloads in natural hierarchy order
+          // (it keeps the sort spec for read-back/serialization but does not reapply
+          // it — probe .probe/hier-probe3.json cases I/J/M).
           let filtersRestored = false;
           if (Array.isArray(addition.filters) && addition.filters.length) {
             sheet.filter(addition.filters as Parameters<TableSheet['filter']>[0]);
@@ -1304,6 +1319,11 @@ export class Workbook {
               return [];
             });
             if (filters.length) sheet.filter(filters as Parameters<TableSheet['filter']>[0]);
+          }
+          if (sorts?.length) {
+            const sortArg = sorts as NonNullable<Parameters<TableSheet['sort']>[0]>;
+            if (view?.hasHierarchy() && filtersRestored) sheet._restoreSortSpec(sortArg);
+            else sheet.sort(sortArg);
           }
         }
         this.sheets.push(sheet);

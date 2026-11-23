@@ -26,9 +26,11 @@ function recordingContext(): CanvasRenderingContext2D {
 }
 
 const DAY = 86_400_000;
-const BASE = Date.UTC(2024, 0, 1);
-const day = (n: number) => new Date(BASE + n * DAY);
-const dateToX = (d: Date) => Math.round(((d.getTime() - BASE) / DAY) * 50);
+const BASE_YEAR = 2024;
+// Wall-clock dates (TASK 92 fix: the previous UTC-aligned construction made
+// the day-boundary snapping depend on the machine time zone).
+const day = (n: number) => new Date(BASE_YEAR, 0, 1 + n);
+const dateToX = (d: Date) => Math.round(((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(BASE_YEAR, 0, 1)) / DAY) * 50);
 
 function leaf(fromDay: number, toDay: number): Task {
   return {

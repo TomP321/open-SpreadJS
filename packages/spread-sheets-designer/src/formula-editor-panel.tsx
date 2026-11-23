@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { useDesigner, useDesignerVersion } from './store.js';
 import { selectionItems } from './selection-pane.js';
+import { resolveText } from './resolve.js';
+
+/** TASK 87: panel captions (`panels` subtree of the loaded resources). */
+const P = (designer: { resources: Record<string, unknown> }, key: string, en: string): string => resolveText(`\${res.panels.${key}}`, designer.resources) || en;
+
+
 
 /* Formula Editor Panel -------------------------------------------------------- */
 
@@ -21,7 +27,7 @@ export function FormulaEditorPanel(): React.ReactElement {
   return (
     <div className="gc-designer-formula-editor-panel gc-designer-dock-panel">
       <div className="gc-designer-formula-editor-panel-header">
-        <span className="gc-designer-formula-editor-panel-title">Formula Editor</span>
+        <span className="gc-designer-formula-editor-panel-title">{P(d, 'formulaEditor', 'Formula Editor')}</span>
         <span className="gc-designer-formula-editor-panel-cell">{info.reference}</span>
       </div>
       <textarea

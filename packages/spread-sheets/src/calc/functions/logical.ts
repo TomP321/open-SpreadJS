@@ -9,6 +9,7 @@ import {
   ReferenceValue,
   ScalarValue,
   Value,
+  dateToSerial,
   error,
   isArray,
   isError,
@@ -416,7 +417,7 @@ function compareEquality(a: ScalarValue, b: ScalarValue): boolean {
 }
 
 function dateSerial(value: Date): number {
-  return (value.getTime() - Date.UTC(1899, 11, 30)) / 86400000;
+  return dateToSerial(value);
 }
 
 function valueType(value: ScalarValue): number {

@@ -11,6 +11,7 @@ import { activeSheet, pasteClipboard, topCell, currentStyle } from './commands/a
 import { selectionBounds } from './commands/base.js';
 import { paddingFields } from './designer-state.js';
 import { numberCategoryForFormat, numberOptionsForFormat } from './dialogs/number-format.js';
+import { messageText } from './resolve.js';
 
 /** Cell Insert... dialog: radios like the trial, then the chosen shift on the model. */
 export function showInsertCellsDialog(d: Designer): void {
@@ -35,7 +36,7 @@ export function showPasteSpecial(d: Designer): void {
     };
     const operation = String(data.operation ?? 'none');
     const options = { operation: operation === 'transform' ? 'none' : operation as 'none' | 'add' | 'subtract' | 'multiply' | 'divide', skipBlanks: !!data.skipBlanks, transpose: !!data.transpose || !!data.pasteLink };
-    if (data.pasteLink) d.showMessageBox('Paste Link pastes the copied range; a live link to the source is not supported yet.', 'Paste Special', 1);
+    if (data.pasteLink) d.showMessageBox(messageText(d, 'pasteLinkNote', 'Paste Link pastes the copied range; a live link to the source is not supported yet.'), messageText(d, 'pasteSpecial', 'Paste Special'), 1);
     pasteClipboard(d, mode[paste] ?? 'all', options);
   }, () => undefined);
 }
@@ -53,7 +54,7 @@ export function showHeaderTag(d: Designer, axis: 'row' | 'col', index: number): 
   const area = axis === 'row' ? 2 : 1;
   const range = axis === 'row' ? sheet.getRange(Math.max(0, index), 0, 1, 1, area) : sheet.getRange(0, Math.max(0, index), 1, 1, area);
   const current = range.tag();
-  d.showDialog('cellTagDialogTemplate', { dialogTitle: axis === 'row' ? 'Row Tag Dialog' : 'Column Tag Dialog', tag: current == null ? '' : String(current) }, (data) => {
+  d.showDialog('cellTagDialogTemplate', { dialogTitle: axis === 'row' ? messageText(d, 'rowTagDialog', 'Row Tag Dialog') : messageText(d, 'columnTagDialog', 'Column Tag Dialog'), tag: current == null ? '' : String(current) }, (data) => {
     range.tag(data.cleared ? undefined : String(data.tag ?? ''));
     d.invalidate();
   }, () => undefined);
@@ -108,7 +109,7 @@ export function showTransformCells(d: Designer): void {
 }
 /** Trial: Convert to Range asks "Do you want to convert the table to a normal range ?" first. */
 export function showConvertTableDialog(d: Designer, table: string): void {
-  d.showMessageBox('Do you want to convert the table to a normal range ?', 'SpreadJS Designer', 1, (result: number) => {
+  d.showMessageBox(messageText(d, 'convertTableConfirm', 'Do you want to convert the table to a normal range ?'), 'SpreadJS Designer', 1, (result: number) => {
     if (result === 1) d.runUndoable('convertTableToRange', { table });
   }, () => undefined, 1 /* MessageBoxButtons.okCancel */);
 }

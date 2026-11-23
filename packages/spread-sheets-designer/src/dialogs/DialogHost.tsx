@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { DesignerApi as Designer, DialogData } from '../designer-api.js';
 import type { IComponentRenderType } from '../types.js';
-import { resolveText } from '../resolve.js';
+import { resolveText, getResources, uiKey } from '../resolve.js';
 import { FORMAT_CELLS_TEMPLATE } from './templates.js';
 import { FormatDialogContent } from './FormatDialog.js';
 import { FunctionArgumentsBody, InsertFunctionBody } from './FunctionDialogs.js';
@@ -9,16 +9,22 @@ import { GoToBody, GoToSpecialBody, SeriesBody } from './GoToDialogs.js';
 import { CellStatesManagerBody, CreateCellStateBody } from './CellStatesDialogs.js';
 import { NewFormattingRuleBody, RuleManagerBody } from './ConditionalFormattingDialogs.js';
 import { ChangeChartTypeBody } from './ChartTypeDialogs.js';
-import { NewTableStyleBody } from './TableStyleDialogs.js';
+import { NewTableStyleBody, NewPivotStyleBody } from './TableStyleDialogs.js';
+import { FormulaSparklineBody } from './FormulaSparklineDialogs.js';
 import { BarcodeBody, MoveChartBody, PageHeaderFooter, PageMargins, PageSheetTab, PageSetupPage, RangePickButton, SlicerFieldList } from './InsertDialogs.js';
 import { FindOptions, FindOptionsToggle, FindResultsSection } from './FindDialog.js';
 import { SettingsBody } from './SettingsDialog.js';
 import { BuiltInFileIconsEditor, TabStyleEditor } from './IconStyleEditors.js';
 import { RemoveDuplicatesBody, SortDialogBody, SubtotalDialogBody, TextToColumnsWizard, ValidationHighlightBody } from './DataDialogs.js';
-import { FieldSettingsBody, InsertPivotTableBody, MovePivotTableBody, PivotTableOptionsBody, ValueFieldSettingsBody, CalculatedFieldBody, CalculatedItemBody, ReportFilterPagesBody, SolveOrderBody } from '../pivot-dialogs.js';
+import { FieldSettingsBody, InsertPivotTableBody, MovePivotTableBody, PivotTableOptionsBody, PivotGroupingBody, ValueFieldSettingsBody, CalculatedFieldBody, CalculatedItemBody, ReportFilterPagesBody, SolveOrderBody } from '../pivot-dialogs.js';
 import { sheetSettingTabs, spreadSettingTabs } from '../settings-model.js';
 import { definedNameValue, matchNameFilter, nameFilterLabel, nameFilters, type DefinedNameEntry } from '../defined-names.js';
 import { CustomCheckbox, CustomRadio, CustomSelect } from './custom-widgets.js';
+
+/** TASK 87: caption helper for the dialog-host-internal bodies (`dialogs` subtree). */
+function dh(designer: { resources: Record<string, unknown> } | undefined, key: string, fallback: string): string {
+  return resolveText(`\${res.dialogs.${key}}`, designer?.resources ?? getResources()) || fallback;
+}
 
 function getPath(object: Record<string, unknown>, path?: string): unknown {
   if (!path) return undefined;
@@ -86,8 +92,8 @@ export function DialogHost({ designer }: { designer: Designer }): React.ReactEle
   };
   const ctx = { designer, data, update, rerender: () => setNonce((n) => n + 1) };
   const allButtons = template.buttons ?? [
-    { text: 'OK', buttonType: 'Ok', closeAfterClick: true },
-    { text: 'Cancel', buttonType: 'Cancel', closeAfterClick: true },
+    { text: '${res.ok}', buttonType: 'Ok', closeAfterClick: true },
+    { text: '${res.cancel}', buttonType: 'Cancel', closeAfterClick: true },
   ];
   // `visibleWhen`/`primaryWhenTab` make the footer follow the dialog's active tab (Find and Replace).
   const activeTab = data.activeTab == null ? undefined : String(data.activeTab);
@@ -99,7 +105,7 @@ export function DialogHost({ designer }: { designer: Designer }): React.ReactEle
       <div className="gc-designer-dialog gc-dialog" role="dialog" aria-modal={template.modal !== false} aria-label={String(data.dialogTitle ?? resolveText(template.title ?? dialog.name, designer.resources) ?? dialog.name)} data-template={dialog.name}>
         <div className="gc-dialog-header">
           <div className="gc-dialog-title">{String(data.dialogTitle ?? resolveText(template.title ?? dialog.name, designer.resources))}</div>
-          <button className="gc-dialog-close" aria-label="Close" onClick={() => designer.closeDialog(dialog.name, false)}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8" fill="none" stroke="currentColor" /></svg></button>
+          <button className="gc-dialog-close" aria-label={resolveText('${res.close}', designer.resources) || 'Close'} onClick={() => designer.closeDialog(dialog.name, false)}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8" fill="none" stroke="currentColor" /></svg></button>
         </div>
         <div className="gc-dialog-content">
           {dialog.name === FORMAT_CELLS_TEMPLATE
@@ -159,15 +165,17 @@ function ComponentRenderer({ component, data, ctx, update }: {
     case 'Column':
       return <div className={`gc-dialog-column${cls}`} style={component.width ? { width: String(component.width) } : undefined}>{component.children?.map((child, index) => <ComponentRenderer key={index} component={child} data={data} ctx={ctx} update={update} />)}</div>;
     case 'TextEditor':
-      return <input className={`gc-dialog-input${cls}`} type={component.bindingPath === 'password' ? 'password' : 'text'} value={String(value ?? '')} onChange={(event) => set(event.target.value)} aria-label={String(component.placeholder ?? component.bindingPath ?? '')} />;
+      // TASK 87: with no explicit placeholder the aria falls back to `dialogs.<uiKey(binding)>`.
+      return <input className={`gc-dialog-input${cls}`} type={component.bindingPath === 'password' ? 'password' : 'text'} value={String(value ?? '')} onChange={(event) => set(event.target.value)} aria-label={component.placeholder ? interpolate(component.placeholder, data, resources) : resolveText(`\${res.dialogs.${uiKey(String(component.bindingPath ?? ''))}}`, resources) || String(component.bindingPath ?? '')} />;
     case 'TextArea':
-      return <textarea className={`gc-dialog-input gc-dialog-textarea${cls}`} aria-label={component.placeholder ? String(component.placeholder) : undefined} value={String(value ?? '')} onChange={(event) => set(event.target.value)} />;
+      return <textarea className={`gc-dialog-input gc-dialog-textarea${cls}`} aria-label={component.placeholder ? interpolate(component.placeholder, data, resources) : undefined} value={String(value ?? '')} onChange={(event) => set(event.target.value)} />;
     case 'NumberEditor':
       return <input className={`gc-dialog-input gc-dialog-number${cls}`} type="number" value={Number(value ?? 0)} onChange={(event) => set(event.target.value === '' ? 0 : Number(event.target.value))} />;
     case 'ComboBox': {
       const items = ((component.itemsPath ? getPath(data, String(component.itemsPath)) : component.items) as ListItem[] ?? []);
-      const options = items.map((item) => ({ text: String(item.text ?? item.value ?? ''), value: item.value }));
-      return <CustomSelect className={`gc-dialog-select${cls}`} ariaLabel={String(component.bindingPath ?? '')} value={value} options={options} onChange={(next) => set(convertOption(items, String(next)))} />;
+      // TASK 87: item captions may be `${res.…}` placeholders so a language package translates them.
+      const options = items.map((item) => ({ text: resolveText(String(item.text ?? item.value ?? ''), resources), value: item.value }));
+      return <CustomSelect className={`gc-dialog-select${cls}`} ariaLabel={component.bindingPath ? resolveText(`\${res.dialogs.${uiKey(String(component.bindingPath))}}`, resources) || String(component.bindingPath) : ''} value={value} options={options} onChange={(next) => set(convertOption(items, String(next)))} />;
     }
     case 'CheckBox':
       return <CustomCheckbox className={cls.trim()} checked={!!value} onChange={(next) => set(next)} label={interpolate(component.text, data, resources)} />;
@@ -187,20 +195,20 @@ function ComponentRenderer({ component, data, ctx, update }: {
       return (
         <div className={`gc-dialog-list${cls}`}>
           {((component.itemsPath ? getPath(data, String(component.itemsPath)) : component.items) as ListItem[] ?? []).map((item, index) => (
-            <div key={index} className={`gc-dialog-list-item${String(value) === String(item.value) ? ' selected' : ''}`} onClick={() => set(item.value)}>{item.text}</div>
+            <div key={index} className={`gc-dialog-list-item${String(value) === String(item.value) ? ' selected' : ''}`} onClick={() => set(item.value)}>{resolveText(String(item.text ?? ''), resources)}</div>
           ))}
         </div>
       );
     case 'TabControl':
       return <TabControl component={component} data={data} ctx={ctx} update={update} />;
     case 'LineStylePicker':
-      return <CustomSelect className={`gc-dialog-select${cls}`} ariaLabel="Line style" value={String(value ?? 'thin')} options={['thin', 'medium', 'thick', 'double', 'dotted', 'dashed'].map((style) => ({ text: style[0].toUpperCase() + style.slice(1), value: style }))} onChange={(next) => set(String(next))} />;
+      return <CustomSelect className={`gc-dialog-select${cls}`} ariaLabel={dh(ctx.designer, 'lineStyle', 'Line style')} value={String(value ?? 'thin')} options={['thin', 'medium', 'thick', 'double', 'dotted', 'dashed'].map((style) => ({ text: dh(ctx.designer, `line${style[0].toUpperCase()}${style.slice(1)}`, style[0].toUpperCase() + style.slice(1)), value: style }))} onChange={(next) => set(String(next))} />;
     case 'BorderPreview':
       return <div className={`gc-dialog-border-preview${cls}`} data-preset={String(value ?? 'none')}><span /></div>;
     case 'NumberOptions':
-      return <NumberOptions data={data} update={update} />;
+      return <NumberOptions designer={ctx.designer} data={data} update={update} />;
     case 'ZoomMagnification':
-      return <ZoomMagnification data={data} update={update} />;
+      return <ZoomMagnification designer={ctx.designer} data={data} update={update} />;
     case 'RangePickButton':
       return <RangePickButton component={component} data={data} ctx={ctx} update={update} />;
     case 'BarcodeBody':
@@ -218,13 +226,13 @@ function ComponentRenderer({ component, data, ctx, update }: {
     case 'PageSheetTab':
       return <PageSheetTab data={data} ctx={ctx} update={update} />;
     case 'FindOptionsToggle':
-      return <FindOptionsToggle data={data} update={update} />;
+      return <FindOptionsToggle data={data} update={update} designer={ctx.designer} />;
     case 'FindOptions':
-      return <FindOptions data={data} update={update} />;
+      return <FindOptions data={data} update={update} designer={ctx.designer} />;
     case 'FindResultsSection':
       return <FindResultsSection data={data} />;
     case 'ValidationCriteria':
-      return <ValidationCriteria data={data} update={update} />;
+      return <ValidationCriteria designer={ctx.designer} data={data} update={update} />;
     case 'NameManager':
       return <NameManager designer={ctx.designer} data={data} update={update} />;
     case 'InsertFunctionEditor':
@@ -237,6 +245,12 @@ function ComponentRenderer({ component, data, ctx, update }: {
       return <SeriesBody designer={ctx.designer} data={data} update={update} />;
     case 'NewTableStyleEditor':
       return <NewTableStyleBody designer={ctx.designer} data={data} update={update} />;
+    /* TASK 93: the New Pivot Table Style dialog body. */
+    case 'NewPivotStyleEditor':
+      return <NewPivotStyleBody designer={ctx.designer} data={data} update={update} />;
+    /* TASK 93 item 3: the per-type formula sparkline dialogs. */
+    case 'FormulaSparklineEditor':
+      return <FormulaSparklineBody designer={ctx.designer} data={data} update={update} />;
     case 'CellStatesManagerEditor':
       return <CellStatesManagerBody designer={ctx.designer} data={data} update={update} />;
     case 'CreateCellStateEditor':
@@ -258,13 +272,13 @@ function ComponentRenderer({ component, data, ctx, update }: {
     case 'TabStyleEditor':
       return <TabStyleEditor data={data} update={update} />;
     case 'MoveOrCopySheetList':
-      return <div className="gc-dialog-list gc-move-copy-list" role="listbox" aria-label="Before sheet:">
-        {[...(data.names as string[]), '(move to end)'].map((name) => <div key={name} role="option" aria-selected={data.before === name} className={`gc-dialog-list-item${data.before === name ? ' selected' : ''}`} onClick={() => update('before', name)}>{name}</div>)}
+      return <div className="gc-dialog-list gc-move-copy-list" role="listbox" aria-label={dh(ctx.designer, 'beforeSheet', 'Before sheet:')}>
+        {[...(data.names as string[]).map((name) => ({ label: name, value: name })), { label: dh(ctx.designer, 'moveToEnd', '(move to end)'), value: '(move to end)' }].map((row) => <div key={row.value} role="option" aria-selected={data.before === row.value} className={`gc-dialog-list-item${data.before === row.value ? ' selected' : ''}`} onClick={() => update('before', row.value)}>{row.label}</div>)}
       </div>;
     case 'TabColorEditor':
-      return <TabColorEditor data={data} update={update} />;
+      return <TabColorEditor designer={ctx.designer} data={data} update={update} />;
     case 'UnhideSheetList':
-      return <UnhideSheetList data={data} update={update} />;
+      return <UnhideSheetList designer={ctx.designer} data={data} update={update} />;
     case 'CustomSortBody':
       return <SortDialogBody designer={ctx.designer} data={data} update={update} />;
     case 'PivotCreateBody':
@@ -277,6 +291,9 @@ function ComponentRenderer({ component, data, ctx, update }: {
       return <FieldSettingsBody designer={ctx.designer} data={data} update={update} />;
     case 'PivotOptionsBody':
       return <PivotTableOptionsBody data={data} update={update} />;
+    /* TASK 93: the Grouping dialog body. */
+    case 'PivotGroupingBody':
+      return <PivotGroupingBody data={data} update={update} />;
     /* TASK 77: Fields, Items & Sets dialogs + the report-filter confirmation. */
     case 'PivotCalcFieldBody':
       return <CalculatedFieldBody designer={ctx.designer} data={data} update={update} />;
@@ -301,7 +318,7 @@ function ComponentRenderer({ component, data, ctx, update }: {
   }
 }
 
-export function TabColorEditor({ data, update }: { data: Record<string, unknown>; update: (path: string, value: unknown) => void }): React.ReactElement {
+export function TabColorEditor({ designer, data, update }: { designer?: Designer; data: Record<string, unknown>; update: (path: string, value: unknown) => void }): React.ReactElement {
   const [hsl, setHsl] = useState({ h: 0, s: 0, l: 1 });
   const rgb = ['red', 'green', 'blue'].map((key) => Math.max(0, Math.min(255, Number(data[key]) || 0)));
   const color = ['red', 'green', 'blue'].every((key) => data[key] === '') ? 'transparent' : `rgb(${rgb.join(',')})`;
@@ -315,14 +332,14 @@ export function TabColorEditor({ data, update }: { data: Record<string, unknown>
     channels.forEach((channel, index) => update(['red', 'green', 'blue'][index], Math.round((channel + next.l - chroma / 2) * 255)));
   };
   return <div className="gc-tab-color-editor">
-    <div className="gc-tab-color-palette"><div className="gc-tab-color-spectrum" aria-label="Color spectrum" onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => {
+    <div className="gc-tab-color-palette"><div className="gc-tab-color-spectrum" aria-label={dh(designer, 'colorSpectrum', "Color spectrum")} onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => {
       if (!(event.buttons & 1)) return;
       const rect = event.currentTarget.getBoundingClientRect();
       select({ ...hsl, h: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), s: Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height)) });
     }} onClick={(event) => {
       const rect = event.currentTarget.getBoundingClientRect();
       select({ ...hsl, h: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), s: Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height)) });
-    }} /><div className="gc-tab-color-lightness" role="slider" aria-label="Lightness" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hsl.l * 100)} style={{ background: `linear-gradient(to bottom, white, hsl(${hsl.h * 360} ${hsl.s * 100}% 50%), black)` }} onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => {
+    }} /><div className="gc-tab-color-lightness" role="slider" aria-label={dh(designer, 'lightness', "Lightness")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hsl.l * 100)} style={{ background: `linear-gradient(to bottom, white, hsl(${hsl.h * 360} ${hsl.s * 100}% 50%), black)` }} onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => {
       if (!(event.buttons & 1)) return;
       const rect = event.currentTarget.getBoundingClientRect();
       select({ ...hsl, l: Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height)) });
@@ -331,17 +348,17 @@ export function TabColorEditor({ data, update }: { data: Record<string, unknown>
       select({ ...hsl, l: Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height)) });
     }} /></div>
     <div className="gc-tab-color-fields">
-      <div>{['red', 'green', 'blue'].map((key, index) => <label key={key}>{key[0].toUpperCase() + key.slice(1)}: <input type="number" min="0" max="255" aria-label={`${key[0].toUpperCase() + key.slice(1)}:`} value={data[key] === '' ? '' : rgb[index]} onChange={(event) => { update('pickerSelected', false); update(key, event.target.value); }} /></label>)}</div>
-      <div className="gc-tab-color-preview">New<div style={{ background: color }} /><div />Current</div>
+      <div>{['red', 'green', 'blue'].map((key, index) => { const caption = dh(designer, key, key[0].toUpperCase() + key.slice(1)); return <label key={key}>{caption}: <input type="number" min="0" max="255" aria-label={`${caption}:`} value={data[key] === '' ? '' : rgb[index]} onChange={(event) => { update('pickerSelected', false); update(key, event.target.value); }} /></label>; })}</div>
+      <div className="gc-tab-color-preview">{dh(designer, 'newColor', "New")}<div style={{ background: color }} /><div />{dh(designer, 'currentColor', "Current")}</div>
     </div>
   </div>;
 }
 
-function UnhideSheetList({ data, update }: { data: Record<string, unknown>; update: (path: string, value: unknown) => void }): React.ReactElement {
+function UnhideSheetList({ designer, data, update }: { designer: Designer; data: Record<string, unknown>; update: (path: string, value: unknown) => void }): React.ReactElement {
   const names = data.names as string[];
   const selected = data.selected as string[];
   const [anchor, setAnchor] = useState(0);
-  return <div className="gc-dialog-list gc-unhide-sheet-list" role="listbox" aria-label="Unhide one or more sheets:" aria-multiselectable="true" tabIndex={0}>
+  return <div className="gc-dialog-list gc-unhide-sheet-list" role="listbox" aria-label={dh(designer, 'unhideSheets', "Unhide one or more sheets:")} aria-multiselectable="true" tabIndex={0}>
     {names.map((name, index) => <div key={name} role="option" aria-selected={selected.includes(name)} className={`gc-dialog-list-item${selected.includes(name) ? ' selected' : ''}`}
       onClick={(event) => {
         if (event.shiftKey) update('selected', names.slice(Math.min(anchor, index), Math.max(anchor, index) + 1));
@@ -357,11 +374,11 @@ function NameManager({ designer, data, update }: { designer: Designer; data: Rec
   const sort = data.sort as { key: string; direction: number } | undefined;
   const valueOf = (entry: DefinedNameEntry): string => definedNameValue(designer.gc, designer.getWorkbook(), entry);
   const columns: { key: keyof DefinedNameEntry & string; label: string; text: (entry: DefinedNameEntry) => string }[] = [
-    { key: 'name', label: 'Name', text: (entry) => entry.name },
-    { key: 'value', label: 'Value', text: valueOf },
-    { key: 'refersTo', label: 'Refers To', text: (entry) => entry.refersTo },
-    { key: 'scope', label: 'Scope', text: (entry) => entry.scope },
-    { key: 'comment', label: 'Comment', text: (entry) => entry.comment },
+    { key: 'name', label: dh(designer, 'name', 'Name'), text: (entry) => entry.name },
+    { key: 'value', label: dh(designer, 'value', 'Value'), text: valueOf },
+    { key: 'refersTo', label: dh(designer, 'refersTo', 'Refers To'), text: (entry) => entry.refersTo },
+    { key: 'scope', label: dh(designer, 'scope', 'Scope'), text: (entry) => entry.scope },
+    { key: 'comment', label: dh(designer, 'comment', 'Comment'), text: (entry) => entry.comment },
   ];
   let visible = entries.filter((entry) => matchNameFilter(entry, filter, valueOf(entry)));
   if (sort) {
@@ -373,27 +390,27 @@ function NameManager({ designer, data, update }: { designer: Designer; data: Rec
   const filterLabel = nameFilterLabel(filter);
   return <div className="gc-name-manager">
     <div className="gc-name-toolbar">
-      <button className="gc-dialog-secondary" onClick={() => designer.showNewName()}>New...</button>
-      <button className="gc-dialog-secondary" disabled={!selected || selected.readOnly} onClick={() => designer.showNewName(selected?.id)}>Edit...</button>
-      <button className="gc-dialog-secondary" disabled={!selected || selected.readOnly} onClick={() => selected && designer.confirmDeleteName(selected.id)}>Delete</button>
-      <label>Filter with:
+      <button className="gc-dialog-secondary" onClick={() => designer.showNewName()}>{dh(designer, 'nameNewBtn', "New...")}</button>
+      <button className="gc-dialog-secondary" disabled={!selected || selected.readOnly} onClick={() => designer.showNewName(selected?.id)}>{dh(designer, 'nameEditBtn', "Edit...")}</button>
+      <button className="gc-dialog-secondary" disabled={!selected || selected.readOnly} onClick={() => selected && designer.confirmDeleteName(selected.id)}>{resolveText('${res.delete}', designer.resources) || 'Delete'}</button>
+      <label>{dh(designer, 'filterWith', "Filter with:")}
         <div className={`gc-name-filter-select${filterOpen ? ' open' : ''}`}>
-          <div className="gc-name-filter-field" role="combobox" aria-expanded={filterOpen} aria-haspopup="listbox" aria-label="Filter with:" tabIndex={0}
+          <div className="gc-name-filter-field" role="combobox" aria-expanded={filterOpen} aria-haspopup="listbox" aria-label={dh(designer, 'filterWith', 'Filter with:')} tabIndex={0}
             onClick={() => setFilterOpen((open) => !open)}
             onKeyDown={(event) => { if (event.key === ' ' || event.key === 'Enter' || event.key === 'ArrowDown') { event.preventDefault(); setFilterOpen(true); } }}>
-            <span className="gc-name-filter-text">{filter ? filterLabel : 'Filter'}</span>
+            <span className="gc-name-filter-text">{filter ? dh(designer, `nameFilter${filter}`, filterLabel) : dh(designer, 'filter', 'Filter')}</span>
             <span className="gc-name-filter-arrow" aria-hidden="true"><i /></span>
           </div>
-          {filterOpen && <div className="gc-name-filter-list" role="listbox" aria-label="Filter with:">
+          {filterOpen && <div className="gc-name-filter-list" role="listbox" aria-label={dh(designer, 'filterWith', 'Filter with:')}>
             {[['', 'Filter'] as [string, string], ...nameFilters].map(([value, label]) => (
               <div key={label} role="option" aria-selected={filter === value} className={`gc-dialog-list-item${filter === value ? ' selected' : ''}`}
-                onClick={() => { setFilterOpen(false); update('filter', value); }}>{label}</div>
+                onClick={() => { setFilterOpen(false); update('filter', value); }}>{dh(designer, value ? `nameFilter${value}` : 'filter', label)}</div>
             ))}
           </div>}
         </div>
       </label>
     </div>
-    <div className="gc-name-list" role="listbox" aria-label="Name Manager">
+    <div className="gc-name-list" role="listbox" aria-label={dh(designer, 'nameManager', 'Name Manager')}>
       <table><thead><tr>{columns.map((column) => {
         const active = sort?.key === column.key;
         return <th key={column.key} aria-label={`${column.label} sort`} onClick={() => update('sort', { key: column.key, direction: active && sort?.direction === 1 ? -1 : 1 })}>
@@ -407,33 +424,33 @@ function NameManager({ designer, data, update }: { designer: Designer; data: Rec
   </div>;
 }
 
-function ValidationCriteria({ data, update }: { data: Record<string, unknown>; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
+function ValidationCriteria({ designer, data, update }: { designer: Designer; data: Record<string, unknown>; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
   const kind = String(data.validationType ?? 'Any value');
   const any = kind === 'Any value', list = kind === 'List', custom = kind === 'Custom';
   const between = [6, 7].includes(Number(data.operator));
   const field = (label: string, path: string): React.ReactElement => <label className="gc-dv-field">{label}<input className="gc-dialog-input" aria-label={label} value={String(data[path] ?? '')} onChange={(event) => update(path, event.target.value)} /></label>;
   return <div className="gc-validation-criteria">
-    <fieldset><legend>Validation Criteria</legend></fieldset>
-    <div className="gc-dv-allow-row"><label className="gc-dv-field">Allow:<CustomSelect className="gc-dialog-select gc-dv-type" ariaLabel="Allow:" value={kind} options={['Any value', 'Whole number', 'Decimal', 'List', 'Date', 'Time', 'Text length', 'Custom'].map((kind) => ({ text: kind, value: kind }))} onChange={(next) => update('validationType', String(next))} /></label>
-      <div><CustomCheckbox disabled={any} checked={data.ignoreBlank !== false} onChange={(next) => update('ignoreBlank', next)} label="Ignore Blank" />
-      {list && <CustomCheckbox checked={data.inCellDropdown !== false} onChange={(next) => update('inCellDropdown', next)} label="In-cell dropdown" />}</div>
+    <fieldset><legend>{dh(designer, 'validationCriteria', "Validation Criteria")}</legend></fieldset>
+    <div className="gc-dv-allow-row"><label className="gc-dv-field">{dh(designer, 'allow', "Allow:")}<CustomSelect className="gc-dialog-select gc-dv-type" ariaLabel={dh(designer, 'allow', 'Allow:')} value={kind} options={['Any value', 'Whole number', 'Decimal', 'List', 'Date', 'Time', 'Text length', 'Custom'].map((kind) => ({ text: dh(designer, `dv${kind.replace(/[^A-Za-z]/g, '')}`, kind), value: kind }))} onChange={(next) => update('validationType', String(next))} /></label>
+      <div><CustomCheckbox disabled={any} checked={data.ignoreBlank !== false} onChange={(next) => update('ignoreBlank', next)} label={dh(designer, 'ignoreBlank', "Ignore Blank")} />
+      {list && <CustomCheckbox checked={data.inCellDropdown !== false} onChange={(next) => update('inCellDropdown', next)} label={dh(designer, 'inCellDropdown', "In-cell dropdown")} />}</div>
     </div>
-    {!list && !custom && <label className="gc-dv-field">Data:<CustomSelect className="gc-dialog-select gc-dv-operator" ariaLabel="Data:" disabled={any} value={String(data.operator ?? 6)} options={[{ text: 'between', value: 6 }, { text: 'not between', value: 7 }, { text: 'equal to', value: 0 }, { text: 'not equal to', value: 1 }, { text: 'greater than', value: 2 }, { text: 'less than', value: 4 }, { text: 'greater than or equal to', value: 3 }, { text: 'less than or equal to', value: 5 }]} onChange={(next) => update('operator', Number(next))} /></label>}
-    {!any && <>{field(list ? 'Source:' : custom ? 'Formula:' : between ? (kind === 'Date' ? 'Start date:' : kind === 'Time' ? 'Start time:' : 'Minimum:') : 'Value:', 'source')}{between && !list && !custom && field(kind === 'Date' ? 'End date:' : kind === 'Time' ? 'End time:' : 'Maximum:', 'formula2')}</>}
+    {!list && !custom && <label className="gc-dv-field">{dh(designer, 'data', "Data:")}<CustomSelect className="gc-dialog-select gc-dv-operator" ariaLabel={dh(designer, 'data', "Data:")} disabled={any} value={String(data.operator ?? 6)} options={[{ key: 'between', text: 'between', value: 6 }, { key: 'notBetween', text: 'not between', value: 7 }, { key: 'equalTo', text: 'equal to', value: 0 }, { key: 'notEqualTo', text: 'not equal to', value: 1 }, { key: 'greaterThan', text: 'greater than', value: 2 }, { key: 'lessThan', text: 'less than', value: 4 }, { key: 'greaterThanOrEqual', text: 'greater than or equal to', value: 3 }, { key: 'lessThanOrEqual', text: 'less than or equal to', value: 5 }].map((option) => ({ text: dh(designer, option.key, option.text), value: option.value }))} onChange={(next) => update('operator', Number(next))} /></label>}
+    {!any && <>{field(list ? dh(designer, 'source', 'Source:') : custom ? dh(designer, 'formula', 'Formula:') : between ? (kind === 'Date' ? dh(designer, 'startDate', 'Start date:') : kind === 'Time' ? dh(designer, 'startTime', 'Start time:') : dh(designer, 'minimum', 'Minimum:')) : dh(designer, 'dvValue', 'Value:'), 'source')}{between && !list && !custom && field(kind === 'Date' ? dh(designer, 'endDate', 'End date:') : kind === 'Time' ? dh(designer, 'endTime', 'End time:') : dh(designer, 'maximum', 'Maximum:'), 'formula2')}</>}
   </div>;
 }
 
 /** Official Zoom dialog body: magnification radio group with a Custom row. */
-function ZoomMagnification({ data, update }: { data: Record<string, unknown>; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
+function ZoomMagnification({ designer, data, update }: { designer: Designer; data: Record<string, unknown>; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
   const choice = String(data.choice ?? '100');
-  const options: [string, string][] = [['200', '200%'], ['100', '100%'], ['75', '75%'], ['50', '50%'], ['25', '25%'], ['fit', 'Fit selection']];
+  const options: [string, string][] = [['200', '200%'], ['100', '100%'], ['75', '75%'], ['50', '50%'], ['25', '25%'], ['fit', dh(designer, 'fitSelection', 'Fit selection')]];
   return (
     <div className="gc-zoom-radio-group-inner">
       {options.map(([value, label]) => (
         <CustomRadio key={value} className="gc-zoom-radio gc-radio" checked={choice === value} onChange={() => update('choice', value)} label={label} />
       ))}
       <span className="gc-zoom-custom-row">
-        <CustomRadio className="gc-zoom-radio gc-zoom-custom-radio gc-radio" checked={choice === 'custom'} onChange={() => update('choice', 'custom')} label="Custom:" />
+        <CustomRadio className="gc-zoom-radio gc-zoom-custom-radio gc-radio" checked={choice === 'custom'} onChange={() => update('choice', 'custom')} label={dh(designer, 'customZoom', "Custom:")} />
         <input
           className="gc-dialog-input gc-zoom-custom-input"
           type="number"
@@ -447,15 +464,15 @@ function ZoomMagnification({ data, update }: { data: Record<string, unknown>; up
   );
 }
 
-function NumberOptions({ data, update }: { data: Record<string, unknown>; update: (path: string | undefined, value: unknown) => void }): React.ReactElement | null {
+function NumberOptions({ designer, data, update }: { designer: Designer; data: Record<string, unknown>; update: (path: string | undefined, value: unknown) => void }): React.ReactElement | null {
   const category = String(data.category ?? 'General');
   if (category === 'General') return null;
   return (
     <div className="gc-format-number-options-content">
-      <div className="gc-dialog-label">Type:</div>
+      <div className="gc-dialog-label">{resolveText('${res.formatDialog.type}', designer.resources) || 'Type:'}</div>
       <input className="gc-dialog-input gc-format-code-input" value={String(data.formatCode ?? '')} onChange={(event) => update('formatCode', event.target.value)} />
       {['Number', 'Currency', 'Accounting', 'Percentage', 'Scientific', 'Fraction'].includes(category) && <>
-        <div className="gc-dialog-label">Decimal places:</div>
+        <div className="gc-dialog-label">{resolveText('${res.formatDialog.decimalPlaces}', designer.resources) || 'Decimal places:'}</div>
         <input className="gc-dialog-input gc-format-decimal-input" type="number" value={Number(data.decimalPlaces ?? 2)} onChange={(event) => update('decimalPlaces', Number(event.target.value))} />
       </>}
     </div>
@@ -516,7 +533,7 @@ function TabControl({ component, data, ctx, update }: { component: IComponentRen
     <div className={`gc-dialog-tabs${component.className ? ` ${component.className}` : ''}`}>
       <div className="gc-dialog-tab-bar" role="tablist">
         {items.map((item, index) => (
-          <button key={item.key ?? index} role="tab" aria-selected={index === active} className={`gc-dialog-tab${index === active ? ' selected' : ''}`} onClick={() => setActive(index)}>{item.text}</button>
+          <button key={item.key ?? index} role="tab" aria-selected={index === active} className={`gc-dialog-tab${index === active ? ' selected' : ''}`} onClick={() => setActive(index)}>{interpolate(item.text, data, ctx.designer.resources)}</button>
         ))}
       </div>
       <div className="gc-dialog-tab-panel" role="tabpanel">

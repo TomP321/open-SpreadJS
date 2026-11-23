@@ -9,6 +9,10 @@
 import type { Workbook } from '../workbook.js';
 import type { DataChart } from './data-chart.js';
 import { resolveConfigType } from './data-chart.js';
+import { ltext } from '../localization.js';
+
+/** DataChart config-panel captions (`dataChart.*` language namespace; the section lookup keys stay English). */
+const dtext = (key: string, fallback: string, ...args: (string | number)[]) => ltext(`dataChart.${key}`, fallback, ...args);
 
 const instances = new WeakMap<HTMLElement, DataChartConfigPanel>();
 
@@ -100,11 +104,11 @@ export class DataChartConfigPanel {
         root.setAttribute('style', 'display:block;width:100%;height:100%;background:#ffffff;color:#333;font:12px/1.5 Calibri,"Segoe UI",Arial,sans-serif;border:1px solid #e3e3e3;box-sizing:border-box;overflow-y:auto');
         const tabs = doc.createElement('div');
         tabs.setAttribute('style', 'display:flex;align-items:center;gap:18px;padding:8px 12px;border-bottom:1px solid #eee');
-        tabs.append(this.tabLabel(doc, 'Inspector', true), this.tabLabel(doc, 'Data Binding', false));
+        tabs.append(this.tabLabel(doc, dtext('inspector', 'Inspector'), true), this.tabLabel(doc, dtext('dataBinding', 'Data Binding'), false));
         const typeRow = doc.createElement('div');
         typeRow.setAttribute('style', 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #f2f2f2');
         const typeLabel = doc.createElement('span');
-        typeLabel.textContent = 'Chart Type';
+        typeLabel.textContent = dtext('chartType', 'Chart Type');
         const typeSelect = doc.createElement('select');
         typeSelect.className = 'opensheets-dc-type';
         typeSelect.setAttribute('style', 'border:1px solid #d9d9d9;padding:2px 4px;background:#fff;color:#333');
@@ -126,7 +130,7 @@ export class DataChartConfigPanel {
         });
         typeRow.append(typeLabel, typeSelect);
         const search = doc.createElement('input');
-        search.setAttribute('placeholder', 'Search property name here...');
+        search.setAttribute('placeholder', dtext('searchProperties', 'Search property name here...'));
         search.setAttribute('style', 'width:calc(100% - 24px);margin:8px 12px;padding:4px 6px;border:1px solid #ddd;border-radius:2px');
         const list = doc.createElement('div');
         list.className = 'opensheets-dc-panel-list';
@@ -173,7 +177,7 @@ export class DataChartConfigPanel {
         wrap.setAttribute('style', 'border-bottom:1px solid #f2f2f2');
         const header = doc.createElement('div');
         header.setAttribute('style', 'display:flex;align-items:center;justify-content:space-between;padding:8px 12px;color:#2e8b57;cursor:pointer');
-        header.textContent = name;
+        header.textContent = dtext(`section.${name}`, name);
         const arrow = doc.createElement('span');
         arrow.textContent = '>';
         arrow.setAttribute('style', 'color:#999');

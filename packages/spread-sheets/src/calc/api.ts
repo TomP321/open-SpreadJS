@@ -7,6 +7,13 @@ import type { Worksheet } from '../worksheet.js';
 import type { CalcEngine } from './engine.js';
 import { Range } from '../primitives.js';
 import { columnLabel, parseFormula, astToText, translateRefs } from './parser.js';
+import { addCalcLanguagePackageDescriptions, languagePackages, getActiveCalcLanguagePackage } from './language-packages.js';
+import { registerItalianCalcLanguagePackage } from './italian-language-package.js';
+
+// The core ships the built-in Italian package REGISTRY entry (TASK 89). Activation still
+// requires `GC.Spread.CalcEngine.LanguagePackages.languagePackages('it')`, so a workbook
+// without a package behaves exactly as before this feature existed.
+registerItalianCalcLanguagePackage();
 import { CalcArray, CalcError, ErrorCode, error, isError } from './values.js';
 import {
   AsyncEvaluateContext,
@@ -105,7 +112,7 @@ export function formulaToExpression(
 ): Expression {
   void baseRow;
   void baseColumn;
-  const ast = parseFormula(formula, { r1c1: useR1C1 });
+  const ast = parseFormula(formula, { r1c1: useR1C1, language: getActiveCalcLanguagePackage() });
   const engine = engineOf(context);
   const raw = engine?.astToExpression(ast) ?? plainExpression(ast);
   return materialize(raw);
@@ -422,7 +429,17 @@ export const GlobalCalcEngineApi = {
     AsyncFunctionEvaluateMode,
   },
   ExcelCompatibleCalcMode: false,
-  LanguagePackages: { languagePackages: () => undefined },
+  // TASK 89: real implementation of the public d.ts contract
+  // (`GC.Spread.CalcEngine.LanguagePackages.languagePackages(languageName?)`).
+  // `_activeLanguagePackage` is the add-in accessor for the live package object (name map +
+  // separators) and `_addDescriptions` merges localized function descriptions into a registered
+  // package (the Designer's resource packages call it for the autocomplete); both are our
+  // extensions, not part of the official surface.
+  LanguagePackages: {
+    languagePackages,
+    _activeLanguagePackage: getActiveCalcLanguagePackage,
+    _addDescriptions: addCalcLanguagePackageDescriptions,
+  },
 };
 
 export { translateRefs, isError };

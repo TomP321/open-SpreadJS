@@ -1,5 +1,13 @@
 import type { DesignerApi as Designer, FindSearchOptions as SearchOptions, FindSearchResult as SearchResult } from './designer-api.js';
 import { TemplateNames } from './names-generated.js';
+import { resolveText , messageText} from './resolve.js';
+
+/** TASK 87: message texts go through the resource tree; `{0}` carries the count. */
+function msg(designer: Designer, key: string, fallback: string, ...args: (string | number)[]): string {
+  let text = resolveText(`\${res.findDialog.${key}}`, designer.resources) || fallback;
+  args.forEach((value, index) => { text = text.split(`{${index}}`).join(String(value)); });
+  return text;
+}
 import type { Workbook } from './core-internals.js';
 
 function regexFor(text: string, options: SearchOptions): RegExp {
@@ -66,8 +74,8 @@ export class FindReplaceController {
     const results = this.collected(data);
     data.results = results;
     if (!results.length) {
-      data.resultsLabel = 'Spread cannot find the data you are searching for.';
-      this.designer.showMessageBox('Spread cannot find the data you are searching for.', 'SpreadJS Designer', 1);
+      data.resultsLabel = msg(this.designer, 'cannotFind', 'Spread cannot find the data you are searching for.');
+      this.designer.showMessageBox(data.resultsLabel, 'SpreadJS Designer', 1);
       return false;
     }
     const wb: Workbook = this.designer.getWorkbook();
@@ -89,12 +97,12 @@ export class FindReplaceController {
     data.results = results;
     if (!results.length) {
       // Like the trial: a message box, the dialog keeps its current size.
-      this.designer.showMessageBox('Spread cannot find the data you are searching for.', 'SpreadJS Designer', 1);
+      this.designer.showMessageBox(msg(this.designer, 'cannotFind', 'Spread cannot find the data you are searching for.'), 'SpreadJS Designer', 1);
       this.designer.invalidate();
       return results;
     }
     (data as Record<string, unknown>).resultsShown = true;
-    (data as Record<string, unknown>).resultsLabel = `${results.length} cell(s) found`;
+    (data as Record<string, unknown>).resultsLabel = msg(this.designer, 'cellsFound', '{0} cell(s) found', results.length);
     this.designer.invalidate();
     return results;
   }
@@ -121,7 +129,7 @@ export class FindReplaceController {
       if (row >= sheet.getRowCount()) row = 0;
       if (`${row}:${col}` === started) break;
     }
-    this.designer.showMessageBox('Spread cannot find a match.', 'Replace', 1);
+    this.designer.showMessageBox(messageText(this.designer, 'noMatch', 'Spread cannot find a match.'), messageText(this.designer, 'replace', 'Replace'), 1);
     return false;
   }
 
@@ -143,7 +151,7 @@ export class FindReplaceController {
       count++;
     }
     data.results = [];
-    data.resultsLabel = `All done, We made ${count} replacements.`;
+    data.resultsLabel = msg(this.designer, 'replacementsMade', 'All done, We made {0} replacements.', count);
     this.designer.invalidate();
     return count;
   }

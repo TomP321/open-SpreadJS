@@ -13,6 +13,8 @@ import React from 'react';
 import type { DesignerApi as Designer } from '../designer-api.js';
 import { chartsNamespace } from '../core-internals.js';
 import { CustomSelect } from './custom-widgets.js';
+import { uiKey } from '../resolve.js';
+import { T } from './t.js';
 
 /** Category rows of the trial's left list, in its order. */
 export const CHART_TYPE_CATEGORIES = [
@@ -214,7 +216,7 @@ export function ChangeChartTypeBody({ designer, data, update }: Props): React.Re
   };
   return (
     <div className="gc-chart-type-dialog">
-      <div className="gc-chart-type-categories" role="listbox" aria-label="Chart category">
+      <div className="gc-chart-type-categories" role="listbox" aria-label={T('chartCategory', 'Chart category')}>
         {CHART_TYPE_CATEGORIES.map((name) => (
           <div key={name} role="option" aria-selected={name === category}
             className={`gc-chart-type-category${name === category ? ' selected' : ''}`}
@@ -224,21 +226,21 @@ export function ChangeChartTypeBody({ designer, data, update }: Props): React.Re
       <div className="gc-chart-type-right">
         <div className="gc-chart-type-tiles">
           {tiles.map((item, index) => (
-            <button key={item.label} type="button" title={item.label}
+            <button key={item.label} type="button" title={T(uiKey(item.label), item.label)}
               className={`gc-chart-type-tile${index === tileIndex ? ' selected' : ''}`}
               onClick={() => update('tile', index)}>
               <ChartTileArt kind={item.kind} />
             </button>
           ))}
         </div>
-        <div className="gc-chart-type-caption">{tile?.label ?? ''}</div>
+        <div className="gc-chart-type-caption">{tile ? T(uiKey(tile.label), tile.label) : ''}</div>
         <div className="gc-chart-type-separator" />
         {tile?.custom && (
           <div className="gc-chart-type-custom">
-            <div className="gc-chart-type-custom-title">Choose the chart type and axis for your data series:</div>
-            <div className="gc-chart-type-series" role="table" aria-label="Data series">
+            <div className="gc-chart-type-custom-title">{T('chooseTheChartTypeAndAxisForYourDataSeries', 'Choose the chart type and axis for your data series:')}</div>
+            <div className="gc-chart-type-series" role="table" aria-label={T('dataSeries', 'Data series')}>
               <div className="gc-chart-type-series-row gc-chart-type-series-head" role="row">
-                <span role="columnheader">Series Name</span><span role="columnheader">Chart Type</span><span role="columnheader">Secondary Axis</span>
+                <span role="columnheader">{T('seriesName', 'Series Name')}</span><span role="columnheader">{T('chartType', 'Chart Type')}</span><span role="columnheader">{T('secondaryAxis', 'Secondary Axis')}</span>
               </div>
               {series.map((row, index) => (
                 <div className="gc-chart-type-series-row" role="row" key={index}>
@@ -246,7 +248,7 @@ export function ChangeChartTypeBody({ designer, data, update }: Props): React.Re
                   <span role="cell">
                     <CustomSelect className="gc-dialog-select" ariaLabel={`Chart type for ${row.name}`}
                       value={typeNameOf(row.chartType)}
-                      options={SERIES_CHART_TYPES.map((option) => ({ text: option.label, value: option.typeName }))} onChange={(next) => update(`seriesType.${index}`, String(next))} />
+                      options={SERIES_CHART_TYPES.map((option) => ({ text: T(uiKey(option.label), option.label), value: option.typeName }))} onChange={(next) => update(`seriesType.${index}`, String(next))} />
                   </span>
                   <span role="cell" className="gc-chart-type-series-axis">
                     <input type="checkbox" aria-label={`Secondary axis for ${row.name}`} checked={row.axisGroup === 1}

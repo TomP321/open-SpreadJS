@@ -12,6 +12,7 @@ import type { Workbook } from '../workbook.js';
 import { GeneralFormatter } from '../formatter.js';
 import { Events, type EventInfo, type ModelEvent } from '../events.js';
 import { CommandManager } from '../commands.js';
+import { ltext } from '../localization.js';
 import { instanceProperties } from '../not-implemented.js';
 import { builtinHintNames } from './formula-hints.js';
 import { registerControl, unregisterControl, findControl as findRegistered } from './controls.js';
@@ -77,7 +78,7 @@ export class FormulaEditor {
     input.className = 'opensheets-formula-panel-input';
     input.spellcheck = false;
     input.setAttribute('role', 'textbox');
-    input.setAttribute('aria-label', 'Formula panel');
+    input.setAttribute('aria-label', ltext('controls.formulaPanel', 'Formula panel'));
     input.addEventListener('input', () => this.showHintsLive());
     panel.appendChild(input);
     this.host.appendChild(panel);

@@ -39,6 +39,8 @@ export class ReportSheet extends Worksheet {
   private sourceCells = new Map<string, TemplateCell>();
   private cellOrigins = new Map<string, [number, number][]>();
   private collapsed = new Set<string>();
+  private collapseButtons = new Map<string, boolean>();
+  private chartPreviews = new Map<string, boolean>();
   private contextExtents = new Map<string, number>();
   private columnExtents = new Map<string, number>();
   private phantomOrigins = new Map<string, { value: unknown; rowCount: number; colCount: number }[]>();
@@ -395,6 +397,41 @@ export class ReportSheet extends Worksheet {
   getPageCount(): number { return this.pages; }
   getPagesCount(): number { return this.getPageCount(); }
   getCollapseState(row: number, col: number): boolean { return this.collapsed.has(`${row},${col}`); }
+  /** Internal: all Group-cell instances of the rendered layout (collapse command targets). */
+  _groupInstances(): [number, number][] {
+    return [...this.sourceCells].filter(([, cell]) => cell.type === 'Group')
+      .map(([key]) => key.split(',').map(Number) as [number, number]);
+  }
+  /** Internal: the cell hosts a data record (add/delete record targets). */
+  _hasRecordCell(row: number, col: number): boolean { return this.sourceCells.has(`${row},${col}`); }
+  /** Internal: coordinates of every generated cell (reset-cell-value sweep). */
+  _recordCells(): [number, number][] {
+    return [...this.sourceCells.keys()].map((key) => key.split(',').map(Number) as [number, number]);
+  }
+  /** Internal: layout serialization + change bookkeeping for the record commands' undo. */
+  _undoState(): { json: Record<string, unknown>; changes: unknown } {
+    return { json: this.toJSON(), changes: this.changes._snapshot() };
+  }
+  /** Internal: rebuild the layout, then restore the change bookkeeping (`renderPage` clears it). */
+  _restoreUndoState(state: { json: Record<string, unknown>; changes: unknown }): void {
+    this.fromJSON(state.json);
+    this.changes._restore(state.changes as never);
+  }
+  /** Internal: per-cell collapse-button visibility (trial template setting, default on). */
+  _collapseButtonVisible(row: number, col: number, value?: boolean): boolean {
+    const key = `${row},${col}`;
+    if (value !== undefined) {
+      if (value) this.collapseButtons.delete(key);
+      else this.collapseButtons.set(key, false);
+    }
+    return this.collapseButtons.get(key) !== false;
+  }
+  /** Internal: per-chart preview visibility (trial template setting, default off). */
+  _chartPreviewVisible(row: number, col: number, value?: boolean): boolean {
+    const key = `${row},${col}`;
+    if (value !== undefined) this.chartPreviews.set(key, value);
+    return this.chartPreviews.get(key) === true;
+  }
   toggleCollapseState(row: number, col: number, targetState?: 'Collapsed' | 'Expanded', recursive = false): void {
     const entries = this.template.entries();
     const key = `${row},${col}`;
@@ -941,6 +978,8 @@ export class ReportSheet extends Worksheet {
         this.height = Math.max(this.height, item.row + item.rowCount);
         this.width = Math.max(this.width, item.col + item.colCount);
       }
+      // Row blocks reserve their full depth even where the last rows carry no value.
+      this.height = Math.max(this.height, axes.height);
     }
     for (const [row, col] of this.template._viewCellStore()?.entries() ?? []) {
       if (this.template.getTemplateCell(row, col)) continue;
@@ -954,7 +993,7 @@ export class ReportSheet extends Worksheet {
         const r = base + i;
         if (r >= this.getRowCount()) this.setRowCount(r + 1);
         if (col >= this.getColumnCount()) this.setColumnCount(col + 1);
-        if (formula) this.setFormula(r, col, this._translateFormula(formula, r - row, 0));
+        if (formula) this._setFormula(r, col, this._translateFormula(formula, r - row, 0));
         else if (value !== null && value !== undefined) this.setValue(r, col, value);
         if (style) this.setStyle(r, col, style);
         this.recordOrigin(row, col, r, col);

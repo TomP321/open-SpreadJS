@@ -379,6 +379,10 @@ export class RowFilterBase {
       for (const c of activeColumns) {
         const conditions = this.items.get(c);
         if (!conditions?.length) continue;
+        // Dynamic average/top-10 filter conditions without their own ranges evaluate
+        // against the filtered column (the trial's menu-authored conditions carry the
+        // filter range instead and keep it).
+        for (const condition of conditions) if (!condition.ranges?.().length) condition._setFilterColumnRange?.(new Range(this.range.row, this.range.col + c, this.range.rowCount, 1));
         const actual = sheet.getValue(row, this.range.col + c);
         if (!conditions.some((condition) => condition.evaluate(sheet, row, this.range!.col + c, actual))) {
           keep = false;

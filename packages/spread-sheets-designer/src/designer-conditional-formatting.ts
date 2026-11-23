@@ -16,6 +16,7 @@ import { activeSheet, selectionBounds } from './commands/base.js';
 import { buildFormatData } from './designer-dialogs.js';
 import { conditionFormatsOf } from './core-internals.js';
 import { beginFormatStylePick, styleFromFormatData, takeFormatStyleTarget } from './dialogs/style-bridge.js';
+import { T } from './dialogs/t.js';
 
 const RULE_TEMPLATE = TemplateNames.NewFormattingRuleDialogTemplate ?? 'newFormattingRuleDialogTemplate';
 const MANAGER_TEMPLATE = 'ruleManagerDialogTemplate';
@@ -204,28 +205,28 @@ export function conditionalRuleDescription(rule: unknown, ruleTypes: Record<stri
     // lessThan 4, lessThanOrEqualsTo 5, between 6, notBetween 7.
     const symbols: Record<number, string> = { 0: '=', 1: '<>', 2: '>', 3: '>=', 4: '<', 5: '<=' };
     const v1 = call(view, 'value1'); const v2 = call(view, 'value2');
-    const phrase = op === 6 ? `between ${String(v1 ?? '')} and ${String(v2 ?? '')}`
-      : op === 7 ? `not between ${String(v1 ?? '')} and ${String(v2 ?? '')}`
+    const phrase = op === 6 ? T('betweenValues', 'between {0} and {1}').replace('{0}', String(v1 ?? '')).replace('{1}', String(v2 ?? ''))
+      : op === 7 ? T('notBetweenValues', 'not between {0} and {1}').replace('{0}', String(v1 ?? '')).replace('{1}', String(v2 ?? ''))
         : `${symbols[op] ?? ''} ${String(v1 ?? '')}`;
-    return { description: `Cell value ${phrase}`.trim(), kind: 'cellValue', style: styleRecord() };
+    return { description: T('cellValuePrefix', 'Cell value {0}').replace('{0}', phrase).trim(), kind: 'cellValue', style: styleRecord() };
   }
-  if (is('top10Rule')) return { description: `${Number(call(view, 'type') ?? 0) === 1 ? 'Bottom' : 'Top'} ${String(call(view, 'rank') ?? 10)}`, kind: 'top10', style: styleRecord() };
+  if (is('top10Rule')) return { description: `${Number(call(view, 'type') ?? 0) === 1 ? T('bottomWord', 'Bottom') : T('topWord', 'Top')} ${String(call(view, 'rank') ?? 10)}`, kind: 'top10', style: styleRecord() };
   if (is('averageRule')) {
-    const types = ['Above Average', 'Below Average', 'Above or Equal Average', 'Below or Equal Average', '1 Std Deviation Above Average', '1 Std Deviation Below Average', '2 Std Deviations Above Average', '2 Std Deviations Below Average', '3 Std Deviations Above Average', '3 Std Deviations Below Average'];
-    return { description: types[Number(call(view, 'type') ?? 0)] ?? 'Above Average', kind: 'average', style: styleRecord() };
+    const types = [T('aboveAverageRule', 'Above Average'), T('belowAverageRule', 'Below Average'), T('aboveOrEqualAverage', 'Above or Equal Average'), T('belowOrEqualAverage', 'Below or Equal Average'), T('std1Above', '1 Std Deviation Above Average'), T('std1Below', '1 Std Deviation Below Average'), T('std2Above', '2 Std Deviations Above Average'), T('std2Below', '2 Std Deviations Below Average'), T('std3Above', '3 Std Deviations Above Average'), T('std3Below', '3 Std Deviations Below Average')];
+    return { description: types[Number(call(view, 'type') ?? 0)] ?? T('aboveAverageRule', 'Above Average'), kind: 'average', style: styleRecord() };
   }
-  if (is('duplicateRule')) return { description: 'Duplicate Values', kind: 'unique', style: styleRecord() };
-  if (is('uniqueRule')) return { description: 'Unique Values', kind: 'unique', style: styleRecord() };
+  if (is('duplicateRule')) return { description: T('duplicateValuesRule', 'Duplicate Values'), kind: 'unique', style: styleRecord() };
+  if (is('uniqueRule')) return { description: T('uniqueValuesRule', 'Unique Values'), kind: 'unique', style: styleRecord() };
   if (is('formulaRule')) {
     // The trial shows the formula with its leading '=' ("Formula: =A1>1"); cores may or may not keep it.
     const f = String(call(view, 'value1') ?? call(view, 'formula') ?? '');
-    return { description: `Formula: ${f.startsWith('=') ? f : f ? `=${f}` : ''}`, kind: 'formula', style: styleRecord() };
+    return { description: T('formulaPrefix', 'Formula: {0}').replace('{0}', f.startsWith('=') ? f : f ? `=${f}` : ''), kind: 'formula', style: styleRecord() };
   }
-  if (is('dataBarRule')) return { description: 'Data Bar', kind: 'dataBar' };
-  if (is('twoColorScale') || is('threeColorScale')) return { description: 'Color Scale', kind: 'colorScale' };
-  if (is('iconSetRule')) return { description: 'Icon Set', kind: 'iconSet' };
-  if (is('rowStateRule') || is('columnStateRule')) return { description: `State (${String(call(view, 'state') ?? '')})`, kind: 'state', style: styleRecord() };
-  return { description: `Rule ${type}`, kind: 'rule' };
+  if (is('dataBarRule')) return { description: T('dataBarType', 'Data Bar'), kind: 'dataBar' };
+  if (is('twoColorScale') || is('threeColorScale')) return { description: T('colorScaleType', 'Color Scale'), kind: 'colorScale' };
+  if (is('iconSetRule')) return { description: T('iconSetType', 'Icon Set'), kind: 'iconSet' };
+  if (is('rowStateRule') || is('columnStateRule')) return { description: `${T('stateWord', 'State')} (${String(call(view, 'state') ?? '')})`, kind: 'state', style: styleRecord() };
+  return { description: T('ruleWord', 'Rule').concat(' ', String(type)), kind: 'rule' };
 }
 
 /** The manager's rows, read through the public `getRules()`/rule accessors. */

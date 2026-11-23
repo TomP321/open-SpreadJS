@@ -6,6 +6,7 @@ import React from 'react';
 import { CustomRadio, CustomSelect } from './custom-widgets.js';
 import type { DesignerApi as Designer, DialogData } from '../designer-api.js';
 import { PAPER_ITEMS } from '../page-setup.js';
+import { T } from './t.js';
 
 /** The trial's range-picker button: captures the current sheet selection into the field. */
 export function RangePickButton({ component, data, ctx, update }: {
@@ -32,7 +33,7 @@ export function RangePickButton({ component, data, ctx, update }: {
     void data;
   };
   return (
-    <button type="button" className="gc-range-pick-button" title="Cell range" aria-label="Cell range" onClick={pick}>
+    <button type="button" className="gc-range-pick-button" title={T('cellRange', 'Cell range')} aria-label={T('cellRange', 'Cell range')} onClick={pick}>
       <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
         <rect x="1" y="2" width="14" height="12" rx="1" fill="#dfeaf7" stroke="#4f81bd" />
         <path d="M1 6h14M6 6v8M1 10h5M11 2v12" stroke="#4f81bd" strokeWidth="0.8" />
@@ -93,7 +94,7 @@ export function BarcodeBody({ data, update }: { data: DialogData; update: (path:
       </div>
       <div className="gc-barcode-column">
         <div className="gc-dialog-column-set gc-barcode-row">
-          <span className="gc-dialog-label">Barcode Type</span>
+          <span className="gc-dialog-label">{T('barcodeType', 'Barcode Type')}</span>
           <CustomSelect className="gc-dialog-select gc-barcode-type" ariaLabel="Barcode Type" value={type} options={[{ text: '', value: '' }, ...barcodeTypeItems.map((item) => ({ text: item, value: item }))]} onChange={(next) => update('barcodeType', String(next))} />
         </div>
         {render(['Background Color', 'backColor', 'color'])}
@@ -101,7 +102,7 @@ export function BarcodeBody({ data, update }: { data: DialogData; update: (path:
         {render(['Quiet Zone Bottom', 'quietBottom', 'number'])}
       </div>
     </div>
-    {type && <fieldset className="gc-dialog-groupbox gc-barcode-options"><legend>Barcode Options</legend>
+    {type && <fieldset className="gc-dialog-groupbox gc-barcode-options"><legend>{T('barcodeOptions', 'Barcode Options')}</legend>
       <div className="gc-barcode-columns">
         <div className="gc-barcode-column">{(isQr ? barcodeQrOptions.slice(0, 2) : barcodeLineOptions.slice(0, 2)).map(render)}</div>
         <div className="gc-barcode-column">{(isQr ? barcodeQrOptions.slice(2) : barcodeLineOptions.slice(2, 4)).map(render)}</div>
@@ -132,9 +133,9 @@ export function MoveChartBody({ data, update }: { data: DialogData; update: (pat
       </svg>
       <label className="gc-dialog-radio gc-radio">
         <input type="radio" name="gc-move-chart-mode" checked={mode === 'new'} onChange={() => update('mode', 'new')} />
-        <span>New sheet:</span>
+        <span>{T('newSheet', 'New sheet:')}</span>
       </label>
-      <input className="gc-dialog-input gc-move-chart-name" type="text" aria-label="New sheet name" disabled={mode !== 'new'} value={String(data.newSheetName ?? '')} onChange={(event) => update('newSheetName', event.target.value)} />
+      <input className="gc-dialog-input gc-move-chart-name" type="text" aria-label={T('newSheetName', 'New sheet name')} disabled={mode !== 'new'} value={String(data.newSheetName ?? '')} onChange={(event) => update('newSheetName', event.target.value)} />
     </div>
     <div className="gc-move-chart-option">
       <svg className="gc-move-chart-thumb" viewBox="0 0 36 30" aria-hidden="true">
@@ -145,7 +146,7 @@ export function MoveChartBody({ data, update }: { data: DialogData; update: (pat
         <rect x="16" y="9" width="3" height="8" fill="#70ad47" />
         <rect x="21" y="11" width="3" height="6" fill="#5b9bd5" />
       </svg>
-      <CustomRadio className="gc-radio" checked={mode !== 'new'} onChange={() => update('mode', 'object')} label="Object in:" />
+      <CustomRadio className="gc-radio" checked={mode !== 'new'} onChange={() => update('mode', 'object')} label={T('objectIn', 'Object in:')} />
       <CustomSelect className="gc-dialog-select gc-move-chart-sheet" ariaLabel="Object in" disabled={mode === 'new'} value={String(data.sheetName ?? '')} options={((data.sheets as string[]) ?? []).map((name) => ({ text: name, value: name }))} onChange={(next) => update('sheetName', String(next))} />
     </div>
   </div>;
@@ -158,7 +159,7 @@ export function MoveChartBody({ data, update }: { data: DialogData; update: (pat
  */
 export function SlicerFieldList({ data, update }: { data: DialogData; update: (path: string, value: unknown) => void }): React.ReactElement {
   const fields = (data.fields as { id: string; pivot: string; field: string; checked?: boolean }[]) ?? [];
-  return <div className="gc-slicer-field-list" role="listbox" aria-label="Slicer fields">
+  return <div className="gc-slicer-field-list" role="listbox" aria-label={T('slicerFields', 'Slicer fields')}>
     {fields.map((item, index) => (
       <label key={item.id} className="gc-dialog-checkbox gc-slicer-field">
         <input type="checkbox" checked={!!item.checked} onChange={(event) => {
@@ -185,43 +186,43 @@ export function PageSetupPage({ data, ctx, update }: {
   const draft = (data.draft ?? {}) as Record<string, unknown>;
   const scaling = String(draft.scaling ?? 'adjust');
   return <div className="gc-page-setup-page">
-    <fieldset className="gc-dialog-groupbox gc-page-orientation-group"><legend>Orientation</legend>
+    <fieldset className="gc-dialog-groupbox gc-page-orientation-group"><legend>{T('orientation', 'Orientation')}</legend>
       <div className="gc-page-orientation-row">
         <label className="gc-dialog-radio gc-radio"><svg className="gc-page-orientation-icon" viewBox="0 0 15 17" aria-hidden="true"><rect x="2" y="1" width="11" height="15" fill="#fff" stroke="#7a7a7a" /></svg>
           <input type="radio" name="gc-page-orientation" checked={Number(draft.orientation) !== 2} onChange={() => update('draft.orientation', 1)} />
-          <span>Portrait</span></label>
+          <span>{T('portrait', 'Portrait')}</span></label>
         <label className="gc-dialog-radio gc-radio"><svg className="gc-page-orientation-icon" viewBox="0 0 17 15" aria-hidden="true"><rect x="1" y="2" width="15" height="11" fill="#fff" stroke="#7a7a7a" /></svg>
           <input type="radio" name="gc-page-orientation" checked={Number(draft.orientation) === 2} onChange={() => update('draft.orientation', 2)} />
-          <span>Landscape</span></label>
+          <span>{T('landscape', 'Landscape')}</span></label>
       </div>
     </fieldset>
-    <fieldset className="gc-dialog-groupbox gc-page-scaling-group"><legend>Scaling</legend>
+    <fieldset className="gc-dialog-groupbox gc-page-scaling-group"><legend>{T('scaling', 'Scaling')}</legend>
       <div className="gc-page-scaling-row">
         <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-page-scaling" checked={scaling === 'adjust'} onChange={() => update('draft.scaling', 'adjust')} /></label>
-        <span>Adjust to:</span>
-        <input className="gc-dialog-input gc-page-adjust" type="number" aria-label="Adjust to" value={String(draft.adjust ?? 100)} onChange={(event) => { update('draft.adjust', event.target.value === '' ? 0 : Number(event.target.value)); update('draft.scaling', 'adjust'); }} />
-        <span>% normal size</span>
+        <span>{T('adjustTo', 'Adjust to:')}</span>
+        <input className="gc-dialog-input gc-page-adjust" type="number" aria-label={T('adjustTo2', 'Adjust to')} value={String(draft.adjust ?? 100)} onChange={(event) => { update('draft.adjust', event.target.value === '' ? 0 : Number(event.target.value)); update('draft.scaling', 'adjust'); }} />
+        <span>{T('normalSize', '% normal size')}</span>
       </div>
       <div className="gc-page-scaling-row">
         <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-page-scaling" checked={scaling === 'fit'} onChange={() => update('draft.scaling', 'fit')} /></label>
-        <span>Fit to:</span>
-        <input className="gc-dialog-input gc-page-fit-wide" type="number" aria-label="pages wide" value={String(draft.fitWide ?? '')} onChange={(event) => { update('draft.fitWide', event.target.value); update('draft.scaling', 'fit'); }} />
-        <span>page(s) wide by</span>
-        <input className="gc-dialog-input gc-page-fit-tall" type="number" aria-label="tall" value={String(draft.fitTall ?? '')} onChange={(event) => { update('draft.fitTall', event.target.value); update('draft.scaling', 'fit'); }} />
-        <span>tall</span>
+        <span>{T('fitTo', 'Fit to:')}</span>
+        <input className="gc-dialog-input gc-page-fit-wide" type="number" aria-label={T('pagesWide', 'pages wide')} value={String(draft.fitWide ?? '')} onChange={(event) => { update('draft.fitWide', event.target.value); update('draft.scaling', 'fit'); }} />
+        <span>{T('pagesWideBy', 'page(s) wide by')}</span>
+        <input className="gc-dialog-input gc-page-fit-tall" type="number" aria-label={T('tall', 'tall')} value={String(draft.fitTall ?? '')} onChange={(event) => { update('draft.fitTall', event.target.value); update('draft.scaling', 'fit'); }} />
+        <span>{T('tall', 'tall')}</span>
       </div>
     </fieldset>
     <div className="gc-dialog-label-line gc-page-separator" />
-    <div className="gc-dialog-column-set gc-page-field-row"><span className="gc-dialog-label">Paper size:</span>
-      <CustomSelect className="gc-dialog-select gc-page-size" ariaLabel="Paper size" value={String(draft.paperName ?? 'Letter')} options={PAPER_ITEMS.map((item) => ({ text: item.text, value: item.text }))} onChange={(next) => update('draft.paperName', String(next))} />
+    <div className="gc-dialog-column-set gc-page-field-row"><span className="gc-dialog-label">{T('paperSize', 'Paper size:')}</span>
+      <CustomSelect className="gc-dialog-select gc-page-size" ariaLabel={T('paperSize2', 'Paper size')} value={String(draft.paperName ?? 'Letter')} options={PAPER_ITEMS.map((item) => ({ text: item.text, value: item.text }))} onChange={(next) => update('draft.paperName', String(next))} />
     </div>
-    <div className="gc-dialog-column-set gc-page-field-row"><span className="gc-dialog-label">Print quality:</span>
-      <input className="gc-dialog-input gc-page-quality" type="number" aria-label="Print quality" value={String(draft.quality ?? 2)} onChange={(event) => update('draft.quality', event.target.value === '' ? 0 : Number(event.target.value))} />
+    <div className="gc-dialog-column-set gc-page-field-row"><span className="gc-dialog-label">{T('printQuality', 'Print quality:')}</span>
+      <input className="gc-dialog-input gc-page-quality" type="number" aria-label={T('printQuality2', 'Print quality')} value={String(draft.quality ?? 2)} onChange={(event) => update('draft.quality', event.target.value === '' ? 0 : Number(event.target.value))} />
     </div>
-    <div className="gc-dialog-column-set gc-page-field-row"><span className="gc-dialog-label">First page number:</span>
-      <input className="gc-dialog-input gc-page-first-number" aria-label="First page number" value={String(draft.firstPage ?? 'Auto')} onChange={(event) => update('draft.firstPage', event.target.value)} />
+    <div className="gc-dialog-column-set gc-page-field-row"><span className="gc-dialog-label">{T('firstPageNumber', 'First page number:')}</span>
+      <input className="gc-dialog-input gc-page-first-number" aria-label={T('firstPageNumber2', 'First page number')} value={String(draft.firstPage ?? 'Auto')} onChange={(event) => update('draft.firstPage', event.target.value)} />
     </div>
-    <div className="gc-page-preview-row"><button type="button" className="gc-dialog-secondary gc-page-preview" onClick={() => ctx.designer.print()}>Print Preview</button></div>
+    <div className="gc-page-preview-row"><button type="button" className="gc-dialog-secondary gc-page-preview" onClick={() => ctx.designer.print()}>{T('printPreview', 'Print Preview')}</button></div>
   </div>;
 }
 
@@ -253,11 +254,11 @@ export function PageMargins({ data, ctx, update }: {
       <div className="gc-margin-side">{input('right', 'Right:')}</div>
     </div>
     <div className="gc-margin-toprow">{input('bottom', 'Bottom:')}{input('footer', 'Footer:')}</div>
-    <fieldset className="gc-dialog-groupbox gc-page-center-group"><legend>Center on page</legend>
+    <fieldset className="gc-dialog-groupbox gc-page-center-group"><legend>{T('centerOnPage', 'Center on page')}</legend>
       {check('draft.centerH', 'Horizontally', update, draft)}
       {check('draft.centerV', 'Vertically', update, draft)}
     </fieldset>
-    <div className="gc-page-preview-row"><button type="button" className="gc-dialog-secondary gc-page-preview" onClick={() => ctx.designer.print()}>Print Preview</button></div>
+    <div className="gc-page-preview-row"><button type="button" className="gc-dialog-secondary gc-page-preview" onClick={() => ctx.designer.print()}>{T('printPreview', 'Print Preview')}</button></div>
   </div>;
 }
 
@@ -285,7 +286,7 @@ export function PageHeaderFooter({ data, ctx, update }: {
   const combo = (side: 'header' | 'footer'): React.ReactElement => {
     const text = hfText(side);
     return <CustomSelect className="gc-dialog-select gc-hf-select" ariaLabel={`${side[0].toUpperCase()}${side.slice(1)}:`} value={text ? 'custom' : 'none'}
-      options={text ? [{ text: '(none)', value: 'none' }, { text: 'custom', value: 'custom' }] : [{ text: '(none)', value: 'none' }]}
+      options={text ? [{ text: T('none2', '(none)'), value: 'none' }, { text: T('custom2', 'custom'), value: 'custom' }] : [{ text: T('none2', '(none)'), value: 'none' }]}
       onChange={(next) => { if (String(next) === 'none') update(`draft.${side}`, { left: '', center: '', right: '' }); }} />;
   };
   const custom = (side: 'header' | 'footer') => (): void => {
@@ -293,20 +294,20 @@ export function PageHeaderFooter({ data, ctx, update }: {
   };
   return <div className="gc-page-hf">
     {box('header')}
-    <div className="gc-hf-label-row"><span className="gc-dialog-label">Header:</span></div>
+    <div className="gc-hf-label-row"><span className="gc-dialog-label">{T('header', 'Header:')}</span></div>
     {combo('header')}
     <div className="gc-hf-button-row">
-      <button type="button" className="gc-dialog-secondary" onClick={custom('header')}>Custom Header...</button>
-      <button type="button" className="gc-dialog-secondary" onClick={custom('footer')}>Custom Footer...</button>
+      <button type="button" className="gc-dialog-secondary" onClick={custom('header')}>{T('customHeader', 'Custom Header...')}</button>
+      <button type="button" className="gc-dialog-secondary" onClick={custom('footer')}>{T('customFooter', 'Custom Footer...')}</button>
     </div>
-    <div className="gc-hf-label-row"><span className="gc-dialog-label">Footer:</span></div>
+    <div className="gc-hf-label-row"><span className="gc-dialog-label">{T('footer', 'Footer:')}</span></div>
     {combo('footer')}
     {box('footer')}
     <div className="gc-hf-checks">
       {check('draft.differentOddAndEvenPages', 'Different odd and even pages', update, draft as Record<string, unknown>)}
       {check('draft.differentFirstPage', 'Different first page', update, draft as Record<string, unknown>)}
     </div>
-    <div className="gc-page-preview-row"><button type="button" className="gc-dialog-secondary gc-page-preview" onClick={() => ctx.designer.print()}>Print Preview</button></div>
+    <div className="gc-page-preview-row"><button type="button" className="gc-dialog-secondary gc-page-preview" onClick={() => ctx.designer.print()}>{T('printPreview', 'Print Preview')}</button></div>
   </div>;
 }
 
@@ -322,7 +323,7 @@ export function PageSheetTab({ data, ctx, update }: {
     <div className="gc-dialog-column-set gc-sheet-field-row" key={path}>
       <span className="gc-dialog-label">{label}</span>
       <input className="gc-dialog-input gc-sheet-area" aria-label={label} value={String(draft[path.split('.')[1]] ?? '')} onChange={(event) => update(path, event.target.value)} />
-      <button type="button" className="gc-range-pick-button" title="Cell range" aria-label="Cell range" onClick={() => {
+      <button type="button" className="gc-range-pick-button" title={T('cellRange', 'Cell range')} aria-label={T('cellRange', 'Cell range')} onClick={() => {
         const range = ctx.designer.getWorkbook().getActiveSheet().getSelections?.()?.find(Boolean);
         if (range) update(path, `${String.fromCharCode(65 + Math.max(0, range.col))}${Math.max(0, range.row) + 1}:${String.fromCharCode(65 + Math.max(0, range.col + Math.max(1, range.colCount) - 1))}${Math.max(0, range.row + Math.max(1, range.rowCount) - 1)}`);
       }}>
@@ -341,10 +342,10 @@ export function PageSheetTab({ data, ctx, update }: {
   );
   return <div className="gc-page-sheet">
     {pickRow('draft.printArea', 'Print area:')}
-    <div className="gc-sheet-subtitle">Print titles</div>
+    <div className="gc-sheet-subtitle">{T('printTitles', 'Print titles')}</div>
     {pickRow('draft.repeatRows', 'Rows to repeat at top:')}
     {pickRow('draft.repeatColumns', 'Columns to repeat at left:')}
-    <div className="gc-sheet-subtitle">Print</div>
+    <div className="gc-sheet-subtitle">{T('print', 'Print')}</div>
     <div className="gc-sheet-checks">
       {check('draft.printGridlines', 'Gridlines', update, draft)}
       {check('draft.showBorder', 'Show borders', update, draft)}
@@ -352,13 +353,13 @@ export function PageSheetTab({ data, ctx, update }: {
       {check('draft.headings', 'Row and column headings', update, draft)}
     </div>
     <div className="gc-sheet-order-row">
-      <span className="gc-dialog-label">Page order:</span>
+      <span className="gc-dialog-label">{T('pageOrder', 'Page order:')}</span>
       <div className="gc-sheet-order-radios">
-        <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-page-order" checked={Number(draft.pageOrder) !== 2} onChange={() => update('draft.pageOrder', 1)} /><span>Down, then over</span></label>
-        <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-page-order" checked={Number(draft.pageOrder) === 2} onChange={() => update('draft.pageOrder', 2)} /><span>Over, then down</span></label>
+        <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-page-order" checked={Number(draft.pageOrder) !== 2} onChange={() => update('draft.pageOrder', 1)} /><span>{T('downThenOver', 'Down, then over')}</span></label>
+        <label className="gc-dialog-radio gc-radio"><input type="radio" name="gc-page-order" checked={Number(draft.pageOrder) === 2} onChange={() => update('draft.pageOrder', 2)} /><span>{T('overThenDown', 'Over, then down')}</span></label>
       </div>
       {orderIcon(Number(draft.pageOrder) === 2)}
     </div>
-    <div className="gc-page-preview-row"><button type="button" className="gc-dialog-secondary gc-page-preview" onClick={() => ctx.designer.print()}>Print Preview</button></div>
+    <div className="gc-page-preview-row"><button type="button" className="gc-dialog-secondary gc-page-preview" onClick={() => ctx.designer.print()}>{T('printPreview', 'Print Preview')}</button></div>
   </div>;
 }

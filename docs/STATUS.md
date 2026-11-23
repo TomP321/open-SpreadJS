@@ -7408,3 +7408,1974 @@ source-sheet cell styles on our side that the official JSON does not stamp.
 - `pnpm lint` — clean.
 - No designer CSS was needed (all three fixes are model-level); no `/* TASK 81 */` block exists
   because none was added.
+
+## TASK 88 — Core in Italian: the it-IT culture plus the core's own UI strings (2026-11-22)
+
+User request: "interfaccia in italiano e inglese". The core (spreadsheet) side; the
+Designer side is TASK 87 (other coder). No designer file was touched.
+
+### 1. `it-it` culture in the core (item 1)
+
+`packages/spread-sheets/src/it-it-formats.json` + registration in `culture.ts`, the same
+model the built-in `ja-jp` culture uses: `CultureManager.addCultureInfo('it-it', italian,
+language)`, `id 1040`, `displayName "Italian (Italy)"`, `name()` `it-IT` (lookups stay
+case-insensitive). Data: decimal `,`, thousands `.` (also for currency/percent),
+`currencySymbol €`, `listSeparator ';'`, `arrayListSeparator ','`, `arrayGroupSeparator ';'`,
+`dd/MM/yyyy` short date, `HH:mm`/`HH:mm:ss` times, `dddd d MMMM yyyy` long date,
+`gennaio…dicembre` (+ the `gen…dic` abbreviations, `monthGenitiveNames` = the same names —
+Italian has no genitive month form), `domenica…sabato` / `dom…sab`, empty `amDesignator`/
+`pmDesignator`, `predefinedFormats` (Accounting/Comma/Currency/Date/Special/Time/shortcut)
+written for the Italian locale (`[$€-410] #,##0…`).
+
+Clean-room note: the official trial core ships **no** Italian culture (measured:
+`getCultureInfo('it-it') === null` on the trial, and `@mescius/spread-sheets-resources-it`
+does not exist on npm — 404; only `-ja`, `-ko`, `-zh` do, checked through the registry
+metadata). So the Italian data is our own transcription of the public Italian regional
+conventions, nothing was sampled from a reference implementation. `instanceType` stays the
+class default `CultureInfo` instead of an invented per-culture tag, and the trial-only
+`TimelineDateOrder`/`TimelineDateSuffix` keep their core defaults.
+
+Format/parse round trips are unit-tested (`test/culture-it.test.ts`, 8 tests): `#,##0.00`
+`1234.5 → 1.234,50`, `0.00% → 12,34%`, `[$€-410] #,##0.00 → € 1.234,50`, accounting pattern,
+`General` parsing of `1.234,5 → 1234.5`, `(1.234,5) → -1234.5`, `€ 1.234,56 → 1234.56`,
+`1.234,5e3 → 1234500`, day-first dates (`5/11/2026 → 5 November`, `22 novembre 2026`,
+`22/22/2026` stays text), and a **real cell edit** (`startEdit('1.234,5')`/`endEdit()` →
+stored value `1234.5`, and a `#,##0.00` cell then paints `1.234,50`).
+
+Measured on the trial core (black box, `apps/compare`'s official pane through the public API):
+the trial keeps `General` rendering culture-independent (`1234.5` and `11/22/2026` stay under a
+comma-separator culture), so our `General` path is untouched — an it-IT `General` cell shows
+`1234.5` on **both** sides; the Italian separators appear in real formats. `ja-jp` and `en-US`
+behaviour is unchanged (asserted in the new tests).
+
+**Formula argument separator stays `,`** for every culture (deliberate): the d.ts documents
+`listSeparator` as the separator of formula arguments (and its EUR-culture example sets `;`),
+so the it-IT data reports `;`, but this build's parser accepts only `,` (array constants keep
+`{row;row}` / `,` columns as measured from the trial). Recorded as a gap rather than silently
+changing formula behaviour: `=SUM(A1,A2)` keeps working in Italian, `=SUM(A1;A2)` does not parse.
+
+### 2. Core UI strings, switched by the culture (item 2)
+
+`src/localization.ts`: `ltext(path, englishFallback, …args)`. It reads the current culture's
+language object through the **public** mechanism (`addCultureInfo(name, culture, language)` /
+`getResources(name)` — the official model, no new public API), resolves the namespace then the
+key (exact dotted key first, e.g. `contextMenu['gc.spread.copy']`, then case-insensitive
+nesting), substitutes `{0}`/`{1}` placeholders, and returns the **English text the call site
+carries** whenever no language object exists — so without any resources package the UI is
+byte-identical to before (English default, every existing gate unchanged). The lookup cache is
+keyed on culture name **plus** a registration generation counter so a package that registers
+its strings after the culture is already current still takes effect.
+
+`src/it-it-strings.json` (12 namespaces, 420 lines) is registered as the it-it language object.
+Call sites now resolve through `ltext` with their English text as the fallback:
+
+| Namespace | Where it renders |
+| --- | --- |
+| `contextMenu` (159 keys) | every item of `context-menu-data.json` (cells, rows, columns, corner, sheet tabs, tables, slicer/timeline, pivot, report sheet, Gantt, paste group + Paste Special submenu) — localized when the menu is built (`menuText`), so the data itself stays English and a **customised** `menuData` caption is never overwritten |
+| `filter` | filter popup: sort rows, Sort/Filter By Color (+ Cell/Font Color headings, No Fill, Automatic), `Clear Filter From "{0}"`, `Text/Number/Date Filters` and their whole choice submenu, the checklist (`Search`, `Seleziona tutto`/`Deseleziona tutto`, `(Vuote)`), OK/Cancel, resize grip, and the Custom AutoFilter dialog (title, `Show rows where:`, And/Or, the 12 condition names, both `?`/`*` hints) |
+| `comments` | classic note/thread card (`Resolved`, `Edit comment`, `Delete thread`, `Comment options`, `Delete/Reopen/Resolve Thread`, `@mention or reply`, `@menzione o risposta` placeholder, Cancel) and the ThreadedCommentPanel chrome + item ARIA labels (`{0} item/items` count) |
+| `pivotPanel`, `pivotMenu` | field panel (`PivotTable Fields`, choose/drag captions, Defer Layout Update, Update, Views, Search, No matches, area captions, view add/apply tips) and the pivot header dropdown (Select field, Sort A→Z/Z→A, More Sort Options…, Clear Filter From "…", Label/Value Filters + operator names, Check All/Uncheck All, the sort dialog: `Sort "x" By`, Manual/Ascending/Descending) |
+| `tablePanel` | TableSheet panel (Fields, Groups, Cross, Add Calculated Column, `Drag here to set row groups`, Remove/Remove All, Group Name, Add Summary Field, Formula/Caption/Slice rows) |
+| `scenarios` | scenario panel (title, Add, Restore All, Delete All, Deactivate, Activate, the empty hint, `{0} sheets/cells` chips, `Activate: {0}` badge, `{sheet}: {n} cell(s)`) |
+| `controls`, `sheets`, `slicer`, `dataChart` | Formula bar / Name box / Names / Zoom / cell editor / formula panel ARIA labels, `Active Sheet:` / `Unhide Sheet:` list popups, slicer blank item label (`(blank)` → `(Vuote)`; the internal `SLICER_BLANK_TEXT` marker used for filter round trips stays English) and the timeline (`All Periods` → `Tutti i periodi`, level names, month labels now follow the culture's abbreviated month names: en-US keeps `JAN…DEC`, it-IT paints `GEN…DIC`), DataChart config panel (Inspector, Data Binding, Chart Type, search placeholder, the 9 section headings) |
+| `status` | status bar painted text: `Ready/Enter/Edit` → `Pronto/Immetti/Modifica`, `Count:/Numerical Count:/Sum:/Average:/Min:/Max:` and the resize/scroll tips. The status **item values** stay English data (`bar.get('cellMode').value === 'Ready'`) so the public API does not change |
+
+Deliberate limits (recorded, not stubbed):
+
+- **Formula function names stay English** (`SUM`, not `SOMMA`) and formula argument parsing
+  stays `,`: the official product localises function names only through its calc-engine
+  language packages (`-languagepackages`), and those have no Italian package (official set:
+  ja-JP/de-DE/es-… only) — TASK 76 already records the language-package data gap.
+- **Validation messages**: the core shows no validation dialog (an invalid commit fires
+  `Events.ValidationError` and the text comes from `DataValidator.errorTitle/errorMessage`,
+  i.e. application strings), so there is no core string to translate. Recorded as a UI gap
+  (matching the current core), not invented here.
+- **Tab strip `+`**: our core paints the new-tab glyph on the tab-strip canvas and has no
+  tooltip element for it (the trial paints its tooltips on the canvas too — STATUS TASK 60
+  probe), so there is no `+` caption string in the core to localise. Recorded as a gap.
+- Panels/controls that build their DOM once (ThreadedCommentPanel, TableSheet panel, scenario
+  panel, DataChart config panel) take the captions of the culture that was current **when they
+  were built** — the official resource-package recipe (load the resources, switch the culture,
+  then create the workbook/controls). Menus, filter dialogs, status bar and slicer/timeline
+  painting re-read the culture on every render, so those switch live; the re-reads are memoized
+  per culture name **plus** the `addCultureInfo` generation (`localization.ts`,
+  `timeline-view.ts` month labels), so a late-registered language package still takes effect
+  without a per-paint lookup.
+- No CSS was needed: the strings are DOM/canvas text only, so `styles/*.css` are unchanged and
+  no `/* TASK 88 */` block exists because none was added.
+
+Verified with `test/localization.test.ts` (12 tests): English fallbacks (including the trial's
+`Clear Filter From "Name"` wording), a hand-registered culture resolving dotted and nested
+keys, late registration taking effect, runtime switching, menu **data** staying English while
+the rendered captions switch, author-customised captions surviving, the real filter dialog tree
+in Italian (`Ordina in modo crescente`, `Cancella filtro da "Nome"`, `Filtri testo`,
+`Uguale a…`, `Seleziona tutto`, `Annulla`, `Filtro automatico personalizzato`,
+`Mostra righe in cui:`), the status bar (`Somma: 6`, `Conteggio: 3`, `Pronto`, item values
+unchanged), the threaded-comment panel, `(blank)`→`(Vuote)` + timeline names live-tested
+through `timelineBuckets` month labels (`JAN` under en-US, `GEN`/`NOV` after switching to
+it-it, and the internal marker unchanged), and the
+pivot/TableSheet/scenario/controls/sheets/dataChart/status string tables.
+
+Trial-side facts measured this task (black box, official pane in `apps/compare`, public API
+only): `getResources('en-US')`/`getResources('ja-JP')` answer `{}` on the trial core (its UI
+text is compiled in, only per-language **resource packages** can supply a language object), and
+registering a language object on the trial does **not** re-label its context menu items
+(`Copy` stays `Copy` under a culture carrying `contextMenu: {'gc.spread.copy': 'ZZZCOPY'}`).
+Our mechanism therefore localizes at menu build time in our own code — the documented
+`CultureManager` model is the storage, the re-labeling is ours. Recorded so nobody later reads
+"resources drive the trial's menus" as a fact.
+
+### 3. `@opensheets/spread-sheets-resources-it` (item 3)
+
+New package `packages/spread-sheets-resources-it` (0.1.0, MIT, `sideEffects: true`): ESM
+`dist/index.js` + CJS `dist/index.cjs` + `.d.ts`/`.d.cts`, and the script-tag
+`dist/gc.spread.sheets.resources.it.min.js` (the official resources-package file-name pattern;
+the official registry has `-ja`/`-ko`/`-zh` only). Importing it (or loading the script after
+the core) registers `it-it` **before any workbook exists**, through
+`CultureManager.addCultureInfo('it-it', culture, strings)`; `registerItalian(gc)` is idempotent,
+keeps the core's built-in culture instance, merges the language object, and only warns when no
+core was found. It declares the core as a peer (resolved through the app's alias like the io
+add-in) and imports the two JSON tables from the core workspace path, so esbuild inlines them
+into **both** bundles and the published package needs no core internals at runtime — one copy
+of the Italian data in the repository.
+
+Proof (`pnpm --filter @opensheets/spread-sheets-resources-it test`, 5 tests, plus
+`.probe/t88/scripttag.mjs`): importing registers culture + strings and switching
+`culture('it-it')` works; the built `.min.js` loaded after `dist/gc.spread.sheets.all.min.js`
+produces an Italian context menu (`Copia`, `Taglia`, `Opzioni di incollaggio:`, `Filtra`,
+`Ordina`) and `1.234,50` / `1234.5` / `22/11/2026`; loaded after the **official** trial core
+(which knows no `it-it`: `getCultureInfo('it-it') === null`) the plugin supplies the culture and
+the trial's own `GeneralFormatter` then answers `1.234,50`, parses `1.234,5 → 1234.5` and
+formats `22/11/2026`. `getResources('it-it')` answers `null` on the official core after our
+registration (its language store is not observable through the public API) — recorded.
+The root README package table gained the new row (`spread-sheets-resources-it` | *(no official
+package)*), and its guide blurb now reads "18 packages (17 one-to-one aliases + the Italian
+core resources package)".
+
+### 4. apps/compare `?lang=it` (item 5)
+
+`src/main.ts`: with `?lang=it` the harness dynamically imports the built package, calls
+`registerItalian(OpenSheets)` and `CultureManager.culture('it-it')` — **our side only**
+(the official pane keeps `en-us`; verified in the run log). `vite.config.ts` resolves the
+package's `@mescius/spread-sheets` peer to our core dist, the same bridge the io dist import
+already needed, so the drop-in name cannot bind the add-on to the official copy in this
+two-sided harness. Screenshots under `.probe/t88/`: `context-menu-it.png` (Copia/Taglia/
+Opzioni di incollaggio group/Cancella contenuto/Inserisci/Elimina/Filtra/Ordina/Nuovo commento
+con thread/Inserisci commento), `filter-popup-it.png` (Italian command column, `Cerca`,
+`Seleziona tutto`/`Deseleziona tutto`, `OK`/`Annulla`), `filter-submenu-it-page.png`,
+plus the page-level shots and `context-menu-official-english-page.png` showing the trial side
+in English for the same interaction (its labels match our English fallbacks item for item).
+
+English default unchanged: `apps/compare` Playwright suite re-run green — 43/43 in
+`m5-interaction`+`interaction`+`text-insets` (context menus, all six paste-options icons, the
+Sort By Color / Filter By Color / Text Filters submenus, the custom filter dialog, the all
+sheets list) and, in the continuation round, the **full** suite ran to completion: 245/245
+passed in 14.7 min (the 233 above plus tab-strip behaviour at all four positions, M7 IO
+four-way XLSX cross-import, metrics/geometry, text insets, undo reference), no failure.
+
+### 5. Trial-side measurements this task (black box, no source read)
+
+- The trial core knows **no** Italian culture: `CultureManager.getCultureInfo('it-it')` answers
+  `null` on the official page, and `culture('it-it')` there returns `undefined` instead of
+  throwing (our core throws `Unknown culture`, as the earlier probe pinned).
+- `CultureManager.getResources('en-US')` and `getResources('ja-JP')` answer `{}` on the trial
+  core: its built-in UI text is not exposed as a resource table, and after our plugin registers
+  a language object for `it-it` the trial still answers `null` — the trial's own localisation
+  store is not reachable through the public API.
+- Registering `contextMenu: {'gc.spread.copy': 'ZZZCOPY', 'gc.spread.cut': 'ZZZCUT'}` for a new
+  culture on the trial core does **not** change its menu item texts (`Copy`/`Cut` stay, in the
+  live `menuData` and in a freshly created workbook). So the trial cannot be shown to localize
+  its menus from the `language` argument of `addCultureInfo`; the language object is the storage
+  contract, the re-labeling is our own implementation (menu build time). Nothing here was
+  inferred from official code.
+- A comma-decimal culture on the trial core keeps `General` rendering culture-independent
+  (`1234.5`, `11/22/2026`) while `#,##0.00` renders `1.234,50`, `mmmm d, yyyy` renders
+  `novembre 22, 2026`, `General.parse('1.234,5') → 1234.5` and
+  `General.parse('22/11/2026')` → 22 November. Our core answers the same for every one of these
+  under `it-it` (`test/culture-it.test.ts`), so the format model was matched, not invented.
+
+### Gates (this task, all run on the final tree)
+
+- `pnpm -r build` — all 26 workspaces built (exit 0; core, designer, io, add-ins,
+  `spread-sheets-resources-it` dist set `index.js`/`index.cjs`/`index.d.ts`/`index.d.cts`/
+  `gc.spread.sheets.resources.it.min.js` 18.94 KB, apps included).
+- `pnpm coverage:api` — Classes 207/207, methods 1796/1796, enums 252/252,
+  declarations 1369/1369 (100.0% each) — unchanged by this task.
+- `pnpm -r typecheck` — 26 `Done` lines, exit 0 (includes the new package, whose core peer is
+  resolved through a `paths` mapping to the core source because the workspace was not
+  re-installed).
+- `pnpm -r test` — exit 0, 0 failures: **spread-sheets 123 files / 3002 tests** (was
+  121 / 2982: `culture-it.test.ts` 8, `localization.test.ts` 12), **resources-it 1 file /
+  5 tests**, designer 37/351, compat 4/255, io 5, compare 2/4, resources-en 1/2, every add-in
+  green. Nothing was skipped, weakened or masked; no existing expectation was edited.
+- `pnpm lint` — clean (`eslint .`, exit 0), and explicitly
+  `eslint packages/spread-sheets-resources-it src/localization.ts test/localization.test.ts
+  test/culture-it.test.ts apps/compare/src/main.ts apps/compare/vite.config.ts` — 0 problems.
+- Playwright comparison (English default, `CMP_BASE_URL` pointed at a spare port so no gated
+  port was occupied): `m5-interaction` + `interaction` + `text-insets` **43/43 passed**
+  (context menus at DPR 1/2, the six paste-option icons, Sort By Color / Filter By Color /
+  Text Filters submenus, the custom filter dialog, the all-sheets list, table filter staging),
+  and the full suite ran to completion in the verification round — **245/245 passed** (14.7 min:
+  tab-strip behaviour at all four tab positions, tabStripPosition pixel parity at DPR 1/2,
+  M7 IO four-way XLSX cross-import, metrics/geometry, text insets, undo reference). No threshold,
+  mask or scenario content was changed. The continuation round re-ran every gate above from
+  scratch after the final code edits (the resource-cache and timeline month-label cache
+  generations, the strengthened live-timeline test, the README package table): build (26
+  workspaces), coverage 100%, typecheck 26 `Done`, test (core 123/3002, resources-it 5), lint
+  clean, and the **full Playwright suite again on the rebuilt core — 245/245 passed** (13.9 min).
+  The Italian screenshots were re-captured against that live build (`texts.json`:
+  `cultures { ours: 'it-IT', official: 'en-us' }`, Italian context menu + filter popup lists) and
+  the script-tag probe re-run on the rebuilt dists (Italian menu, `1.234,50` / `1234.5` /
+  `22/11/2026` on our core and — via the plugin — on the official trial core).
+- Italian screenshots (`apps/compare` with `?lang=it`, our pane only): `.probe/t88/`
+  `context-menu-it.png`, `context-menu-it-page.png`, `filter-popup-it.png`,
+  `filter-popup-it-page.png`, `filter-submenu-it-page.png`,
+  `context-menu-official-english-page.png` (trial side, English, same interaction),
+  `scripttag-ours-it.png` (script-tag load), plus `texts.json` and the console capture
+  recording `cultures: { ours: 'it-IT', official: 'en-us' }` and the Italian caption lists.
+- No CSS was required (core strings are DOM/canvas text), so `styles/*.css` are untouched and
+  there is no `/* TASK 88 */` block because none was added. `packages/spread-sheets-designer/**`
+  and the designer resources packages were not touched, `pnpm-lock.yaml` is unchanged
+  (`git status` clean for it) and no `pnpm install` was run; nothing is committed.
+
+## TASK 87 — Designer UI in Italian (`@opensheets/spread-sheets-designer-resources-it`) (2026-11-21)
+
+User request: "interfaccia in italiano e inglese". English stays the default; the Italian UI is a
+new resource package merged through the public `setResources` exactly like the official
+per-language packages (there is no official Italian one, so no alias and no drop-in twin).
+
+### New package `packages/spread-sheets-designer-resources-it`
+- `@opensheets/spread-sheets-designer-resources-it@0.1.0` (MIT), mirroring the `-resources-en`
+  package: ESM/CJS (`dist/index.js`/`index.cjs`, side-effect registration) plus the script-tag
+  bundle `dist/gc.spread.sheets.designer.resource.it.min.js` (self-contained: publishes onto
+  `GC.Spread.Sheets.DesignerResources` AND merges through `Designer.setResources`).
+- Exports `italianResources` with EXACTLY the `englishResources` key tree. Our own translation in
+  the terminology of the Italian Microsoft Excel UI (Home, Inserisci, Layout di pagina, Formule,
+  Dati, Revisione, Visualizza, Impostazioni; Incolla/Taglia/Copia/Copia formato; Grassetto,
+  Corsivo, Sottolineato; Allineamento/Numeri/Stili/Celle/Modifica; Formattazione condizionale,
+  Formatta come tabella, Stili cella; Inserisci funzione, Gestione nomi; Ordina e filtra,
+  Convalida dati, Rimuovi duplicati, Testo in colonne; Blocca riquadri; Proteggi foglio; ...).
+- Unit tests (`test/resources.test.ts`, 7): recursive key-set equality (no missing/no extra),
+  every English leaf is a non-empty string in Italian, `${...}`/`{...}` placeholders preserved,
+  NO value left equal to its English string except an explicit allow-list of proper/product/
+  function names (OpenSheets Designer, OK, File, Home, Max, Min, Radar, Sparkline, Zoom, Area,
+  undoList/redoList), the expected Excel-IT terminology (Grassetto, Incolla, Formattazione
+  condizionale, Copia formato, Layout di pagina, Formato celle, Trova e sostituisci, Pronto), and
+  the registration into the designer resource store.
+- README documents usage (import order: designer package → this package → `new Designer`,
+  alias-free). `docs/MIGRATION.md` gained section "5. Lingua italiana (Designer UI in Italian)".
+
+### Designer consumes the whole tree (packages/spread-sheets-designer)
+The ribbon commands/tabs and contextual tabs already resolved `${res.*}` placeholders; the parts
+of the tree that were hardcoded were wired so a language package loaded BEFORE construction
+localises them:
+- `src/ribbon/ribbon.tsx` + `src/ribbon/controls.tsx` + `src/ribbon/label-resources.ts` (new): the
+  tab strip, the File button and the group captions resolve through the tree
+  (`ribbon.home.*`/`ribbon.tableDesign.*`/…); the English label keeps its role as IDENTITY
+  (collapse thresholds, `collapsedGroupMetrics`, `ribbon.ribbonGroupId.<label>` ids) so the
+  adaptive layout keys are untouched.
+- `src/dialogs/templates.ts` + `DialogHost.tsx` (tab captions, default OK/Cancel, Close aria) +
+  `FindDialog.tsx` (Within/Search/Look in combos, checkboxes, `Opzione >>`) + `FormatDialog.tsx`
+  (all six tab names, Number/Alignment/Font/Border/Fill/Protection labels, category list,
+  alignment/text-direction/underline combos, border presets, sub-dialog OK/Cancel) +
+  `extra-templates.ts` (57 OK/56 Cancel/2 Close/1 Applica buttons now `${res.*}`) +
+  `MessageBoxHost.tsx` (OK/Cancel).
+- `src/status-bar.tsx` (`Pronto`/`Zoom`), `src/context-menu-items.ts` (`Formato celle...`),
+  `src/backstage.tsx` (Nuovo/Apri/Salva/Importa/Esporta/Stampa/Informazioni, Indietro, Vuota),
+  `src/commands/style-actions.ts` (the number-format combo list entries are resource
+  placeholders; the format CODE values are unchanged).
+- English rendering is byte-identical: the resolvers fall back to the previous literals and
+  `englishResources` was aligned to the ACTUAL strings (findDialog.within/workSheet/option and
+  formatDialog.protectionText — they had drifted from the UI, so `${res...}` cannot change it).
+- Two latent bugs fixed on the way: the `-resources-en`/`-it` package `index.ts` read
+  `globalThis.Spread` instead of `globalThis.GC.Spread` (the `DesignerResources` slot write was a
+  silent no-op); `Designer` construction re-merged that slot, which is why language packages
+  must (and now do) reach it.
+- CSS: one `/* TASK 87 */` block at the end of `src/styles.css` (regenerated `styles/*.css` via
+  `scripts/finalize.ts`): the Format Cells dialog title keeps its trial width as a FLOOR
+  (`width:auto; min-width:87.2px`) so longer Italian titles stay one line; the tab strip
+  (`overflow-x:auto`, scrollbar hidden like the trial's ribbon rail, tabs `flex:0 0 auto;
+  min-width:max-content`) scrolls instead of overlapping when 10 Italian captions exceed 650px.
+
+### Harness (apps/designer-compare, harness code only)
+- `?lang=it`: `src/ours.ts` loads `@opensheets/spread-sheets-designer-resources-it` instead of
+  `-en` before creating the Designer; `src/main.ts` forwards the flag to the `ours` iframe of the
+  split view. The official side is never affected.
+- Workspace link for the new package was created by symlink (no `pnpm install`):
+  `apps/designer-compare/node_modules/@opensheets/spread-sheets-designer-resources-it`.
+
+### Full-tree localisation (round 2 — the supervisor requirement: NO English except proper/function names)
+The resource tree was extended (English values byte-identical to the previous literals; language
+packages translate the whole subtree) and every remaining UI surface wired to it:
+- `resources.ts`: new `ribbon.groups/pivot/papers/menus/commands/commandTexts/shapes/galleries/
+  functionCategories/cellStyles/formatShape` subtrees (~1 400 keys: Page Layout, Formulas, Data,
+  Review, View, Settings and all contextual-tab captions/tooltips/dropdown items, every shape,
+  sparkline, icon set, colour scale, pivot command), `findDialog.ignoreHidden/searchResults`,
+  `statusBar.zoomIn/Out/sum/count/average/inMode/zoomLevel`, `panels.enter/noNamesDefined`,
+  ~70 new `dialogs.*` (Create Sparklines range labels, Format Cells category descriptions,
+  goal-seek/camera/table/hyperlink/protect dialog labels, pivot Value-Field-Summarize/Show-As
+  lists), a new top-level `pivotPanel` subtree and `backstage.*`/`settings.*` already covered.
+- Render sites: `config.ts`/`contextual-ribbon.ts`/`pivot-ribbon.ts` group + tab captions resolve
+  through `ribbon/label-resources.ts`; `ribbon/menus.tsx`, `ribbon/controls.tsx`,
+  `ribbon/theme-galleries.tsx` (PivotTable Styles gallery titles/footer), `insert-ui.tsx`,
+  `commands/index.ts` (~250 `rc()` titles incl. the Paste-Options gallery, data bars, colour
+  scales, icon sets, View/Review/Settings commands, `PrintLineVisible` command text),
+  `pivot-designer.ts`/`pivot-dialogs.tsx` (Value Field Settings lists), `status-bar.tsx`
+  (stats + zoom tooltips), `formula-bar.tsx`, `formula-editor-panel.tsx`, `selection-pane.tsx`,
+  `threaded-comments.tsx`, `backstage.tsx`, `context-menu-items.ts` — every measured/clicked
+  surface.
+- **Core PivotTable Fields panel** (owned by the core package, English constants there): the
+  Designer localises its DOM after mount via a MutationObserver driven by the new `pivotPanel.*`
+  resources (`pivot-panel.tsx`; identity replacement in English, so no core change and no
+  English effect) + the chevron menu items.
+- **Latent i18n bug fixed**: `dialogs/ConditionalFormattingDialogs|CellStatesDialogs|
+  TableStyleDialogs|ChartTypeDialogs` and the Format Cells tab strip evaluated `T()` at MODULE
+  load, which bakes English before any language package registers (visible: 'Cell Button',
+  'Padding', rule-type rows). Converted to render-time `T(uiKey(label), label)` /
+  `${res.dialogs.*}` placeholders (English output unchanged — verified by the EN smoke).
+- Italian ribbon layout at 1280 AND 1024: long captions now wrap inside the button
+  (`gc-designer-fixed-caption-wrap`, measured with a >8 px hysteresis so English stays
+  pixel-identical) or grow the button (`HorizontalCommandButton`/`CheckBoxControl` measure the
+  button box and drop the trial `maxWidth` when the ink overflows); one-word overflows carry
+  soft hyphens ('Orienta\u00ADmento', 'col\u00ADlega\u00ADmenti', 'Pre\u00ADce\u00ADden\u00ADte', ...). No
+  clipped or overlapping ribbon text in any shot.
+
+### Screenshot review (`.probe/t87/`; `shot.mjs` = 8 tabs, `shot2.mjs` = backstage/menus/dialogs/contextual/1024, `en-smoke.mjs` = English regression)
+- Tabs 1280 (`tabs/01-…08-*.png`): Home, Inserisci, Layout di pagina, Formule, Dati, Revisione,
+  Visualizza, Impostazioni — all-Italian, no overlap; 1024 (`shots/40-1024-*.png`) same, groups
+  collapse per the adaptive rules.
+- Backstage `shots/01-backstage.png` (Nuovo/Apri/Salva/Importa/Esporta/Stampa/Informazioni, Vuota).
+- Dropdowns/menus `shots/02-menu-paste.png`, `03-menu-borders.png`, `04-menu-styles-group.png`,
+  `05b-menu-cells-group.png`, `05g-menu-editing-group.png`, `05c-menu-shapes.png`,
+  `05d-menu-papersize.png` (the trial-size list: Lettera/A4/…), number-format and sparkline lists.
+- 17 dialogs `shots/10…29b-*.png`: Formato celle (incl. the translated category descriptions),
+  Trova e sostituisci, Incolla speciale, Gestione nomi, Convalida dati, Zoom, Imposta pagina,
+  Ordina, Impostazioni di Spread, Impostazioni foglio, Gestione regole di formattazione
+  condizionale, Nuova regola di formattazione (rule types/operator combos/scale grid all Italian),
+  Ricerca obiettivo, Vai a - Speciali, Inserisci funzione, Crea tabella, Rimuovi duplicati,
+  Testo in colonne, Crea Sparkline (Intervallo dati/collocazione), Crea tabella pivot,
+  Gestisci stati cella (Aggiungi/Rimuovi), Change… dialogs — zero English.
+- Contextual tabs `shots/30-ctx-table-design.png` (Progettazione tabella), `31-ctx-shape-format`
+  (Formato forma), `32-ctx-chart-design` (Progettazione grafico), `33-ctx-sparkline` (Sparkline),
+  `35/36-ctx-pivot-*` (Analizza/Progettazione tabella pivot + Campi tabella pivot panel Italian).
+- English regression `en/{home,formatcells,newrule}.png`: the default page (no `?lang`) renders
+  the same English strings as before the task (New Formatting Rule rule-type list, Minimum/
+  Maximum, 'Cell Button', 'Padding', 'Add Cell States' … all unchanged) and the smoke script
+  asserts no `${res.` leaks and no Italian words in the English UI.
+
+### Known gaps (documented, NOT stubbed)
+- Values the Italian Excel itself keeps: proper/product names (OpenSheets Designer, File, Home,
+  Calibri/…), function names (Max, Min, Sum formula tokens shown in lists), paper sizes A3/A4/A5,
+  R1C1, `undoList/redoList` and `PrintLineVisible` (internal command ids; the View-tab checkbox
+  caption is now 'Riga di stampa'), workbook DATA (sheet names, field names like Region/North,
+  theme names, shape names set as data like 'rectangle 1' stay as stored — display names from
+  the resources are translated where the official translates them).
+- Pre-existing (English, unchanged by TASK 87): with the find dialog's options expanded the
+  `.gc-find-options` block lays out below the clipped `.gc-dialog-content` box (identical
+  geometry in English and Italian; task68's token/size gates do not cover it).
+
+### Verification
+Final gates after the round-2 extension: `pnpm -r build`, `pnpm coverage:api`
+(207/207, 1796/1796, 252/252, 1369/1369), `pnpm -r typecheck`, `pnpm -r test` (all suites,
+37 designer test files / 351 tests incl. the dialog-template and combo-label specs, 7 IT tests,
+2 EN tests) and `pnpm lint` all pass. The EN smoke (`en-smoke.mjs`) asserts the default page
+carries no `${res.` leaks, no Italian words and identical English captions; no existing test was
+weakened (the IT "nothing left in English" test's allow-list only grew with justified
+proper-name/function-name entries, each with an inline comment). The number-format combo now
+shows the LOCALISED category like the official trial (verified black-box on `?side=official`:
+the trial shows `Number` for a `0.00`-formatted cell). Round-1 English-mode playwright parity
+against the official Designer (server 5186, `DESIGNER_URL`, 99 tests over `context-entries
+context-dialogs menus adaptive task64-dialogs task68-dialogs`): 79 passed, 20 failed — all 20
+are the pre-existing adaptive DPR-2 pixel gates of the 21-failure baseline recorded by
+TASK 84/85 (±1 variant drifts run to run in the 0.5–1.9 % band, documented there; no new red
+from TASK 87). `dialog-template.test.ts` was updated only to run `${res.*}` titles/buttons
+through the resolver before comparing (assertions and expected strings identical).
+
+### Round 3 (2026-11-22): whole-interface sweep, systemic fixes, zero-leak audit
+
+- Module-level `T()` baking (systemic): dialog data arrays built at import time froze English
+  before a language package registered. `ConditionalFormattingDialogs.tsx` / `CellStatesDialogs.tsx`
+  now store `${res.dialogs.*}` placeholders (`sr()`) resolved at render; `ChartTypeDialogs.tsx` /
+  `TableStyleDialogs.tsx` keep raw data names and localize at render via `T(uiKey(name), name)`;
+  the FormatDialog `TEXT_DIRECTION_ITEMS` / `LABEL_ALIGNMENTS` / `ICON_POSITIONS` arrays became
+  placeholders too. No import-time evaluation of labels remains (verified by a brace-depth scan
+  of every `.ts/.tsx` under `src/`).
+- Newly wired surfaces + resource keys (EN values byte-identical to the previous literals; IT
+  translations added): every Spread/Sheet Settings label (≈70 `settings.*` keys from
+  `settings-model.ts`), Format Cells number-category `title`s, font style list, border edge
+  buttons and line styles (hair/dash variants), radius None/All/Outer, fill palette colour names
+  (`themeColorNames` subtree; tint digits kept), fill pattern names, mask example names
+  (`maskExamples` subtree), fraction and special format names, Go To Special radio labels,
+  CF manager Edit/Delete buttons and combo arias, function-category display for the Insert
+  Function dialog and the Formulas tab galleries (`functionCategoryDisplay()`; also `all`/
+  `recommended` category keys), Themes combo caption, undo/redo access-bar + list captions
+  (`ribbon.commands.undo/redo/undoList/redoList` are now real strings — the previous nested
+  `${res.ribbon.accessBar.*}` placeholders leaked unresolved into aria-labels), group
+  dialog-launcher arias (`ribbon.indicatorLabels`), Paste Special Transpose, page-setup
+  "page(s) wide by"/"% normal size"/`paperSize2`, wizard title with `{0}` step slot
+  (`textToColumnsWizardStep`), `< Back`/`Next >` (also fixed literal `&gt;`/`&amp;` HTML
+  entities that rendered verbatim in EN and IT), "Search results"/`locale (location):` labels,
+  `contextMenu.richText` → `Testo RTF...`, dialog-editor aria fallback `dialogs.<uiKey(binding)>`
+  for caption-less template inputs (`searchText`, `replaceText`, `goal`, `changingCell`,
+  `formulaCell`, `range`, `password`, `url`, `weight`, … — 16 keys), and every remaining
+  message-box/dialog TITLE literal (pivot dialogs `Create PivotTable`/`Change Data Source`/
+  `Move PivotTable`/…, `Error`/`error`, `replace`, `Subtotal`, `Hyperlink`, `Sort`,
+  `Create camera shape`, `Barcode Dialog`, `Create Sparklines`, `Resize Table`, `Table Name`,
+  `Sparkline Weight`).
+- English bugs fixed on the way (visible in EN too, unchanged wording otherwise): the Name
+  Manager `New...`/`Edit...` buttons and the tab-colour preview New/Current labels rendered the
+  source text `dh(designer, …)` literally (missing JSX braces); the sparkline dialog exposed an
+  internal `isFormulaSparkline` checkbox that the trial does not show (removed from the
+  template; the payload default stays); `Next &gt;`/`Layout &amp; Print` entities; nested
+  undo/redo placeholders. The same missing-braces class hit three default-hidden dock panels
+  (`Formula Editor`, `Threaded Comments` title/Reset/No-comments/See-more, all as literal
+  `P(d, …)` text); they now resolve against `panels.*` (verified live in EN and IT).
+- IT test tightened: the `allowedSameAsEnglish` set lost `ribbon.commands.undo/redo` and
+  `ribbon.accessBar.undoList/redoList` (they now translate to Annulla/Ripeti/Elenco …) and
+  `contextMenu.richText` (`Testo RTF...`); `contextMenu.tag` stays with an inline rationale.
+- Zero-leak verification: `.probe/t87/audit2.mjs` (run with a fresh build + fresh Vite cache)
+  drives every ribbon tab (8), every auto-discovered ribbon dropdown per tab (~50), the
+  backstage, cell/row-header/column-header/sheet-tab context menus, 28 dialogs, all Format
+  Cells categories and all Settings tabs — 115 contexts — and diffs the visible text +
+  `title`/`aria-label` strings between `?lang=en` and `?lang=it`. Any string identical on both
+  sides is a leak unless allowlisted (numbers/codes/cell refs, font and theme names, paper
+  sizes + inch dimensions, locale display names, culture-formatted Number-tab samples,
+  `functionCatalog` signatures/descriptions and the Custom-Lists weekday/month defaults — all
+  core data owned outside this task, each class commented in the script). Result: 115 ok /
+  0 leaking. One allowlisted collision worth noting: IT Number-category `Data` (Date) vs the EN
+  ribbon tab `Data` (set-diff false positive, verified separately on both pages).
+- Screenshots (`.probe/t87/shots/`, round-3 set): all 8 tabs at 1280 (`it-tab*.png`) and 1024
+  (`40-1024-*.png`, incl. review/settings added), backstage + all backstage pages, paste/borders/
+  styles/cells/editing/shapes/papersize/functions menus (`0*-menu-*.png`, `tab*-menu-*.png`
+  equivalents under `it-tab*-menu-*`), context tabs: table design, shape format, chart design,
+  sparkline, pivot analyze + pivot design (`30..36-ctx-*.png`), and dialogs: format cells (+all
+  10 categories), find/replace, paste special, name manager, data validation, zoom, page setup,
+  sort, spread/sheet settings (+all tabs), CF manager/new rule, goal seek, go-to special, insert
+  function, create table, remove duplicates, text-to-columns (all 3 steps reachable), cell
+  states, table style, hyperlink, comment, protect sheet/workbook, sparkline create, pivot
+  create, chart type (`dlg-*.png` / `it-dlg-*.png`). No clipped or overlapping ribbon text at
+  1280 or 1024 with the longer Italian captions.
+- Gates re-run after all round-3 changes: `pnpm -r build` ✓, `pnpm coverage:api` ✓ (100 %),
+  `pnpm -r typecheck` ✓, `pnpm -r test` ✓ (all packages incl. 351 designer + 7 IT tests),
+  `pnpm lint` ✓.
+
+## TASK 89 — Formulas in Italian (calc-engine language package `it`) (2026-11-22)
+
+User request: "anche le formule le voglio in italiano". `=SUM(A1,A2)` worked under it-it;
+`=SOMMA(A1;A2)` did not parse (gap recorded in TASK 88). This task implements the public
+`GC.Spread.CalcEngine.LanguagePackages` layer for real and ships an Italian language package.
+
+### What the contract and docs say (and where they were readable from)
+
+- Public d.ts (`@mescius/spread-sheets@19.2.5`, kept byte-identical as our type contract):
+  `GC.Spread.CalcEngine.LanguagePackages.languagePackages(languageName?)` — "Gets or Sets the
+  language package for calc engine … If no value is set, return the calc engine language name
+  string" (so: setter returns/accepts a name, no-arg call is the getter). `IFormulaInfo` declares
+  both `formula` and `formulaWithCulture` ("The formula string with culture"), which is the
+  type-level proof that the OFFICIAL model stores one canonical formula and renders a
+  culture/language-localized display text — matching `getFormulaInformation()` docs. The
+  add-in's own d.ts (`@mescius/spread-sheets-languagepackages`) is an empty stub (side-effect
+  import only), and the online docs pages for the add-in could not be fetched from this
+  environment (web search unavailable; the probed developer.mescius.com doc paths 404), so the
+  authoritative sources used here are the public d.ts + a fresh black-box probe of the running
+  v19.2.5 trial (below) — no official min.js/CSS was read.
+- The package-object fields named in the task (`listSeparator`, `arrayListSeparator`,
+  `arrayGroupSeparator`, `numberDecimalSeparator`) are implemented under exactly these names in
+  `LanguagePackageData` (our registry description type).
+- Black-box probe of the official trial with the languagepackages add-in loaded and
+  `languagePackages('it')` activated (apps/designer-compare `?side=official&lang=it`, public API
+  only): `languagePackages()` -> `'it'`; `setFormula('=SOMMA(1;2;3)')` throws **Invalid Formula**
+  (the trial's parser keeps the ENGLISH grammar); `setFormula('=SUM(1,2)')` evaluates 6 and its
+  `getFormula()` displays **`SOMMA(1,2)`** (localized NAMES, English separators); errors stay
+  English (`#DIV/0!`, `#N/A`); `toJSON()` contains `SUM` and never `SOMMA` (invariant English
+  storage). So the official 'it' package localizes DISPLAY only.
+- Model implemented (superset per the user request, same storage/display contract): storage,
+  `toJSON()` and XLSX keep the invariant English canonical text (so files open in Excel in any
+  language); with the package active, USER INPUT is accepted in BOTH grammars (Italian and
+  English), and the cell editor, formula bar, `getFormula()` and the `showFormulas` painting show
+  the localized form (`=SOMMA(A1;A2)`), while `getFormulaInformation().formula` stays canonical
+  and `.formulaWithCulture` carries the localized text (the d.ts pair). Errors stay English —
+  like the official engine (measured above); the package interface still supports a localized
+  `errors` table for languages that do localize them. `languagePackages('')`/`(null)` deactivates
+  (back to plain English); an unknown name returns undefined and leaves the active package
+  untouched, matching the "gets or sets" semantics.
+
+### Core (`packages/spread-sheets`)
+
+- `src/calc/language-packages.ts` — the registry + active-package mechanism: separator table
+  (it: `listSeparator ';'`, `arrayListSeparator ';'`, `arrayGroupSeparator '\\'`,
+  `numberDecimalSeparator ','`, `numberGroupSeparator '.'`, `trueValue VERO`, `falseValue FALSO`),
+  two-way name maps (localized lookup case-insensitive), error table support, localized
+  description table + `addCalcLanguagePackageDescriptions` mutator (used by UI resource packages),
+  `languagePackages()` implementing the d.ts contract.
+- `src/calc/italian-language-package.ts` — the built-in `it` data: **413 non-identity name pairs
+  over the 581-name catalog** (every catalog function has an Italian name — identity where Excel
+  in Italy keeps English, e.g. MAX, SIN, SORT, UNIQUE, BC_*); SOMMA, MEDIA, SE, CERCA.VERT,
+  CONTA.SE, SOMMA.SE, CONCATENA, OGGI, ARROTONDA, INDICE, CONFRONTA, SE.ERRORE, STRINGA.ESTRAI,
+  ANNULLA.SPAZI, VAL.NON.DISP, MEDIA.PIÙ.SE, SE.NON.DISP., ... — unique on both sides (test).
+  Registered at core load (`calc/api.ts`), but INACTIVE until `languagePackages('it')`.
+- Lexer: `language` option — `,`-decimal number scanning (`=1,5*2` -> one 1.5 literal, with
+  `1,5` inside an argument list treated as ONE number like Excel-IT, tested), `\` array-row token
+  (`{1;2\3;4}`), localized names/booleans accepted as identifiers/keywords; error literals stay
+  English. Parser: localizes on parse (localized -> canonical AST) AND renders the localized text
+  from the canonical AST (`astToText(localized)`/`localizeFormulaText`); R1C1 passes through.
+- Storage: `sheet-cells.setFormula` normalizes localized input to the canonical English text
+  (single source of truth); `worksheet.getFormula` returns the localized display text when a
+  package is active, `worksheet._getFormula` the stored canonical one; conditional-formatting
+  `Condition.formula` and defined names normalize the same way (tests: CF `=SOMMA(A1;A2)>1`
+  stores `SUM(A1,A2)>1`; name `=SOMMA($A$1;$A$2)` stores `SUM($A$1,$A$2)`).
+- Autocomplete/tooltip (`features/formula-hints.ts`): suggests and inserts Italian names
+  (prefix `=SOM` -> SOMMA, SOMMA.PIÙ.SE…), the argument tooltip shows `SOMMA(number1; [number2]; …)`
+  with the `;` separator, the innermost-call tracker understands localized names (incl. dotted
+  `CERCA.VERT`, accented `MEDIA.PIÙ.SE`), and the description line follows the active package
+  (filled by the Designer's resources, fallback English catalog).
+- `calc/api.ts` — `GC.Spread.CalcEngine.LanguagePackages` is now the real implementation;
+  hidden non-enumerable-style extensions `_activeLanguagePackage()` (live package object for
+  add-ins/UI) and `_addDescriptions(name, map)` (single live registry — deliberately NOT
+  re-exported through the internals bundle: bundling the mutator value there inlines a SECOND
+  registry, which the round-5 designer test caught).
+- Internals (`gc.spread.sheets.internals.js`) exports the `LanguagePackage`/`LanguagePackageData`
+  types only (value exports would duplicate the registry).
+
+### Designer + resources
+
+- `function-library.ts`: galleries/dialogs keep canonical-English data but display/insert
+  localized names (`functionDisplayName`), use `functionListSeparator()` in signatures,
+  argument rows and the built formula (`formulaFromArguments('ROUND',…) -> ARROTONDA(1,5;0)`),
+  search matches Italian names too (`somma` finds SUM); `functionDescriptionLocalized` reads the
+  loaded resource language's `functionDescriptions.<NAME>` subtree (dots -> underscores in the
+  resource keys because the tree addresses leaves by dotted paths) with the English catalog as
+  fallback. `syncCalcLanguageDescriptions` merges that subtree into the active package (through
+  the core's `_addDescriptions`, keyed on (package, subtree-identity) so later `setResources`
+  calls re-sync) — called at Designer construction and lazily on every package access.
+- `@opensheets/spread-sheets-designer-resources-it`: **241 Italian function descriptions**
+  (the required 100+ most-used, covering every gallery-listed name; remaining catalog functions
+  fall back to the English catalog description — marked here as the gap), mirrored 1:1 as 241
+  English descriptions in the Designer's `resources.ts` (the en/it key-tree equality test keeps
+  them locked); one duplicate `DAYS360` key removed (build error).
+- Formulas tab (`ribbon/menus.tsx`), function dialogs (`FunctionDialogs.tsx`): Italian names,
+  `;`-separated signatures, Italian descriptions, argument dialog "Formula = MEDIA.DEV()" style
+  built with the localized name + culture separator.
+- `apps/designer-compare` `?lang=it`: both sides activate their Italian layer before the
+  Designer is created (official: the real languagepackages add-in; ours: culture + package), for
+  black-box comparison.
+
+### Activation & packages
+
+- `@opensheets/spread-sheets-resources-it` now ALSO activates the calc language package on load
+  (idempotent, guarded), so one import gives Italian UI + Italian formulas; documented in its
+  README and in `docs/MIGRATION.md` § "Lingua italiana" (which previously told users formulas
+  stay English — updated; the TASK 88 "listSeparator vs `,`" gap is closed).
+- `@opensheets/spread-sheets-languagepackages` stays the install-time counterpart (documented
+  no-op) with an updated note: the core now ships `it`; the other official language data sets
+  (fr/de/es/… in the trial's non-enumerable bundles) remain a tracked content gap.
+
+### Verification (visual, this session)
+
+- `?side=ours&lang=it`: formula bar and F2 editor accept `=SOMMA(B2:E2;1)` -> 571,
+  `=SOMMA(B2:B5)` -> 395, `=CONTA.SE(B2:B5;">100")` -> 2, `=1,5*2` -> 3; reselecting shows the
+  Italian text; autocomplete lists SOMMA… with the Italian description ("CONTA.SE — Contea le
+  celle di un intervallo che soddisfano una condizione…"); tooltip `SOMMA(number1; [number2]; …)`
+  highlights the current argument. Insert Function dialog: Italian title/categories (Tutte,
+  Consigliate, Matematica e trigonometria…), Italian names (ASS, INDIRIZZO, AGGREGA, AMMORT.DEGR…),
+  search "MEDIA" finds MEDIA/MEDIANA/RANGO.MEDIA…, description "Restituisce il valore assoluto di
+  un numero." ✓.
+- `?side=ours` (no lang, English default): UI unchanged, `=SOMMA(B2:B5)` -> `#NAME?` exactly as
+  before the feature (the package is registered but inactive).
+- Official side `?side=official&lang=it`: recorded above (display-only localization).
+
+### Tests / gates
+
+- `test/calc/language-package.test.ts` — 30 tests: registry/get-set semantics + live accessor,
+  separators table, catalog coverage + two-sided uniqueness + cross-collision guard (a localized
+  name that equals a DIFFERENT catalog function must be identity), parse of SOMMA/SE/CONTA.SE/
+  CERCA.VERT/MEDIA.PIÙ.SE/SE.NON.DISP., decimal comma + English re-parse, mixed grammar
+  (`=SOMMA(A1,A2,B1)`), strings with accented literals, sheet references (`=SOMMA(Foglio2!A1:B2;3)`),
+  culture array constants `{1;2\3;4}` both directions, VERO/FALSO, English errors,
+  display->parse->canonical round trips in BOTH languages, `getFormulaInformation` formula vs
+  formulaWithCulture, toJSON/fromJSON survival (package active AND English), R1C1, defined names
+  and CF normalization, descriptions (registration data + late mutator, case-insensitive,
+  cross-language isolation).
+- `test/formula-hints.test.ts` — new TASK 89 block (localized innermost-call detection, display/
+  canonical name helpers, `;` separator) WITHOUT touching the existing expectations (the direct
+  module imports keep the built-in name list identical; the earlier full-core import that had
+  shifted `filterFormulaNames('S')[0]` from SCATTERSPARKLINE to SCAN was reverted — existing test
+  byte-identical to before this task).
+- Designer `test/function-library.test.ts` — 12 tests incl. display names, `;` signature,
+  `formulaFromArguments` -> `ARROTONDA(1,5;0)`, Italian search, `functionDescriptionLocalized`
+  underscore keys, and the resource->package description merge (dotted reverse-mapping, genuine
+  underscore names untouched). Reset uses the typed `languagePackages('')` form (public d.ts types
+  the parameter `string`; the `null` form is covered in the core tests).
+- `pnpm -r build` 0 failures; `pnpm coverage:api` — Classes 207/207, methods 1796/1796, enums
+  252/252, declarations 1369/1369 (100%); `pnpm -r typecheck` all workspaces Done;
+  `pnpm -r test` — core 124 files + every other package green (run after the final edits,
+  including the strengthened `languagePackages`/descriptions assertions); `pnpm lint` clean.
+- No CSS was added (formula text is canvas/DOM), so `styles/*.css` are untouched and there is no
+  `/* TASK 89 */` block because none was needed. `packages/spread-sheets-designer/src/styles.css`
+  and designer theme code untouched (dark-theme coder's files); `pnpm-lock.yaml` unchanged; no
+  `pnpm install` run; nothing committed. Official assets: only public d.ts files were read; the
+  trial was exercised through its public API/UI (black-box), and no pixels or style sheets were
+  copied.
+
+## TASK 90 — User-reported bugs: zoom font fallback, bold glitches, frozen-panes scrolling (2026-11-22)
+
+The user tested the Windows preview (Chrome, real Calibri/Segoe UI) and reported (A) "when I zoom
+in the font falls back to a default", (B) "even when you make it bold there are several bugs",
+(C) "the freeze panes don't let me scroll ... the bar does not move with the cursor". The
+supervisor clarified: A/B reproduce through the RIBBON font commands (`Increase Font Size` then
+Bold on a `14.6667px Calibri` cell), C is the scrollbar thumb drag that stops when the pointer
+leaves the 15 px bar. All three are fixed; every claim below is a black-box trial comparison
+(`apps/designer-compare ?side=official|ours`, probes under `.probe/t90/`, pair screenshots under
+`.probe/t90/shots2/`).
+
+### A/B — the font commands and Ctrl+B/I/U (fixed rounds 1-4)
+
+Cause (rounds 1-2, `.probe/t90/fonts-r1.json`, `parse-r1.json`): the ribbon font commands wrote a
+shorthand FRAGMENT into the cell (`font:'12pt'`, `font:'bold'`) and `getActualStyle` copied the
+source shorthand over the resolved long-hands. A fragment is not a valid `ctx.font` value, so
+Chromium silently ignored the assignment and drew the cell in whatever font the canvas held last -
+exactly symptom A (and the bold/italic glitches of B). Fixes:
+- Designer commands now write only the LONG-HAND member (`fontWeight`, `fontStyle`, `fontSize`,
+  `fontFamily` - `packages/spread-sheets-designer/src/commands/style-actions.ts`), like the trial,
+  whose raw cell writes we recorded as `{font:'12pt', fontSize:'12pt'}` etc.
+- `Style` (`primitives.ts`) parses partial shorthands into its four parts and reports the
+  canonical composed shorthand; `getActualStyle` merges font PARTS across the whole cascade and
+  recomposes - `12pt` resolves to `12pt Calibri`, `bold` to `bold 14.6667px Calibri`; multi-word
+  families get quoted the trial way (`11pt 'Calibri Light'`).
+- The canvas font goes through `canvasFont(style, zoom)`: always a complete
+  `[style] [weight] <px-scaled-size> '<family>'` shorthand (unit conversion pt/px/em/% -> CSS px,
+  size scaled by sheet zoom, DPR handled by the backing-store transform), used by the renderer,
+  the autofit/measurement paths (`sheet-layout.ts`) and the cell editor overlay
+  (`interaction.ts` sets `editor.style.font = view.font(style)`).
+
+New in round 4:
+- **Ctrl+B / Ctrl+I / Ctrl+U were inert on ours** (the trial applies them and syncs the ribbon
+  checkbox - `.probe/t90/ctrl-keys2-r1.json` / `ctrl3-r1.json`). `DesignerShell`'s key handler now
+  dispatches the chord through the same command path as the checkbox click
+  (`executeCommand(name, name, !getCommandState(name).checked)`), so chord and button are one
+  command: toggles match the trial exactly (bold-off writes `normal`, `Ctrl+I` twice ends
+  `normal normal`, `Ctrl+U` toggles decoration bit 1, the chord applies even while the cell editor
+  is open and survives Escape).
+- **`themeFont` cascade rule** (`.probe/t90/themefont*.mjs`, `themejson.mjs`, measured): the
+  resolved family comes from the most specific cascade level carrying a `fontFamily` OR a
+  `themeFont`; a level with `themeFont` resolves its family THROUGH the theme (`Body` -> theme body
+  font `Calibri`; unknown tokens pass through verbatim - `Heading` -> `'Heading'`, `Whatever` ->
+  `'Whatever'`), and a more specific explicit family drops the themeFont from the result. This is
+  why on the trial a default style `13pt Trebuchet MS` resolves as `13pt Calibri` (its built-in
+  `themeFont:'Body'` wins) - ours now matches; the round-1 unit expectation was corrected to the
+  measured trial value.
+- **Ctrl+wheel zoom step**: fixed ±0.15 per event whatever the deltaY (trial `1 -> 1.15 -> 1.3 ->
+  1.45`, clamped 0.1..4; ours used 0.1) - `.probe/t90/zoomwheel.mjs`.
+
+Evidence/tests: `packages/spread-sheets/test/task90-font.test.ts` (parsing/composition/cascade/
+themeFont matrix/canvas font at zooms 1-4), `packages/spread-sheets-designer/test/
+task90-font-commands.test.ts` (ribbon ladder, mixed ranges, named/row/col/default walks, underline
+bit toggles, and a new Format Cells > Font dialog case), and the new Playwright pairing spec
+`apps/designer-compare/test/task90-font-parity.spec.ts` (8 tests): identical clicks/chords on both
+pages with identical resolved style, identical raw cell shorthand, identical ribbon checked class
+after every step; combo typed family/size; Ctrl+B during editing; the editor overlay font at zoom
+1.5 (`italic 700 28px "Liberation Sans"`); Ctrl+wheel zoom parity.
+Symptom A with an INSTALLED font (Linux Calibri fallback had hidden it): `14pt "Liberation Sans"`
+bold at zoom 1.5 under deviceScaleFactor 1.25 - the zoomed cell rect is page-identical, the glyph
+ink mass 1102 (trial) vs 1079 (ours) within 2%, ink height/width within 3 px, and Ctrl+U adds the
+underline ink on both sides (`.probe/t90/clip.mjs` recorded the dense-text subpixel-AA floor:
+raw pixelmatch at dpr 1.25 is 5-14% even for identical renderings, so the HARD gates are the ink
+mass/bbox; the pixelmatch AA floor is attached to the test info, not gated).
+
+### C — frozen-panes scrolling, wheel, thumb drag (fixed rounds 1-4)
+
+- Wheel: 3 rows / 3 columns per event whatever the delta/mode (trial measured `wheel3-r1.json`);
+  shift+wheel and deltaX move sideways. Touchpad deltas of 1-40 previously scrolled NOTHING - the
+  reported "mouse wheel does not scroll". Wheel works over the scrollable pane, the frozen block
+  and the row headers alike.
+- Viewport getters address the frozen blocks by index like the trial (index 0 = leading block, 1 =
+  scrolling pane, 2 = trailing block) (`viewport2-r1.json`).
+- Thumb drag: document-level `pointermove/pointerup/pointercancel` listeners + `setPointerCapture`
+  - the drag keeps following the pointer wherever it goes (x drifting 60 px off the 15 px bar),
+  scrolls LIVE on every single move event, and a release outside the bar/window ends it
+  (`drag2-r1.json`). Before, ours stopped tracking the moment the pointer left the bar - the
+  supervisor's repro.
+- Drag quantization (round 4, `.probe/t90/scroll2-r7.json`): the trial maps the pointer's travelled
+  pixels onto the ITEM-INDEX range: `round(deltaPx * (lastItem - frozenLead) / (trackLen -
+  thumbLen))` whole items, zoom-invariant (its z1 and z1.5 trails are the same rows). Ours now
+  reproduces the trial trails item-for-item: `22/40/59/77/96` rows (frozen 3, 20 px steps),
+  `19/38/57/76/95` (plain), `4/6/8/10` / `2/5/7/9` columns (30 px steps) - before: `21/39/58/76/95`
+  (floor + `clientHeight` travel 213 instead of the DOM-rect 211) and `2/4/6/9` horizontally.
+- Thumb sizing: `floor(track * visible / (visible + content))`, min 10 px (trial rows5 thumb 41 vs
+  our old 42); vertical matches the trial exactly (12 / 10 / 10 / 41). The scroll pane extent
+  excludes the frozen blocks, and the thumb bottom stops exactly at the track bottom at row 199.
+- Track click pages by the SCROLL-PANE extent (trial 3 -> 11 with the 171px pane; ours used the
+  full 231px viewport -> 14). Fixed; e2e-pinned ours == trial.
+- Arrows: one row/column per click whatever the item sizes (round 2 `hbar-r1.json`), e2e-pinned.
+- Keyboard navigation across the frozen line and selection drag across it: already paired in
+  `.probe/t90/frozen-nav-r1.json` (identical trails), now locked by the e2e test.
+
+Tests: `packages/spread-sheets/test/task90-scroll.test.ts` (10 unit tests: wheel steps, item
+arrows, Ctrl+wheel 0.15 ladder + clamps, track-click pane extent incl. the frozen variant, drag
+that leaves the bar with exact trail values, release far away, the four trial drag trails
+item-for-item, frozen viewport addressing) and the new Playwright spec
+`apps/designer-compare/test/task90-scroll.spec.ts` (9 tests) driving the REAL mouse
+(`page.mouse.down/move with steps/up` that leaves the bar, thumb+viewport read after EVERY move,
+HiDPI contexts dpr 1.25/1.5, zoom 1 and 1.5, frozen rows AND columns, wheel over scrollable/
+frozen/header, shift+wheel, deltaX, arrow clicks, track clicks, keyboard across the frozen line,
+ours == official value after each step). All 17 e2e tests pass.
+
+### Rounds 5-6 (continuation) — trial parity of the `CellRange` accessors and the workbook `font` option
+
+The full gate after round 4 exposed two stale expectations in the pre-existing
+`packages/spread-sheets/test/range.test.ts`. Black-box probes (`.probe/t90/rangefont.mjs` ->
+`rangefont-r1.json`, `.probe/t90/rangefont2.mjs` -> `rangefont2-r1.json`/`rangefont2-r2.json`,
+public API reads on both Designer pages) showed the trial's real behaviour:
+
+- **`CellRange.themeFont()` getter** (trial, measured): it does NOT return the resolved
+  actual-style member — it walks the cascade and returns the RAW `themeFont` of the most specific
+  style level that DEFINES one (cell own with the named-style reference resolved, then row, then
+  column, then the area default). The area default's built-in `'Body'` is reported even for a cell
+  whose font names an explicit family (there the RESOLVED `getActualStyle().themeFont` is dropped,
+  ours matched that already ✓), and a stored non-string value round-trips verbatim (the trial's
+  own `getActualStyle` THROWS on such a value). Implemented as `_themeFontRaw` (`sheet-styles.ts`,
+  thin `Worksheet` delegator, special-cased only for the `themeFont` key in the `CellRange`
+  accessor loop in `range.ts`). All measured keys of `rangefont2` are now identical on both sides
+  (plain `Body`, row-style cell `16pt Verdana` + `Body`, explicit-family cell `Body` getter /
+  undefined actual, `'Whatever'` passthrough -> `14.6667px Whatever`).
+- **Workbook CONSTRUCTOR option `font`** (trial, measured): `new Workbook(undefined, {font:'bold
+  16px Arial'})` stores it (`wb.options.font` reads back) but it NEVER participates in style
+  resolution — the trial's `getActualStyle(0,0).font` is still `14.6667px Calibri` (theme body
+  font via the built-in `themeFont:'Body'`), and `font` appears in neither `IWorkbookOptions` nor
+  `IWorksheetOptions` of the contract d.ts. Ours used to seed the cascade baseline with
+  `parent.options.font`; removed in `getActualStyle` and `fillStyleRecord` (both now the fixed
+  `14.6667px Calibri` + `themeFont:'Body'` — the values task46/task75 pin from trial JSON).
+- `range.test.ts`: the two superseded guesses (sentinel round-trip `themeFont`, `bold 16px Arial`)
+  were replaced by the trial-measured values, each with the probe file cited; no assertion was
+  removed (the file gained a case, now 70 tests incl. the new `themeFont accessor getter walks
+  the cascade raw` test that pins the trial's row/default/own-token behaviour), and the
+  workbook-options case additionally pins that the option IS stored.
+- The designer `task90-font-commands.test.ts` now constructs styles through the **contract**:
+  the official d.ts `Style` constructor is positional (no config-object overload) and
+  `setStyle`/`setStyleName` take non-null `Style`/`string` — the test uses `Object.assign(new
+  Style(), props)` (`styleOf` helper), `new Style()` to clear and `''` to unset a style name; all
+  trial-measured assertions are unchanged and the package typechecks against the contract d.ts.
+
+### Known residuals (recorded honestly, not gated away)
+
+- Horizontal thumb length at extreme layouts still differs from the trial by a few px (frozen z1:
+  150 vs 151 OK; frozen z1.5: ours 100 vs trial 93 - no extent-ratio formula fit the trial's
+  horizontal numbers across the 9 measured configs; `.probe/t90/hfit-r3.json` kept as evidence).
+  Consequence: a horizontal thumb drag at zoom 1.5 WITH frozen columns differs from the trial by
+  ONE column at the 4th step (trial `4/5/7/8`, ours `4/5/7/9`); all other bars/zooms match
+  item-for-item. The e2e covers horizontal at zoom 1 (frozen and plain); the z1.5-frozen case is
+  left out of the spec with this note rather than a loosened threshold.
+- At machine click rates the trial's jQuery arrow buttons swallow repeated events (official
+  3/4/5/5/5/5 for 5 fast clicks, `.probe/t90/arrow2.mjs`); ours advances on each. Human-paced
+  clicks (150 ms) match exactly on both sides; the e2e tests use human pace.
+- `sheet.options({scrollbarShowMax/scrollbarMaxAlign:false/true})` did not trigger a trial
+  re-layout in the probe (thumb unchanged), so no option-specific thumb/drag behavior could be
+  measured; our options keep the documented defaults (showMax true, maxAlign false).
+- A dense-glyph pixelmatch at dpr 1.25 has a 5-14% subpixel-AA floor even when both sides draw the
+  identical font/size/position (measured with the fixes in place); the paired visual gate for the
+  webfont case is therefore the ink mass/bbox, with the pixelmatch number attached to the test
+  info for transparency.
+- `themeFont:'Heading'` reproduces the trial's measured passthrough (`getActualStyle().fontFamily
+  === 'Heading'`, `.font === '12pt Heading'`); the trial's own canvas then rasterizes that unknown
+  family with the browser fallback - ours behaves the same through the same resolved members.
+- Pathological `themeFont` values (rounds 5-6): storing a NON-STRING in `themeFont` makes the
+  trial's own `getActualStyle` throw (`n3.split is not a function`, `.probe/t90/rangefont-r1.json`
+  `rangeSentinel.actual`) - ours tolerates it and resolves as if the member were absent (the raw
+  value still round-trips through `getStyle` and the `CellRange.themeFont()` getter, like the
+  trial). We do not replicate the crash.
+- The trial's CellRange exposes no `name()` accessor at runtime (`rangefont2-r1.json`
+  `namedStyle.name`, and the contract d.ts declares none for CellRange); ours keeps the
+  style-name accessor the earlier TASK 46 work pinned - recorded divergence, not exercised by the
+  paired specs. Likewise `range.fontWeight('bold')` lands in `getStyle().toJSON()` with a
+  different MEMBER ORDER than the trial (`{font,fontWeight}` vs ours `{fontWeight,font}` - same
+  keys/values; parity tests compare values, not key order).
+
+## TASK 91 — Formula bar and General-format bugs found by the supervisor (official vs ours, black-box) (2026-11-22)
+
+### Item 1 — the formula bar of a selected formula cell (Designer + core FormulaTextBox)
+
+Before: ours showed `B3/B2-1` (no `=`), no reference colours, plain `{...}`-less array formulas
+and the FORMATTED text of value cells. The official shows `=B3/B2-1` with the references coloured
+exactly as the F2 cell editor colours them.
+
+- Designer bar (`packages/spread-sheets-designer/src/formula-bar.tsx`): the selected cell's text is
+  `=` + formula (array formulas `{=...}` — the trial paints the braces, measured), or the General
+  text of a value cell (`250` in a `#,##0.00` cell — measured: the trial's bar is format-agnostic,
+  `TRUE`/`FALSE` for booleans, culture separators honoured). Colouring: a read-only colour layer
+  behind the transparent-text input renders the SAME tokens as the editor via the core tokenizer
+  (`Spread.Sheets._formulaColorSegments` -> `features/formula-color.ts` `colorFormula`, the module
+  the cell editor and `FormulaTextBox` already use), scroll-synchronised with the input.
+- Core `GC.Spread.Sheets.FormulaTextBox.FormulaTextBox` (`features/controls.ts` `refresh`): same
+  text rules (`=`, `{=...}`, General value text instead of `getText`'s formatted text).
+- `{=...}` commit round-trip: `designer-undo.ts` turns a `{=...}` bar edit back into
+  `setArrayFormula` (and the undo snapshot restores the sheet as before).
+- Italian (TASK 89 interaction): the bar shows the display grammar it stores — `=SOMMA(B2:B5;1)`
+  with Italian names and `;` (verified paired; e2e test).
+
+### Item 2 — the General width-fitting rule (`packages/spread-sheets/src/general-fit.ts`)
+
+Before: any numeric text wider than the column painted `########`. The trial shortens the number
+first and hashes only when NOTHING fits. Measured black-box on the trial at zoom 100 % and 150 %
+(the fitted text is zoom-invariant — ink spans scale exactly x1.5), columns 24..200 px.
+
+Rule (unit-pinned in `test/general-fit.test.ts`, 11 tests): base = `String(value)` with the
+culture's separators; then the first candidate that fits is painted: decimals reduced one place at
+a time (rounded half away from zero, trailing `0`s kept, candidates that round away every decimal
+skipped) -> 0-decimal integer when nonzero -> scientific `d.dddddE±dd` down to `dE±dd` -> `0`; the
+`#` run only when even that fails. A `String()` `e` base with |exponent| < 10 (`1e-7`) wins the
+whole chain only when `avail >= w(base) + w(d0) + 3` px (trial: `1e-7` at 68 px columns, `1.5e-7`
+at 76 px, but `1E-10`/`1e+21`-style 10-digit exponents NEVER show the lowercase form — they use
+the canonical `d.dddddE±dd`).
+
+The supervisor's matrix, as the trial paints it (columns B..G = 30/40/110/60/80/200 px, zoom 100 = 150 %):
+
+| value | 30 px | 40 px | 60 px | 80 px | 110 px | 200 px |
+|---|---|---|---|---|---|---|
+| -0.2222222 | `-0.2` | `-0.22` | `-0.22222` | `-0.2222222` | full | full |
+| 0.123456789 | `0.12` | `0.123` | `0.123457` | full | full | full |
+| 123456.789 | `####` | `######` | `123456.8` | full | full | full |
+| 1234567890123 | `####` | `######` | `1.2E+12` | `1.2346E+12` | full | full |
+| -1e-12 | `0` | `0` | `-1.0E-12` | `-1.0000E-12` | `-1.00000E-12` | `-1.00000E-12` |
+| 1e20 | `####` | `######` | `1.0E+20` | `1.0000E+20` | `1.00000E+20` | `100000000000000000000` |
+| 123456789012345 | `####` | `######` | `1.2E+14` | `1.2346E+14` | `1.23457E+14` | full |
+| 396.5 | `397` | `396.5` | `396.5` | `396.5` | `396.5` | `396.5` |
+| 123456789012 | `####` | `######` | `1.2E+11` | `1.2346E+11` | full | full |
+| 0.00001 | `0` | `1E-05` | `0.00001` | `0.00001` | `0.00001` | `0.00001` |
+
+`getValue`/`getText` stay the full unfitted text on the trial (measured via API: `getText` returns
+`-0.2222222`, `-1e-12`, `100000000000000000000`, ...) — ours identical.
+
+Rendering: `drawText` (rendering-draw.ts) calls `generalFitText` for General numbers with the paint
+context's own measurement (so it follows the configured font and is scale-invariant); the existing
+`#`-run fallback stays for dates/formatted numbers and for General numbers when nothing fits.
+
+### Item 2b — General + number formats under the culture (supervisor 20:00 note)
+
+`GeneralFormatter` (`formatter.ts`): numeric General text is now `String(value)` with the CURRENT
+culture's decimal/group separators (`396,5` under it-IT — previously the SSF path gave `396.5`);
+`localizeNumber` also runs on that path, so a General cell, the formula bar and `getText` agree.
+`#,##0.00` under it-IT still gives `1.234,50` (existing behaviour untouched). The renderer's
+no-formatter number path paints the same culture text (`generalNumberText`). The stored value
+never changes (`getValue` -> `396.5`).
+
+### Tests
+
+- Core unit: `test/general-fit.test.ts` (11), `test/culture-it.test.ts` (8, incl. new TASK 91
+  cases), `test/m5-controls.test.ts` (8, FormulaTextBox `=`/`{=}`/General-text cases added).
+- Designer unit: `test/formula-bar-text.test.ts` (5).
+- designer-compare e2e: `formula-bar-t91.spec.ts` (2: paired official-vs-ours bar text + coloured
+  reference tokens per cell incl. `{=...}` plain on both sides, Italian bar) and
+  `general-fit-t91.spec.ts` (2: matrix text gate + it-it). The matrix gate compares TEXT, not
+  pixels (supervisor directive): `getText`/`getValue` are diffed live across the two pages, and
+  our RENDERER'S OWN painted strings are read from a new opt-in core hook
+  (`GC.Spread.Sheets._generalFitLog(true)` records what `drawText` paints for General numbers —
+  off by default, zero cost) and checked against the table above transcribed from the trial.
+  Paired screenshots of the matrix at both zooms are attached as evidence. The template's SUM
+  formulas are cleared in the spec setup — they contaminated the trial's F column in earlier
+  measurements (that, and a mis-read 44 px column, produced the "1E-05 vs 0.00001 at 60 px"
+  confusion: the trial paints the base `0.00001` from 52 px up).
+
+### Behaviour differences we accept (measured, documented — not chased per supervisor)
+
+- Our fallback font is a few % narrower than the trial's resolved one (installed fonts differ);
+  a scientific candidate can therefore gain/lose ONE mantissa digit at a column boundary
+  (ours paints `-1.00000E-12` where the trial paints `-1.0000E-12` at 80 px, `1.23E+11` vs
+  `1.2E+11` at 60 px). Same rule, same chain, one different fitting digit — the spec gate allows
+  exactly +-1 scientific mantissa digit, everything else is an exact string match.
+- The `#` run length follows each side's own hash advance (font property); the gate matches
+  `/^#+$/`.
+
+### Gates
+
+- Full run (final round): `pnpm -r build` Done everywhere; `pnpm coverage:api` — Classes 207/207,
+  methods 1796/1796, enums 252/252, declarations 1369/1369 (100 %); `pnpm -r typecheck` — all 27
+  workspaces Done; `pnpm -r test` — exit 0, no failures (core 3042 tests incl. the 3 pre-existing
+  formatting tests that the first TASK 91 `formatter.ts` edit had broken: the `String()` General
+  branch shadowed the Date branch, so date cells' `getText` leaked the serial `43832` instead of
+  `1/2/2020` — fixed by testing `!(value instanceof Date)`, `m5.test.ts`/`wb46.test.ts`/
+  `worksheet-data-state.test.ts` green, expectations untouched); `pnpm lint` clean.
+- `apps/designer-compare` Playwright: `formula-bar-t91.spec.ts` + `general-fit-t91.spec.ts` —
+  4/4 passed against the trial (DESIGNER_URL=127.0.0.1:5186), screenshots attached.
+  No existing test weakened.
+- CSS: the colour layer added to `packages/spread-sheets-designer/src/styles.css` in an
+  `/* TASK 91 */` block, kept in sync in the four generated `styles/*.css` files the way the
+  build regenerates them. No official assets read beyond public d.ts; no pixels copied (the trial
+  was measured black-box and only TRANSCRIBED STRINGS are in the sources).
+
+## TASK 85 — The 21 known adaptive DPR-2 failures: third investigation (2026-11-21)
+
+One more honest attempt at the adaptive.spec DPR-2 class, per supervisor instruction. **No product
+change resulted — but the root cause is now pinned much more precisely than in TASK 50/57, and the
+direction of the deviation is corrected: OUR page renders identically to a vanilla Chromium page;
+it is the TRIAL page whose text rasterizes differently from vanilla.** Gate, thresholds and masks
+untouched; the 21 variants keep failing with this evidence.
+
+### 1. Reproduce + classify (Home@1280 DPR 2, `.probe/t85/`)
+Re-measured 0.587 % masked (3 696 px of 629 274). Connected-cluster analysis (clusters.mjs): **every
+top cluster is an unmasked DOM text label** ("Wrap", "Paste", the FontFamily combo value,
+"Merge & Center", "Styles", …) — no icon geometry, no border, no field-color leak (the icon mask
+works). Per-pixel classes: ~46 % of diff pixels are LCD color-fringe pixels, ~45 % neutral AA,
+0 pixels are "ink vs background" flips → no glyph moved by a whole pixel. Row-ink profiles
+(shift.mjs) fit a systematic **vertical glyph shift of 0.05–0.30 device px, ours BELOW official**
+(across all 8 top clusters; horizontal dx ≈ 0). This refines TASK 57's "phase identical", which
+only tested vertical-stem (X) centroids.
+
+### 2. The decisive control: OURS == vanilla Chromium, the TRIAL page is the deviant (static3.mjs)
+Byte-identical `position:absolute` text divs injected at identical fractional coordinates on
+(a) a bare `data:` page, (b) our page, (c) the official page, DPR 2:
+**ours-vs-bare = 0 px** (identical raster), **official-vs-either = 958 px**. The official raster
+is crisper (grid-quantized stem rows) and exactly 1.00 device px higher (row/col ink centroids).
+SVG `getStartPositionOfChar`/`getBBox`/`getComputedTextLength` probes (svg.mjs) prove the layout
+inputs are **bit-identical in all three documents** (origin 20.5, bbox h=14, advance 34.015625);
+computed styles of the injected node are identical (58 diff, all custom `--sjs-*` properties,
+csdiff.mjs); CDP `CSS.getPlatformFontsForNode` reports the same face (Liberation Sans,
+isCustomFont:false). So: identical paint instructions + identical geometry, different rasterizer
+mode, in the trial's document.
+
+### 3. What the state is NOT (all measured, ours page kept == bare throughout)
+CSS cascade (all standard properties equal on labels and injected nodes), display/box-sizing
+(table vs block, content-box h14 — mutation experiment mutate.mjs: 0 px effect), element geometry
+and fractional rects (bit-equal), fontconfig/family resolution (fc-match chain uniform; single
+LiberationSans file; `document.fonts` empty on both), zoom/transform/opacity/filter/will-change/
+contain/isolation/backdrop (none; toggles inert), fractional scroll (all scrollLeft/Top exactly 0),
+scroll-snap, compositing-triggering helpers (`#gcDummyElement`/`.gc-theme-version`/measurement
+spans/popups: remove ⇒ no change), running animations (`getAnimations()` cancel ⇒ none),
+editable/selection/focus state (both directions, ce.mjs), page mode quirks/standards/viewport meta
+(page-mode.mjs — inert), WebGL (none on either page; adding one latches nothing), 2D-canvas volume
+(the trial opens 264 contexts vs our 6 — 280 extra canvases up to 1024² with fillText latched
+nothing), OffscreenCanvas (2d+webgl+transferToImageBitmap), createImageBitmap, alpha:false,
+willReadFrequently, video elements, Chromium flags `--font-render-hinting=none|slight|full`,
+`--disable-lcd-text` (residual stays 305 px in grayscale ⇒ not an LCD-filter split),
+`--disable-gpu(-compositing)`, `--disable-partial-raster`, `--disable-skia-runtime-opts`,
+`--force-color-profile=srgb`. Loading the trial's CSS files into a bare page via `<link>` (browser
+parses; never read here) does not latch it either (minirepro.mjs).
+
+### 4. What the state IS
+A per-**renderer-process** font-raster-mode latch (LCD masks with grid-snapped glyph origins vs
+Chromium-default fractional positioning): it is established by the trial package's **JS bootstrap**
+(CSS loading alone does not latch; neither does any reproduced API footprint), it **survives
+removal of all DOM and all stylesheets** on the trial page (residual 335 px on the still-loaded
+renderer, strip.mjs), and it **propagates to any later same-site document in that renderer** —
+which explains and corrects the old TASK 50 "shared-context pages match" anomaly (bisect.mjs:
+ours opened in a trial-warmed renderer == trial raster) — and explains TASK 57's ours-vs-ours 0 %
+A/B (two soft-mode pages). The adaptive spec opens each page via `browser.newPage()` (its own
+context/renderer), so ours always runs vanilla-mode and the official always latched-mode →
+deterministic 0.59–1.92 % residuals. The one observable footprint that co-occurs is the trial's
+264 × `getContext('2d')` bootstrap, but volume replication does not latch, so the true trigger is
+inside execution paths of the trial's minified code that the clean-room rules forbid reading.
+
+### 5. Verdict
+No honest fix exists **within the code we author**: no CSS/DOM/SVG value we can legally set on our
+page reproduces or cancels this rasterizer mode (section 3 is exhaustive over everything
+externally observable and toggleable). Pixel-matching would require mimicking an unreachable
+Chromium-internal font-pipeline state the trial latches during its bootstrap. Gate left unchanged.
+Current matrix (this run, `.probe/t85/` + test artifacts): 21 DPR-2 variants red 0.587–1.924 %,
+3 green (Review@1280 0.265, Review@1024 0.337, Settings@1280 0.481), all DPR-1 green (max 0.353 %),
+resize sweep green — identical to TASK 57/58, zero regressions.
+Files: `.probe/t85/{repro,clusters,forensics,shift,dom,propdiff,mutate,inject3,csdiff,bisect,aftersel,grid,iso,plat2,concur,flags,scrollancestors,rootcs,helpers,peel,bisroot,strip,svg,webgl,many2d,minirepro,page-mode,stylediff,flake,canon,anims,ce,e1e2,offs}.{mjs,sh}`
++ `out/` crops and JSONs.
+
+### Gate state at close (and a concurrency note)
+`pnpm -r build` green; `pnpm coverage:api` 100 % on all counts; `pnpm -r typecheck` green and
+`pnpm lint` green as of the last runs that saw a stable tree. While this task's long verification
+runs were executing (21:57–21:59), **another editor concurrently modified `src/dialogs/templates.ts`,
+`DialogHost.tsx`, `FindDialog.tsx` and added the untracked package
+`spread-sheets-designer-resources-it` in this tree** (a resource-string refactor, mid-flight:
+templates now carry `${res.*}` placeholders and `FindDialog.tsx` has 6 fresh TS2322 errors). The
+only remaining failures at close — 2 `test/dialog-template.test.ts` designer tests and the designer
+typecheck — are entirely inside those concurrent edits, not in anything TASK 85 touched (this task
+changed no product code; its only tree edits are this STATUS section and `.probe/t85/` evidence,
+which the clean-room rules approve). The supervisor should re-run the gates after the concurrent
+work lands; the earlier passing matrix predates those file changes.
+
+### 6. Run 2 (2026-11-23) — clean-probe protocol; the verdict survives, sharpened
+
+Fourth investigation of the same class, per supervisor instruction (targeted variants only during
+the work, full gates once at the end). **Still no product change: no legal CSS/DOM value or
+own-code sequence reproduces the trial's glyph rasterization.** No gate/mask/threshold touched.
+Evidence: `.probe/t85b/` (scripts + `out*/` crops).
+
+**Protocol fix over run 1.** Run-1's static3 crop position (161,57.5) turned out to be
+contaminated: the trial's own positioned ribbon elements paint *over* an appended probe there
+(elementsFromPoint shows app elements topmost), so some run-1 crops compared app pixels to probe
+pixels. Run 2 uses a **clean isolated probe**: one 200x60 opaque box, crop strictly inside it
+(zero app pixels), DPR 2, at exact integer device coords. Re-validated: **ours-vs-ours 0 px,
+ours-vs-bare 0 px, official-vs-bare = 112 px** (6 000-device-px crop) — deterministic, all three
+byte-stable across 13 browser launches and flag sets.
+
+**What the 112 px is.** `official_lum = 0.9864 x bare_lum + 0.0018` (uniform **-1.4 % coverage**);
+row centroid delta -0.011 dev px, col centroid +0.226 dev px; LCD fringe signature identical
+(max |r-b| = 122 both). So: same face, size, origin, AA mode — the *generated mask* carries ~1.4 %
+less ink.
+
+**What it is NOT (all measured against the clean baseline):**
+- placement/phase: sweep of fractional `left` at 1/64-CSS-px (LayoutUnit) steps — no shift
+  reproduces the official mask (vs-official grows monotonically from 112); sweep of
+  `font-size` 11.85–12.15 @0.01 — no fit (best 110 @12.01);
+- CSS text knobs, all inert on both pages: text-rendering {geometricPrecision, optimizeLegibility,
+  optimizeSpeed}, -webkit-font-smoothing {none, antialiased, subpixel-antialiased},
+  font-synthesis:none, font-variant-ligatures:none, font-kerning:none, font-feature-settings,
+  font-variation-settings, font-optical-sizing (font-size-adjust does raster-shift — control that
+  the probe is size-sensitive, so the test had power);
+- layout/viewport state identical byte-exact: probe rects, html/body margins, scroll,
+  visualViewport.scale=1, no transforms/layers/filters;
+- Chromium font-pipeline flags (`--font-render-hinting=none|slight|full`,
+  `--disable-skia-runtime-opts`, `--disable-partial-raster`, `--disable-gpu(-compositing)`,
+  `--(enable|disable)-gpu-rasterization`, `--force-color-profile=srgb|generic_rgb`,
+  `--enable-features=FontationsLinuxSystemFonts,FontationsSystemFontFallback`): official raster
+  unchanged (0 px) in every launch, ours/bare unchanged too — run-1's flag results were made on
+  the contaminated crops and are now re-established cleanly; `--disable-lcd-text` moves BOTH pages
+  (~330 px) and the two still differ — the delta is not LCD-specific;
+- web fonts / custom faces: `document.fonts.size = 0` both pages, CDP platform font identical
+  (LiberationSans postscript), no FontFace/fonts.add/load/Worker calls (init-script interposition).
+
+**Causation, tightened (all black-box).** Request-blocking on the real trial page: **all .js
+blocked → probe is vanilla (0 px vs bare); all allowed → latched** — the trigger is in the trial's
+script execution, not its HTML/CSS (confirms run 1 on the real page). Allowing exactly one of the
+19 served bundles never latches (mutual imports make per-file results inconclusive, but rules out
+one self-contained module top-level). A timeline probe injected at t=17 ms rasterizes vanilla and
+never flips through boot (glyph masks already generated are not regenerated); a fresh probe at
+t~4 s is latched — so the trial JS moves a process-level mask-generation state between its first
+glyph creation and ~4 s, affecting only *newly generated* glyphs. Eight minimal canvas/readback
+sequences copied from the trial's boot profile (willReadFrequently context + getImageData x3 at
+t=656 ms; measureText storms 400/4000; 60-canvas fillText/drawImage storms; timed combinations)
+none latch a bare page (own-code replication confirmed dead — same as run 1).
+
+**State at close (this run).** Gates: `pnpm -r build` green; `pnpm coverage:api` 100 %
+(207/1796/252/1369); `pnpm -r typecheck` green; `pnpm -r test` green (all packages); `pnpm lint`
+green — i.e. the concurrency issue noted in run 1's close is resolved in the current tree.
+Adaptive (targeted re-measure only, no product edits): Home@1280 DPR-2 0.587 %, DPR-1 0.054 % —
+unchanged, zero regressions from the concurrent TASK 86/87 work. The 21 DPR-2 variants keep
+failing 0.587–1.924 % with this evidence.
+
+**Verdict (2x confirmed).** The trial's DOM text rasterizes 1.4 % lighter because its minified
+bootstrap flips a Chromium-internal font-pipeline state we cannot reach from legal CSS/DOM/SVG
+values or public-API footprints. Per AGENTS.md test-integrity: no masking, no threshold change;
+honest stop.
+
+
+## TASK 92 — Visible feature gaps in charts and comments (2026-11-23)
+
+Three measured feature gaps: chart selection adornments + interaction, trendline/error-bar
+RENDERING (they only round-tripped through JSON), and the classic-comment connector line.
+All three are now implemented, unit-tested and verified black-box against the trial.
+
+### 1. Chart selection (frame, 8 handles, move/resize, Delete)
+- **Trial**: clicking a chart shows a thin selection frame with 8 round resize handles; dragging
+  the frame moves the chart, dragging a handle resizes it (`x()/y()/width()/height()` update),
+  keyboard Delete removes it; the d.ts lists the events `FloatingObjectSelectionChanged`
+  (selectionType 1/0), `FloatingObjectChanged` (propertyName "position"/"size") — no chart-only
+  selection event exists in the d.ts, so these are what we fire.
+- **Ours**: charts are DOM floating objects (`features/floating-objects.ts`): the frame/handles
+  already existed for shapes/pictures and apply to charts too — selection on click
+  (left + right button), single selection, drag-move/drag-resize through the public accessors,
+  Escape deselects, Delete removes, `FloatingObjectSelectionChanged`/`FloatingObjectChanged`
+  fire. Verified in the live Designer (`?side=ours`): click → frame + 8 handles + the ribbon
+  switches to the Chart Design contextual tab; SE-handle drag grew the chart 420×300 → 460×330
+  (`width()/height()` read back 460/330); Delete removed it.
+- **Tests**: new `test/chart-selection.test.ts` (7 tests, jsdom + forced `view.paint()`):
+  8 handles with the right directions, selection + SelectionChanged event, frame drag →
+  x/y + Changed(position), SE drag → width/height + Changed(size), NW drag keeps the opposite
+  corner, Escape/Delete behaviour, second chart deselects the first.
+
+### 2. Trendlines and error bars on the canvas
+- **Trial** (measurements kept in `.probe/notes-t92.md`): every trendline draws as a DASHED
+  polyline (default `prstDash` 8 = sysDot, width 2, accent 1) across the plot — category charts
+  regress on the 1-based category index, scatter on the real x-value; `forward`/`backward` extend
+  the drawn domain (category units / x-range fraction); `intercept` pins the curve through
+  (0, intercept); the equation label is two ITALIC grey (#595959) lines `y = …` / `R² = …` near
+  the line's right end; the legend gains an entry per trendline right after its series with a
+  dashed swatch and the (auto-generated) name — trial probe: `Linear(Q1)`,
+  `3period MovingAverage(Q1)`. Error bars: thin grey (#595959) solid line through each point
+  from value−err to value+err (plus/minus/both respected), horizontal end caps unless
+  `noEndCap`; fixedValue / percentage (value·p/100) / standardDeviation / standardError
+  (n−1 denominator × multiplier, default 1) / custom via per-point plus/minus numRefs.
+- **Ours** (rounds 1–3 + this round):
+  - `features/charts/trendlines.ts` — the regression maths: linear (with fixed intercept),
+    exponential (ln fit + curve), logarithmic, polynomial (Gauss-elimination normal equations,
+    order 2..6, fixed-intercept variant), power, moving average window; r², equation strings with
+    the trial's coefficient trimming, forecast domain extension; `autoTrendlineName()` added this
+    round (the trial's auto names, confirmed black-box on the trial's own runtime).
+  - `features/charts/paint-decorations.ts` — the renderer (trendlines + error bars), wired into
+    the series paint pass after the glyphs (`drawSeriesDecorations` from `paint-series.ts`).
+  - `series.ts` — bidirectional public-API conversion: `series().get/set` carry `trendlines[]`
+    and `errorBars {vertical,horizontal}` into/from the chartSpace `c:trendline`/`c:errBars`
+    arrays (the setter now persists them too, so the feature is usable without JSON round-trip);
+    the getter returns the trial's auto-generated trendline name when none was set.
+  - `paint.ts` — legend entries for trendlines (dashed swatch, auto name, after their series)
+    and ITALIC equation labels added this round.
+  - Side-by-side verification in the Designer (`A1:B5`, Q1 series, linear dispEq+dispRSqr +
+    3-period moving average): ours shows the same dashed blue lines, the `y = -4.5x + 110` /
+    `R² = …` italic label and the `■ Q1 ····· Linear(Q1) ····· 3period MovingAverage(Q1)` legend.
+- **Tests**: `test/chart-trendlines.test.ts` (23: regression maths, all six types, forecasts,
+  intercept, r², equation formatting, error-amount computations incl. custom refs) and
+  `test/chart-trend-api.test.ts` (12: chartSpace round-trips, paint-model passthrough, recording
+  context asserts the polyline/error-bar strokes and the labels, every trendline family renders
+  without throwing, bar orientation horizontal error bars, auto names, legend order/swatch).
+- **Remaining diff (honest)**: the trial's R² label showed `0.0833` for a data set whose exact
+  r² is `0.083077` — its label rounding rule could not be reproduced from the black-box; ours
+  prints the correctly-rounded trimmed value (`0.0830769`). The equation coefficients themselves
+  match the trial exactly (`-4.5`, `110`).
+
+### 3. Classic-comment connector line
+- **Trial** (`m4-comments` probe, DOM geometry + the 30×29 `gc-spread-lineCanvas` pixel scan):
+  a 1px BLACK line from the comment box's top-left corner to the cell's top-right corner (the
+  red indicator), with a small filled arrowhead (~7px long, 8px wide) at the cell end; drawn for
+  every SHOWN comment — hover-shown, always-shown and while editing. Thread cards have no
+  connector. The trial also never flips the box to the cell's left (it clips at the pane edge)
+  — pre-existing placement, unchanged here.
+- **Ours**: `comment-ui.ts` keeps one layer-wide `svg.os-comment-connector` (pointer-events none,
+  under the boxes); `paintConnectors()` rebuilds a line+arrowhead per shown box (hover/editor
+  box and every always-shown host) from the same anchors the DOM uses, so it follows scroll/zoom
+  through `sync()`; `refreshAlwaysShown()` no longer needs a pre-existing layer for always-shown
+  comments (it still avoids creating the overlay for comment-free sheets). Hover display already
+  matched (displayMode `hoverShown`=2 default, `alwaysShown`=1) — verified visually side-by-side
+  in `apps/compare` (`?scenario=m4-comments`).
+- **Tests**: 4 new in `test/comment-ui.test.ts`: line starts exactly at the box corner, black
+  1px, filled arrowhead at the cell end, box close clears it, always-shown keeps a connector and
+  hiding removes it, thread cards get none.
+
+### Closed "Known gaps"
+The task-75 gap list ("chart selection frame/handles are not painted", "chart
+trendlines/errorBars round-trip through JSON but do not render") is now stale and has been
+updated accordingly.
+
+### Not touched / remaining
+- `toImageSrc` still renders the live canvas only (task-75 note, unchanged).
+- Comment box vertical placement keeps the earlier measured anchor (trial sits a few px higher);
+  connector follows whatever anchor the box uses, so parity of the LINE is independent of it.
+
+### Side fixes needed to make the gates pass (machine TZ is now Europe/Rome)
+The gates went red on HEAD (before this task's edits) once the machine's time zone changed
+from UTC to Europe/Rome: `test/calc-oracle-date` (`A1+30` off by the TZ offset),
+`test/t80-gantt-arrows` (day-snapping of UTC-aligned dates) and `test/distribution`
+(a stale bare-`tsup` dist; the package's real `pnpm build` + `finalize.ts` fixes it).
+- Verified against the live trial ON THIS MACHINE: `new Date(2024,0,15)` cell + `=A1+30`
+  → **45336** exactly, and `=DATE(2024,2,29)` → local-midnight Date (`getHours()===0`):
+  the trial's dates are WALL-CLOCK values, TZ-independent by local fields.
+- The core date model is now uniformly wall-clock: `calc/values.ts` `dateToSerial` builds
+  the serial from the local fields, `serialToDate`/`makeDate` produce local wall-clock
+  Dates, and every consumer (`functions/date.ts`, `text.ts`, `logical.ts`,
+  `financial-extra.ts`) reads/writes components instead of mixing `getUTC*`/ms-diffs
+  (ms-diffs across DST boundaries were silently off by an hour: YEARFRAC/PRICE).
+  `TIME()` returns `serialToDate(seconds/DAY)` — the same wall-clock object identity.
+- Test harnesses: the `calc-oracle-*` fixtures were captured under TZ=UTC, so Date inputs
+  are parsed as wall-clock (`…Z` inputs keep their literal fields) and Date results are
+  compared by wall-clock fields (local fields + the fixtures' `Z` decoration) — identical
+  pass/fail semantics under any zone, nothing loosened. `t80-gantt-arrows`'s helpers use
+  wall-clock dates (same numbers under UTC).
+- Under the package's own `TZ=UTC vitest run` (the gate) every suite passes exactly as
+  before; under the raw machine zone they now pass too (verified full 128-file run).
+
+## TASK 93 — Remaining "NotImplemented" stubs the user can hit (2026-11-23)
+
+Five user-reachable `NotImplemented` stubs, each measured black-box on the trial
+(apps/designer-compare `?side=official`, port 5186) before implementing.
+
+### 1. Pivot grouping dialog (PivotTable Analyze ▸ Group Selection / Group Field / Ungroup)
+- **Trial**: the "Grouping" dialog (315x360): date fields get a gray "Auto" header,
+  checked "Starting at:"/"Ending at:" inputs prefilled with the field min/max
+  (`m/d/yyyy`), a multi-select "By:" list Seconds..Years (Months/Quarters/Years
+  pre-selected on date-only data) and a "Number of days:" input enabled only when
+  Days is selected; number fields get the same header with a single "By:" input
+  (min/max measured 50/225); text fields answer "Grouping is available for date and
+  number fields.". OK replaces the origin row field with `<Unit> (<Origin>)` fields
+  newest-unit-first (Years, Quarters, Months — measured order); Ungroup on any unit
+  removes the whole date grouping of the origin.
+- **Ours**: `pivotGroupingDialogTemplate` + `showPivotGrouping`/`applyPivotGrouping`
+  (pivot-designer.ts), the Grouping dialog body (pivot-dialogs.tsx) and the
+  `pivotTableGroupSelection`/`pivotTableGroupField`/`pivotTableUnGroup` command
+  routing; core: `getFieldInfo` now reports start/end for row/col/filter date and
+  number fields (the dialog pre-fill) and `ungroup()` removes the whole date
+  grouping of the origin like the trial.
+- **Tests**: `test/task93-pivot-grouping.test.ts` (6 tests).
+
+### 2. Custom pivot styles (PivotTable Styles gallery)
+- **Trial**: right-click on a gallery tile: custom styles get **Apply / Modify... /
+  Duplicate... / Delete / Set As Default**, built-in tiles **Apply / Duplicate... /
+  Set As Default** (measured). The style editor (New: "New Pivot Table Style",
+  Modify: "Modify Pivot Table Style", both 589x417): Name row, 25-item
+  "Pivot Table Element:" list (labels verbatim, including the trial's
+  `First Column stripe`), Format/Clear, a Preview grid and a Stripe Size combo for
+  the four stripe elements. Duplicate... opens the editor prefilled with the clone
+  and a generated name; a custom section sits above Light in the gallery;
+  Set As Default stores the **lower-case theme name** — `toJSON()` then writes
+  `defaultPivotTableStyle: "medium2"` / `"my pivot style"` (a STRING, measured)
+  and new pivot tables use the default (with no default the trial uses Light 16:
+  `styleName: "PivotStyleLight16"` measured).
+- **Ours**: reuses the New Table Style dialog components (`NewPivotStyleBody` in
+  TableStyleDialogs.tsx, template `pivoTtableStyleDialogTemplate` =
+  `TemplateNames.PivotTableStyleDialogTemplate`); the gallery gained the Custom
+  section, the tile right-click menu (theme-galleries.tsx) and the designer
+  methods `showNewPivotTableStyleDialog`/`duplicatePivotTheme`/`deletePivotTheme`/
+  `setDefaultPivotTheme` (designer-custom-styles.ts); core: `defaultPivotTableTheme`
+  resolves custom AND built-in names, `toJSON()` serializes the string form and
+  `fromJSON()` reads it back, and `pivotTables.add()` without a theme honours the
+  workbook default (d.ts contract) falling back to Light 16 — both measured on the
+  trial and asserted in our tests. IT translations for all new dialog strings.
+- **Tests**: `test/task93-pivot-styles.test.ts` (5 tests: dialog open/auto name,
+  register+apply, Modify prefills/updates in place, Duplicate (custom + built-in
+  clone) via the editor, Delete + default reset, Set As Default serialization,
+  round-trip import and the Light16 fallback).
+- **Gaps**: the trial's duplicate-name rule for built-ins suggested "Medium2 2"
+  (not fully decoded); we generate `<name> 1` and skip taken names.
+
+### 3. Extended sparkline formulas (Insert ▸ Sparklines)
+- **Trial**: the gallery has 23 items in 6 sections; measured per item:
+  LINE/AREA/COLUMN/WINLOSS/PIE/STACKED/CASCADE/PARETO/HISTOGRAM/SCATTER/SPREADS/
+  BOXPLOT open the generic "Create Sparklines" dialog (349x248 — Data Range,
+  Location Range, and a **checked `isFormulaSparkline` checkbox**, which an earlier
+  round had wrongly recorded as hidden); MONTH/YEAR/BULLET (488x267)/GAUGEKPI
+  (578x380)/PROGRESS (498x200)/RANGEBLOCK (328x233)/VARIANCE (508x237)/
+  LOLLIPOP (508x277)/HBAR+VBAR (298x167)/IMAGE (548x296) open a dedicated dialog
+  with one input per formula argument (labels verbatim: `PlannedValue:`,
+  `ColorPositive:`, ...). OK writes e.g. `=SCATTERSPARKLINE(B2)` or
+  `=MONTHSPARKLINE(,1,L2,"lightgray","lightgreen","green","darkgreen")`
+  (byte-measured); unchecking `isFormulaSparkline` for LINE/COLUMN/WINLOSS creates
+  a CLASSIC sparkline instead of a formula (trial: no formula, classic group).
+- **Ours**: all 23 commands route to real dialogs (`sparkline-dialog-specs.ts`
+  drives the 11 custom dialogs through the shared dialog host +
+  `formulaSparklineDialogTemplate`; the generic dialog gained the checkbox);
+  `applySparklines`/`applyFormulaSparkline` write the formulas (or the classic
+  sparkline via `sheet.setSparkline`). The core already evaluates and draws every
+  extended formula (`features/sparkline-ex.ts` + `sparkline-draw.ts`), so the
+  inserted formulas render immediately.
+- **Tests**: `test/task93-sparklines.test.ts` (5 tests: full command→function
+  routing table, the byte-measured Month/Gauge/Bullet/HBar/Image formulas, blank
+  location → active cell, checkbox default checked, unchecked → classic).
+- **Gaps**: the trial's per-pixel layout of the custom dialogs was captured as
+  sizes/labels/field order, not geometry per control; the trial formulas for
+  YEAR/HBar/VBar/RangeBlock/Variance/Lollipop/IMAGE were only sampled through the
+  dialogs (IMAGE's trailing `{}` object arguments are not reproduced); unchecking
+  the checkbox in the extended-family dialogs is not trial-verified (we keep the
+  formula there).
+
+### 4. Cell editors gallery commands (`cellEditorsAddin`)
+- **Trial/facts**: the d.ts contract lists `CheckBoxList`, `RadioButtonList`,
+  `ButtonList`, `Diagonal`, `DataObject`, `RangeTemplate` as CORE `CellTypes`
+  classes (our core implements all of them), so those gallery items are NOT
+  add-in features — they now apply a real cell type over the selection.
+  `fileUploadCellType` was mapped to a non-existent `FileName` class and silently
+  fell into the notice; it correctly maps to `FileUpload` now.
+- **Remaining**: only the "Cell Dropdowns" gallery (calculator, color picker, date
+  picker, list, month picker, slider, time picker, workflow list, multi-column
+  picker) belongs to the `cell-editors` add-in package (no such classes in the
+  core d.ts); those keep the `cellEditorsAddin` notice (milestone M6b).
+- **Tests**: `test/task93-cell-types.test.ts` (2 tests).
+
+### 5. XLSX export options (packages/spread-sheets-io)
+- **Ours**: `password` exports a real Agile-encrypted (AES-256/SHA-512) CFB
+  package — our importer decrypts it (wrong password → errorCode 3);
+  `excelFileType` XLSM/XLTM write the macro-enabled content types and read back
+  (other types keep the honest NotImplemented, like the official XLSB refusal);
+  `saveAsView` writes the rendered text for formula/template format strings;
+  `rowHeadersAsFrozenColumns` / `columnHeadersAsFrozenRows` prepend the header
+  content as frozen columns/rows with formulas, spans, merges, sizes and outlines
+  shifted accordingly; `includeAutoMergedCells` materialises the equal-value
+  auto-merge runs as real `mergeCells`; the import-side inverses
+  (`frozenColumnsAsRowHeaders`, ...) stay NotImplemented.
+- **Tests**: `packages/spread-sheets-io/test/xlsx.test.ts` (12 tests, 6 new
+  round-trip scenarios through our own importer).
+
+### Fixes to the round-3 WIP (found by typecheck/tests, not gate regressions)
+`DialogHost.tsx` was missing the `NewPivotStyleBody` import (the pivot style
+dialog body could not render), `pivot-designer.ts` called
+`showNewPivotTableStyleDialog` without importing it (fixed by routing through
+`d.showNewPivotTableStyleDialog()` — the direct import created a module-init
+cycle), `pivotThemeManager.update`/`pivotElementStyle` type errors, and the
+gallery tile menu was never rendered. All covered by the tests above.
+
+### Pre-existing gap found while verifying (fixed as part of item 1's visual check)
+Ungrouped raw-DATE row/column items of a pivot table rendered as their cache
+keys (epoch milliseconds like `1641164400000`) instead of the trial's
+`1/3/2022` labels — `buildLayout()` wrote the cache key as the label text
+(verified pre-existing: no core test ever asserted ungrouped date item labels).
+Fixed: `buildLayout()` now formats label text through `usDateFromKey` when the
+CACHE field is a date (the display sites: row item/group/subtotal, column
+headers/subtotals and the report-filter page value), while filtering, drilling
+and the derived group fields (`Years (SaleDate)` = '2022', `Qtr1`, `Jan`,
+number buckets) keep their raw string items — the model's date `dataType` must
+not drive the label (a regression test caught that: the Years column would have
+rendered `1/1/1970`). Verified live on the Designer page and by two new core
+tests (`test/pivot.test.ts` "date item labels (TASK 93)": formatted labels + a
+label filter that keeps matching on the cache keys).
+
+## TASK 86 — Designer DARK theme parity (`gc.spread.sheets.designer.dark.min.css`) (2026-11-23)
+
+The official Designer ships light and dark stylesheets under the same file names as ours. This
+task gives our dark designer stylesheet the same palette and behavior the official dark theme
+produces, measured black-box on the paired pages (computed styles of the running trial DOM and
+pixel samples of our own screenshots; official CSS/JS files were never read; all icon artwork is
+masked in the gates per the clean-room rule).
+
+### How it is driven
+- `apps/designer-compare` gained a `?theme=dark` harness switch: the official side imports the
+  official `styles/gc.spread.sheets.designer.dark.min.css`, ours our `styles/gc.spread.sheets.designer.dark.min.css`;
+  the page sets `data-theme="dark"` on the designer container.
+- One `/* TASK 86 */` block in `packages/spread-sheets-designer/src/styles.css` (regenerated into
+  the three `styles/*.css` outputs by the build): dark theme tokens (`#141414` chrome rails,
+  `#292929` panels, `#3d3d3d` hover, `#383838` selected, `#242424` backstage-selected,
+  `#666` strokes, `#60bd81` brand, white foreground, `.24/.28` shadows) plus `[data-theme="dark"]`
+  rules for shell, ribbon combos/glyphs, backstage, dialogs (the big `dialog * { color }` flip),
+  Format Cells Number tab, CF Rules Manager, custom combos, name-box dropdown (stays light),
+  formula-editor panel. Core-owned chrome (sheet canvas, sheet tab strip, green status bar, cell
+  context menus) stays light in BOTH themes, exactly like the trial (measured: trial menu white
+  `#c6c6c6` border, square corners, `1px 2px 5px rgba(0,0,0,.40)` shadow, `#444` items,
+  `#d3f0e0` hover band, `#ddd` group band — those shared rules also corrected the LIGHT menu,
+  whose earlier values had been measured off our own page).
+
+### Paired dark spec
+New `apps/designer-compare/test/dark-theme.spec.ts` (7 tests, same masking/threshold conventions
+as the light specs): computed chrome colours + tab layout + masked pixels for the ribbon
+(0.076% Home, ≤0.266% for all 8 tab panels), File backstage (0.369%), Format Cells dialog
+(0.440%, DOM colour/layout parity + 5% pixel gate), Find and Replace dialog (0.945%), the cell
+context menu staying light on the dark page (0.191%, 1% gate, hover band proven with the real
+mouse) and the sheet-tab strip + status-bar band (0.164%).
+
+### Find dialog re-model (biggest single fix of this round)
+The trial's collapsed Find dialog is 508 x 204.7, **centered** ((800-204.7)/2 = 297.65) and
+**modeless** (measured: the page behind shows zero dimming in both themes, sheet pixels 255
+open-vs-closed, while its modal dialogs dim 184 dark / 250 light — ours matched those). Ours sat
+at `margin-top: 220px` in a dimmed overlay, so every glyph rasterized at different fractional
+device pixels. Rebuilt to the trial's DOM-dump coordinates (header 34 with 14.5px/500 lh-30 title
+incl. its 5px padding-left; tabs at (14,45) h30 lh30 pad 0 10 min-width 60 centred, underline
+window span left 10 right 11 bottom 2; Find-what row at (24,85) with a fixed 80px label column
+and 380x24 radius-4 input; Option button 72.5x25 at (409,116) font 13.3333; footer 45.7 pad 8
+gap 10 with stretch buttons whose trial captions live in a `span` padded 5.3333px 13.3333px →
+button width = ink + 40.67, 80px floor: Find All 84.4, Find Next 97.7, Close 80; Close +5px).
+Now both pages place the dialog at the same absolute position (±0.01 px) and identical internal
+boxes. The find overlay's dim is dropped (`background: transparent` for the template, both
+themes) to match the trial's modeless look.
+
+### Text-AA discovery (Blink LCD text policy)
+Dialog text rendered GRAYSCALE in ours vs subpixel-LCD (blue/yellow glyph fringes) in the trial
+— this, not colour, was the residual dialog pixel mass. `-webkit-font-smoothing` proved inert in
+this Chromium; the real lever (bisected live): text only gets LCD AA when its blocks carry an
+**opaque background close to the text**. The trial paints its find header/content/tab blocks with
+the dialog fill (#fff light / #292929 dark); ours left them transparent. Adding the same
+token-driven fills (visually identical) restored LCD text: the title region then matched the
+trial to the pixel (gray 48 / fringe 716 on both sides). Format dialog text already matched.
+
+### Cell context menu rows (also fixed the light gates' model)
+Trial row model: 16x16 icon slot ALWAYS reserved (even on icon-less rows like `Insert...`),
+12px icon-to-text gap (caption ink at menu-x34, ours had x29 / x7-without-icon), caption in a
+block span with a normal line box at y6 (ours centered at y7). Implemented via a
+`gc-designer-context-icon-blank` placeholder (cell menus only — the tab menu keeps its own
+measured model) + row `padding-top/bottom 5`, `gap: 11`, `align-items: flex-start`. Paste
+Options block: 242x28 #ddd band inset 2px (icon x9, bold caption x37 y61) and six flush 34px
+option boxes from x36 (24px icons centred at x41). Result: the dark context-menu gate went from
+7.3% to 0.19% (a diagnostic capture without the spec's masks measures **0.000%** vs the trial);
+`context-placement.spec.ts` (tab menu, unchanged rows) re-passes at its 0.5% gate.
+Trial menu item/label computed `border-top-color` is explicitly `rgba(0,0,0,0)`; ours inherited
+`currentColor` (#444 after the ink fix) so the probe differed — items and the paste caption now
+declare `border-color: transparent`.
+
+### Known residuals (recorded honestly)
+- The trial's `Option >>` button text renders grayscale while all other find-dialog text is LCD
+  (its own `gc-ui-button` component composites; no readable/allowed CSS lever to mirror): the
+  largest single Find-dialog hotspot (~320 of the 972 masked px). No official internals were
+  read; the mode difference is only measured from rendered pixels.
+- The Find dialog's rounded-corner AA differs by ~0.01 px because the trial box origin is
+  297.67 and ours 297.66 (content-driven height rounding); ~110 px across the four corners.
+- Modeless Find: the trial shows no modal mask, so its sheet stays interactive while Find is
+  open; ours keeps the modal overlay non-dimming but still click-blocking (behavior parity not
+  implemented this task; pixels now match).
+- The trial centers its Find dialog at the exact 204.7 height; ours pins 204.7 px for the
+  collapsed state (265/481 for options/results per the TASK 68 size gates) — the
+  options-expanded/results states have DOM+size gates but no paired dark pixel gate.
+- Dark paired pixel gates cover: ribbon (all 8 tabs), backstage, Format Cells, Find, cell context
+  menu, sheet-tab strip + status bar. The other common dialogs (Page Setup, CF Manager, Go To,
+  Series, Insert Function...) get dark computed-colour/layout rules from the TOKENS + the
+  `dialog *` ink flip and keep their existing LIGHT paired gates; a dedicated dark pixel gate per
+  dialog was out of scope for this round.
+- Ribbon adaptive/collapsed rendering (`src/ribbon/controls.tsx` sizing) was not touched (other
+  coder's investigation zone); the dark ribbon gates pass at the default 1440 px layout.
+
+### Raw-key label parity (round 3)
+Black-box DOM probes of the running trial showed two groups of containers keep their RAW command
+keys as accessible labels in every language (aria-label/title `undoList`, `redoList`,
+`indicatorFonts`, …). Our localized `resources.ts` wrapped those keys, so a light `shell.spec`
+comparison failed. Fixed: `undoList`/`redoList` command titles are literals
+(`src/commands/index.ts`), group-launcher `indicatorLabels` are literals in the EN resources and —
+after re-checking the official Italian page, which also keeps the raw keys — in the IT resources
+(`indicatorFonts: 'indicatorFonts'` …). `precision.spec.ts » dialog launchers select Font,
+Alignment and Number` drives exactly those raw accessible names and passes.
+
+### Unterminated token templates (round 3, clean-room-safe fix)
+A nest-aware source audit (`.probe/audit-tokens.mjs`, 106 designer files) found template literals
+whose escaped token opener `\${res.…` was missing its closing brace (the interpolation swallowed
+it), so the lookup path was truncated and labels resolved to the fallback or — through
+`themeColorNames`/`paletteName` — rendered raw fragments. Fixed in `FormatDialog.tsx` (2),
+`ribbon/menus.tsx` (1), `ribbon/theme-galleries.tsx` (1); the re-run audit reports 0 unclosed
+templates.
+
+### Round 4 targeted verification (2026-11-23)
+With the fixed sources rebuilt into `dist`, the designer-compare run of `dark-theme.spec.ts`
+(7 tests) passes at its gates: ribbon Home 0.076% (max tab panel 0.266%), backstage 0.369%,
+Find dialog 0.950%, Format Cells 0.440%, dark cell context menu 0.191%, sheet-tab strip +
+status bar 0.164%. The designer vitest suites pass (38 files, 360 tests). Targeted re-runs of
+`precision.spec.ts` (all 15 tests incl. the two 0.5% gates), `task90-font-parity.spec.ts` and
+`task90-scroll.spec.ts` (16 tests) now pass too — their round-3 failures came from the
+pre-fix dist / run-timeout flakiness, not from TASK 86 or TASK 90.
+
+### Pre-existing failure on this tree (NOT TASK 86; from the merged F89/F90 designer-branch work)
+- `pivot-designer.spec.ts » item 3 (PivotTable Analyze / Design contextual tabs, captions,
+  commands)`: the Analyze-tab "Filter Connections" group caption drifts 3 px x relative to the
+  snapshot taken earlier in the same test (gate tolerance 2). Proven identical on the pre-F86
+  tree (round 3), i.e. independent of the dark-theme work; ribbon-group layout drift from the
+  merged designer-branch work, in the other coder's ribbon-sizing zone. Left unfixed here.
+
+## TASK 95 — Remaining core gaps: ThreadedCommentPanel look, toImageSrc offscreen semantics, cast cleanup (2026-11-23)
+
+Black-box measurements for this task live under `.probe/t95/out/` (panel.json,
+panel2.json, resolved.json, images.json, charts.json, shot-official.png,
+shot-ours.png): the official core runtime was driven through the public API in
+the apps/compare dual-runtime harness (`chart-comparison.html`, official trial =
+`@mescius/spread-sheets` 19.2.5 + its charts/shapes plug-ins) and its rendered
+DOM (light + shadow, class/aria/role/text/geometry only) was observed as
+black-box. No official min.js/CSS was opened; nothing from the trial rendering
+is embedded — all glyphs are our own drawn paths.
+
+### Item 1 — GC.Spread.Sheets.ThreadedComments.ThreadedCommentPanel (core class, rebuilt on the measured official look)
+
+The panel class existed since TASK 46 item 4; this round rebuilt its card UI on
+the trial structure measured in .probe/t95 (the API members — constructor(host,
+workbook) length 2, attach/detach/refresh/destroy answering undefined, static +
+prototype findControl — were already trial-verified there):
+
+- Card head: cell-reference text block ("C3") with a "More options" settings
+  button (role=button, aria-label/title "More options", aria-haspopup="true",
+  aria-expanded state) at the right of the card, as the trial places it
+  (probe1 sticky-title dump; the head sits right-aligned).
+- Options menu (role=menu, aria-label "Threaded comment options menu") lists
+  "Delete Thread" then "Resolve Thread" — measured identical on active AND
+  resolved cards (probe2 replyMenuItems, probe3 resolvedMenuItems); the Resolve
+  item toggles the resolved state. Every reply of an ACTIVE thread carries its
+  own "More options" button that opens the same card menu (probe2 moreButtonCount
+  3 = card + 2 replies); resolved replies have none (probe1 card 0_0).
+- Replies are per-reply articles (aria-label "Threaded comment reply") with a
+  24 px avatar (initial, first-seen user colour), the author name (title
+  attribute, "Guest" for unknown ids — the trial shows the same) and a
+  timestamp line formatted like the trial's `sjs-date-time` ("1/2/2026
+  11:00:00" — wall-clock local fields, probe3 timestamps).
+- Reply editor: contenteditable div with `data-placeholder="@mention or
+  reply"` (probe2 editorDump attributes), hidden "Post Comment"/"Cancel" buttons
+  that appear on focus/input (probe2 buttons-container hidden→visible flow);
+  Enter posts, Escape/Cancel clears; Post appends the reply authored by
+  `UserManager.current()` (trial authorId form `{GUID}`). Resolved threads show
+  the same editor and accept replies while staying resolved (probe3
+  resolvedRepliesAfterPost/resolvedStillResolved).
+- @mentions: typing "@query" opens the picker (UserManager.search over locally
+  registered users — the trial core has no user backend either and shows the
+  empty state "Couldn't find any matches", probe2 mentionTexts); picking a user
+  inserts a chip and posts a `ContentType.mention` block
+  ({type:1, userId}) into `IReply.message` — the block shape both d.ts and the
+  trial runtime use (probe3 fix: the trial `ITextBlock` is {type:0, value}).
+- "New" inserts a draft card for the active cell WITHOUT touching the model
+  (probe2 afterNew: card "Threaded comment at row 6, column 6" while
+  threadedComments.size() stayed 2); posting the draft calls
+  `threadedComments.add(row, col, [reply])`, Cancel removes it. The draft card
+  survives model auto-updates (typed text kept).
+- Resolved banner reworked to the trial layout: check icon + "Resolved" label
+  left, "Reopen Thread" and "Delete Thread" 18 px icon buttons right.
+- Filter button now answers the trial aria state (aria-haspopup="true",
+  aria-expanded true/false around the dropdown). New localized keys
+  (`comments.moreOptions/postComment/replyItem/noMatches`, Italian table
+  extended in `src/it-it-strings.json`). Panel CSS updated in place in
+  `styles/gc.spread.sheets.css` (our own rules, our own SVG glyphs).
+
+Recorded divergences (honest, not hidden): the trial renders its cards inside
+web components (light-DOM `data-comment-key`/aria labels match, inner classes
+are shadow-DOM internals we do not copy); the trial's timestamp span carries the
+measured text but sat in a 0-height container in every card we screenshotted
+(visibility rule not observable black-box) — we render it visibly at 11 px;
+the trial's active card shows a purple focus frame after interaction (selection
+state, not part of the panel API); the "See more comments" virtualization gap
+recorded in TASK 46 item 4 stands.
+
+### Item 2 — toImageSrc renders offscreen (own canvas, viewport-independent)
+
+Trial semantics measured dual-runtime (.probe/t95/out/images.json, charts.json):
+
+- `Workbook.toImageSrc` and `Worksheet.toImageSrc` do NOT exist: the official
+  core d.ts declares `toImageSrc` only on Chart / ShapeBase / Slicer /
+  DOMTableSlicer, and the official core runtime answers `typeof undefined` for
+  both members — our core matches (a new test asserts the parity, so a future
+  accidental addition is caught).
+- Charts: PNG exactly `width() x height()` (measured 400x300 -> 400x300, resized
+  400x220 -> 400x220, 3x3 -> 3x3); the trial paints the FULL chart when the
+  chart sits outside the live canvas (x()=900 on a 600 px host — same image, len
+  15366 in-viewport vs off-viewport) and when `isVisible(false)`. Our
+  `chart.toImageSrc()` (own canvas + `paintChart`, shared with the live painter)
+  answered the same in the same probe (15358 ours, own artwork): already
+  compliant, now pinned by tests instead of prose.
+- Shapes: the trial PNG covers the shape box plus its painting margin —
+  200x100 -> 206x106 and 400x100 -> 406x106 (3 px on every side); hidden shapes
+  snapshot identically. `ShapeBase.toImageSrc` now paints into a
+  (width+6) x (height+6) canvas with a 3 px translate before the shared
+  `paintTo` path (groups inherit it: bbox 150x50 -> 156x56). The trial's
+  curved-shape raster was one pixel tighter on one axis (120x60 oval -> 126x65);
+  we apply the uniform 3 px margin rule measured on rectangles rather than
+  copying their raster extents. Degenerate sizes (width/height <= 0) keep
+  answering the empty string.
+- Gap recorded (other coder's area, TASK 94 / charts/**): the trial's
+  `charts.add(name, type, x, y)` without width/height defaults to 200x160;
+  ours leaves `width()`/`height()` `null` (its `toImageSrc` then snapshots a
+  1x1 canvas). Not touched by this task (forbidden path).
+- Gap recorded: `GC.Spread.Sheets.Slicers.DOMTableSlicer.toImageSrc()` still
+  answers `''` and the `GC.Spread.Slicers.ItemSlicer` snapshot is not painted;
+  the trial only exposes those classes through the slicers plug-in, so their
+  PNG semantics could not be measured core-only this round.
+
+The stale "toImageSrc renders the live canvas only" notes (task-75/F92) are
+resolved by this round.
+
+### Item 3 — TASK 93 cast cleanup (the "11 as unknown as (6 test canvas stubs)" follow-up)
+
+- `src/workbook.ts` `_resolvedDefaultThemes`: the `PivotTableThemes as unknown as
+  Record<...>` index cast is replaced by a typed lookup: `pivot/theme-statics.ts`
+  now keeps the 85 built-in themes in a `Map` and exports `builtInPivotTheme`,
+  `builtInPivotThemeKeys`, `builtInPivotThemeKey`; `pivot/pivot-table.ts`
+  (`resolveTheme`/`themeKeyOf`/`getBuiltInTheme`) uses them too (the old
+  `asRecord(PivotTableThemes)` scans, including the 'prototype'/'name'/'length'
+  key filtering, are gone).
+- `designer-custom-styles.ts` `deletePivotTheme`/`setDefaultPivotTheme`: the two
+  `designer.getWorkbook() as unknown as {...defaultPivotTableTheme...}` casts are
+  replaced by the `defaultThemeWorkbook()` seam in `core-internals.ts` (typed
+  view of the contract's `defaultPivotTableTheme(themeName?: string)` member plus
+  our core's setter extension for a theme instance / `null` — documented there).
+- `commands/insert.ts` applySparklines: the `d.gc as unknown as {...SparklineSetting}`
+  and `sheet as unknown as {setSparkline...}` casts are gone — the code now calls
+  the contract members directly (`new d.gc.Spread.Sheets.Sparklines.SparklineSetting()`,
+  `sheet.setSparkline(...)` with the `Sparklines.SparklineType`/`DataOrientation`
+  enum members, which the core d.ts declares).
+- Test canvas stubs: the four identical `stubCanvas2d()` copies in the designer
+  tests (task93-pivot-grouping/-sparklines/-pivot-styles + task77-pivot-commands)
+  collapse into ONE shared typed helper `test/canvas-stub.ts` (the remaining
+  typing seam is inside that helper); the TASK 93 files lost their 6 casts.
+
+### Tests
+
+- `packages/spread-sheets/test/task95-panel.test.ts` (10 tests): trial aria
+  structure (region/banner/haspopup-expanded), card head + per-reply buttons
+  counts (3 active / 1 resolved), per-reply articles/avatars/timestamp string
+  ("1/2/2026 11:00:00"), Post/Cancel visibility + author id =
+  UserManager.current(), Enter posts, resolved threads accept replies and stay
+  resolved, shared card menu Delete->Resolve order + outside-click close, mention
+  picker (filter, "Couldn't find any matches", chip -> ContentType.mention block),
+  New draft card (no model change, survives auto-update, Post commits, Cancel
+  removes).
+- `packages/spread-sheets/test/task95-image.test.ts` (7 tests): no Workbook/
+  Worksheet toImageSrc (both sides), shape 206x106 / 406x106 (trial-measured),
+  hidden shape identical, degenerate size -> '', group bbox + margin, chart
+  400x300 / 320x240 exact, off-canvas (x=900 on a 600 px host) and hidden charts
+  snapshot fully, toImageSrcAsync resolves to the same string.
+- `panel46.test.ts` retargeted where TASK 95 measured better than TASK 46 did:
+  the options menu is opened through the trial "More options" button and asserted
+  in the trial order (Delete Thread, Resolve Thread; resolved cards keep it), the
+  New flow asserts the trial draft-card semantics (size() unchanged before Post,
+  no data-comment-key). Nothing was weakened: all previously trial-verified
+  assertions (aria labels, data-comment-key, "<n> items", filter rows, footer,
+  lifecycle returns) stay. `localization.test.ts`'s region aria-label assertion
+  was retargeted to the measured trial root label (the panel title, en + it) and
+  now also asserts the English value.
+- Designer tests: the four affected files (task93-*, task77-pivot-commands) pass
+  unchanged against the cleaned seams (35 tests).
+
+Gates after this task (run once at the end): `pnpm -r build` green;
+`pnpm coverage:api` -> Classes 207/207, methods 1796/1796, enums 252/252,
+declarations 1369/1369 (100.0%); `pnpm -r typecheck` green;
+`pnpm -r test` green (spread-sheets 3145, designer 383, compat 255, io 28,
+the add-in/app packages green); `pnpm lint` green. No commits.
+
+## TASK 94 — Regressions and supervisor-found bugs (designer-compare suite) (2026-11-23)
+
+### Before (`.probe/t94/failing-before.txt`, 34 failing tests on this tree)
+- 21 × `adaptive.spec.ts:39` DPR-2 variants — the documented TASK 85 environment baseline
+  (uniform −1.4 % ink coverage in the official raster; no honest product fix), left untouched.
+- 9 × `format-cells-tabs.spec.ts` (Font behaviour ×2 + visual, Border behaviour + geometry, Fill behaviour ×4)
+- 2 × `precision.spec.ts` (Format Cells 0.5 % gate 0.980 %; dialog launchers timeout)
+- 1 × `pivot-designer.spec.ts:434` (`analyze g2 "Filter Connections" x` off by 3 px)
+- 1 × `shell.spec.ts:76` (`ribbon.undoList` label "Undo List" vs the trial's "undoList")
+
+### Root cause 1 — TASK 87 truncated `${res.…}` templates (format-cells + precision + labels)
+Four generated placeholder templates ended with an interpolation instead of a literal `}`
+(e.g. `` `\${res.${tree}.${uiKey(name)}` ``), so the string handed to `resolveText` was
+`${res.dialogs.medium` — the regex needs the closing brace, the placeholder passed through
+unchanged (truthy) and beat the `|| fallback`. Raw fragments like `${res.dialogs.none` leaked
+into Format Cells Border-style/Fill-palette/font-list aria-labels and titles → 9 behaviour/
+geometry specs + the Font visual (5.08 %) failed. Fixed by completing the templates in
+`dialogs/FormatDialog.tsx` (displayName + mask examples), `ribbon/theme-galleries.tsx`
+(pivot-style section titles) and `ribbon/menus.tsx` (group titles).
+Guard: `test/task94-label-regressions.test.ts` scans every `\${res.` template in src and pins
+"the result is a complete `${res.path}`" (verified it catches all four historical bugs).
+
+### Root cause 2 — TASK 87 localized machine-name ribbon labels (shell + precision launchers)
+The trial keeps `undoList`/`redoList` split-button aria-label/title as the raw command names in
+EVERY language (black-box: `[data-command="ribbon.undoList"] → aria-label="undoList"`), and the
+group dialog-launcher indicators keep `indicatorFonts`/`indicatorAlignment`/`indicatorNumbers`.
+TASK 87 routed both through the resource tree ("Undo List"/"Font"). Reverted to raw names
+(`commands/index.ts` specs, `ribbon/controls.tsx` aria-label); the resource keys stay in the
+tree for consumers. `shell.spec.ts:76` + `precision.spec.ts:61` pass.
+
+### Root cause 3 — TASK 87 `min-width: max-content` on the Format Cells tab strip (precision:7)
+The strip had F50's exact per-tab widths (nth-child, the trial's flex-shrunk widths); F87's
+language-package rule widened every caption ~1 px ("Decoration" 74.09 → 75.03), a rightward
+drift up to +3.2 px over ten tabs → masked diff 0.980 % > 0.5 %. The trial itself lets a wider
+caption overflow into its 10 px padding (text ink 58.03 in a 54.09 content box). Restored with
+a TASK 94 CSS override `.gc-format-tab-bar .gc-dialog-tab { min-width: 0; }` (overflow-x scroll
+safety net kept): gate back to **0.408 %** (matches the historical 0.412 %).
+
+### Root cause 4 — TASK 87 `overflow-wrap: break-word` on long ribbon captions (pivot-designer:434)
+The trial never breaks a word mid-word: "Filter Connections" wraps as Filter / Connections with
+the caption box sized to min-content (74.72 px, spilling symmetrically over the 70 px slot —
+the centred ink lands at identical coordinates). F87's break-word broke it as Connection / s,
+moving the title ink 3 px. TASK 94 CSS override restores `overflow-wrap: normal` +
+`min-width: min-content` + 14 px lines (measured on the trial).
+
+### Supervisor bugs (fixed in round 1, verified live this round)
+1. **Chart jumps up by the header height after the first click** — `focus()` in the
+   chart/floating-object pointerdown handlers auto-scrolled the (overflow:hidden but
+   programmatically scrollable) floating layer; now `focus({ preventScroll: true })` in
+   `features/floating-objects.ts` + `datacharts/data-chart.ts`, and `rendering-draw.ts` pins
+   the layer scroll back to 0 on every paint. Live check: chart at (520,230) keeps top y=428
+   before click, with the 8-handle selection frame, and after deselect; `chart.y()` stays 230.
+   Unit test `test/chart-selection.test.ts`.
+2. **Trendline `style.color:'red'` ignored (read back "accent 1 0")** — the OOXML converters used
+   `tokenToColorObject` (scheme tokens only); `features/charts/series.ts` now uses
+   `userColorToObject` for trendline/error-bar `style.color`, exactly the chart API's token
+   grammar. Live both-sides check: `series().set()` with `color:'red'` reads back
+   `rgb(255,0,0)` on the trial AND on ours; scheme tokens (`accent 1 0`) still serialise
+   `schemeClr`. Unit tests in `test/chart-trend-api.test.ts`.
+
+### After (full suite once, workers=1, retries=1, `--reporter=list,json`)
+Full designer-compare suite once on the final tree (workers=1, retries=1, fresh vite on 5186):
+**297 tests — 21 failed / 275 passed / 1 skipped** (`.probe/t94/suite-after.{log,json}`,
+`.probe/t94/failing-after.txt`) vs **34 failed** before (`.probe/t94/failing-before.txt`).
+The remaining 21 are exactly the 21 `adaptive.spec.ts:39` DPR-2 variants — the identical set as
+before (TASK 85 documented environment baseline, left untouched per its evidence-only conclusion).
+All 13 non-baseline failures (9 format-cells + 2 precision + 1 pivot-designer + 1 shell) are
+fixed. No spec, threshold or mask was touched; no scenario content changed.
+
+### Gates
+`pnpm -r build` ✓ · `pnpm coverage:api` ✓ (classes 207/207, methods 1796/1796, enums 252/252,
+declarations 1369/1369) · `pnpm -r typecheck` ✓ · `pnpm -r test` ✓ (0 failures; +3 unit tests in
+`packages/spread-sheets-designer/test/task94-label-regressions.test.ts`) · `pnpm lint` ✓.
+Fixed round-1 test bug on the way: `chart-trend-api.test.ts` used non-existent enum members
+(`ErrorBarType.stdError`/`ErrorBarValueType.value`); the trial d.ts names are
+`ErrorBarType.plus` / `ErrorBarValueType.standardError` (our enums already match).
+
+## TASK 97 — TableSheet residuals (TS-1, TS-2) and table theme data (CH-2) (2026-11-23)
+
+All trial references are black-box API probes under `.probe/` (`hier-probe.json`,
+`hier-probe2.json`, `hier-probe3.json`, `theme-core-probe.json`, comparison evidence
+`.probe/tablesheet-comparison.json`) run against the trial through
+`apps/compare/scripts/tablesheet-comparison.mjs` (vite on 127.0.0.1:5192 in this session).
+
+### TS-2 — panel scenarios (verified, no product change needed)
+
+The four scenarios `tableSheetPanel`, `panelExternalGroup`, `panelSummary`,
+`panelVisibilityRefresh` in `apps/compare/scripts/tablesheet-comparison.mjs` were already
+ported to the mini-workbook TableSheetPanel (TASK 49 item 1 rewrote them for the TASK-33
+structure; the backlog text predates that). Re-run this task against the trial: all four
+report **identical public-API state** on both sides (`panelFound`/`miniFound`/`miniValues`/
+group chips/summary inputs/checkbox-column toggle, OR select-all, sort refresh), pixel diffs
+2.31-2.58% (known TASK-33 residual list: trial headless caption deferral, selection line
+width, field icons). No thresholds touched.
+
+### TS-1 — hierarchy + filter + sort combined JSON interchange (fixed)
+
+New comparison scenarios `richJSONHierarchyTrialImport` (trial-built workbook loaded by each
+product), `richJSONHierarchyImportsOurWorkbook` (ours-built, loaded by each) and
+`richJSONHierarchyShape` (per-kind JSON digest); 12-row `Parent` hierarchy +
+`sort([{score,desc}])` + value filter + `togglePinnedRows([1])`. Before the fix both
+load-backs differed; trial ground truth (probe hier-probe3):
+
+- Live behavior already matched (cases A-D: siblings sorted, children follow parents).
+- Pinned rows are **inert on hierarchy views** in the trial: `togglePinnedRows([1])` moves
+  nothing, answers `undefined` (flat views answer the count, case G) and serializes
+  `pinnedRows: []` (case F). Pinned rows carried in JSON on a hierarchy view survive as a
+  raw list in `toJSON()` but never move rows.
+- A hierarchy view **with an active filter reloads in natural hierarchy order**: the trial
+  keeps the sort spec (`sort()` read-back, `rowFilter.sortMap`, view `sortInfo` serialized)
+  but does not reapply it when a filter is restored (cases I/J/M). Without a filter the sort
+  is reapplied (case H). Flat views keep sort+filter+pinned intact (case K).
+
+Product fixes:
+- `src/data/index.ts` — `View.togglePinnedRows` returns `undefined` and changes nothing on
+  hierarchy views; the pinned-rows re-placement in `cachedRows` is skipped when the view has
+  a hierarchy (raw list survives serialization only).
+- `src/tablesheet/index.ts` — `TableSheet.togglePinnedRows` mirrors the no-op (undefined, no
+  frozen-row change) and gained `_restoreSortSpec(sorts)` (record a sort spec without
+  reordering).
+- `src/workbook.ts` (fromJSON TableSheet restore) — filters are restored **before** the
+  sorts; on a hierarchy view with restored filters the sort is registered via
+  `_restoreSortSpec` (read-back + `rowFilter.sortMap` serialization keep the trial's values)
+  while a hierarchy view without filters or a flat view reorders normally.
+
+Results: `richJSONHierarchyTrialImport` and `richJSONHierarchyImportsOurWorkbook` API MATCH
+in both directions (rows `[1,5,2,6,3,7,4,8,9,11,12]`, sort/filter read-backs, pinnedRows);
+the whole 122-scenario comparison run reports 113 API MATCH with the 9 remaining diffs being
+the documented TASK-49 serialization-shape noise (trial core serializer keys, `_ps`/`__ID__`
+internals, key order — `workbookRoundTrip`, `sortedWorkbookJSON`, `currentTheme`,
+`getTableTheme`, template `name`-first order, `richJSONShape`, `richJSONHierarchyShape`).
+Hierarchy view `indexMap` content stays trial-internal noise (both products ignore it on
+load; trial's own reload does not follow its serialized indexMap).
+
+New unit tests: `test/tablesheet-interchange.test.ts` +5 (live hierarchy sort+filter order,
+inert pins on hierarchy, filtered-hierarchy reload in natural order with sort spec kept in
+read-back and re-serialized `sortMap`, sorted-only hierarchy reload still sorted,
+JSON-carried pins raw-but-inert). Suite 16/16.
+
+### CH-2 — table themes: professional1-24 wired as the trial's tablesheet feature exposes them
+
+Re-probed the trial in both package configurations (`.probe/theme-core-probe.json`):
+- **trial core only**: `Tables.TableThemes` has exactly 60 enumerable built-ins;
+  `professional1` answers `undefined` (the TASK 38 finding stands for this build).
+- **trial core + `@mescius/spread-sheets-tablesheet`**: all 24 `professional` themes are real
+  `TableTheme` objects AND enumerable (`Object.keys` length 84, `professional1..24` appended
+  at indices 60-83 in declaration order), each `toJSON()` starts `name|headerRowStyle|
+  wholeTableStyle`, and all 24 theme JSON digests are byte-identical to ours;
+  `defaultTableTheme('professional1')` resolves (read-back name `professional1`).
+  `professional25` stays undefined on both sides.
+
+Our core always ships the table sheet type (documented superset, TASK 49 residual 2), so the
+core+tablesheet configuration is our runtime contract:
+- `src/features/table-style.ts` — the 24 statics are now defined `enumerable: true` after the
+  60 built-ins (was `enumerable: false`; the old probe f40b-professional-full claim was wrong
+  for this configuration). `table-theme-data.ts` / `table-theme-professional.ts` hold real,
+  trial-identical data — no longer dead data.
+- `src/workbook.ts` — `defaultTableTheme(name)` now answers the resolved theme object from
+  the setter (trial probe; previously undefined), matching the contract signature.
+- Designer table-styles gallery unaffected (hardcoded 60 built-in list, measured from the
+  official designer UI; built-in professional themes are not enumerated there on either
+  side).
+- `test/data-features.test.ts` "exposes the 60 built-in and 24 professional table themes"
+  updated to the corrected enumeration truth (84 keys, order, professional25 undefined).
+
+### Gate notes / remaining gaps
+- No CSS was added this task (no `/* TASK 97 */` block in src/styles.css needed).
+- Panel pixel residuals unchanged (TASK 33 list).
+- Hierarchy `indexMap` serialized content and the trial core-serializer key noise
+  (`allowCellOverflow`, `conditionalFormats`, `clipBoardOptions`, `_ps` internals, GUIDs)
+  remain tolerated omissions (TASK 49 residual 5).
+- The trial's `sort()` read-back on a filtered hierarchy sheet is kept but never reorders on
+  reload — mirrored exactly; a later live `sort()` call on such a sheet reorders normally on
+  both products (not probed further).
+
+## TASK 96 — ReportSheet: the six remaining cross-axis `refresh context` layouts (2026-11-23)
+
+All six `.probe/report-residuals.json` trial layouts now render through `expandAxes`
+(`packages/spread-sheets/src/report/axes.ts`); the `NotImplemented('...refresh context')` path
+for these shapes is gone. Unit tests: `report.test.ts`
+"ReportSheet horizontal list axis trial observations (TASK 96)" (6 tests, all grids asserted
+against the recorded trial outputs).
+
+1. `xt-list`: a `List` cell may now be the horizontal axis (instances per record, not per key);
+   a second horizontal `List` with `context.horizontal` pointing at the axis and its default
+   vertical parent the axis itself (`axisChildren`) concatenates behind every axis instance
+   column inside each row block. A horizontally spilling cell that names a horizontal context
+   is no longer counted as a second axis.
+2. `xt-summary-h-list`: with a free Summary on the axis row, a horizontal `List` axis nested in
+   the row group does not repeat per block: all records concatenate on one row below the stacked
+   groups and the context-free Summary closes that row aggregating the whole axis (width =
+   instances + 1). A row root standing in the axis column above the axis row is now accepted.
+3. `d4`: `List`/`Group` cells bound to the axis (both contexts) are laid out like the pair
+   Summaries: on the independent axis only the instance owning their template column is laid out
+   (the rest are `getCells` `rowCount: 0` phantoms), on a nested axis every instance column of
+   the block is (`pairValues`: records for a `List`, distinct keys for a `Group`). This also
+   covers `v10` (an axis row feeding a vertical list and an axis-bound list below it).
+4. `v9`: a second independent horizontal group chained to the axis (`v9`'s `C1`) expands per
+   axis instance inside the instance's block; the axis block width grows to
+   `1 + (S.col - axis.col) + max secondary instances`. A list bound to that second group
+   (`context.horizontal: 'C1'`) pins like `d4` to the secondary instance owning its column.
+5. `d5`: a `Group` bound to both axes pins to its own column block, and the `List` bound under
+   it (vertical context the pinned group, horizontal the axis) interleaves one record row per
+   row-group block across all axis columns, packed right below the blocks (the trial's row-2/3
+   grid, where the second block's pinned group cell wins the shared cell over the list record,
+   is reproduced exactly). Note: the trial template's `vertical: 'D1'` names no template cell;
+   the recorded trial output behaves like the default nearest-data-cell parent, so an
+   unresolvable explicit vertical context falls back to that default (probe-inferred, marked in
+   the source).
+6. Layout height: row blocks reserve their full depth even when their last rows carry no value;
+   `expandAxes` now returns `height >= cursor` and `renderPage` applies it
+   (`v9`'s empty row 3 exists in the trial sheet).
+
+Gates after this task (run once at the end): `pnpm -r build`, `pnpm coverage:api`,
+`pnpm -r typecheck`, `pnpm -r test` (core suite 3151 incl. the 6 new TASK 96 tests), `pnpm lint`.
+
+## TASK 98 — Small visible gaps (2026-11-23)
+
+Four candidate gaps; each was re-measured black-box against the trial first. Items 1-3
+turn out to be already at parity or near-parity except for the specific residuals listed;
+the changes made are small and paired-spec-covered.
+
+### Item 1 — Format Cells dialog Font/Border/Fill/Protection tabs (designer)
+Re-measured both sides in apps/designer-compare (`?side=official` / `?side=ours`, 1280x720).
+The supervisor-listed differences are ALREADY fixed (earlier tasks rebuilt the dialog): the
+Font tab has the three input+listbox columns (font names, `Normal/Italic/Bold/Bold Italic`,
+sizes 8..72), the Size editor shows `11` (points), Color is a 350 px full-width bar combo
+with a dropdown arrow, Underline is a 270 px combo, Effects and Preview are bordered
+group boxes (fieldset), and the Effects group holds only the Strikethrough checkbox (the
+trial has no superscript/subscript here). Border (line-style list + color bar + presets +
+position buttons + Apply-to/Corner radius group), Fill (No Color button, 70-swatch theme
+grid, Fill Effect.../More Colors..., pattern color/style combos, Sample fieldset) and
+Protection (Locked/Hidden/Allow Edit in Cell + both notes) match as well; the existing
+paired geometry specs and per-tab visual gates cover them and pass unchanged.
+
+Residuals fixed this task (own CSS overrides, `/* TASK 98 */` block at the end of
+packages/spread-sheets-designer/src/styles.css, regenerated into styles/*.min.css by the
+build):
+- Font list windows 130 px -> 132 px tall, item pitch 28 px -> 30 px (trial windows are
+  132 px with 30 px pitch; item top aligned to the trial's y=199).
+- Preview: the trial nests the bordered fieldset (346x96 at x+2) inside a 350x101 wrapper.
+  Our `.gc-font-preview-group` keeps the 350x101 wrapper rect and now draws the border on
+  an inset `::before` box at the trial's exact rect (own vector CSS, no pixels copied);
+  the legend masks the border line at the trial's x+8.
+New paired spec `apps/designer-compare/test/task98-font-tab.spec.ts` drives BOTH sides
+through the real dialog UI and compares the list windows, per-list item pitch, the
+Underline/Color combos, the Effects fieldset and the Preview wrapper+inner rects live; it
+also pins the trial reference values (132 px window, 30 px pitch, 350x101 wrapper,
+334x61 text container) and the Size editor text `11`. Passes.
+Measured visual gates after the change (task-43 suite, nothing masked): Font 3.82% (was
+4.12%), Border 3.80% (was 5.41%), Fill 4.06% (was 4.24%), Protection 0.64% (was 3.42%).
+All Font/Border/Fill/Protection paired geometry + visual specs pass.
+
+### Item 2 — TableSheet Custom-hierarchy editing without `unparse` (already at parity)
+Re-ran the black-box harness scenario live on this machine:
+`TABLESHEET_SCENARIO=hierarchyWithoutUnparse_Custom node scripts/tablesheet-comparison.mjs`
+(.probe/tablesheet-comparison.json): the trial leaves all the Custom-hierarchy edits
+unchanged (`addHierarchyItemAbove/Below/Before/After`, `promote/demoteHierarchyLevel`,
+`moveUp/moveDown` with a parse-only Custom schema and no `unparse` callback) — 50 visible
+rows identical, source data identical — and OpenSheets returns exactly the same rows and
+data; only the standard 2.65% watermark/strip pixel noise remains. The matching behaviour
+is implemented (src/data/index.ts edit paths return early when `unparse` is absent) and
+the unit test `packages/spread-sheets/test/tablesheet.test.ts` "leaves a custom hierarchy
+unchanged when it has no unparse callback" pins it. No code change needed; the older
+"remains unsupported" note in the Task 27 rounds is superseded.
+
+### Item 3 — Classic comment box anchor (fixed)
+Re-measured precisely (t56-comments-box, both panes + the trial's 30x31 line-canvas ink
+corners): the trial anchors the shown comment box 17 px right of the host cell's right
+edge and 16 px ABOVE the cell's top edge (connector ink: cell corner at canvas (6,23),
+box corner at (23,7)); ours used +9/-19 — 8 px too far left and 3 px too HIGH (the old
+"trial sits a few px higher" note was wrong in direction). `commentAnchor` in
+packages/spread-sheets/src/comment-ui.ts now uses +17/-16 (flip fallback mirrored); the
+connector follows automatically (verified: line M269 76 -> cell corner, arrow tip at the
+cell top-right corner).
+- Unit test added: `packages/spread-sheets/test/comment-ui.test.ts` "anchors the box at
+  the trial offsets: 17 px right of the cell, 16 px above its top (TASK 98 item 3)".
+- Paired spec added: `apps/compare/test/comments-anchor-t98.spec.ts` measures the trial's
+  anchor from its own box DOM + line-canvas corners and compares both sides live; passes.
+- Regression-checked: apps/compare `m4-comments`, `t56-comments-box`, `t56-threaded-comments`
+  pixel gates pass at DPR 1 and DPR 2; designer-compare `comments.spec.ts` (4 tests) passes.
+
+### Gate status
+Run once at the end (all green): `pnpm -r build` ok; `pnpm coverage:api` 207/207 classes,
+1796/1796 methods, 252/252 enums, 1369/1369 declarations (100.0%); `pnpm -r typecheck` ok;
+`pnpm -r test` ok (core 132 files / 3150 tests, designer 44 / 386, all other packages and
+apps green); `pnpm lint` ok. Playwright paired specs run for this task:
+`task98-font-tab.spec.ts`, the Font/Border/Fill/Protection pairs and visual gates of
+`format-cells-tabs.spec.ts`, `comments-anchor-t98.spec.ts`, the compare comment scenarios
+(DPR 1+2) and `comments.spec.ts` - 36 tests, all passing.
+
+## TASK 100 — NotImplemented stub burn-down, part 2: CellTypes, ConditionalFormatting, DataValidation, StatusBar, InputMask (2026-11-23)
+
+Before/after entry counts in `packages/spread-sheets/src/generated/stubs.json` (namespaces removed after their members were verified implemented and behavioral gaps fixed; coverage stays 100 %):
+
+| Namespace | Stub entries before | after | Declared members | New unit tests |
+| --- | ---: | ---: | ---: | ---: |
+| GC.Spread.Sheets.CellTypes | 17 | 0 | 103 | 108 |
+| GC.Spread.Sheets.ConditionalFormatting | 12 | 0 | 110 | 111 |
+| GC.Spread.Sheets.DataValidation | 9 | 0 | 26 | 27 |
+| GC.Spread.Sheets.StatusBar | 5 | 0 | 14 | 23 (with InputMask) |
+| GC.Spread.Sheets.InputMask | 4 | 0 | 3 | 23 (with StatusBar) |
+
+Reflection already answered non-stub implementations for every entry, but black-box probes and the new member tests found six behavioral gaps, fixed in the product:
+
+- `CellTypes.Base.typeName` had only the stub fallback on the prototype (instances shadowed it). It now gets the standard `instanceProperties` accessor (`src/features/cell-types.ts`), so the member descriptor is real without the fallback.
+- `ConditionalFormatting.Condition.evaluate` ignored `treatNullValueAsZero` — blank cells now compare as 0 when the flag is set.
+- `ConditionalFormatting.Condition.evaluate` ignored `useWildCards` for text conditions — `*`/`?` in the expected text now act as wildcards on equals-to comparison (wildcards on by default, like the trial).
+- `Condition.getValidList` could not list the cells of the documented absolute formula sources (`$A$1:$A$3`): the range path now strips `$` and reads the cells directly.
+- `InputMask.namedPattern(name, null)` removed the name completely; the trial (probe `.probe/t100`, browser probe of the official core, 48 compared `validatePattern` cases in `.probe/t100/im-check.ts`) keeps a `null` tombstone: `getNamedPatterns()` drops the name but `namedPattern(name)` reads back `null`, and a re-add works. Existing `m5-controls.test.ts` had encoded the old behavior (`toBeUndefined`); its assertion was corrected to the trial answer (`toBeNull`) with the probe recorded — no test was weakened.
+- `InputMask.validatePattern` now implements the trial's grammar classification verbatim: `Parse Quantifier Pattern Failure` (`a{2,1}`, `a{0}`), `Error Quantifier Position` (`{2}`, `(a|b){2}`, `a}{2}`, `{a}`), `Parse Unknown Pattern Failure` (`a[`, `(ab`, `a{`, `}`), `Empty Pattern`, `No Restriction Can Be Entered` (single-alternative groups like `(000)`/`(a)` never restrict; multi-alternative groups like `(ab|cd)`, `(0|1)` do), and calendar patterns validate by field family: each of year/month/day/hour(12+24)/minute/second/meridiem may appear at most once — repeats answer `Duplicated Date Time Pattern` (the previous date branch always failed because the token regex capture group leaked into the dedupe keys).
+
+New tests (one per declared member): `test/task100-celltypes.test.ts` (108), `test/task100-conditionalformatting.test.ts` (111), `test/task100-datavalidation.test.ts` (27), `test/task100-statusbar-inputmask.test.ts` (23).
+
+Nothing in these five namespaces proved non-implementable; no entry was left stubbed. `pnpm coverage:api`: classes 207/207, methods 1796/1796, enums 252/252, declarations 1369/1369 (all 100 %). `packages/compat` conformance suite passes with the widened `namedPattern` return type. The black-box trial probe served the official package through a throwaway `.probe/t100` HTTP harness (port 5192, file never read into source).
+
+## TASK 99 — Burn down the NotImplemented stubs the user can hit, part 1 (2026-11-23)
+
+Three user-reachable stub families: the filter-menu value choices, the context-menu
+paste options, and the `GC.Spread.Sheets.Commands.*` constants. All measurements are
+black-box through the public API (apps/compare + apps/designer-compare `?side=official`)
+and the trial's own `toJSON()` output.
+
+### Stub-count burn-down (packages/spread-sheets/src/generated/stubs.json)
+
+| Namespace | before TASK 99 | after | remaining |
+| --- | --- | --- | --- |
+| `GC.Spread.Sheets.Commands` (standalone members) | 114 | 9 | `openCalculator`, `openColorPicker`, `openDateTimePicker`, `openList`, `openMonthPicker`, `openMultiColumn`, `openSlider`, `openTimePicker`, `openWorkflowList` |
+| all other namespaces | 2479 | 2479 | unchanged this task |
+| **total stubbed members** | **2593** | **2488** | −105 |
+
+(2593/2488 = class-prototype members + standalone variable/function entries; the
+`GC.Spread.Sheets.Commands` namespace entry itself stays, like every other namespace
+container. `docs/API_COVERAGE.md` regenerated, coverage stays 207/207 classes,
+1796/1796 methods, 252/252 enums, 1369/1369 declarations.)
+
+### 1. Filter-menu choices (Top 10, Above/Below Average, dynamic date filters, All Dates in Period)
+- **Trial** (measured via `autoFilter.add` + `toJSON()` on the trial page): Above/Below
+  Average store `{conType: averageCondition, type: 0|1, ranges:[filter range]}` and
+  re-evaluate against the current data on every filter run; the dynamic date choices
+  (this/last/next Week·Month·Quarter·Year, Today/Yesterday/Tomorrow) store
+  `{conType: dateExCondition, expected: DateOccurringType}` (Today 0 … Last Year 15) and
+  Year To Date stores `expectTypeId: 6` with the year offset as `expected`; Top 10 opens
+  the "Top 10 Auto Filter" dialog (Show top/bottom, N, Items/Percent) and stores
+  `{conType: 8, expected, type, isPercent, ranges}`.
+- **Ours**: the `notImplementedChoices` list is gone from filter-menu.ts - all 18 value
+  choices work: average conditions carry the filter range and re-evaluate (conditions.ts
+  gained the `averageCondition`/`dateExCondition` evaluation), the date choices map to the
+  trial-exact `DateOccurringType` numbers, Top 10 gets the dialog (our own markup, same
+  fields/results as the trial) and All Dates in Period opens the nested Year/Quarter/Month
+  flyout which applies the matching `dateExCondition`.
+- **Tests**: `test/task99-stubs.test.ts` (average keep-rules + stored condition shapes +
+  live re-evaluation, Top 10 dialog results and stored JSON, week/month/year-to-date/last-year
+  splits, All Dates in Period flyout).
+
+### 2. Context-menu paste options (pasteFormula, pasteFormatting, pasteValuesFormatting, pasteFormulaFormatting)
+- **Ours**: `InteractionController.pasteSpecial()` applies the matching subset (formula /
+  style / computed value) of the Copy snapshot at the active cell; same-sheet formulas are
+  re-based, values-only variants drop the formula, the whole paste is one undo record, the
+  ClipboardPasting/Pasted events fire like the plain paste path, an empty clipboard is a
+  no-op and the snapshot is taken at Copy time (source edits afterwards do not leak).
+  No `NotImplemented: ContextMenu.*` warn remains for these four items.
+- **Tests**: `test/task99-stubs.test.ts` (5 paste tests + a snapshot-isolation test).
+
+### 3. GC.Spread.Sheets.Commands constants
+- **Ours**: all 115 contract names are now real command objects `{canUndo, execute}` on
+  `GC.Spread.Sheets.Commands` (command-constants.ts; `canUndo` per the trial probe
+  `cmd:canundo-all`, recorded in `test/commands-sweep.test.ts`): the model commands
+  (clipboard, edit commit, outlines, floating objects, sheet ops, TableSheet/Table,
+  zoom) run on the existing core behaviour with trial-style undo snapshots
+  (`execute(context, options, true)` restores), and the interactive commands
+  (navigation/selection/editing/undo/redo) keep their view-level overrides in
+  interaction.ts. The nine Spread-Reports names (`ReportChartPreviewVisible`,
+  `ReportCollapseButtonToggle`, `reportSheet*`) were undefined in the trial core
+  (add-on-registered, re-probed in the running Designer) - since our core bundles
+  ReportSheet they run against report sheets (add/delete record, collapse/expand all,
+  reset cell value, submit, regenerate, per-cell collapse/chart-preview toggles).
+  96 implemented entries were pruned from stubs.json (plus the 9 report entries in the
+  first round); the 9 editor-popup names keep their entries and the honest
+  "runs but the editor popup is not implemented yet" warn (their pickers belong to the
+  trial's `cell-editors` add-in UI - see TASK 93 item 4, milestone M6b; the Designer's
+  Cell Dropdowns gallery cell buttons route to them and currently no-op like before).
+- **Tests**: `test/commands-sweep.test.ts` (all 115 canUndo/execute descriptors + the
+  behaviour sweep) and `test/task99-stubs.test.ts` (5 report-command behaviour tests).
+
+### Gate notes
+- `pnpm -r build`, `pnpm coverage:api`, `pnpm -r typecheck`, `pnpm -r test`
+  (core 133 files / 3179 tests), `pnpm lint` all green; no existing test weakened.
+- The regenerated `docs/API_COVERAGE.md` M5 note now lists the implemented filter-menu
+  choices and paste options; the remaining context-menu items and date-mask editing stay
+  honest NotImplemented (part 2 scope).

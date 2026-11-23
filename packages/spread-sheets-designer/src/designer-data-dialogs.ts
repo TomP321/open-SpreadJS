@@ -13,6 +13,7 @@ import { definedNames, deleteDefinedName, saveDefinedName, validateDefinedName }
 import { allCategory, formulaFromArguments, functionParameters } from './function-library.js';
 import { applySelection, applySeriesFill, computeSpecialSelection, gotoNameItems, resolveReference } from './dialogs/GoToDialogs.js';
 import { validationDefaults } from './dialogs/extra-templates.js';
+import { messageText , resolveText} from './resolve.js';
 
 function columnName(col: number): string {
   let out = '';
@@ -44,7 +45,7 @@ export function showInsertTable(d: Designer): void {
   for (let i = 0; i < cc; i++) { const value = sheet.getValue(region.row, region.col + i); if (typeof value !== 'string') { hasHeaders = false; break; } }
   for (let i = 0; i < cc; i++) headers.push(hasHeaders ? String(sheet.getValue(region.row, region.col + i) ?? `Column${i + 1}`) : `Column${i + 1}`);
   d.showDialog(TemplateNames.InsertTableDialogTemplate ?? 'insertTableDialogTemplate', { range: reference, hasHeaders, headers: headers.join(', '), tableStyle: 'medium2' },
-    (data) => d.runUndoable('applyTable', { data }), (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Create Table', 3); });
+    (data) => d.runUndoable('applyTable', { data }), (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'createTable', 'Create Table'), 3); });
 }
 export function showHyperlink(d: Designer): void {
   const sheet = activeSheet(d);
@@ -56,7 +57,7 @@ export function showHyperlink(d: Designer): void {
     target: targets[Number(current?.target ?? 0)] ?? 'blank', linkColor: String(current?.linkColor ?? '#0563c1'), visitedLinkColor: String(current?.visitedLinkColor ?? '#954f72'),
     reference: '', email: '', subject: '', remove: false,
   },
-    (data) => d.runUndoable('applyHyperlink', { data }), (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Hyperlink', 3); });
+    (data) => d.runUndoable('applyHyperlink', { data }), (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'hyperlink', 'Hyperlink'), 3); });
 }
 /** Formulas ▸ Insert Function: search, category gallery and function gallery. */
 export function showInsertFunction(d: Designer): void {
@@ -101,7 +102,7 @@ export function showGoTo(d: Designer): void {
       if (!reference) return;
       const resolved = resolveReference(d, reference);
       if (!resolved) {
-        d.showMessageBox('The reference is not valid.', 'Go To', 3);
+        d.showMessageBox(messageText(d, 'invalidReference', 'The reference is not valid.'), messageText(d, 'goTo', 'Go To'), 3);
         return;
       }
       resolved.sheet.setActiveCell(resolved.bounds.row, resolved.bounds.col);
@@ -117,7 +118,7 @@ export function showGoToSpecial(d: Designer): void {
     (data) => {
       const result = computeSpecialSelection(d, data as never);
       if (!result) {
-        d.showMessageBox('No cells were found.', 'SpreadJS Designer', 2);
+        d.showMessageBox(messageText(d, 'noCellsFound', 'No cells were found.'), 'SpreadJS Designer', 2);
         return;
       }
       const sheet = activeSheet(d);
@@ -164,16 +165,16 @@ export function showNewName(d: Designer, previousId?: string): void {
   // Opened from the Name Manager: the trial returns to that dialog afterwards.
   const returnToManager = d.dialog?.name === (TemplateNames.NameManagerDialogTemplate ?? 'nameManagerDialogTemplate');
   const previous = definedNames(wb).find((item) => item.id === previousId);
-  const scopes = [{ text: 'Workbook', value: 'Workbook' }, ...Array.from({ length: wb.getSheetCount() }, (_, i) => ({ text: wb.getSheet(i).name(), value: wb.getSheet(i).name() }))];
+  const scopes = [{ text: resolveText('${res.findDialog.workBook}', d.resources) || 'Workbook', value: 'Workbook' }, ...Array.from({ length: wb.getSheetCount() }, (_, i) => ({ text: wb.getSheet(i).name(), value: wb.getSheet(i).name() }))];
   const sheetReference = /^[A-Za-z_][\w.]*$/.test(sheet.name()) ? sheet.name() : `'${sheet.name().replace(/'/g, "''")}'`;
   d.showDialog(TemplateNames.NewNameTemplate ?? 'newNameTemplate', {
     name: previous?.name ?? '', refersTo: previous?.refersTo ?? `=${sheetReference}!$${columnName(col)}$${row + 1}`,
     comment: previous?.comment ?? '', scope: previous?.scope ?? 'Workbook', scopes,
   }, (data) => { saveDefinedName(wb, data, previousId); if (returnToManager) showNameManager(d); else d.invalidate(); },
-  (error) => { if ((error as Error)?.message === 'Cancelled') { if (returnToManager) showNameManager(d); } else d.showMessageBox(String((error as Error)?.message ?? error), previous ? 'Edit Name' : 'New Name', 3); },
+  (error) => { if ((error as Error)?.message === 'Cancelled') { if (returnToManager) showNameManager(d); } else d.showMessageBox(String((error as Error)?.message ?? error), previous ? messageText(d, 'editNameTitle', 'Edit Name') : messageText(d, 'newNameTitle', 'New Name'), 3); },
   (data) => {
     try { validateDefinedName(wb, data, previousId); return true; }
-    catch (error) { d.showMessageBox(String((error as Error)?.message ?? error), previous ? 'Edit Name' : 'New Name', 3); return false; }
+    catch (error) { d.showMessageBox(String((error as Error)?.message ?? error), previous ? messageText(d, 'editNameTitle', 'Edit Name') : messageText(d, 'newNameTitle', 'New Name'), 3); return false; }
   });
 }
 export function deleteName(d: Designer, id: string): void {
@@ -187,7 +188,7 @@ export function deleteName(d: Designer, id: string): void {
 export function confirmDeleteName(d: Designer, id: string): void {
   const entry = definedNames(d.getWorkbook()).find((item) => item.id === id);
   if (!entry) return;
-  d.showMessageBox(`Are you sure you want to delete the name ${entry.name}?`, 'SpreadJS Designer', 1, (result: number) => {
+  d.showMessageBox(messageText(d, 'deleteNameConfirm', 'Are you sure you want to delete the name {0}?', [entry.name]), 'SpreadJS Designer', 1, (result: number) => {
     if (result === 1 || result === 2) deleteName(d, id);
   });
 }
@@ -218,7 +219,7 @@ export function showDataValidation(d: Designer): void {
     }
   }
   d.showDialog(TemplateNames.DataValidationDialogTemplate ?? 'dataValidationDialogTemplate', data,
-    (data) => d.runUndoable('applyDataValidation', { data }), (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Data Validation', 3); });
+    (data) => d.runUndoable('applyDataValidation', { data }), (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'dataValidation', 'Data Validation'), 3); });
 }
 /** Custom Sort dialog. The trial keeps the level list for the whole session. */
 export function showSort(d: Designer): void {
@@ -227,7 +228,7 @@ export function showSort(d: Designer): void {
     (submitted) => {
       d._sortSettings = { levels: submitted.levels as SortLevel[], hasHeaders: submitted.hasHeaders as boolean, byRows: submitted.byRows as boolean };
       d.runUndoable('applySort', { data: submitted });
-    }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Sort', 3); });
+    }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'sort', 'Sort'), 3); });
 }
 export function showRemoveDuplicates(d: Designer): void {
   const data = duplicateDataFromSelection(d);
@@ -236,7 +237,7 @@ export function showRemoveDuplicates(d: Designer): void {
     d.runUndoable('removeDuplicatesApply', args);
     const result = args.result as { removed: number; unique: number } | null;
     if (!result) {
-      d.showMessageBox('You cannot remove duplicate information when the range has an outline. To remove duplicates, clear the outline and perform the remove duplicates operation again.', 'SpreadJS Designer', 2);
+      d.showMessageBox(messageText(d, 'removeDuplicatesOutline', 'You cannot remove duplicate information when the range has an outline. To remove duplicates, clear the outline and perform the remove duplicates operation again.'), 'SpreadJS Designer', 2);
       return;
     }
     d.showMessageBox(result.removed
@@ -251,19 +252,19 @@ export function showTextToColumns(d: Designer): void {
     d.runUndoable('splitTextToColumns', args);
     if (args.needsReplace) {
       // The trial warns before overwriting live cells outside the source range.
-      d.showMessageBox("There's already data here. Do you want to replace it?", 'SpreadJS Designer', 2, () => {
+      d.showMessageBox(messageText(d, 'replaceDataConfirm', "There's already data here. Do you want to replace it?"), 'SpreadJS Designer', 2, () => {
         d.runUndoable('splitTextToColumns', { data: { ...submitted, confirmed: true } });
       });
     }
   };
   d.showDialog(TemplateNames.TextToColumnDialogWizardStep1Template ?? 'textToColumnDialogWizardStep1Template', data,
-    run, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Text to Columns', 3); });
+    run, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'textToColumns', 'Text to Columns'), 3); });
 }
 export function showSubtotal(d: Designer): void {
   const data = subtotalDataFromSelection(d);
   d.showDialog(TemplateNames.SubTotalDialogTemplate ?? 'subTotalDialogTemplate', data,
     (submitted) => d.runUndoable('applySubtotal', { data: submitted }),
-    (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Subtotal', 3); });
+    (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'subtotal', 'Subtotal'), 3); });
 }
 /** The Subtotal dialog's Remove button: strip subtotal rows and outlines. */
 export function removeSubtotalsNow(d: Designer, data?: DialogData): void {
@@ -279,7 +280,7 @@ export function showAutoOutline(d: Designer): void {
     const region = bounds.rowCount === 1 && bounds.colCount === 1 ? currentRegion(sheet, bounds) : bounds;
     d.runUndoable('autoOutlineApply', { data: { region } });
   };
-  if (sheetHasOutlines(sheet)) d.showMessageBox('Modify existing outline?', 'SpreadJS Designer', 2, () => run());
+  if (sheetHasOutlines(sheet)) d.showMessageBox(messageText(d, 'modifyOutline', 'Modify existing outline?'), 'SpreadJS Designer', 2, () => run());
   else run();
 }
 /** Data Validation ▸ Circle Invalid Data / Clear Validation Circles. */
@@ -294,13 +295,13 @@ export function showGoalSeek(d: Designer): void {
   const { row, col } = topCell(sheet);
   d.showDialog(TemplateNames.GoalSeekDialogTemplate ?? 'GoalSeekDialogTemplate', { formulaCell: `$${columnName(col)}$${row + 1}`, goal: '', changingCell: '', maxIterations: 200, tolerance: 0.001 }, (data) => {
     const changing = String(data.changingCell ?? '').match(/^\$?([A-Za-z]+)\$?(\d+)$/);
-    if (!changing) throw new Error('Enter a valid changing cell');
+    if (!changing) throw new Error(messageText(d, 'validChangingCell', 'Enter a valid changing cell'));
     const changingCol = columnIndexOf(changing[1]);
     const changingRow = Number(changing[2]) - 1;
     const gp = d.gc.Spread.Sheets.CalcEngine?.goalSeek;
-    if (!gp) throw new Error('Goal Seek is not available');
+    if (!gp) throw new Error(messageText(d, 'goalSeekUnavailable', 'Goal Seek is not available'));
     gp(sheet, changingRow, changingCol, sheet, row, col, Number(data.goal ?? 0));
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String((error as Error)?.message ?? error), 'Goal Seek', 3); });
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String((error as Error)?.message ?? error), messageText(d, 'goalSeek', 'Goal Seek'), 3); });
 }
 /**
  * TASK 68: Insert Slicer (Data ribbon). The trial lists the pivot-table fields
@@ -331,7 +332,7 @@ export function showInsertSlicerDialog(d: Designer): void {
       top += 280;
     }
     d.invalidate();
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Insert Slicer', 3); });
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'insertSlicer', 'Insert Slicer'), 3); });
 }
 
 export function showZoom(d: Designer): void {

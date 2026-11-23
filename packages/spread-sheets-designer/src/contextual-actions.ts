@@ -17,7 +17,7 @@ import { activeSheet, activeRanges } from './commands/base.js';
 import { parseA1, selectedShapes, toA1 } from './commands/insert.js';
 import { chartInternals, chartsOf, internals } from './core-internals.js';
 import { tabSwatchColor, tabThemeBases } from './ribbon/colors.js';
-import { resolveText } from './resolve.js';
+import { resolveText, messageText } from './resolve.js';
 import { contextualCommandNames } from './contextual-ribbon.js';
 
 /** Queue a sheet repaint after a table/chart/sparkline model change. */
@@ -250,20 +250,20 @@ export function showResizeTableDialog(d: Designer, table: Table): void {
     try {
       next = parseA1(reference.replace(/\$/g, ''));
     } catch {
-      d.showMessageBox('The range is not valid.', 'Resize Table', 3);
+      d.showMessageBox(messageText(d, 'invalidRange', 'The range is not valid.'), messageText(d, 'resizeTable', 'Resize Table'), 3);
       return;
     }
     if (next.row !== range.row) {
-      d.showMessageBox('The headers must remain in the same row.', 'Resize Table', 3);
+      d.showMessageBox(messageText(d, 'headersSameRow', 'The headers must remain in the same row.'), messageText(d, 'resizeTable', 'Resize Table'), 3);
       return;
     }
     const overlaps = next.col < range.col + range.colCount && range.col < next.col + next.colCount;
     if (!overlaps || next.rowCount < 1 || next.colCount < 1) {
-      d.showMessageBox('The resulting table range must overlap the original table range.', 'Resize Table', 3);
+      d.showMessageBox(messageText(d, 'overlapRange', 'The resulting table range must overlap the original table range.'), messageText(d, 'resizeTable', 'Resize Table'), 3);
       return;
     }
     d.runUndoable('resizeTableRange', { data: { table: table.name(), row: next.row, col: next.col, rowCount: next.rowCount, colCount: next.colCount } });
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Resize Table', 3); });
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'resizeTable', 'Resize Table'), 3); });
 }
 
 function renameTable(d: Designer, table: Table, name: string): void {
@@ -276,7 +276,7 @@ function renameTable(d: Designer, table: Table, name: string): void {
     table.name(trimmed);
   } catch {
     /* Trial message (transcribed from the running UI). */
-    d.showMessageBox(text(d, 'ribbon.tableDesign.duplicateTableName', 'This name already exists. Names should be unique.'), 'Table Name', 1);
+    d.showMessageBox(text(d, 'ribbon.tableDesign.duplicateTableName', 'This name already exists. Names should be unique.'), text(d, 'ribbon.tableDesign.tableName', 'Table Name'), 1);
     return;
   }
   /* A data table keeps its converted state under the new name (the trial names the
@@ -520,7 +520,7 @@ function showSparklineWeightDialog(d: Designer, currentPoints: number): void {
     if (points === null || points === 'custom') return;
     for (const spark of selectedSparklines(d)) updateSparkSetting(spark, { lineWeight: pixelsOf(points) });
     repaint(d);
-  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), 'Sparkline Weight', 3); });
+  }, (error) => { if ((error as Error)?.message !== 'Cancelled') d.showMessageBox(String(error), messageText(d, 'sparklineWeight', 'Sparkline Weight'), 3); });
 }
 
 /* ------------------------------------------------------------ execution --- */

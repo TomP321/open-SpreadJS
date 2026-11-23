@@ -11,6 +11,8 @@ import { SUBTOTAL_ITEMS, SHOW_DATA_AS_ITEMS, applyCalcFieldAdd, applyCalcFieldDe
 import type { PivotTable } from './pivot-designer.js';
 import { FormatDialogContent } from './dialogs/FormatDialog.js';
 import { numberFormatterFor } from './dialogs/number-format.js';
+import { T } from './dialogs/t.js';
+import { resolveText } from './resolve.js';
 
 /** One label + input row of the trial's dialog grid. */
 function FieldRow({ label, children, className }: { label: string; children: React.ReactNode; className?: string }): React.ReactElement {
@@ -27,24 +29,24 @@ function FieldRow({ label, children, className }: { label: string; children: Rea
 export function InsertPivotTableBody({ designer: _designer, data, update }: { designer: Designer; data: DialogData; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
   const existing = data.placement === 'existing';
   return <div className="gc-insert-pivot-dialog">
-    <div className="gc-insert-pivot-title">Choose the data that you want to analyze</div>
+    <div className="gc-insert-pivot-title">{T('chooseTheDataThatYouWantToAnalyze', 'Choose the data that you want to analyze')}</div>
     <div className="gc-range-select">
-      <input className="gc-dialog-input gc-insert-pivot-range" value={String(data.range ?? '')} onChange={(event) => update('range', event.target.value)} aria-label="Table/Range" />
+      <input className="gc-dialog-input gc-insert-pivot-range" value={String(data.range ?? '')} onChange={(event) => update('range', event.target.value)} aria-label={T('tableRange', 'Table/Range')} />
       <span className="gc-range-select-button" aria-hidden="true" />
     </div>
-    <div className="gc-insert-pivot-title gc-insert-pivot-title-2">Choose where you want the PivotTable report to be placed</div>
+    <div className="gc-insert-pivot-title gc-insert-pivot-title-2">{T('chooseWhereYouWantThePivotTableReportToBePlaced', 'Choose where you want the PivotTable report to be placed')}</div>
     <div className="gc-radio-group">
       <label className={`gc-radio-item${!existing ? ' gc-radio-item-selected' : ''}`}>
         <input type="radio" className="gc-radio-button" checked={!existing} onChange={() => update('placement', 'new')} />
-        <span className="gc-radio-text">New Worksheet</span>
+        <span className="gc-radio-text">{T('newWorksheet', 'New Worksheet')}</span>
       </label>
       <label className={`gc-radio-item${existing ? ' gc-radio-item-selected' : ''}`}>
         <input type="radio" className="gc-radio-button" checked={existing} onChange={() => update('placement', 'existing')} />
-        <span className="gc-radio-text">Existing Worksheet</span>
+        <span className="gc-radio-text">{T('existingWorksheet', 'Existing Worksheet')}</span>
       </label>
     </div>
     <div className={`gc-range-select gc-insert-pivot-location${!existing ? ' gc-component-disabled' : ''}`}>
-      <input className="gc-dialog-input" value={String(data.location ?? '')} disabled={!existing} onChange={(event) => update('location', event.target.value)} placeholder="A1" aria-label="Location" />
+      <input className="gc-dialog-input" value={String(data.location ?? '')} disabled={!existing} onChange={(event) => update('location', event.target.value)} placeholder="A1" aria-label={T('location', 'Location')} />
       <span className="gc-range-select-button" aria-hidden="true" />
     </div>
   </div>;
@@ -55,21 +57,69 @@ export function InsertPivotTableBody({ designer: _designer, data, update }: { de
 export function MovePivotTableBody({ data, update }: { data: DialogData; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
   const existing = data.placement === 'existing';
   return <div className="gc-insert-pivot-dialog">
-    <div className="gc-insert-pivot-title">Choose where you want the PivotTable report to be placed</div>
+    <div className="gc-insert-pivot-title">{T('chooseWhereYouWantThePivotTableReportToBePlaced', 'Choose where you want the PivotTable report to be placed')}</div>
     <div className="gc-radio-group">
       <label className={`gc-radio-item${!existing ? ' gc-radio-item-selected' : ''}`}>
         <input type="radio" className="gc-radio-button" checked={!existing} onChange={() => update('placement', 'new')} />
-        <span className="gc-radio-text">New Worksheet</span>
+        <span className="gc-radio-text">{T('newWorksheet', 'New Worksheet')}</span>
       </label>
       <label className={`gc-radio-item${existing ? ' gc-radio-item-selected' : ''}`}>
         <input type="radio" className="gc-radio-button" checked={existing} onChange={() => update('placement', 'existing')} />
-        <span className="gc-radio-text">Existing Worksheet</span>
+        <span className="gc-radio-text">{T('existingWorksheet', 'Existing Worksheet')}</span>
       </label>
     </div>
     <div className={`gc-range-select gc-insert-pivot-location${!existing ? ' gc-component-disabled' : ''}`}>
-      <input className="gc-dialog-input" value={String(data.location ?? '')} disabled={!existing} onChange={(event) => update('location', event.target.value)} aria-label="Location" />
+      <input className="gc-dialog-input" value={String(data.location ?? '')} disabled={!existing} onChange={(event) => update('location', event.target.value)} aria-label={T('location', 'Location')} />
       <span className="gc-range-select-button" aria-hidden="true" />
     </div>
+  </div>;
+}
+
+/* ------------------------------------------------ Grouping (TASK 93) ------ */
+
+/* Geometry measured from the trial's Grouping dialog (315x360; dialog-relative):
+   "Auto" 17,50; Starting/Ending rows at y72/y94 (checkbox 13x13 at x17, label
+   x33, input 183x19 at x111); "By:" 17,117; the Seconds..Years list x30..293
+   rows 16px; "Number of days:" label right-aligned at x233 + 60x20 input;
+   the number variant shows only the three inputs. */
+
+const GROUP_UNITS = ['groupSeconds', 'groupMinutes', 'groupHours', 'groupDays', 'groupMonths', 'groupQuarters', 'groupYears'];
+
+/** One Grouping dialog row: checkbox (date dialog only) + label + input. */
+function GroupingRow({ checked, onChecked, label, value, onChange, inputId }: { checked: boolean; onChecked: (v: boolean) => void; label: string; value: string; onChange: (v: string) => void; inputId: string }): React.ReactElement {
+  return (
+    <div className="gc-pivot-grouping-row">
+      <input type="checkbox" className="gc-pivot-grouping-check" checked={checked} onChange={(event) => onChecked(event.target.checked)} aria-label={label} />
+      <label className="gc-pivot-grouping-label" htmlFor={inputId}>{label}</label>
+      <input className="gc-dialog-input gc-pivot-grouping-input" id={inputId} value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  );
+}
+
+export function PivotGroupingBody({ data, update }: { designer?: Designer; data: DialogData; update: (path: string | undefined, value: unknown) => void }): React.ReactElement {
+  const isDate = data.kind !== 'number';
+  const bys = Array.isArray(data.bys) ? data.bys as boolean[] : [];
+  const daysSelected = !!bys[3];
+  return <div className="gc-pivot-grouping-dialog">
+    <div className="gc-pivot-grouping-auto">{T('auto', 'Auto')}</div>
+    <GroupingRow inputId="gc-grouping-start" checked={data.startEnabled !== false} onChecked={(v) => update('startEnabled', v)} label={T('startingAt', 'Starting at:')} value={String(data.start ?? '')} onChange={(v) => update('start', v)} />
+    <GroupingRow inputId="gc-grouping-end" checked={data.endEnabled !== false} onChecked={(v) => update('endEnabled', v)} label={T('endingAt', 'Ending at:')} value={String(data.end ?? '')} onChange={(v) => update('end', v)} />
+    {isDate ? <>
+      <div className="gc-pivot-grouping-by-label">{T('byLabel', 'By:')}</div>
+      <div className="gc-pivot-grouping-list" role="listbox" aria-multiselectable="true">
+        {GROUP_UNITS.map((key, unit) => <div key={key} role="option" aria-selected={!!bys[unit]}
+          className={`gc-pivot-grouping-item${bys[unit] ? ' gc-pivot-grouping-item-selected' : ''}`}
+          onClick={() => { const next = [...bys]; next[unit] = !next[unit]; update('bys', next); }}>{T(key, key)}</div>)}
+      </div>
+      <div className="gc-pivot-grouping-interval">
+        <label className="gc-pivot-grouping-interval-label" htmlFor="gc-grouping-interval">{T('numberOfDays', 'Number of days:')}</label>
+        <input className="gc-dialog-input gc-pivot-grouping-interval-input" id="gc-grouping-interval" type="number" min="1" step="1" disabled={!daysSelected}
+          value={String(data.interval ?? '1')} onChange={(event) => update('interval', event.target.value)} />
+      </div>
+    </> : <div className="gc-pivot-grouping-row gc-pivot-grouping-by-row">
+      <span className="gc-pivot-grouping-label gc-pivot-grouping-by-indent">{T('byLabel', 'By:')}</span>
+      <input className="gc-dialog-input gc-pivot-grouping-input" value={String(data.by ?? '')} onChange={(event) => update('by', event.target.value)} aria-label={T('byLabel', 'By:')} />
+    </div>}
   </div>;
 }
 
@@ -103,10 +153,10 @@ function FormatCellsOverlay({ designer, initial, onOk, onCancel }: { designer: D
   return (
     <div className="gc-designer-dialog-overlay gc-pivot-nf-overlay">
       <div className="gc-designer-dialog gc-pivot-numberformat-dialog" data-template="pivotNumberFormatDialog">
-        <div className="gc-dialog-header"><div className="gc-dialog-title">Format Cells</div><button className="gc-dialog-close" aria-label="Close" onClick={onCancel}>×</button></div>
+        <div className="gc-dialog-header"><div className="gc-dialog-title">{T('formatCells', 'Format Cells')}</div><button className="gc-dialog-close" aria-label="Close" onClick={onCancel}>×</button></div>
         <div className="gc-dialog-content gc-pivot-nf-content"><FormatDialogContent designer={designer} data={nfData} update={update} /></div>
         <div className="gc-dialog-footer">
-          <button className="gc-dialog-button" onClick={onCancel}>Cancel</button>
+          <button className="gc-dialog-button" onClick={onCancel}>{resolveText('${res.cancel}', designer.resources) || 'Cancel'}</button>
           <button className="gc-dialog-button gc-dialog-button-primary" onClick={() => onOk(numberFormatFromData(nfData))}>OK</button>
         </div>
       </div>
@@ -117,16 +167,16 @@ function FormatCellsOverlay({ designer, initial, onOk, onCancel }: { designer: D
 /** The common first rows of the trial's Field Settings / Value Field Settings dialogs. */
 function PivotDialogHeader({ data, update, dialogName }: { data: DialogData; update: (path: string | undefined, value: unknown) => void; dialogName: string }): React.ReactElement {
   return <>
-    <div className="gc-pd-label gc-pd-src-label">Source Name:</div>
+    <div className="gc-pd-label gc-pd-src-label">{T('sourceName', 'Source Name:')}</div>
     <div className="gc-pd-src">{String(data.sourceName ?? '')}</div>
-    <div className="gc-pd-label gc-pd-custom-label">Custom Name:</div>
-    <input className="gc-pd-custom" value={String(data.customName ?? '')} onChange={(event) => update('customName', event.target.value)} aria-label="Custom Name" />
+    <div className="gc-pd-label gc-pd-custom-label">{T('customName', 'Custom Name:')}</div>
+    <input className="gc-pd-custom" value={String(data.customName ?? '')} onChange={(event) => update('customName', event.target.value)} aria-label={T('customName2', 'Custom Name')} />
     {dialogName === 'pivotValueFieldSettingsDialogTemplate' ? <div className="gc-pd-tabs">
-      <button role="tab" className={`gc-pd-tab gc-pd-tab1${data.__tab === 'values' ? '' : ' selected'}`} onClick={() => update('__tab', 'summarize')}>Summarize Values By</button>
-      <button role="tab" className={`gc-pd-tab gc-pd-tab2${data.__tab === 'values' ? ' selected' : ''}`} onClick={() => update('__tab', 'values')}>Show Value As</button>
+      <button role="tab" className={`gc-pd-tab gc-pd-tab1${data.__tab === 'values' ? '' : ' selected'}`} onClick={() => update('__tab', 'summarize')}>{T('summarizeValuesBy', 'Summarize Values By')}</button>
+      <button role="tab" className={`gc-pd-tab gc-pd-tab2${data.__tab === 'values' ? ' selected' : ''}`} onClick={() => update('__tab', 'values')}>{T('showValueAs', 'Show Value As')}</button>
     </div> : <div className="gc-pd-tabs">
-      <button role="tab" className={`gc-pd-tab gc-pd-tab1${data.__tab === 'layout' ? '' : ' selected'}`} onClick={() => update('__tab', 'subtotals')}>Subtotals</button>
-      <button role="tab" className={`gc-pd-tab gc-pd-tab2 gc-pd-tab-lp${data.__tab === 'layout' ? ' selected' : ''}`} onClick={() => update('__tab', 'layout')}>Layout &amp; Print</button>
+      <button role="tab" className={`gc-pd-tab gc-pd-tab1${data.__tab === 'layout' ? '' : ' selected'}`} onClick={() => update('__tab', 'subtotals')}>{T('subtotals', 'Subtotals')}</button>
+      <button role="tab" className={`gc-pd-tab gc-pd-tab2 gc-pd-tab-lp${data.__tab === 'layout' ? ' selected' : ''}`} onClick={() => update('__tab', 'layout')}>{T('layoutAmpPrint', 'Layout & Print')}</button>
     </div>}
   </>;
 }
@@ -147,20 +197,20 @@ export function ValueFieldSettingsBody({ designer, data, update }: { designer: D
     <PivotDialogHeader data={data} update={update} dialogName="pivotValueFieldSettingsDialogTemplate" />
     <div className="gc-pd-panel">
       {tab === 'summarize' ? <>
-        <div className="gc-pd-panel-head">Summarize values field by</div>
-        <div className="gc-vfs-note">Choose the type of calculation that you want to use to summarize data from the selected field</div>
-        <div className="gc-vfs-list" role="listbox" aria-label="Summarize values field by">
+        <div className="gc-pd-panel-head">{T('summarizeValuesFieldBy', 'Summarize values field by')}</div>
+        <div className="gc-vfs-note">{T('chooseTheTypeOfCalculationThatYouWantToUseToSummarizeDataFromTheSelectedField', 'Choose the type of calculation that you want to use to summarize data from the selected field')}</div>
+        <div className="gc-vfs-list" role="listbox" aria-label={T('summarizeValuesFieldBy', 'Summarize values field by')}>
           {SUBTOTAL_ITEMS.map((item) => (
-            <div key={item.text} role="option" aria-selected={Number(data.subtotal ?? 8) === item.value} className={`gc-vfs-item${Number(data.subtotal ?? 8) === item.value ? ' selected' : ''}`} onClick={() => update('subtotal', item.value)}>{item.text}</div>
+            <div key={item.text} role="option" aria-selected={Number(data.subtotal ?? 8) === item.value} className={`gc-vfs-item${Number(data.subtotal ?? 8) === item.value ? ' selected' : ''}`} onClick={() => update('subtotal', item.value)}>{T(item.labelKey, item.text)}</div>
           ))}
         </div>
       </> : <>
-        <div className="gc-pd-panel-head">Show value as</div>
-        <select className="gc-vfs-sva" value={String(showDataAs)} onChange={(event) => update('showDataAs', Number(event.target.value))} aria-label="Show value as">
-          {SHOW_DATA_AS_ITEMS.map((item) => <option key={item.text} value={item.value}>{item.text}</option>)}
+        <div className="gc-pd-panel-head">{T('showValueAs2', 'Show value as')}</div>
+        <select className="gc-vfs-sva" value={String(showDataAs)} onChange={(event) => update('showDataAs', Number(event.target.value))} aria-label={T('showValueAs2', 'Show value as')}>
+          {SHOW_DATA_AS_ITEMS.map((item) => <option key={item.text} value={item.value}>{T(item.labelKey, item.text)}</option>)}
         </select>
-        <div className="gc-pd-label gc-vfs-bf-label">Base field:</div>
-        <div className="gc-pd-label gc-vfs-bi-label">Base item:</div>
+        <div className="gc-pd-label gc-vfs-bf-label">{T('baseField', 'Base field:')}</div>
+        <div className="gc-pd-label gc-vfs-bi-label">{T('baseItem', 'Base item:')}</div>
         <div className={`gc-vfs-base-list${needsBase ? '' : ' gc-component-disabled'}`}>
           {baseFields.map((name) => (
             <div key={name} className={`gc-vfs-base-item${baseField === name ? ' selected' : ''}`} onClick={() => needsBase && update('baseField', name)}>{name}</div>
@@ -173,7 +223,7 @@ export function ValueFieldSettingsBody({ designer, data, update }: { designer: D
         </div>
       </>}
     </div>
-    <input type="button" className="gc-pd-foot-btn gc-vfs-nf" value="Number Format" onClick={() => setFormatOpen(true)} />
+    <input type="button" className="gc-pd-foot-btn gc-vfs-nf" value={T('numberFormat', 'Number Format')} onClick={() => setFormatOpen(true)} />
     <input type="button" className="gc-pd-foot-btn gc-pd-ok" value="OK" onClick={() => designer.closeDialog(String(designer.dialog?.name ?? 'pivotValueFieldSettingsDialogTemplate'), true)} />
     <input type="button" className="gc-pd-foot-btn gc-pd-cancel" value="Cancel" onClick={() => designer.closeDialog(String(designer.dialog?.name ?? 'pivotValueFieldSettingsDialogTemplate'), false)} />
     {formatOpen && <FormatCellsOverlay
@@ -196,15 +246,15 @@ export function FieldSettingsBody({ designer, data, update }: { designer: Design
     <PivotDialogHeader data={data} update={update} dialogName="pivotFieldSettingsDialogTemplate" />
     <div className="gc-pd-panel gc-fs-panel">
       {tab === 'subtotals' ? <>
-        <div className="gc-pd-panel-head gc-fs-head">Subtotals</div>
+        <div className="gc-pd-panel-head gc-fs-head">{T('subtotals', 'Subtotals')}</div>
         <label className="gc-pd-radio gc-pd-radio1"><input type="radio" checked={subtotals === 'automatic'} onChange={() => update('subtotals', 'automatic')} /></label>
-        <div className="gc-pd-radio-label gc-pd-radio1" onClick={() => update('subtotals', 'automatic')}>Automatic</div>
+        <div className="gc-pd-radio-label gc-pd-radio1" onClick={() => update('subtotals', 'automatic')}>{T('automatic', 'Automatic')}</div>
         <label className="gc-pd-radio gc-pd-radio2"><input type="radio" checked={subtotals === 'none'} onChange={() => update('subtotals', 'none')} /></label>
-        <div className="gc-pd-radio-label gc-pd-radio2" onClick={() => update('subtotals', 'none')}>None</div>
+        <div className="gc-pd-radio-label gc-pd-radio2" onClick={() => update('subtotals', 'none')}>{T('none', 'None')}</div>
         <label className="gc-pd-radio gc-pd-radio3"><input type="radio" checked={subtotals === 'custom'} onChange={() => update('subtotals', 'custom')} /></label>
-        <div className="gc-pd-radio-label gc-pd-radio3" onClick={() => update('subtotals', 'custom')}>Custom</div>
-        <div className={`gc-fs-hint${subtotals === 'custom' ? '' : ' gc-component-disabled'}`}>Select one or more functions:</div>
-        <div className={`gc-vfs-list gc-fs-list${subtotals === 'custom' ? '' : ' gc-component-disabled'}`} role="listbox" aria-label="Subtotal functions">
+        <div className="gc-pd-radio-label gc-pd-radio3" onClick={() => update('subtotals', 'custom')}>{T('custom', 'Custom')}</div>
+        <div className={`gc-fs-hint${subtotals === 'custom' ? '' : ' gc-component-disabled'}`}>{T('selectOneOrMoreFunctions', 'Select one or more functions:')}</div>
+        <div className={`gc-vfs-list gc-fs-list${subtotals === 'custom' ? '' : ' gc-component-disabled'}`} role="listbox" aria-label={T('subtotalFunctions', 'Subtotal functions')}>
           {SUBTOTAL_ITEMS.map((item) => {
             const chosen = Array.isArray(data.customFunctions) ? (data.customFunctions as string[]) : [];
             const selected = chosen.includes(item.text);
@@ -212,18 +262,18 @@ export function FieldSettingsBody({ designer, data, update }: { designer: Design
               if (subtotals !== 'custom') return;
               const next = selected ? chosen.filter((name) => name !== item.text) : [...chosen, item.text];
               update('customFunctions', next);
-            }}>{item.text}</div>;
+            }}>{T(item.labelKey, item.text)}</div>;
           })}
         </div>
       </> : <>
-        <div className="gc-pd-panel-head gc-fs-head">Layout</div>
+        <div className="gc-pd-panel-head gc-fs-head">{T('layout', 'Layout')}</div>
         <label className="gc-fs-check gc-fs-check1"><input type="checkbox" checked={!!data.showNoData} onChange={(event) => update('showNoData', event.target.checked)} /></label>
-        <div className="gc-fs-check-label gc-fs-check1" onClick={() => update('showNoData', !data.showNoData)}>Show items with no data</div>
+        <div className="gc-fs-check-label gc-fs-check1" onClick={() => update('showNoData', !data.showNoData)}>{T('showItemsWithNoData', 'Show items with no data')}</div>
         <label className="gc-fs-check gc-fs-check2"><input type="checkbox" checked={subtotals === 'top'} onChange={() => update('subtotals', subtotals === 'top' ? 'automatic' : 'top')} /></label>
-        <div className="gc-fs-check-label gc-fs-check2" onClick={() => update('subtotals', subtotals === 'top' ? 'automatic' : 'top')}>Display subtotals at the top of each group</div>
+        <div className="gc-fs-check-label gc-fs-check2" onClick={() => update('subtotals', subtotals === 'top' ? 'automatic' : 'top')}>{T('displaySubtotalsAtTheTopOfEachGroup', 'Display subtotals at the top of each group')}</div>
       </>}
     </div>
-    <input type="button" className="gc-pd-foot-btn gc-fs-label" value="Label Format" onClick={() => setFormatOpen(true)} />
+    <input type="button" className="gc-pd-foot-btn gc-fs-label" value={T('labelFormat', 'Label Format')} onClick={() => setFormatOpen(true)} />
     <input type="button" className="gc-pd-foot-btn gc-pd-ok" value="OK" onClick={() => designer.closeDialog(String(designer.dialog?.name ?? 'pivotFieldSettingsDialogTemplate'), true)} />
     <input type="button" className="gc-pd-foot-btn gc-pd-cancel" value="Cancel" onClick={() => designer.closeDialog(String(designer.dialog?.name ?? 'pivotFieldSettingsDialogTemplate'), false)} />
     {formatOpen && <FormatCellsOverlay
@@ -241,17 +291,17 @@ export function PivotTableOptionsBody({ data, update }: { data: DialogData; upda
   const [tab, setTab] = useState('printing');
   const tabs = ['Printing', 'Layout & Format', 'Data', 'Totals & Filters', 'Display', 'Calculation'];
   return <div className="gc-value-field-dialog gc-pivot-options-dialog">
-    <FieldRow label="PivotTable Name:"><input className="gc-dialog-input gc-value-field-custom" value={String(data.pivotName ?? '')} onChange={(event) => update('pivotName', event.target.value)} aria-label="PivotTable Name" /></FieldRow>
+    <FieldRow label={T('pivotTableName', 'PivotTable Name:')}><input className="gc-dialog-input gc-value-field-custom" value={String(data.pivotName ?? '')} onChange={(event) => update('pivotName', event.target.value)} aria-label={T('pivotTableName2', 'PivotTable Name')} /></FieldRow>
     <div className="gc-dialog-tab-bar gc-pivot-dialog-tabs" role="tablist">
       {tabs.map((label) => (
         <button key={label} role="tab" aria-selected={tab === label.toLowerCase()} className={`gc-dialog-tab${tab === label.toLowerCase() ? ' gc-dialog-tab-active' : ''}`} onClick={() => setTab(label.toLowerCase())}>{label}</button>
       ))}
     </div>
     {tab === 'printing' && <div className="gc-pivot-options-body">
-      <div className="gc-pivot-dialog-label">Print</div>
-      <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!data.printExpandCollapse} onChange={(event) => update('printExpandCollapse', event.target.checked)} /><span>Print expand/collapse buttons when displayed on PivotTable</span></label>
-      <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!data.repeatRowLabels} onChange={(event) => update('repeatRowLabels', event.target.checked)} /><span>Repeat row labels on each printed page</span></label>
-      <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!data.setPrintTitles} onChange={(event) => update('setPrintTitles', event.target.checked)} /><span>Set print titles</span></label>
+      <div className="gc-pivot-dialog-label">{T('print', 'Print')}</div>
+      <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!data.printExpandCollapse} onChange={(event) => update('printExpandCollapse', event.target.checked)} /><span>{T('printExpandCollapseButtonsWhenDisplayedOnPivotTable', 'Print expand/collapse buttons when displayed on PivotTable')}</span></label>
+      <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!data.repeatRowLabels} onChange={(event) => update('repeatRowLabels', event.target.checked)} /><span>{T('repeatRowLabelsOnEachPrintedPage', 'Repeat row labels on each printed page')}</span></label>
+      <label className="gc-dialog-checkbox"><input type="checkbox" checked={!!data.setPrintTitles} onChange={(event) => update('setPrintTitles', event.target.checked)} /><span>{T('setPrintTitles', 'Set print titles')}</span></label>
     </div>}
     {tab !== 'printing' && <div className="gc-pivot-options-body gc-pivot-options-empty"><span /></div>}
   </div>;
@@ -296,21 +346,21 @@ export function CalculatedFieldBody({ designer, data, update }: { designer: Desi
     setCreated(pivot ? calcFieldEntries(pivot).map((field) => field.name) : []);
   };
   return <div className="gc-calc-dialog gc-calc-field-dialog">
-    <FieldRow label="Name:">
-      <input className="gc-dialog-input gc-calc-name" value={name} onChange={(event) => setName(event.target.value)} aria-label="Name" />
+    <FieldRow label={T('name2', 'Name:')}>
+      <input className="gc-dialog-input gc-calc-name" value={name} onChange={(event) => setName(event.target.value)} aria-label={T('name', 'Name')} />
       <input type="button" className="gc-calc-btn gc-calc-add" value={exists ? 'Modify' : 'Add'} onClick={() => {
         if (exists) applyCalcFieldModify(designer, name, formula);
         else applyCalcFieldAdd(designer, name, formula);
         refresh();
       }} />
     </FieldRow>
-    <FieldRow label="Formula:">
-      <input className="gc-dialog-input gc-calc-formula" value={formula} onChange={(event) => setFormula(event.target.value)} aria-label="Formula" />
-      <input type="button" className="gc-calc-btn gc-calc-delete" value="Delete" onClick={() => { applyCalcFieldDelete(designer, name); refresh(); }} />
+    <FieldRow label={T('formula', 'Formula:')}>
+      <input className="gc-dialog-input gc-calc-formula" value={formula} onChange={(event) => setFormula(event.target.value)} aria-label={T('formula2', 'Formula')} />
+      <input type="button" className="gc-calc-btn gc-calc-delete" value={T('delete', 'Delete')} onClick={() => { applyCalcFieldDelete(designer, name); refresh(); }} />
     </FieldRow>
-    <div className="gc-calc-label gc-calc-fields-label">Fields:</div>
-    <CalcFieldList items={fields} selected={selected} onSelect={setSelected} label="Fields" />
-    <input type="button" className="gc-calc-btn gc-calc-insert-field" value="Insert Field" onClick={() => {
+    <div className="gc-calc-label gc-calc-fields-label">{T('fields', 'Fields:')}</div>
+    <CalcFieldList items={fields} selected={selected} onSelect={setSelected} label={T('fields2', 'Fields')} />
+    <input type="button" className="gc-calc-btn gc-calc-insert-field" value={T('insertField', 'Insert Field')} onClick={() => {
       const field = fields[selected];
       if (!field) return;
       update('formula', formula ? `${formula} ${formulaReference(field)}` : `=${formulaReference(field)}`);
@@ -333,19 +383,19 @@ export function CalculatedItemBody({ designer, data, update }: { designer: Desig
   const exists = created.includes(name);
   const refresh = (): void => setAdded(pivot ? pivotItemNames(pivot, sourceName) : []);
   return <div className="gc-calc-dialog gc-calc-item-dialog">
-    <FieldRow label="Name:">
-      <input className="gc-dialog-input gc-calc-name" value={name} onChange={(event) => setName(event.target.value)} aria-label="Name" />
+    <FieldRow label={T('name2', 'Name:')}>
+      <input className="gc-dialog-input gc-calc-name" value={name} onChange={(event) => setName(event.target.value)} aria-label={T('name', 'Name')} />
       <input type="button" className="gc-calc-btn gc-calc-add" value={exists ? 'Modify' : 'Add'} onClick={() => { applyCalcItemAdd(designer, sourceName, name, formula); refresh(); }} />
     </FieldRow>
-    <FieldRow label="Formula:">
-      <input className="gc-dialog-input gc-calc-formula" value={formula} onChange={(event) => setFormula(event.target.value)} aria-label="Formula" />
-      <input type="button" className="gc-calc-btn gc-calc-delete" value="Delete" onClick={() => { applyCalcItemDelete(designer, sourceName, name); refresh(); }} />
+    <FieldRow label={T('formula', 'Formula:')}>
+      <input className="gc-dialog-input gc-calc-formula" value={formula} onChange={(event) => setFormula(event.target.value)} aria-label={T('formula2', 'Formula')} />
+      <input type="button" className="gc-calc-btn gc-calc-delete" value={T('delete', 'Delete')} onClick={() => { applyCalcItemDelete(designer, sourceName, name); refresh(); }} />
     </FieldRow>
     <div className="gc-calc-columns">
       <div className="gc-calc-column">
-        <div className="gc-calc-label gc-calc-fields-label">Fields:</div>
-        <CalcFieldList items={fields} selected={fieldIndex} onSelect={(index) => { setFieldIndex(index); setItemIndex(0); update('sourceName', fields[index] ?? ''); }} label="Fields" />
-        <input type="button" className="gc-calc-btn gc-calc-insert-field" value="Insert Field" onClick={() => {
+        <div className="gc-calc-label gc-calc-fields-label">{T('fields', 'Fields:')}</div>
+        <CalcFieldList items={fields} selected={fieldIndex} onSelect={(index) => { setFieldIndex(index); setItemIndex(0); update('sourceName', fields[index] ?? ''); }} label={T('fields2', 'Fields')} />
+        <input type="button" className="gc-calc-btn gc-calc-insert-field" value={T('insertField', 'Insert Field')} onClick={() => {
           const field = fields[fieldIndex];
           if (!field) return;
           const next = formula ? `${formula} ${formulaReference(field)}` : `=${formulaReference(field)}`;
@@ -353,9 +403,9 @@ export function CalculatedItemBody({ designer, data, update }: { designer: Desig
         }} />
       </div>
       <div className="gc-calc-column">
-        <div className="gc-calc-label gc-calc-items-label">Items:</div>
-        <CalcFieldList items={items} selected={itemIndex} onSelect={setItemIndex} label="Items" />
-        <input type="button" className="gc-calc-btn gc-calc-insert-item" value="Insert Item" onClick={() => {
+        <div className="gc-calc-label gc-calc-items-label">{T('items', 'Items:')}</div>
+        <CalcFieldList items={items} selected={itemIndex} onSelect={setItemIndex} label={T('items2', 'Items')} />
+        <input type="button" className="gc-calc-btn gc-calc-insert-item" value={T('insertItem', 'Insert Item')} onClick={() => {
           const item = items[itemIndex];
           if (!item) return;
           const label = `${sourceName}[${item}]`;
@@ -383,17 +433,17 @@ export function SolveOrderBody({ designer, data, update: _update }: { designer: 
     bumped((value) => value + 1);
   };
   return <div className="gc-calc-dialog gc-solve-order-dialog">
-    <div className="gc-calc-label gc-solve-head">Solve order:</div>
-    <div className="gc-calc-list gc-solve-list" role="listbox" aria-label="Solve order">
+    <div className="gc-calc-label gc-solve-head">{T('solveOrder', 'Solve order:')}</div>
+    <div className="gc-calc-list gc-solve-list" role="listbox" aria-label={T('solveOrder2', 'Solve order')}>
       {entries.map((entry, index) => (
         <div key={`${entry.sourceName}-${entry.calcItemName}`} role="option" aria-selected={index === clamp()} className={`gc-calc-list-item${index === clamp() ? ' selected' : ''}`} onClick={() => setSelected(index)}>{`${entry.sourceName}[${entry.calcItemName}] = ${entry.formula}`}</div>
       ))}
     </div>
     <div className="gc-solve-note">if the value in a PivotTable cell is affected by two or more calculated items, the value is determined by the last formula in the solve order.</div>
     <div className="gc-solve-buttons">
-      <input type="button" className="gc-calc-btn gc-solve-up" value="Move Up" onClick={() => move('up')} />
-      <input type="button" className="gc-calc-btn gc-solve-down" value="Move Down" onClick={() => move('down')} />
-      <input type="button" className="gc-calc-btn gc-solve-delete" value="Delete" onClick={() => {
+      <input type="button" className="gc-calc-btn gc-solve-up" value={T('moveUp', 'Move Up')} onClick={() => move('up')} />
+      <input type="button" className="gc-calc-btn gc-solve-down" value={T('moveDown', 'Move Down')} onClick={() => move('down')} />
+      <input type="button" className="gc-calc-btn gc-solve-delete" value={T('delete', 'Delete')} onClick={() => {
         const entry = entries[clamp()];
         if (!entry) return;
         applyCalcItemDelete(designer, entry.sourceName, entry.calcItemName);
@@ -408,7 +458,7 @@ export function SolveOrderBody({ designer, data, update: _update }: { designer: 
 export function ReportFilterPagesBody({ data }: { data: DialogData }): React.ReactElement {
   const fields = Array.isArray(data.filterFields) ? (data.filterFields as string[]) : [];
   return <div className="gc-calc-dialog gc-report-filter-dialog">
-    <div className="gc-calc-label gc-report-filter-label">Show all report filter pages of:</div>
+    <div className="gc-calc-label gc-report-filter-label">{T('showAllReportFilterPagesOf', 'Show all report filter pages of:')}</div>
     <div className="gc-report-filter-list">
       {fields.map((name) => <span key={name} className="gc-report-filter-field">{name}</span>)}
     </div>

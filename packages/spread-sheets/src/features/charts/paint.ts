@@ -11,6 +11,8 @@ import { formatAxisNumber, formatValue } from './scale.js';
 import { resolveChartColor } from './colors-resolve.js';
 import { getTitle, getLegend, getAxes } from './accessors.js';
 import { resolveRefText } from './data.js';
+import { autoTrendlineName } from './trendlines.js';
+import { dashArray } from './paint-decorations.js';
 import { drawGroup } from './paint-series.js';
 import { paintDataChart } from './paint-data-charts.js';
 
@@ -133,8 +135,8 @@ export function paintChart(chart: Chart, ctx: CanvasRenderingContext2D, width: n
 
 }
 
-function legendEntriesFor(chart: Chart, model: PaintModel): { name: string; color: string | null; kind: PaintGroup['kind']; chartType: number; hasMarker: boolean }[] {
-  const out: { name: string; color: string | null; kind: PaintGroup['kind']; chartType: number; hasMarker: boolean }[] = [];
+function legendEntriesFor(chart: Chart, model: PaintModel): LegendEntry[] {
+  const out: LegendEntry[] = [];
   const pieGroup = model.groups.find(g => g.kind === 'pie' || g.kind === 'doughnut');
   if (pieGroup) {
     const palette = (chart._space.colorScheme?.[1] as string[] | undefined) ?? [];
@@ -147,7 +149,19 @@ function legendEntriesFor(chart: Chart, model: PaintModel): { name: string; colo
     // Clustered bar charts list the series in slot order (top slot first =
     // last series); stacked bars keep the creation order (trial-measured).
     const order = group.horizontal && group.kind === 'bar' && !group.stacked ? [...group.series].reverse() : group.series;
-    order.forEach((ser, index) => out.push({ name: ser.name || `Series ${index + 1}`, color: ser.color, kind: group.kind, chartType: group.chartType, hasMarker: !!ser.marker }));
+    order.forEach((ser, index) => {
+      out.push({ name: ser.name || `Series ${index + 1}`, color: ser.color, kind: group.kind, chartType: group.chartType, hasMarker: !!ser.marker });
+      // Trial (TASK 92 probe): each trendline follows its series with a dashed
+      // swatch and the (auto-generated) trendline name.
+      for (const tl of ser.trendlines ?? []) {
+        const ln = tl.spPr?.ln as JsonRecord | undefined;
+        out.push({
+          name: tl.name !== undefined ? String(tl.name) : autoTrendlineName(Number(tl.trendlineType ?? 1), tl.period, ser.name),
+          color: resolveChartColor(ln?.solidFill ?? 'accent 1 0', chart._sheet, '#4472c4') ?? '#4472c4',
+          kind: group.kind, chartType: group.chartType, hasMarker: false, dash: dashArray(ln?.prstDash),
+        });
+      }
+    });
   }
   return out;
 }
@@ -343,7 +357,9 @@ function hasAxisLine(model: PaintModel): boolean {
   return true;
 }
 
-type LegendEntry = { name: string; color: string | null; kind: PaintGroup['kind']; chartType: number; hasMarker: boolean };
+type LegendEntry = { name: string; color: string | null; kind: PaintGroup["kind"]; chartType: number; hasMarker: boolean; dash?: number[] };
+
+/** Legend icon+label for one series or trendline (trendline entries carry a dash pattern). */
 
 function drawLegend(pc: PaintContext, legendInfo: JsonRecord, entries: LegendEntry[]): void {
   if (legendInfo.visible === false || !entries.length || !pc.layout.legend) return;
@@ -364,7 +380,16 @@ function drawLegend(pc: PaintContext, legendInfo: JsonRecord, entries: LegendEnt
   const icon = (x: number, y: number, entry: LegendEntry): void => {
     ctx.fillStyle = entry.color ?? '#4472c4';
     ctx.strokeStyle = entry.color ?? '#4472c4';
-    if (entry.kind === 'line') {
+    if (entry.dash) {
+      // Trial: a trendline legend entry is a dashed line segment in the trendline color.
+      ctx.lineWidth = 2;
+      ctx.setLineDash(entry.dash);
+      ctx.beginPath();
+      ctx.moveTo(x, y + 5);
+      ctx.lineTo(x + 24, y + 5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (entry.kind === 'line') {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(x, y + 5);
@@ -398,7 +423,7 @@ function drawLegend(pc: PaintContext, legendInfo: JsonRecord, entries: LegendEnt
       ctx.fillRect(x, y, 10, 10);
     }
   };
-  const advance = (entry: LegendEntry): number => entry.kind === 'line' || entry.kind === 'radar' ? 24 : entry.kind === 'scatter' ? 15 : entry.kind === 'bubble' ? 13 : 14;
+  const advance = (entry: LegendEntry): number => entry.dash || entry.kind === 'line' || entry.kind === 'radar' ? 24 : entry.kind === 'scatter' ? 15 : entry.kind === 'bubble' ? 13 : 14;
   const widthOf = (entry: LegendEntry): number => ctx.measureText(entry.name).width + advance(entry);
   if (position === 3) {
     // Trial stacks the left legend from the plot bottom upward (pitch ~28.5).

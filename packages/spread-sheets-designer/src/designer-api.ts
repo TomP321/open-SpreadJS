@@ -282,6 +282,15 @@ export interface DesignerApi extends IDesignerCommandContext {
   showNewTableStyleDialog(): void;
   editTableStyleElement(key: string): void;
   clearTableStyleElement(key: string): void;
+  /* TASK 93: the PivotTable Styles gallery's New Pivot Table Style... dialog. */
+  _pivotStyleDraft: import('./designer-custom-styles.js').PivotStyleDraft | undefined;
+  showNewPivotTableStyleDialog(name?: string): void;
+  editPivotStyleElement(key: string): void;
+  clearPivotStyleElement(key: string): void;
+  /* TASK 93: the gallery tile context menu (Duplicate... / Delete / Set As Default). */
+  duplicatePivotTheme(name: string, builtIn?: boolean): void;
+  deletePivotTheme(name: string): void;
+  setDefaultPivotTheme(name: string): void;
   clearTableStyleOfSelection(): void;
   showManageCellStatesDialog(): void;
   addCellState(): void;
@@ -312,6 +321,7 @@ export interface DesignerApi extends IDesignerCommandContext {
   showPivotFieldSettings(fieldName: string): void;
   showValueFieldSettings(fieldName: string): void;
   showPivotTableOptions(): void;
+  showPivotGrouping(): void;
   /* TASK 77: PivotTable Analyze ▸ Fields, Items & Sets dialogs (Calculated Field / Calculated
    * Item / Solve Order) and the Show Report Filter Pages confirmation. */
   showCalculatedField(): void;

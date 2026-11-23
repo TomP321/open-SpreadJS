@@ -7,6 +7,7 @@ import { printInfoOf, recordView, workbookInternals } from './core-internals.js'
 import type { Worksheet } from './core-internals.js';
 import { applyPageSetupDraft, pageSetupDraft, type PageSetupDraft } from './page-setup.js';
 import { activeSheet } from './commands/actions.js';
+import { messageText } from './resolve.js';
 
 /** The trial's Page Layout tab seeds the print header/heading visibility and
  *  the first page number into printInfo the first time the tab is shown, and
@@ -67,7 +68,7 @@ function patchThemeSheets(d: Designer, part: 'colors' | 'font', scheme: { clone(
 export function printDesigner(d: Designer): void {
   const workbook = workbookInternals(d.getWorkbook());
   if (typeof workbook.print === 'function') workbook.print();
-  else d.showMessageBox('Printing is not available in this build.', 'Print', 3);
+  else d.showMessageBox(messageText(d, 'printUnavailable', 'Printing is not available in this build.'), messageText(d, 'print', 'Print'), 3);
 }
 export function showPageSetup(d: Designer, initialTab: 'page' | 'margins' | 'header' | 'print' = 'page'): void {
   const sheet = activeSheet(d);

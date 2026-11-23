@@ -17,6 +17,12 @@
  * drop-in alias work:
  *
  *   "@mescius/spread-sheets-languagepackages": "npm:@opensheets/spread-sheets-languagepackages@^0.1.0"
+ *
+ * TASK 89 note: the core now ships the Italian (`it`) calc language package — function names,
+ * ';'/'\' separators and the ',' decimal comma, activated with
+ * `GC.Spread.CalcEngine.LanguagePackages.languagePackages('it')`. The remaining official
+ * language data sets (fr/de/es/... non-enumerable in the trial's minified bundle) stay a
+ * tracked content gap.
  */
 import core from '@mescius/spread-sheets';
 import { install } from './install.js';

@@ -11,7 +11,7 @@ import { pivotCommandState } from './pivot-designer.js';
 import { contextualCommandState } from './contextual-actions.js';
 import { selectedShapes as insertSelectedShapes } from './commands/insert.js';
 import { fitPagesLabel, MARGIN_PRESETS, PAPER_ITEMS } from './page-setup.js';
-import { resolveText } from './resolve.js';
+import { resolveText, localizedText } from './resolve.js';
 
 /** The margin preset matching the sheet's print margins ('Custom' if none). */
 export function currentMarginPreset(sheet: Worksheet): string {
@@ -71,8 +71,12 @@ export function computeCommandState(d: Designer, commandName: string): CommandSt
     }
     case 'fontWeight': state.checked = /bold|[6-9]00/.test(String(style.fontWeight ?? '')); break;
     case 'fontItalic': state.checked = /italic|oblique/.test(String(style.fontStyle ?? '')); break;
-    case 'fontUnderline': state.checked = /underline/.test(String(style.textDecoration ?? '')) && !/double/.test(String(style.textDecoration ?? '')); break;
-    case 'fontDoubleUnderline': state.checked = /double/.test(String(style.textDecoration ?? '')); break;
+    // TASK 90: `textDecoration` is the numeric TextDecorationType mask (underline 1, lineThrough
+    // 2, overline 4, doubleUnderline 8, accounting 16/32) — the string test these cases used never
+    // matched a number, so the ribbon checkboxes stayed unchecked and their click wrote the wrong
+    // next state.
+    case 'fontUnderline': state.checked = (Number(style.textDecoration ?? 0) & 1) !== 0 && (Number(style.textDecoration ?? 0) & 8) === 0; break;
+    case 'fontDoubleUnderline': state.checked = (Number(style.textDecoration ?? 0) & 8) !== 0; break;
     case 'wrapText': state.checked = !!style.wordWrap; break;
     case 'topAlign': state.checked = Number(style.vAlign ?? 0) === 0; break;
     case 'middleAlign': state.checked = Number(style.vAlign) === 1; break;
@@ -80,7 +84,7 @@ export function computeCommandState(d: Designer, commandName: string): CommandSt
     case 'leftAlign': state.checked = Number(style.hAlign) === 0; break;
     case 'centerAlign': state.checked = Number(style.hAlign) === 1; break;
     case 'rightAlign': state.checked = Number(style.hAlign) === 2; break;
-    case 'ribbonNumberFormat': state.value = format === 'General' || !format ? 'General' : format; state.text = format === 'General' || !format ? 'General' : categoryForFormat(format); break;
+    case 'ribbonNumberFormat': state.value = format === 'General' || !format ? 'General' : format; state.text = localizedText(d.resources, format === 'General' || !format ? 'General' : categoryForFormat(format), 'ribbon.home'); break;
     case 'backColor': state.color = (style.backColor as string | undefined) ?? 'transparent'; break;
     case 'foreColor': state.color = (style.foreColor as string | undefined) ?? '#000000'; break;
     case 'formatPainter': state.checked = !!d._formatPainterStyle; break;
@@ -104,10 +108,10 @@ export function computeCommandState(d: Designer, commandName: string): CommandSt
     case 'printLineVisible': state.checked = sheet.isPrintLineVisible(); break;
     case 'orientationPortrait': state.checked = Number(sheet.printInfo().orientation()) !== 2; break;
     case 'orientationLandscape': state.checked = Number(sheet.printInfo().orientation()) === 2; break;
-    case 'marginSelector': state.text = currentMarginPreset(sheet); break;
+    case 'marginSelector': state.text = localizedText(d.resources, currentMarginPreset(sheet), 'ribbon.menus'); break;
     case 'marginNormal': case 'marginWide': case 'marginNarrow':
       state.checked = currentMarginPreset(sheet) === commandName.slice('margin'.length); break;
-    case 'paperKindSelector': state.text = currentPaperName(sheet); break;
+    case 'paperKindSelector': state.text = localizedText(d.resources, currentPaperName(sheet), 'ribbon.papers'); break;
     case 'paperLetter': case 'paperLegal': case 'paperA4': case 'paperA3': {
       const kind = PAPER_ITEMS.find((item) => item.text === commandName.slice('paper'.length))?.kind;
       state.checked = kind !== undefined && Number(sheet.printInfo().paperSize().kind()) === kind;

@@ -8,3 +8,4 @@ declare module '@mescius/spread-sheets-designer-resources-en';
 declare module '@mescius/spread-sheets-pivot-addon';
 declare module '@mescius/spread-sheets-designer';
 declare module '@mescius/spread-sheets-designer-react';
+declare module '@mescius/spread-sheets-languagepackages';

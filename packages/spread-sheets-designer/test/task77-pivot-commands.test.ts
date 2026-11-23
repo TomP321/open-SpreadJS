@@ -22,24 +22,9 @@ import {
 } from '../src/pivot-designer.js';
 
 // jsdom ships no 2D canvas backend; the List Formulas report auto-fits its formula column, so
-// the measurement path needs a stub (the same one packages/spread-sheets/test/formula-panel-io.test.ts uses).
-function stubCanvas2d(): void {
-  (globalThis as Record<string, unknown>).CanvasRenderingContext2D = class {};
-  HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, id?: string) {
-    if (id !== '2d') return null;
-    const target: Record<string, unknown> = { canvas: this };
-    return new Proxy(target, {
-      get: (t, prop) => {
-        if (typeof prop === 'symbol') return undefined;
-        if (prop in t) return t[prop as string];
-        if (prop === 'measureText') return (text: unknown) => ({ width: String(text).length * 7, actualBoundingBoxAscent: 8, actualBoundingBoxDescent: 2 });
-        if (prop === 'createLinearGradient' || prop === 'createRadialGradient' || prop === 'createPattern') return () => ({ addColorStop: () => undefined });
-        return () => undefined;
-      },
-      set: (t, prop, value) => { t[prop as string] = value; return true; },
-    }) as unknown as CanvasRenderingContext2D;
-  } as HTMLCanvasElement['getContext'];
-}
+// the measurement path needs a stub (shared helper, TASK 95).
+import { stubCanvas2d } from './canvas-stub.js';
+
 stubCanvas2d();
 
 const DATA = [

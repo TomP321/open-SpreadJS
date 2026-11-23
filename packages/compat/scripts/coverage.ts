@@ -200,7 +200,7 @@ const lines = [
   'Batch array responses have bounded submission-event coverage; see the status for the observed behavior.',
   'See [STATUS.md](STATUS.md#gcdata-partial).',
   '',
-  'M5 includes partial UI/module behavior despite implemented constructors/methods. Advanced filter presets and paste modes warn NotImplemented; date-mask editing throws NotImplemented. See [STATUS.md](STATUS.md#m5--partial-acceptance-gates-remain-red) for the bounded behavior, remaining modules and failed visual gates.',
+  'M5 includes partial UI/module behavior despite implemented constructors/methods. Filter-menu value choices (Top 10, Above/Below Average, dynamic date filters) and the context-menu paste options are implemented (TASK 99); remaining context-menu items and date-mask editing throw NotImplemented. See [STATUS.md](STATUS.md#m5--partial-acceptance-gates-remain-red) for the bounded behavior, remaining modules and failed visual gates.',
   '',
   'The runtime inventory loads our optional `@opensheets/spread-sheets-io` side effects. `Workbook.import` and `export` cover the bounded XLSX/CSV/SSJSON implementation; `open` delegates named Excel files and reports SJS as unsupported, and `save` is an explicit unsupported callback. Core-only builds intentionally omit all four methods, matching the reference. IO gaps and failed differential/visual gates are recorded in [STATUS.md](STATUS.md#m7a--io-plugin-partial).',
   '',

@@ -4,8 +4,9 @@
  * the command routing uses. The class methods are thin wrappers around these
  * functions. */
 import type { DesignerApi as Designer } from './designer-api.js';
+import { messageText } from './resolve.js';
 import { applyBuiltin, activeSheet, topCell } from './commands/actions.js';
-import type { Worksheet } from './core-internals.js';
+import { extendView, type SheetInternals, type Worksheet } from './core-internals.js';
 
 /** Payload of the '__designerUndoable' command the undo bridge registers on the workbook command manager. */
 interface UndoBridgeCommand {
@@ -24,6 +25,8 @@ interface FormulaCommitCommand {
   col: number;
   value?: string;
   before?: string;
+  /** TASK 91: array-formula range when the committed cell is an array-formula anchor (`{=...}` text). */
+  array?: { rowCount: number; colCount: number };
   sheetKey: number;
 }
 
@@ -83,7 +86,11 @@ export function installFormulaCommit(d: Designer): void {
       if (isUndo) { sheet.fromJSON(JSON.parse(options.before as string)); }
       else {
         const text = String(options.value ?? '');
-        if (text.startsWith('=')) sheet.setFormula(options.row, options.col, text); else {
+        if (text.startsWith('{=') && text.endsWith('}')) { // TASK 91: array formula committed from the bar
+          const range = options.array ?? { rowCount: 1, colCount: 1 };
+          sheet.setArrayFormula(options.row, options.col, range.rowCount, range.colCount, text.slice(2, -1));
+        }
+        else if (text.startsWith('=')) sheet.setFormula(options.row, options.col, text); else {
           sheet.setFormula(options.row, options.col, null);
           sheet.setValue(options.row, options.col, text === '' ? null : text);
         }
@@ -98,10 +105,11 @@ export function commitFormula(d: Designer, text: string): void {
   const sheet = activeSheet(d);
   const { row, col } = topCell(sheet);
   const before = JSON.stringify(sheet.toJSON());
+  const array = extendView<SheetInternals, object>(sheet)._arrayFormula?.(row, col);
   try {
     d.getWorkbook().commandManager().execute({
-      cmd: '__designerFormulaCommit', row, col, value: text, before, sheetKey: undoSheetKey(d, sheet),
+      cmd: '__designerFormulaCommit', row, col, value: text, before, array, sheetKey: undoSheetKey(d, sheet),
     });
-  } catch (error) { d.showMessageBox(String(error), 'Error', 3); }
+  } catch (error) { d.showMessageBox(String(error), messageText(d, 'error', 'Error'), 3); }
   d.invalidate();
 }

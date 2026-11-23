@@ -10,6 +10,7 @@ import type { Worksheet } from '../worksheet.js';
 import { AreaRef, CalcError, CalcArray, ErrorCode, ErrorThrown, ScalarValue, Value, error, isArray, isLambda, isReference, normalizeNumber } from './values.js';
 
 import { parseFormula } from './parser.js';
+import { getActiveCalcLanguagePackage } from './language-packages.js';
 import { columnNumber } from './engine-ast.js';
 import { EvalContext, ExternalRangeArray, implicitIntersect, scalar, toMatrix } from './evaluate.js';
 import type { CalcEngine, FormulaCell } from './engine.js';
@@ -132,7 +133,8 @@ export function evaluateFormulaValue(engine: CalcEngine,
   ): unknown {
     const sheet = engine.resolveContextSheet(context);
     if (!sheet) return error(ErrorCode.value);
-    const ast = parseFormula(formula, { r1c1: useR1C1 });
+    // Public CalcEngine.evaluateFormula: user input, so the active language package applies.
+    const ast = parseFormula(formula, { r1c1: useR1C1, language: getActiveCalcLanguagePackage() });
     const ctx: EvalContext = {
       host: engine,
       sheet,

@@ -1,11 +1,13 @@
 export interface MaskOptions { pattern: string; placeholder?: string; excludeLiteral?: boolean; excludePlaceholder?: boolean }
 interface Unit { literal?: string; alternatives?: string[]; test?: RegExp; transform?: 'upper' | 'lower'; min: number; max: number }
-const patterns = new Map<string, string>();
-export function getNamedPatterns(): { name: string; pattern: string }[] { return [...patterns].map(([name, pattern]) => ({ name, pattern })); }
-export function namedPattern(name: string, pattern?: string | null): string | void { if (pattern === undefined) return patterns.get(name); if (pattern === null) patterns.delete(name); else patterns.set(name, pattern); }
+type PatternMap = Map<string, string | null>;
+const patterns: PatternMap = new Map();
+export function getNamedPatterns(): { name: string; pattern: string }[] { return [...patterns].filter(([, pattern]) => pattern !== null).map(([name, pattern]) => ({ name, pattern: pattern as string })); }
+/** Trial semantics: setting `null` removes the name from the list but the name then reads back as `null`. */
+export function namedPattern(name: string, pattern?: string | null): string | null | void { if (pattern === undefined) return patterns.get(name); if (pattern === null) patterns.set(name, null); else patterns.set(name, pattern); }
 function units(input: string): Unit[] {
   let pattern = input;
-  for (let depth = 0; depth < 16; depth++) { let next = pattern; for (const [name, replacement] of patterns) next = next.replaceAll(name, replacement); if (next === pattern) break; pattern = next; if (depth === 15) throw new Error('Parse Unknown Pattern Failure'); }
+  for (let depth = 0; depth < 16; depth++) { let next = pattern; for (const [name, replacement] of patterns) if (replacement !== null) next = next.replaceAll(name, replacement); if (next === pattern) break; pattern = next; if (depth === 15) throw new Error('Parse Unknown Pattern Failure'); }
   const result: Unit[] = [];
   for (let i = 0; i < pattern.length; i++) {
     const ch = pattern[i]; let unit: Unit;
@@ -28,11 +30,91 @@ function units(input: string): Unit[] {
   }
   return result;
 }
+/** Grammar facts the trial reports through `Error` messages reused verbatim in `IValidatePatternResult`. */
+const MASK_UNKNOWN = 'Parse Unknown Pattern Failure';
+const MASK_QUANTIFIER = 'Parse Quantifier Pattern Failure';
+const MASK_QUANTIFIER_POSITION = 'Error Quantifier Position';
+/** Expand named patterns and classify the mask grammar the way the trial's validator does. */
+function scanMaskGrammar(input: string): boolean {
+  let pattern = input;
+  for (let depth = 0; depth < 16; depth++) {
+    let next = pattern;
+    for (const [name, replacement] of patterns) if (replacement !== null) next = next.replaceAll(name, replacement);
+    if (next === pattern) break;
+    pattern = next;
+    if (depth === 15) throw new Error(MASK_UNKNOWN);
+  }
+  let restriction = false;
+  let prevAtom = false;
+  let i = 0;
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    if (ch === '\\') { if (++i >= pattern.length) break; prevAtom = true; i++; continue; }
+    if (ch === '}') { if (!prevAtom) throw new Error(MASK_UNKNOWN); prevAtom = false; i++; continue; }
+    if ('a0<>#'.includes(ch)) { restriction = true; prevAtom = true; i++; continue; }
+    if (ch === '[') {
+      let end = i + 1;
+      while (end < pattern.length && (pattern[end] !== ']' || pattern[end - 1] === '\\')) end++;
+      if (end >= pattern.length) throw new Error(MASK_UNKNOWN);
+      restriction = true; prevAtom = true; i = end + 1; continue;
+    }
+    if (ch === '(') {
+      let end = i + 1;
+      while (end < pattern.length && pattern[end] !== ')') end++;
+      if (end >= pattern.length) throw new Error(MASK_UNKNOWN);
+      // A choice group only restricts input when it actually offers alternatives, and a quantifier may not follow it.
+      if (pattern.slice(i + 1, end).includes('|')) restriction = true;
+      prevAtom = false;
+      i = end + 1;
+      if (pattern[i] === '{') throw new Error(MASK_QUANTIFIER_POSITION);
+      continue;
+    }
+    if (ch === '{') {
+      const match = /^\{([^}]*)\}/.exec(pattern.slice(i));
+      if (!match) throw new Error(MASK_UNKNOWN);
+      if (!prevAtom) throw new Error(MASK_QUANTIFIER_POSITION);
+      const quantifier = /^(\d*)(,)?(\d*)$/.exec(match[1]);
+      const minText = quantifier?.[1] ?? '';
+      const hasComma = quantifier?.[2] === ',';
+      const maxText = quantifier?.[3] ?? '';
+      if (!quantifier || (!minText && !maxText)) throw new Error(MASK_QUANTIFIER);
+      const min = minText ? Number(minText) : 1;
+      const max = maxText ? Number(maxText) : hasComma ? Number.MAX_SAFE_INTEGER : min;
+      if (!hasComma && min < 1) throw new Error(MASK_QUANTIFIER);
+      if (min > max) throw new Error(MASK_QUANTIFIER);
+      i += match[0].length;
+      continue;
+    }
+    prevAtom = true;
+    i++;
+  }
+  return restriction;
+}
 export function validatePattern(pattern: string): { success: boolean; message?: string } {
   if (!pattern) return { success: false, message: 'Empty Pattern' };
-  if (isDatePattern(pattern)) { const fields = pattern.match(DATE_TOKEN) ?? []; const keys = fields.map(f => f[0]); return new Set(keys).size === keys.length ? { success: true } : { success: false, message: 'Parse Unknown Pattern Failure' }; }
-  try { const parsed = units(pattern); if (!parsed.some(u => u.test || u.alternatives)) return { success: false, message: 'No Restriction Can Be Entered' }; return { success: true }; }
-  catch { return { success: false, message: 'Parse Unknown Pattern Failure' }; }
+  if (isDatePattern(pattern)) {
+    // Trial rule: each calendar FIELD FAMILY (year, month, day, hour, minute, second, meridiem)
+    // may appear at most once — `HH-hh` or `yyyy-...-yyyy` answer `Duplicated Date Time Pattern`.
+    const DATE_FAMILIES: Record<string, string> = { yyyy: 'y', yy: 'y', MM: 'M', M: 'M', dd: 'd', d: 'd', HH: 'h', H: 'h', hh: 'h', h: 'h', mm: 'm', m: 'm', ss: 's', s: 's', tt: 't', t: 't' };
+    const seen = new Set<string>();
+    let i = 0;
+    while (i < pattern.length) {
+      const token = DATE_TOKEN.exec(pattern.slice(i));
+      if (token) {
+        const family = DATE_FAMILIES[token[0]!]!;
+        if (seen.has(family)) return { success: false, message: 'Duplicated Date Time Pattern' };
+        seen.add(family);
+        i += token[0].length;
+      } else i++;
+    }
+    return { success: true };
+  }
+  try {
+    return scanMaskGrammar(pattern) ? { success: true } : { success: false, message: 'No Restriction Can Be Entered' };
+  } catch (error) {
+    const message = error instanceof Error && [MASK_UNKNOWN, MASK_QUANTIFIER, MASK_QUANTIFIER_POSITION].includes(error.message) ? error.message : MASK_UNKNOWN;
+    return { success: false, message };
+  }
 }
 
 /* Calendar patterns (yyyy yy MM M dd d HH H hh h mm m ss s tt t plus separators) use a

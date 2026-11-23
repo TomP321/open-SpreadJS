@@ -9,8 +9,10 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import type { DesignerApi as Designer } from '../designer-api.js';
+import { T } from './t.js';
 import {
-  allCategory, categoryList, dialogCategories, functionArgumentRows, functionDescription,
+  allCategory, categoryList, dialogCategories, functionArgumentRows, functionCategoryDisplay,
+  functionDescriptionLocalized, functionDisplayName, functionListSeparator,
   functionSignature, recommendedCategory,
 } from '../function-library.js';
 
@@ -30,10 +32,10 @@ function fieldText(raw: unknown): string {
   return text.startsWith('=') ? text : `=${text}`;
 }
 
-/** Preview line: filled arguments only, without the fields' `=` prefixes. */
+/** Preview line: filled arguments only, without the fields' `=` prefixes. TASK 89: localized name + separator. */
 function preview(name: string, args: string[]): string {
   const values = args.map((value) => String(value ?? '').replace(/^=/, '').trim()).filter((value) => value.length > 0);
-  return `Formula = ${name}(${values.join(',')})`;
+  return `Formula = ${functionDisplayName(name)}(${values.join(functionListSeparator())})`;
 }
 
 export function InsertFunctionBody({ designer, data, update }: {
@@ -50,12 +52,12 @@ export function InsertFunctionBody({ designer, data, update }: {
   const select = (name: string): void => { update('function', name); };
   return (
     <div className="gc-insert-function">
-      <div className="gc-insert-function-label">Search for a function:</div>
+      <div className="gc-insert-function-label">{T('searchForAFunction', 'Search for a function:')}</div>
       <div className="gc-function-search">
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" /><path d="m10.4 10.4 3.2 3.2" stroke="currentColor" fill="none" /></svg>
         <input
           className="gc-dialog-input gc-function-search-input"
-          aria-label="Search for a function:"
+          aria-label={T('searchForAFunction', 'Search for a function:')}
           value={search}
           onChange={(event) => {
             const next = event.target.value;
@@ -65,35 +67,35 @@ export function InsertFunctionBody({ designer, data, update }: {
             if (found.length) update('function', found[0]);
           }}
         />
-        {search ? <button type="button" className="gc-function-search-clear" aria-label="Clear" title="Clear" onClick={() => { update('search', ''); update('category', allCategory); const found = categoryList(allCategory, ''); if (found.length) update('function', found[0]); }}>×</button> : null}
+        {search ? <button type="button" className="gc-function-search-clear" aria-label={T('clear', 'Clear')} title={T('clear', 'Clear')} onClick={() => { update('search', ''); update('category', allCategory); const found = categoryList(allCategory, ''); if (found.length) update('function', found[0]); }}>×</button> : null}
       </div>
       <div className="gc-function-galleries">
         <div className="gc-function-gallery">
-          <div className="gc-insert-function-label">Function Category:</div>
-          <div className="gc-dialog-list gc-function-category-list" role="listbox" aria-label="Function Category:">
+          <div className="gc-insert-function-label">{T('functionCategory', 'Function Category:')}</div>
+          <div className="gc-dialog-list gc-function-category-list" role="listbox" aria-label={T('functionCategory', 'Function Category:')}>
             {categories.map((name) => (
               <div key={name} role="option" aria-selected={name === category} className={`gc-dialog-list-item${name === category ? ' selected' : ''}`}
                 onClick={() => {
                   update('category', name);
                   const first = categoryList(name, search)[0];
                   if (first) select(first);
-                }}>{name}</div>
+                }}>{functionCategoryDisplay(designer.resources, name)}</div>
             ))}
           </div>
         </div>
         <div className="gc-function-gallery">
-          <div className="gc-insert-function-label">Function List:</div>
-          <div className="gc-dialog-list gc-function-name-list" role="listbox" aria-label="Function List:">
+          <div className="gc-insert-function-label">{T('functionList', 'Function List:')}</div>
+          <div className="gc-dialog-list gc-function-name-list" role="listbox" aria-label={T('functionList', 'Function List:')}>
             {names.map((name) => (
               <div key={name} role="option" aria-selected={name === selected} className={`gc-dialog-list-item${name === selected ? ' selected' : ''}`}
-                onClick={() => select(name)} onDoubleClick={() => designer.openFunctionArguments(name)}>{name}</div>
+                onClick={() => select(name)} onDoubleClick={() => designer.openFunctionArguments(name)}>{functionDisplayName(name)}</div>
             ))}
           </div>
         </div>
       </div>
       <div className="gc-function-detail">
         <div className="gc-function-signature">{signature}</div>
-        <div className="gc-function-description">{selected ? functionDescription(selected) : ''}</div>
+        <div className="gc-function-description">{selected ? functionDescriptionLocalized(designer.resources, selected) : ''}</div>
       </div>
     </div>
   );
@@ -117,7 +119,7 @@ export function FunctionArgumentsBody({ designer, data, update }: {
   const setArg = (index: number, value: string): void => update('args', args.map((current, at) => (at === index ? value : current)));
   return (
     <div className="gc-function-arguments">
-      <div className="gc-function-arguments-name">{name}</div>
+      <div className="gc-function-arguments-name">{functionDisplayName(name)}</div>
       <div className="function-arguments-container">
         {parameters.map((parameter, index) => (
           <div key={`${parameter}-${index}`} className="parameter-container">
@@ -127,14 +129,14 @@ export function FunctionArgumentsBody({ designer, data, update }: {
                 <input className="range-input" aria-label={`${parameter}:`} value={fieldText(args[index])}
                   onFocus={() => setPicking(index)} onChange={(event) => setArg(index, event.target.value)} />
               </span>
-              <div role="button" tabIndex={0} className={`range-select-button${picking === index ? ' active' : ''}`} title="Select a range in the sheet"
+              <div role="button" tabIndex={0} className={`range-select-button${picking === index ? ' active' : ''}`} title={T('selectARangeInTheSheet', 'Select a range in the sheet')}
                 aria-label={parameter} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setPicking(picking === index ? -1 : index); } }}
                 onClick={() => setPicking(picking === index ? -1 : index)}><span /></div>
             </div>
           </div>
         ))}
       </div>
-      <div className="gc-function-description">{functionDescription(name)}</div>
+      <div className="gc-function-description">{functionDescriptionLocalized(designer.resources, name)}</div>
       <fieldset className="gc-designer-labelLine"><legend className="gc-designer-labelLine-text" /></fieldset>
       <div className="gc-function-preview-formula">{preview(name, args)}</div>
     </div>

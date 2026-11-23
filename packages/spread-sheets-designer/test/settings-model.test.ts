@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { resolveText } from '../src/resolve.js';
+import { englishResources } from '../src/resources.js';
+
+// TASK 87: model captions are `${res.settings.*}` placeholders; resolve before comparing.
+const r = (value: unknown): string => resolveText(value, englishResources);
 import GC from '@mescius/spread-sheets';
 import {
   applySettings, readSettings, settingsTabForCommand, sheetSettingTabs, spreadSettingTabs,
@@ -10,9 +15,9 @@ const tabKeys = (tabs: typeof spreadSettingTabs) => tabs.map((tab) => tab.key);
 describe('Spread Settings model', () => {
   it('has the trial’s seven tabs', () => {
     expect(tabKeys(spreadSettingTabs)).toEqual(['general', 'scrollBars', 'calculation', 'tabStrip', 'clipboard', 'customList', 'namedPattern']);
-    expect(spreadSettingTabs.map((tab) => tab.text)).toEqual(['General', 'ScrollBars', 'Calculation', 'Tab Strip', 'Clipboard', 'Custom Lists', 'Named Patterns']);
+    expect(spreadSettingTabs.map((tab) => r(tab.text))).toEqual(['General', 'ScrollBars', 'Calculation', 'Tab Strip', 'Clipboard', 'Custom Lists', 'Named Patterns']);
     expect(tabKeys(sheetSettingTabs)).toEqual(['general', 'gridlines', 'headers', 'sheetTab']);
-    expect(sheetSettingTabs[2].subTabs?.map((entry) => entry.text)).toEqual(['Column Headers', 'Row Headers']);
+    expect(sheetSettingTabs[2].subTabs?.map((entry) => r(entry.text))).toEqual(['Column Headers', 'Row Headers']);
   });
 
   it('opens each ribbon command on its own tab', () => {

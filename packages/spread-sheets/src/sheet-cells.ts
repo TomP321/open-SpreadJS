@@ -12,7 +12,7 @@
 import { CellBindingSource, getPath, setPath } from './features/binding.js';
 import { CellStore } from './structures.js';
 import { assertCustomFunction } from './calc/functions-api.js';
-import { INVALID_CUSTOM_NAME, assertCustomName, assertNameFormula } from './calc/custom-names.js';
+import { INVALID_CUSTOM_NAME, assertCustomName, assertNameFormula, normalizeNameFormula } from './calc/custom-names.js';
 import { CellRange, adjustFormula } from './range.js';
 
 import { GC } from './generated/enums.js';
@@ -51,7 +51,19 @@ export function setText(sheet: Worksheet, row: number, col: number, value: strin
     sheet.setValue(row, col, parsed ?? value, area);
 }
 
-export function setFormula(sheet: Worksheet, row: number, col: number, value: string | null, area = VIEW): void {
+export function setFormula(
+    sheet: Worksheet,
+    row: number,
+    col: number,
+    value: string | null,
+    area = VIEW,
+    /**
+     * `true` for internal replays that carry the STORED (canonical English) text (paste/undo
+     * round trips of raw store values). The public call keeps `false` and parses with the
+     * active calc language package, so user input may be localized.
+     */
+    canonicalParse = false,
+): void {
     if (sheet.options.isProtected && sheet.getActualStyle(row, col, area).locked !== false) return;
     coordinate(row);
     coordinate(col);
@@ -60,11 +72,14 @@ export function setFormula(sheet: Worksheet, row: number, col: number, value: st
     let parsedR1c1: boolean | undefined;
     if (stored && sheet.calcEngine?.parseFormula && area === VIEW) {
       const original = stored;
-      const canonical = sheet.calcEngine.parseFormula(sheet, row, col, stored);
+      const canonical = canonicalParse
+        ? sheet.calcEngine.parseFormulaText?.(sheet, stored, sheet.calcEngine.isR1C1?.() ?? false, undefined) ??
+          sheet.calcEngine.parseFormula(sheet, row, col, stored)
+        : sheet.calcEngine.parseFormula(sheet, row, col, stored);
       if (canonical !== undefined) {
         stored = canonical;
         const last = sheet.calcEngine.lastParsed;
-        if (last && last.text === original) {
+        if (last && last.text === original && (canonicalParse ? last.language === undefined : true)) {
           parsedAst = last.ast;
           parsedR1c1 = last.r1c1;
         }
@@ -449,13 +464,14 @@ export function addCustomName(sheet: Worksheet,
     isReadOnly?: boolean,
   ): void {
     assertCustomName(name, formula);
-    assertNameFormula(formula.replace(/^=/, ''), sheet.calcEngine?.isR1C1?.() ?? false);
+    const r1c1 = sheet.calcEngine?.isR1C1?.() ?? false;
+    assertNameFormula(formula.replace(/^=/, ''), r1c1);
     const key = name.toLowerCase();
     // The trial refuses a second name that collides with one it already holds,
     // ignoring case: adding `MYA` and then `mya` throws `invalid custom name`.
     const taken = sheet.names.get(key);
     if (taken) throw new Error(INVALID_CUSTOM_NAME);
-    const info = new NameInfo(name, formula.replace(/^=/, ''), baseRow, baseCol, comment, isReadOnly);
+    const info = new NameInfo(name, normalizeNameFormula(formula.replace(/^=/, ''), r1c1), baseRow, baseCol, comment, isReadOnly);
     info._onRename = (previous, next) => {
       const existing = sheet.names.get(next.toLowerCase());
       if (existing && existing !== info) throw new Error('Name already exists');

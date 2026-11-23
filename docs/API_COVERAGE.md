@@ -11,7 +11,7 @@ relative and absolute references, bracketed field names, and one-based array pat
 Batch array responses have bounded submission-event coverage; see the status for the observed behavior.
 See [STATUS.md](STATUS.md#gcdata-partial).
 
-M5 includes partial UI/module behavior despite implemented constructors/methods. Advanced filter presets and paste modes warn NotImplemented; date-mask editing throws NotImplemented. See [STATUS.md](STATUS.md#m5--partial-acceptance-gates-remain-red) for the bounded behavior, remaining modules and failed visual gates.
+M5 includes partial UI/module behavior despite implemented constructors/methods. Filter-menu value choices (Top 10, Above/Below Average, dynamic date filters) and the context-menu paste options are implemented (TASK 99); remaining context-menu items and date-mask editing throw NotImplemented. See [STATUS.md](STATUS.md#m5--partial-acceptance-gates-remain-red) for the bounded behavior, remaining modules and failed visual gates.
 
 The runtime inventory loads our optional `@opensheets/spread-sheets-io` side effects. `Workbook.import` and `export` cover the bounded XLSX/CSV/SSJSON implementation; `open` delegates named Excel files and reports SJS as unsupported, and `save` is an explicit unsupported callback. Core-only builds intentionally omit all four methods, matching the reference. IO gaps and failed differential/visual gates are recorded in [STATUS.md](STATUS.md#m7a--io-plugin-partial).
 
@@ -94,15 +94,6 @@ React: supported workbook option/event props, incremental worksheet/column confi
 - `GC.Data.Table` unsupported or add-on-only members: `columns`.
 - `GC.Spread.CalcEngine.Expression` unsupported or add-on-only members: `type`.
 - `GC.Spread.Common.CultureInfo` unsupported or add-on-only members: `equalCharacters`, `fontScriptCode`.
-- `GC.Spread.Sheets.Commands.ReportChartPreviewVisible`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Commands.ReportCollapseButtonToggle`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Commands.reportSheetAddRecord`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Commands.reportSheetCollapseAll`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Commands.reportSheetDeleteRecord`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Commands.reportSheetExpandAll`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Commands.reportSheetRegenerateReport`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Commands.reportSheetResetCellValue`: property access throws `NotImplemented`.
-- `GC.Spread.Sheets.Commands.reportSheetSubmit`: property access throws `NotImplemented`.
 - `GC.Spread.Sheets.GanttSheet.Calendar` unsupported or add-on-only members: `name`.
 - `GC.Spread.Sheets.GanttSheet.CustomWorkWeek` unsupported or add-on-only members: `finish`, `start`.
 - `GC.Spread.Sheets.GanttSheet.GanttGridlines` unsupported or add-on-only members: `statusDate`.

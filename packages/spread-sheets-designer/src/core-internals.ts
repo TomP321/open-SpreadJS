@@ -90,6 +90,12 @@ export interface SheetsNamespaceExtras {
    *  shared-formula coalescing — TASK 75); `installDesigner()` calls it, tests use it to measure the
    *  exact trial JSON shape without mounting a Designer. */
   _setDesignerSerialization?: (on: boolean) => void;
+  /** Hidden hook of the core exposing the cell-editor/`FormulaTextBox` formula colourer (TASK 91):
+   *  the Designer formula bar renders its syntax colouring from exactly these segments. */
+  _formulaColorSegments?: (text: string) => { text: string; color?: string }[];
+  /** Hidden hook of the core answering the `General` text of a value (TASK 91: what the bar shows
+   *  for a selected non-formula cell — culture separators, `TRUE`/`FALSE`, General dates). */
+  _generalText?: (value: unknown) => string;
 }
 export function sheetsNamespace(gc: GCRoot): SheetsNamespaceExtras & GCRoot['Spread']['Sheets'] {
   return extendView<SheetsNamespaceExtras, GCRoot['Spread']['Sheets']>(gc.Spread.Sheets);
@@ -162,6 +168,8 @@ export interface SheetInternals {
   _manualPageBreaks(): { rows: number[]; cols: number[] };
   /** Renderer view of the workbook (pixel scroll/zoom the draw overlay maps pointer events through). */
   _view(): SheetView | undefined;
+  /** Array-formula range covering the cell (TASK 91: the formula bar shows `{=...}` for these), undefined otherwise. */
+  _arrayFormula(row: number, col: number): { rowCount: number; colCount: number } | undefined;
   /** Last `backgroundImage()` call: source plus layout/paintOrder options. */
   getBackgroundImageInfo(): { backgroundImage: string | null; option: { layout?: 'repeat' | 'none'; paintOrder?: 'normal' | 'over-content' } };
   /** `backgroundImage` viewed with the `null` our core accepts to remove the image (the contract types the value `string`). */
@@ -598,6 +606,20 @@ export function pivotNamespace(gc: GCRoot): PivotNamespaceExtras & GCRoot['Sprea
 export interface PivotThemeView { name(): string; toJSON(): Record<string, unknown> }
 export function pivotTableThemes(gc: GCRoot): Record<string, PivotThemeView | undefined> {
   return extendView<Record<string, PivotThemeView | undefined>, GCRoot['Spread']['Pivot']['PivotTableThemes']>(gc.Spread.Pivot.PivotTableThemes);
+}
+
+/**
+ * `Workbook.defaultPivotTableTheme` is declared with the single getter shape
+ * `defaultPivotTableTheme(themeName?: string): PivotTableTheme | undefined` in the
+ * contract; our core's setter overloads additionally accept a theme instance (set)
+ * and `null` (clear) — the gallery's "Set As Default" / "Delete" flows (TASK 93).
+ * One typed seam (TASK 95) instead of a per-call cast on the workbook.
+ */
+export interface DefaultThemeWorkbook {
+  defaultPivotTableTheme?: (themeName?: GC.Spread.Pivot.PivotTableTheme | string | null) => GC.Spread.Pivot.PivotTableTheme | undefined;
+}
+export function defaultThemeWorkbook(workbook: Workbook): Workbook & DefaultThemeWorkbook {
+  return extendView<DefaultThemeWorkbook, Workbook>(workbook);
 }
 
 /**

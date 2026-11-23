@@ -16,6 +16,7 @@ import { workbookSparklineOf } from './features/sparkline-ex.js';
 import { canvasColor as resolveColor, mixColor, withAlpha } from './colors.js';
 import { Range, Style, type LineBorder } from './primitives.js';
 import { GeneralFormatter } from './formatter.js';
+import { generalFitText, generalNumberText, recordGeneralFit } from './general-fit.js';
 import { isDefaultCellType } from './features/cell-types.js';
 import { applyInsets, buttonBands, drawButton, drawDecoration, drawWatermark, layoutButtons, parseInsets, visibleButtons, type ButtonRect } from './features/cell-extras.js';
 import { drawFilterGlyph, type FilterGlyphState } from './features/glyphs.js';
@@ -233,6 +234,9 @@ export function paint(renderer: WorkbookRenderer, ): void {
       if (!renderer.floatingLayer) renderer.floatingLayer = element('div', 'opensheets-floating-layer', renderer.root);
       renderer.floatingLayer.style.width = `${renderer.viewWidth}px`; renderer.floatingLayer.style.height = `${renderer.viewHeight}px`;
       renderer.floatingLayer.style.left = `${renderer.viewportX}px`; renderer.floatingLayer.style.top = `${renderer.viewportY}px`;
+      // TASK 94 bug 1: the layer is a pure clip container (overflow:hidden) — any scroll offset it
+      // ever got (e.g. a focus auto-scroll) would shift every floating object; keep it pinned at 0.
+      if (renderer.floatingLayer.scrollTop || renderer.floatingLayer.scrollLeft) { renderer.floatingLayer.scrollTop = 0; renderer.floatingLayer.scrollLeft = 0; }
       renderer.floatingLayer.querySelectorAll<HTMLElement>('.opensheets-floating-object').forEach(el => el.style.display = 'none');
       objects.forEach((item, index) => item._render(renderer, renderer.floatingLayer!, index));
     }
@@ -418,7 +422,11 @@ export function text(renderer: WorkbookRenderer, row: number, col: number, value
     const s = renderer.sheet!;
     if (s.options.showFormulas && s.getFormula(row, col)) return '=' + s.getFormula(row, col);
     if (value == null || (value === 0 && !s.options.showZeros)) return '';
-    if (!style.formatter && !(value instanceof Date) && typeof value !== 'object') return typeof value === 'boolean' ? String(value).toUpperCase() : String(value);
+    if (!style.formatter && !(value instanceof Date) && typeof value !== 'object') {
+      // TASK 91 (2b): a plain number without a formatter paints the `General` text, which
+      // follows the current culture's decimal separator (`396,5` under it-it).
+      return typeof value === 'boolean' ? String(value).toUpperCase() : typeof value === 'number' ? generalNumberText(value) : String(value);
+    }
     if (typeof style.formatter === 'string') {
       let formatter = renderer.formatters.get(style.formatter);
       if (!formatter) renderer.formatters.set(style.formatter, formatter = new GeneralFormatter(style.formatter));
@@ -500,10 +508,22 @@ export function drawText(renderer: WorkbookRenderer, ctx: CanvasRenderingContext
     const width = Math.max(0, rect.width - 2 * pad - indent);
     // The trial shows a number/date whose text does not fit as a run of '#' filling the
     // available width, left-aligned (hash glyphs advance ~1px wider than their measure).
+    // TASK 91: a `General` number shortens the number first (fewer decimals -> integer ->
+    // scientific), and only falls back to the '#' run when nothing fits (`general-fit.ts`).
+    const generalNumber = typeof value === 'number' && Number.isFinite(value)
+      && (style.formatter == null || (typeof style.formatter === 'string' && /^general$/i.test(style.formatter)))
+      && !(renderer.sheet!.options.showFormulas && renderer.sheet!.getFormula(row, col));
+    // The trial fits `General` texts against `width - 1 px` more than the plain clip (measured
+    // on the trial at 100 %: `1.23E+12` = 57.5 px is rejected in a 60 px column, `-0.22222`
+    // = 52.5 px accepted; a 3 px total inset matches every boundary of the matrix).
+    const fitted = generalNumber && !style.wordWrap && !style.shrinkToFit
+      ? generalFitText(value, text, Math.max(0, width - z), (candidate) => ctx.measureText(candidate).width)
+      : undefined;
     const hashes = (value instanceof Date || typeof value === 'number') && !style.wordWrap && !style.shrinkToFit
-      && measured > width && width >= 8;
-    const shown = hashes ? '#'.repeat(Math.max(1, Math.floor(width / ctx.measureText('#').width))) : text;
-    const shownMeasured = hashes ? ctx.measureText(shown).width : measured;
+      && measured > width && width >= 8 && fitted === null;
+    const shown = hashes ? '#'.repeat(Math.max(1, Math.floor(width / ctx.measureText('#').width))) : (generalNumber && fitted ? fitted : text);
+    const shownMeasured = hashes ? ctx.measureText(shown).width : generalNumber && fitted && fitted !== text ? ctx.measureText(fitted).width : measured;
+    if (generalNumber) recordGeneralFit(`${renderer.sheet!.name()}:${row},${col}`, shown); // TASK 91 test hook (no-op unless enabled)
     const alignMode = hashes ? 0 : align;
     const lines = style.wordWrap ? wrappedLines(shown, width, t => ctx.measureText(t).width) : shown.split('\n');
     const blockHeight = lines.length * lineHeight;

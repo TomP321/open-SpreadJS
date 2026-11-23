@@ -7,6 +7,19 @@ import { resolveColor } from '../colors.js';
 import { Range } from '../primitives.js';
 import { GC } from '../generated/enums.js';
 import { evaluateFormula } from '../calc/api.js';
+import { astToText, parseFormula } from '../calc/parser.js';
+import { getActiveCalcLanguagePackage } from '../calc/language-packages.js';
+
+/** Canonical English form of a conditional-format rule formula typed in any accepted grammar. */
+function normalizeRuleFormula(text: string): string {
+  const language = getActiveCalcLanguagePackage();
+  if (!language) return text;
+  try {
+    return astToText(parseFormula(text.replace(/^=/, ''), { language }), {});
+  } catch {
+    return text;
+  }
+}
 import type { Worksheet } from '../worksheet.js';
 import { serializeValue, deserializeValue, type JsonRecord } from '../serialization.js';
 
@@ -177,25 +190,37 @@ export class Condition {
   private treatNullAsZero_ = false;
   private baseRow_ = 0;
   private baseColumn_ = 0;
+  /** Column pool for dynamic filter conditions (average/top-10), set by the row filter. */
+  private filterRange_?: Range;
+
+  /** Internal (non-API): points a dynamic average/top-10 condition at the filtered column. */
+  _setFilterColumnRange(range: Range | undefined): void {
+    this.filterRange_ = range;
+  }
 
   static fromSource(expected: string): Condition {
     return new Condition(ConditionType.areaCondition!, { expected });
   }
   static fromFormula(formula: string): Condition {
-    return new Condition(ConditionType.areaCondition!, { expected: '', formula });
+    return new Condition(ConditionType.areaCondition!, { expected: '', formula: normalizeRuleFormula(formula) });
   }
+  /** Day-of-month condition (1-31). */
   static fromDay(day: number): Condition {
     return new Condition(ConditionType.dateExCondition!, { expectTypeId: 5, expected: day });
   }
+  /** Month condition; the trial stores/evaluates the zero-based month index. */
   static fromMonth(month: number): Condition {
     return new Condition(ConditionType.dateExCondition!, { expectTypeId: 3, expected: month });
   }
+  /** Quarter condition; the trial uses QuarterType (0 = January-March). */
   static fromQuarter(quarter: number): Condition {
-    return new Condition(ConditionType.dateExCondition!, { expectTypeId: 4, expected: quarter });
+    return new Condition(ConditionType.dateExCondition!, { expectTypeId: 2, expected: quarter });
   }
+  /** Week condition; the trial matches the day of week (Sunday = 0). */
   static fromWeek(week: number): Condition {
-    return new Condition(ConditionType.dateExCondition!, { expectTypeId: 2, expected: week });
+    return new Condition(ConditionType.dateExCondition!, { expectTypeId: 4, expected: week });
   }
+  /** Year condition; `expected` is the full calendar year. */
   static fromYear(year: number): Condition {
     return new Condition(ConditionType.dateExCondition!, { expectTypeId: 1, expected: year });
   }
@@ -230,7 +255,9 @@ export class Condition {
       return this;
     }
     if (formulaOrBaseRow === undefined) return this.args.formula ?? '';
-    this.args.formula = formulaOrBaseRow;
+    // TASK 89: store the canonical English form of a formula typed in the active
+    // language package; the rule's evaluation and translation stay English-grammar.
+    this.args.formula = normalizeRuleFormula(String(formulaOrBaseRow));
     return this;
   }
   ignoreBlank(value?: boolean): boolean | this {
@@ -299,7 +326,7 @@ export class Condition {
     if (this.cmp !== undefined) json.compareType = this.cmp;
     if (this.one) { json.item1 = this.one.toJSON(); if (!this.ranges_.length || this.one.conType === 13) delete (json.item1 as JsonRecord).ignoreBlank; }
     if (this.two) { json.item2 = this.two.toJSON(); if (!this.ranges_.length || this.two.conType === 13) delete (json.item2 as JsonRecord).ignoreBlank; }
-    for (const key of ['expected', 'formula', 'expectTypeId', 'customValueType', 'integerValue'])
+    for (const key of ['expected', 'formula', 'expectTypeId', 'customValueType', 'integerValue', 'type', 'isPercent'])
       if (this.args[key] !== undefined && !(key === 'integerValue' && !this.args[key])) json[key] = serializeValue(this.args[key]);
     if (this.args.ignoreBlank !== undefined) json.ignoreBlank = this.args.ignoreBlank;
     if (this.args.ignoreCase !== undefined) json.ignoreCase = this.args.ignoreCase;
@@ -363,7 +390,9 @@ export class Condition {
     if (typeof formula === 'string' && formula) {
       const text = formula.startsWith('=') ? formula.slice(1) : formula;
       if (sheet) {
-        const rangeMatch = /^([A-Za-z]{1,3})(\d+):([A-Za-z]{1,3})(\d+)$/.exec(text.trim());
+        // TASK 100: the documented sources are absolute ranges (`$A$1:$A$3`); strip `$` for the
+        // direct range read so the trial's `createFormulaListValidator("$A$1:$A$3")` lists all cells.
+        const rangeMatch = /^([A-Za-z]{1,3})(\d+):([A-Za-z]{1,3})(\d+)$/.exec(text.replace(/\$/g, '').trim());
         if (rangeMatch) {
           const col = (letters: string): number => {
             let value = 0;
@@ -402,11 +431,23 @@ export class Condition {
       case ConditionType.numberCondition:
       case ConditionType.cellValueCondition: {
         const expected = this.getExpected(evaluator, baseRow, baseColumn);
+        // TASK 100: treatNullValueAsZero compares blank cells as 0, like the trial.
+        const actualNumber = actual == null || actual === '' ? NaN : asNumber(actual);
+        if (this.treatNullAsZero_ && Number.isNaN(actualNumber) && (actual == null || actual === '')) {
+          const zero = compareValues(0, expected, this.cmp ?? Compare.equalsTo);
+          if (!this.ignoreBlank_) return zero;
+        }
         if (this.args.integerValue && !Number.isInteger(asNumber(actual))) return false;
         return compareValues(actual, expected, this.cmp ?? Compare.equalsTo);
       }
       case ConditionType.textCondition: {
         const expected = asText(this.getExpected(evaluator, baseRow, baseColumn));
+        // TASK 100: useWildCards (on by default, like the trial) lets `*` and `?` in the
+        // expected text act as wildcards for an equals-to comparison.
+        if (this.wildCards_ && (expected.includes('*') || expected.includes('?')) && (this.cmp ?? TextCompare.equalsTo) === TextCompare.equalsTo) {
+          const pattern = new RegExp(`^${expected.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.+').replace(/\?/g, '.')}$`, this.ignoreCase_ ? 'i' : '');
+          return pattern.test(asText(actual));
+        }
         return textMatches(asText(actual), expected, this.cmp ?? TextCompare.equalsTo, this.ignoreCase_);
       }
       case ConditionType.formulaCondition: {
@@ -427,20 +468,24 @@ export class Condition {
         const date = serialDate(actual);
         if (!date) return false;
         const expected = Number(this.args.expected);
-        switch (this.args.expectTypeId) {
+        const typeId = this.args.expectTypeId === undefined ? undefined : Number(this.args.expectTypeId);
+        if (typeId === undefined) return dynamicDateOccurs(expected, date);
+        switch (typeId) {
           case 1:
             return date.getFullYear() === expected;
-          case 2: {
-            const start = new Date(date.getFullYear(), 0, 1);
-            const week = Math.floor((date.getTime() - start.getTime()) / 604800000) + 1;
-            return week === expected;
-          }
-          case 3:
-            return date.getMonth() + 1 === expected;
-          case 4:
-            return Math.floor(date.getMonth() / 3) + 1 === expected;
+          case 2: // QuarterType (trial-measured): 0 = Jan-Mar ... 3 = Oct-Dec
+            return Math.floor(date.getMonth() / 3) === expected;
+          case 3: // trial stores the zero-based month index (All Dates in Period: January = 0)
+            return date.getMonth() === expected;
+          case 4: // trial's fromWeek matches the day of week (Sunday = 0, measured on the trial)
+            return date.getDay() === expected;
           case 5:
             return date.getDate() === expected;
+          case 6: { // Year To Date (trial filter): January 1 of `current year + expected` up to today
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            return date.getFullYear() === now.getFullYear() + expected && date.getTime() <= today;
+          }
           default:
             return false;
         }
@@ -478,9 +523,89 @@ export class Condition {
         const color = style?.[this.cmp === 1 ? 'foreColor' : 'backColor'];
         return typeof color === 'string' && resolveColor(color) === resolveColor(String(this.args.expected));
       }
+      case ConditionType.averageCondition: {
+        const poolRange = this.filterRange_ ?? this.ranges_[0];
+        const pool = poolRange ? numberPool(evaluator, poolRange) : [];
+        if (!pool.length || typeof actual !== 'number') return false;
+        const mean = pool.reduce((a, b) => a + b, 0) / pool.length;
+        const sd = Math.sqrt(pool.reduce((a, b) => a + (b - mean) ** 2, 0) / pool.length);
+        const type = Number(this.args.type ?? 0);
+        switch (type) {
+          case 0: return actual > mean;
+          case 1: return actual < mean;
+          case 2: return actual >= mean;
+          case 3: return actual <= mean;
+          case 4: return actual > mean + sd;
+          case 5: return actual < mean - sd;
+          case 6: return actual > mean + 2 * sd;
+          case 7: return actual < mean - 2 * sd;
+          case 8: return actual > mean + 3 * sd;
+          case 9: return actual < mean - 3 * sd;
+          default: return false;
+        }
+      }
+      case ConditionType.top10Condition: {
+        const poolRange = this.filterRange_ ?? this.ranges_[0];
+        const pool = poolRange ? numberPool(evaluator, poolRange) : [];
+        if (!pool.length || typeof actual !== 'number') return false;
+        const rank = Number(this.args.expected ?? 10);
+        const bottom = Number(this.args.type ?? 0) === 1;
+        const sorted = [...pool].sort((a, b) => (bottom ? a - b : b - a));
+        const count = this.args.isPercent ? Math.max(1, Math.ceil((pool.length * rank) / 100)) : Math.max(0, Math.trunc(rank));
+        return sorted.slice(0, count).includes(actual);
+      }
       default:
         return false;
     }
+  }
+}
+
+/** Numeric values inside a rectangle (row-major, blanks and non-numbers skipped). */
+function numberPool(evaluator: unknown, range: Range): number[] {
+  const sheet = evaluator as EvalHost | undefined;
+  const out: number[] = [];
+  if (!sheet || typeof sheet.getValue !== 'function') return out;
+  for (let r = range.row; r < range.row + range.rowCount; r++)
+    for (let c = range.col; c < range.col + range.colCount; c++) {
+      const value = sheet.getValue(r, c);
+      if (typeof value === 'number') out.push(value);
+    }
+  return out;
+}
+
+/**
+ * Dynamic date windows (trial AutoFilter choices: a `dateExCondition` without an
+ * `expectTypeId`, `expected` = `DateOccurringType` value). Weeks are Sunday
+ * based, like the trial's default culture.
+ */
+function dynamicDateOccurs(type: number, date: Date, now = new Date()): boolean {
+  const day = 86400000;
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = midnight(now);
+  const target = midnight(date);
+  const weekStart = today - new Date(today).getDay() * day;
+  const monthWindow = (months: number) => ({
+    start: new Date(now.getFullYear(), now.getMonth() + months, 1).getTime(),
+    end: new Date(now.getFullYear(), now.getMonth() + months + 1, 1).getTime(),
+  });
+  switch (type) {
+    case 0: return target === today; // today
+    case 1: return target === today - day; // yesterday
+    case 2: return target === today + day; // tomorrow
+    case 3: return target >= today - 7 * day && target <= today; // last 7 days
+    case 4: case 5: case 6: { const w = monthWindow(type === 4 ? 0 : type === 5 ? -1 : 1); return target >= w.start && target < w.end; }
+    case 7: case 8: case 9: { const offset = (type === 7 ? 0 : type === 8 ? -7 : 7) * day; return target >= weekStart + offset && target < weekStart + offset + 7 * day; }
+    case 10: case 11: case 12: {
+      const quarter = Math.floor(now.getMonth() / 3) + (type === 11 ? 0 : type === 12 ? -1 : 1);
+      const start = new Date(now.getFullYear(), quarter * 3, 1).getTime();
+      const end = new Date(now.getFullYear(), quarter * 3 + 3, 1).getTime();
+      return target >= start && target < end;
+    }
+    case 13: case 14: case 15: {
+      const year = now.getFullYear() + (type === 14 ? 0 : type === 15 ? -1 : 1);
+      return target >= new Date(year, 0, 1).getTime() && target < new Date(year + 1, 0, 1).getTime();
+    }
+    default: return false;
   }
 }
 

@@ -5,7 +5,7 @@ import { canvasColor as resolveColor } from '../colors.js';
  * pointer input and createEditorElement/getEditorValue/setEditorValue bridge
  * the HTML editor.
  */
-import { Style, clone } from '../primitives.js';
+import { Style, canvasFont, clone } from '../primitives.js';
 import { GC } from '../generated/enums.js';
 import { instanceProperties } from '../not-implemented.js';
 import { cachedImage } from './image-cache.js';
@@ -41,8 +41,6 @@ function formatValue(value: unknown, formatter: unknown): string {
   if (typeof value === 'boolean') return String(value).toUpperCase();
   return String(value);
 }
-
-const DEFAULT_FONT = '14.6667px Calibri';
 
 /** Normal line box of a cell font (matches the renderer's `fontMetrics().height`, which measures
  * a `line-height:normal` span: 19px for the default 11pt Calibri = 14.6667px). */
@@ -147,13 +145,13 @@ export class Base {
     if (settings && typeof settings === 'object') for (const [key, value] of Object.entries(settings as JsonRecord)) if (key !== 'typeName') (this as JsonRecord)[key] = deserializeValue(value);
   }
   getAutoFitHeight(_value: unknown, text: string, cellStyle: Style, zoomFactor: number): number {
-    const size = Number((String(cellStyle.font ?? DEFAULT_FONT).match(/([\d.]+)px/) ?? [0, 14.6667])[1]);
+    const size = Number((canvasFont(cellStyle).match(/([\d.]+)px/) ?? [0, 14.6667])[1]);
     return Math.max(1, text.split('\n').length) * size * 1.2 * zoomFactor + 2;
   }
   getAutoFitWidth(_value: unknown, text: string, cellStyle: Style, zoomFactor: number): number {
     const context = document.createElement('canvas').getContext('2d');
     if (!context) return text.length * 7 * zoomFactor;
-    context.font = String(cellStyle.font ?? DEFAULT_FONT);
+    context.font = canvasFont(cellStyle);
     return context.measureText(text).width * zoomFactor + 8;
   }
   getEditorValue(editorContext: HTMLElement, _context?: unknown): unknown {
@@ -225,7 +223,7 @@ export class Base {
     ctx.beginPath();
     ctx.rect(x, y, w - 1, h - 1);
     ctx.clip();
-    ctx.font = String(style.font ?? DEFAULT_FONT);
+    ctx.font = canvasFont(style);
     ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textBaseline = 'middle';
     const align = Number(style.hAlign ?? 0);
@@ -243,6 +241,11 @@ export class Base {
     return result;
   }
 }
+
+// TASK 100: `typeName` is a declared data property; instances carry the value
+// ('0' on Base, '1' on Text, ...), the prototype keeps the lazy accessor so the
+// member descriptor exists without the NotImplemented fallback.
+instanceProperties(Base, 'typeName');
 
 export class Text extends Base {
   override typeName = '1';
@@ -503,9 +506,9 @@ export class CheckBox extends Base {
       ctx.beginPath();
       ctx.rect(x, y, Math.max(0, w - 1), Math.max(0, h - 1));
       ctx.clip();
-      ctx.font = String(style.font ?? DEFAULT_FONT);
+      ctx.font = canvasFont(style);
       ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
-      const line = fontLineHeight(String(style.font ?? DEFAULT_FONT));
+      const line = fontLineHeight(canvasFont(style));
       // `textAlign` puts the caption beside (left/right/inside) or around (top/bottom) the square.
       // The trial hangs the caption 2px of leading below the square plus half the line box
       // (measured: the ink of a caption under a box at 75..87 starts at row 93).
@@ -571,7 +574,7 @@ export class Button extends Base {
     ctx.lineWidth = 1;
     ctx.strokeRect(left + 0.5, top + 0.5, Math.max(0, right - left - 1), Math.max(0, bottom - top - 1));
     const text = String(this.props.text ?? '') || this.format(value, (style.formatter as string) ?? 'General');
-    ctx.font = String(style.font ?? DEFAULT_FONT);
+    ctx.font = canvasFont(style);
     ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -636,7 +639,7 @@ export class ComboBox extends Base {
   ): void {
     const text = this.displayText(value);
     ctx.save();
-    ctx.font = String(style.font ?? DEFAULT_FONT);
+    ctx.font = canvasFont(style);
     ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
@@ -723,7 +726,7 @@ export class HyperLink extends Base {
     ctx.beginPath();
     ctx.rect(x, y, w - 1, h - 1);
     ctx.clip();
-    ctx.font = String(style.font ?? DEFAULT_FONT);
+    ctx.font = canvasFont(style);
     ctx.fillStyle = resolveColor(String(this.props.linkColor ?? '#0066cc'));
     ctx.textBaseline = 'top';
     ctx.fillText(text, x, y + 3);
@@ -861,7 +864,7 @@ export class CheckBoxList extends ItemListBase {
     const boxWidth = toggleMode ? Number(artwork.width ?? TOGGLE_DEFAULTS.width) || 30 : size;
     const boxHeight = toggleMode ? Number(artwork.height ?? TOGGLE_DEFAULTS.height) || 15 : size;
     ctx.save();
-    ctx.font = String(style.font ?? DEFAULT_FONT);
+    ctx.font = canvasFont(style);
     ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textBaseline = 'middle';
     let px = x + 1;
@@ -913,7 +916,7 @@ export class RadioButtonList extends ItemListBase {
     const items = this.props.items as unknown[];
     const size = Number(this.props.boxSize) || 13;
     ctx.save();
-    ctx.font = String(style.font ?? DEFAULT_FONT);
+    ctx.font = canvasFont(style);
     ctx.textBaseline = 'middle';
     let px = x + 1;
     const top = y + 2;
@@ -973,7 +976,7 @@ export class ButtonList extends ItemListBase {
     const selected = this.valueSet(value).map(String);
     const items = this.props.items as unknown[];
     ctx.save();
-    ctx.font = String(style.font ?? DEFAULT_FONT);
+    ctx.font = canvasFont(style);
     ctx.textBaseline = 'middle';
     const padding = Number(this.padding()) || 5;
     const spacing = Number((this.itemSpacing() as JsonRecord | undefined)?.horizontal ?? 5);
@@ -1096,7 +1099,7 @@ export class RangeTemplate extends Base {
     const sheet = this.sheet;
     if (!sheet) return;
     ctx.save();
-    ctx.font = String(style.font ?? DEFAULT_FONT);
+    ctx.font = canvasFont(style);
     ctx.fillStyle = resolveColor(String(style.foreColor ?? 'black'));
     ctx.textBaseline = 'middle';
     ctx.fillText(String(sheet.getValue(this.row, this.col) ?? ''), x + 2, y + 2);

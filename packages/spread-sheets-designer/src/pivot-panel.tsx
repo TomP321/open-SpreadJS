@@ -13,6 +13,7 @@ import { activePivot, activatePivotAtPanelDrop, pivotPanelTable, type PivotTable
 import { dockPaneVisible, setDockPane } from './dock-panes.js';
 import { placeMenu } from './menu-placement.js';
 import { pivotNamespace } from './core-internals.js';
+import { resolveText, localizedText } from './resolve.js';
 
 interface PivotPanelLike {
   attach(pivotTable: PivotTable): void;
@@ -89,12 +90,57 @@ export function PivotFieldListPanel(): React.ReactElement {
     d._pivotFieldListFollow = false;
     d._pivotFieldListName = null;
   };
+  /** The panel's own DOM belongs to the core add-on (English `TEXT` constants);
+   * the language packages translate it here after mount (TASK 87): a Mutation
+   * observer replaces each known English caption with the `pivotPanel.*`
+   * resource value. With the English resources the replacement is the identity,
+   * so the English panel DOM stays untouched. */
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const enMap: [string, string, string][] = [
+      ['h2', 'title', 'PivotTable Fields'],
+      ['.gc-panel-fields-title', 'choose', 'Choose fields to add to report'],
+      ['.gc-panel-areas-title', 'drag', 'Drag fields between areas below:'],
+      ['.gc-panel-defer-layout-label', 'defer', 'Defer Layout Update'],
+      ['.gc-panel-area-item-title-text', '', ''],
+    ];
+    const areaMap: Record<string, string> = { Filters: 'areaFilters', Columns: 'areaColumns', Rows: 'areaRows', Values: 'areaValues' };
+    const localize = (): void => {
+      const tr = (key: string): string => resolveText(`\${res.pivotPanel.${key}}`, d.resources);
+      for (const [sel, key, en] of enMap) {
+        if (!key) continue;
+        host.querySelectorAll(sel).forEach((node) => { if (node.textContent?.trim() === en) { const v = tr(key); if (v && v !== en) node.textContent = v; } });
+      }
+      host.querySelectorAll('.gc-panel-area-item-title-text').forEach((node) => {
+        const en = node.textContent?.trim() ?? '';
+        const key = areaMap[en];
+        if (key) { const v = tr(key); if (v && v !== en) node.textContent = v; }
+      });
+      host.querySelectorAll('input.gc-panel-search-input').forEach((node) => {
+        const input = node as HTMLInputElement;
+        if (input.placeholder === 'Search') { const v = tr('search'); if (v && v !== 'Search') input.placeholder = v; }
+      });
+      host.querySelectorAll('button, .gc-panel-button').forEach((node) => {
+        const en = node.textContent?.trim() ?? '';
+        if (en === 'Update') { const v = tr('update'); if (v && v !== en) node.textContent = v; }
+        if (node.getAttribute('title') === 'Add a new view') { const v = tr('addView'); if (v && v !== 'Add a new view') node.setAttribute('title', v); }
+        if (node.getAttribute('title') === 'Apply the view') { const v = tr('applyView'); if (v && v !== 'Apply the view') node.setAttribute('title', v); }
+      });
+      host.querySelectorAll('div, span').forEach((node) => { if (node.childElementCount === 0 && node.textContent?.trim() === 'Views') { const v = tr('views'); if (v && v !== 'Views') node.textContent = v; } });
+      host.querySelectorAll('div, span').forEach((node) => { if (node.childElementCount === 0 && node.textContent?.trim() === 'No matches') { const v = tr('noMatches'); if (v && v !== 'No matches') node.textContent = v; } });
+    };
+    localize();
+    const observer = new MutationObserver(localize);
+    observer.observe(host, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [d]);
   // Trial behaviour: after the first open the panel stays mounted and is only hidden (TASK 77:
   // it is also hidden while another pane of the dock stack is the visible one).
   return (
     <div className="gc-designer-pivot-table-fields gc-designer-panel gc-designer-dock-panel" style={d.pivotFieldListOpen && dockPaneVisible(d, 'pivot') ? undefined : { display: 'none' }}>
       <div className="gc-designer-pivot-table-fields-host" ref={hostRef} />
-      <button className="gc-designer-panel-dialog-close-button-container" aria-label="Close" onClick={close}>
+      <button className="gc-designer-panel-dialog-close-button-container" aria-label={resolveText('${res.panels.close}', d.resources) || 'Close'} onClick={close}>
         <span className="gc-designer-panel-dialog-close-button-image">×</span>
       </button>
     </div>
@@ -184,7 +230,7 @@ export function PivotItemMenu(): React.ReactElement | null {
           <React.Fragment key={item.command}>
             {item.separator && <div className="gc-designer-pivot-item-menu-sep" role="separator" />}
             <div role="menuitem" aria-disabled={disabled} className={`gc-designer-pivot-item-menu-entry${disabled ? ' gc-designer-pivot-item-menu-disabled' : ''}`} onClick={() => run(item.command, disabled)}>
-              {item.text}
+              {localizedText(d.resources, item.text, 'pivotPanel')}
             </div>
           </React.Fragment>
         );

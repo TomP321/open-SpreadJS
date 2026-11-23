@@ -318,38 +318,86 @@
 .opensheets-scenario-panel .item-footer .activate:hover { background: #e8eef5; }
 .opensheets-scenario-panel .empty { margin: 24px 12px; color: #777; text-align: center; white-space: pre-line; display: none; }
 .opensheets-scenario-panel .empty.visible { display: block; }
-/* Threaded comments panel (TASK 46 item 4, our own panel DOM). */
+/* Threaded comments panel (TASK 46 item 4, our own panel DOM; TASK 95 rebuilt
+   on the official DOM measured black-box — probes .probe/t95: 30 px New/filter
+   buttons, 18 px resolved-banner actions, 24 px per-reply avatars, per-reply
+   timestamps, a "More options" settings button on the card head and on each
+   active-thread reply, a Delete/Resolve options menu, a 28 px contenteditable
+   reply editor with Post Comment / Cancel buttons and a mention dropdown). */
 .opensheets-threaded-comment-panel { height: 100%; display: flex; flex-direction: column; box-sizing: border-box; font: 12px 'Segoe UI', Arial; color: #333; background: #fafafa; }
-.opensheets-tc-header { padding: 8px 10px; background: #fff; border-bottom: 1px solid #e5e5e5; }
+.opensheets-tc-header { padding: 7px 10px 10px; background: #fff; border-bottom: 1px solid #e5e5e5; }
 .opensheets-tc-title { font-size: 13px; font-weight: 600; }
-.opensheets-tc-buttons { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.opensheets-tc-new { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #ccc; background: #fff; padding: 2px 8px; font: 12px 'Segoe UI', Arial; cursor: pointer; }
-.opensheets-tc-new svg { width: 14px; height: 14px; flex: none; }
+.opensheets-tc-buttons { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.opensheets-tc-new { display: inline-flex; align-items: center; gap: 6px; min-width: 66px; height: 30px; box-sizing: border-box; border: 1px solid #ccc; background: #fff; padding: 0 8px; font: 12px 'Segoe UI', Arial; cursor: pointer; }
+.opensheets-tc-new svg { width: 20px; height: 20px; flex: none; }
 .opensheets-tc-count { color: #666; }
 .opensheets-tc-filter-wrap { margin-left: auto; position: relative; }
-.opensheets-tc-filter { position: relative; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #ccc; background: #fff; color: #555; cursor: pointer; }
-.opensheets-tc-filter svg { width: 14px; height: 14px; flex: none; }
+.opensheets-tc-filter { position: relative; width: 35px; height: 30px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #ccc; background: #fff; color: #555; cursor: pointer; }
+.opensheets-tc-filter svg { width: 18px; height: 18px; flex: none; }
 .opensheets-tc-filter-badge { position: absolute; top: -6px; right: -6px; min-width: 12px; background: #217346; color: #fff; border-radius: 8px; font-size: 10px; padding: 0 4px; }
-.opensheets-tc-filter-dropdown { position: absolute; right: 0; top: 24px; z-index: 10; min-width: 150px; padding: 4px 0; background: #fff; border: 1px solid #d8d8d8; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
+.opensheets-tc-filter-dropdown { position: absolute; right: 0; top: 32px; z-index: 10; min-width: 150px; padding: 4px 0; background: #fff; border: 1px solid #d8d8d8; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
 .opensheets-tc-filter-option { display: flex; align-items: center; gap: 6px; padding: 4px 10px; cursor: pointer; }
 .opensheets-tc-filter-option:hover { background: #f0f4f8; }
 .opensheets-tc-filter-separator { padding: 4px 10px; color: #888; font-size: 11px; border-top: 1px solid #e5e5e5; margin-top: 4px; }
 .opensheets-tc-filter-checkbox { width: 12px; height: 12px; display: inline-block; border: 1px solid #bbb; background: #fff; }
 .opensheets-tc-filter-checkbox.checked { background: #217346; border-color: #217346; }
-.opensheets-tc-scrollable { flex: 1; overflow: auto; padding: 8px 10px; }
-.opensheets-tc-item { margin-bottom: 8px; }
-.opensheets-tc-comment { padding: 8px; background: #fff; border: 1px solid #e2e2e2; border-radius: 4px; }
-.opensheets-tc-resolved { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1px solid #eee; color: #555; font-size: 11px; }
-.opensheets-tc-resolved-action { margin-left: auto; cursor: pointer; color: #777; padding: 0 4px; }
-.opensheets-tc-reply { display: flex; gap: 6px; align-items: baseline; margin: 3px 0; }
-.opensheets-tc-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.opensheets-tc-avatar { width: 18px; height: 18px; border-radius: 50%; color: #fff; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.opensheets-tc-author { font-weight: 600; }
-.opensheets-tc-tag { margin-left: auto; color: #777; font-size: 11px; }
-.opensheets-tc-menu { border: none; background: none; color: #888; cursor: pointer; font-size: 12px; padding: 0; }
-.opensheets-tc-text { color: #444; }
-.opensheets-tc-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
-.opensheets-tc-actions button { border: 1px solid #ccc; background: #fff; cursor: pointer; }
+.opensheets-tc-scrollable { flex: 1; overflow: auto; padding: 5px 10px; }
+.opensheets-tc-item { margin-bottom: 12px; }
+.opensheets-tc-comment { position: relative; padding: 10px; background: #fff; border: 1px solid #e2e2e2; border-radius: 4px; }
+.opensheets-tc-resolved { display: flex; align-items: center; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid #eee; color: #555; font-size: 11px; }
+.opensheets-tc-resolved-left { display: flex; align-items: center; gap: 4px; }
+.opensheets-tc-resolved-right { margin-left: auto; display: flex; gap: 2px; }
+.opensheets-tc-resolved-check, .opensheets-tc-resolved-action { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; cursor: pointer; color: #777; }
+.opensheets-tc-resolved-label { margin-left: 2px; }
+.opensheets-tc-head { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.opensheets-tc-ref { font-weight: 600; margin-left: auto; }
+.opensheets-tc-settings { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; box-sizing: border-box; color: #777; cursor: pointer; }
+.opensheets-tc-replies { margin-top: 6px; }
+.opensheets-tc-reply { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+.opensheets-tc-avatar { width: 24px; height: 24px; border-radius: 50%; color: #fff; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.opensheets-tc-message { flex: 1; min-width: 0; }
+.opensheets-tc-message-head { display: flex; align-items: center; gap: 4px; }
+.opensheets-tc-author { font-weight: 600; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opensheets-tc-reply-settings { margin-left: auto; }
+.opensheets-tc-text { color: #444; white-space: pre-line; word-break: break-word; }
+.opensheets-tc-time { display: block; color: #999; font-size: 11px; margin-top: 2px; }
+.opensheets-tc-mention-chip { color: #217346; font-weight: 600; }
+.opensheets-tc-link { color: #0563c1; text-decoration: underline; }
+.opensheets-tc-editor-wrap { position: relative; margin-top: 8px; }
+.opensheets-tc-editor { min-height: 28px; box-sizing: border-box; border: 1px solid #ddd; background: #fff; border-radius: 3px; padding: 5px 8px; font: 12px 'Segoe UI', Arial; color: #333; }
+.opensheets-tc-editor:empty::before { content: attr(data-placeholder); color: #999; }
+.opensheets-tc-editor-buttons { display: none; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+.opensheets-tc-editor-buttons.visible { display: flex; }
+.opensheets-tc-editor-post, .opensheets-tc-editor-cancel { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 22px; box-sizing: border-box; border: 1px solid #ccc; background: #fff; color: #555; cursor: pointer; }
+.opensheets-tc-mention-list { position: absolute; left: 0; top: 100%; z-index: 11; min-width: 160px; max-height: 140px; overflow: auto; background: #fff; border: 1px solid #d8d8d8; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
+.opensheets-tc-mention-option { padding: 4px 10px; cursor: pointer; }
+.opensheets-tc-mention-option:hover { background: #f0f4f8; }
+.opensheets-tc-mention-empty { padding: 6px 10px; color: #888; }
+.opensheets-tc-menu-items { display: none; }
+.opensheets-tc-menu { position: absolute; right: 8px; top: 40px; z-index: 12; min-width: 160px; padding: 4px 0; background: #fff; border: 1px solid #d8d8d8; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
+.opensheets-tc-menu.open { display: block; }
+.opensheets-tc-menu-item { display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer; color: #444; }
+.opensheets-tc-menu-item:hover { background: #f0f4f8; }
 .opensheets-tc-navigate { padding: 6px 0; text-align: center; color: #555; cursor: pointer; display: none; }
 .opensheets-tc-navigate.visible { display: block; }
-.opensheets-tc-editor { width: 100%; box-sizing: border-box; margin: 4px 0; font: 12px 'Segoe UI', Arial; }
+
+/* TASK 99 */
+/* Filter menu "Top 10" dialog (our own layout, same structure as the custom-filter dialog). */
+.opensheets-host .opensheets-top10-dialog { position: fixed; left: calc(50vw - 172px); top: calc(50vh - 84px); width: 344px; height: 168px; box-sizing: border-box; border: 0; box-shadow: inset 0 0 0 1px #a7abb0; background: #f0f0f0; color: #242f48; font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
+.opensheets-host .opensheets-top10-dialog .opensheets-custom-title { left: 1px; top: 1px; width: 342px; height: 30px; }
+.opensheets-host .opensheets-top10-dialog .opensheets-custom-title-text { line-height: 30px; }
+.opensheets-host .opensheets-top10-dialog .opensheets-custom-close { right: 4px; width: 28px; height: 30px; line-height: 30px; }
+.opensheets-host .opensheets-top10-dialog .opensheets-custom-show { top: 38px; }
+.opensheets-host .opensheets-top10-row { position: absolute; left: 26px; top: 64px; height: 28px; display: flex; align-items: center; gap: 12px; font: 12px 'Segoe UI', Calibri, Thonburi, Arial, Verdana, sans-serif; }
+.opensheets-host .opensheets-top10-row label { display: inline-flex; align-items: center; gap: 4px; }
+.opensheets-host .opensheets-top10-row input[type='radio'] { width: 13px; height: 13px; margin: 0; }
+.opensheets-host .opensheets-top10-count { width: 60px; height: 23px; box-sizing: border-box; border: 1px solid #767676; background: white; font: 12px Arial; padding: 0 2px; }
+.opensheets-host .opensheets-top10-row select { width: 90px; height: 25px; box-sizing: border-box; border: 1px solid #767676; background: white; font: 12px Arial; padding: 0 2px; }
+.opensheets-host .opensheets-top10-dialog .opensheets-custom-footer { top: 114px; width: 342px; }
+.opensheets-host .opensheets-top10-dialog .opensheets-custom-footer input:first-child { left: 150px; }
+.opensheets-host .opensheets-top10-dialog .opensheets-custom-footer input:last-child { left: 237px; }
+/* Nested "All Dates in Period" flyout in the date filter submenu (single list:
+   Quarter 1-4 then the month names, like the trial). */
+.opensheets-host .opensheets-filter-period-menu { position: absolute; display: none; z-index: 3; background: white; border: 1px solid #a7abb0; box-shadow: 2px 3px 5px #0004; white-space: nowrap; max-height: 420px; overflow-y: auto; }
+.opensheets-host .opensheets-filter-period-item { height: 20px; line-height: 20px; padding: 0 14px; cursor: pointer; outline: none; }
+.opensheets-host .opensheets-filter-period-item:hover, .opensheets-host .opensheets-filter-period-item:focus { background: #e5f1fb; color: #1e395b; }

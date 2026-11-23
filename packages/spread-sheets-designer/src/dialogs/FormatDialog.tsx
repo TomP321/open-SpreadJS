@@ -1,26 +1,49 @@
 /* Custom Format Cells body. The shell geometry follows the running v19 trial:
  * 678 x 576.7 dialog, 34 px header, 30 px tab strip and 45.7 px footer. */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DesignerApi as Designer } from '../designer-api.js';
 import type { GCRoot } from '../core-internals.js';
+import { getResources, resolveText, uiKey } from '../resolve.js';
 import { CUSTOM_CODES, DATE_TYPES, FRACTION_TYPES, LOCALE_ITEMS, NUMBER_CATEGORIES, SPECIAL_TYPES, SYMBOL_ITEMS, TIME_TYPES, numberFormatterFor } from './number-format.js';
 import { CustomSelect } from './custom-widgets.js';
+import { T } from './t.js';
 
 interface Props { designer: Designer; data: Record<string, unknown>; update: (path: string | undefined, value: unknown) => void }
 
 const CATEGORIES = NUMBER_CATEGORIES;
 
+/** TASK 87: labels that exist in the resource tree (`formatDialog.*`) follow the
+ * loaded language package; the English defaults keep the current rendering. */
+const fmt = (designer: Designer, key: string, fallback: string): string =>
+  resolveText(`\${res.formatDialog.${key}}`, designer.resources) || fallback;
+
+/** TASK 87: localized display text for a data-bearing English name (the raw value stays
+ * in state/data; only the rendering follows the loaded language package). */
+const displayName = (designer: Designer, name: string, tree = 'dialogs'): string =>
+  resolveText(`\${res.${tree}.${uiKey(name)}}`, designer.resources) || name;
+/** Fill palette: 'Accent 1 80' = theme name + tint; translate the name, keep the tint. */
+const paletteName = (designer: Designer, token: string): string => {
+  const m = /^(.*) (-?\d+)$/.exec(token);
+  return m ? `${displayName(designer, m[1], 'themeColorNames')} ${m[2]}` : displayName(designer, token, 'themeColorNames');
+};
+
+/** Resource key for each internal (English, value-bearing) category name. */
+const CATEGORY_KEYS: Record<string, string> = {
+  General: 'general', Number: 'number', Currency: 'currency', Accounting: 'accounting', Date: 'date', Time: 'time',
+  Percentage: 'percentage', Fraction: 'fraction', Scientific: 'scientific', Text: 'text', Special: 'special', Custom: 'custom',
+};
+
 const TABS = [
-  { key: 'number', text: 'Number' },
-  { key: 'alignment', text: 'Alignment' },
-  { key: 'font', text: 'Font' },
-  { key: 'border', text: 'Border' },
-  { key: 'fill', text: 'Fill' },
-  { key: 'cellButton', text: 'Cell Button' },
-  { key: 'padding', text: 'Padding' },
-  { key: 'decoration', text: 'Decoration' },
-  { key: 'protection', text: 'Protection' },
-  { key: 'mask', text: 'Mask' },
+  { key: 'number', text: '${res.formatDialog.number}' },
+  { key: 'alignment', text: '${res.formatDialog.alignment}' },
+  { key: 'font', text: '${res.formatDialog.font}' },
+  { key: 'border', text: '${res.formatDialog.border}' },
+  { key: 'fill', text: '${res.formatDialog.fill}' },
+  { key: 'cellButton', text: '${res.dialogs.cellButton}' },
+  { key: 'padding', text: '${res.dialogs.padding}' },
+  { key: 'decoration', text: '${res.dialogs.decoration}' },
+  { key: 'protection', text: '${res.formatDialog.protection}' },
+  { key: 'mask', text: '${res.dialogs.mask}' },
 ];
 
 const DESCRIPTIONS: Record<string, string> = {
@@ -95,52 +118,52 @@ function NumberTab({ designer, data, update }: Props): React.ReactElement {
 
   return (
     <div className="gc-format-number-layout">
-      <div className="gc-num-cat-label">Category:</div>
+      <div className="gc-num-cat-label">{fmt(designer, 'category', 'Category:')}</div>
       {/* The trial frames the category list in its own bordered box (150x382, bottom edge
           46px below the last item); the role=listbox list is the inner 336px column. */}
       <div className="gc-num-cat-frame">
-        <div className="gc-num-cat-list" role="listbox" aria-label="Category:">
-          {CATEGORIES.map((name) => <div key={name} role="option" aria-selected={category === name} title={name} className={`gc-num-cat-item${category === name ? ' selected' : ''}`} onClick={() => choose(name)}>{name}</div>)}
+        <div className="gc-num-cat-list" role="listbox" aria-label={fmt(designer, 'category', 'Category:')}>
+          {CATEGORIES.map((name) => <div key={name} role="option" aria-selected={category === name} title={CATEGORY_KEYS[name] ? fmt(designer, CATEGORY_KEYS[name]!, name) : name} className={`gc-num-cat-item${category === name ? ' selected' : ''}`} onClick={() => choose(name)}>{CATEGORY_KEYS[name] ? fmt(designer, CATEGORY_KEYS[name]!, name) : name}</div>)}
         </div>
       </div>
-      <fieldset className="gc-num-sample"><legend>Sample</legend><div className="gc-num-sample-text">{sampleText}</div></fieldset>
-      {(category === 'General' || category === 'Text') && <div className="gc-num-comment">{DESCRIPTIONS[category]}</div>}
+      <fieldset className="gc-num-sample"><legend>{fmt(designer, 'sample', 'Sample')}</legend><div className="gc-num-sample-text">{sampleText}</div></fieldset>
+      {(category === 'General' || category === 'Text') && <div className="gc-num-comment">{T(uiKey(DESCRIPTIONS[category]), DESCRIPTIONS[category])}</div>}
       {hasSpinner && <>
-        <div className="gc-num-label gc-num-dec-label">Decimal places:</div>
-        <Spinner className="gc-num-dec-spinner" ariaLabel="Decimal places:" min={0} max={30} value={decimals} onChange={(v) => update('decimals', v)} />
+        <div className="gc-num-label gc-num-dec-label">{fmt(designer, 'decimalPlaces', 'Decimal places:')}</div>
+        <Spinner className="gc-num-dec-spinner" ariaLabel={fmt(designer, 'decimalPlaces', 'Decimal places:')} min={0} max={30} value={decimals} onChange={(v) => update('decimals', v)} />
       </>}
-      {category === 'Number' && <BoxCheck className="gc-num-sep" text="Use 1000 Separator(,)" checked={separator} onChange={(v) => update('separator', v)} />}
+      {category === 'Number' && <BoxCheck className="gc-num-sep" text={T('use1000Separator', 'Use 1000 Separator(,)')} checked={separator} onChange={(v) => update('separator', v)} />}
       {(category === 'Currency' || category === 'Accounting') && <>
-        <div className="gc-num-label gc-num-sym-label">Symbol:</div>
+        <div className="gc-num-label gc-num-sym-label">{fmt(designer, 'symbol', 'Symbol:')}</div>
         <Select className="gc-format-align-combo gc-num-sym-combo" value={symbol} onChange={(v) => update('symbol', Number(v))} items={SYMBOL_ITEMS.map((text, i) => ({ text, value: String(i) }))} />
       </>}
       {negativeList !== undefined && <>
-        <div className="gc-num-label gc-num-neg-label">Negative numbers:</div>
+        <div className="gc-num-label gc-num-neg-label">{fmt(designer, 'negativeNumbers', 'Negative numbers:')}</div>
         <div className="gc-num-list gc-num-neg-list">
           {negativeLabels.map((label, i) => <div key={i} role="option" aria-selected={negative === i} className={`gc-num-list-row${negative === i ? ' selected' : ''}${i % 2 === 1 ? ' negative-item' : ''}`} onClick={() => update('negative', i)}>{label}</div>)}
         </div>
       </>}
       {typeItems && <>
-        <div className="gc-num-label gc-num-type-label">Type:</div>
+        <div className="gc-num-label gc-num-type-label">{fmt(designer, 'type', 'Type:')}</div>
         <div className="gc-num-list gc-num-type-list">
-          {typeItems.map((label, i) => <div key={i} role="option" aria-selected={type === i} title={label} className={`gc-num-list-row${type === i ? ' selected' : ''}`} onClick={() => update('type', i)}>{label}</div>)}
+          {typeItems.map((label, i) => <div key={i} role="option" aria-selected={type === i} title={T(uiKey(label), label)} className={`gc-num-list-row${type === i ? ' selected' : ''}`} onClick={() => update('type', i)}>{T(uiKey(label), label)}</div>)}
         </div>
       </>}
       {(category === 'Date' || category === 'Time' || category === 'Special') && <>
-        <div className="gc-num-label gc-num-locale-label">locale (location):</div>
+        <div className="gc-num-label gc-num-locale-label">{T('localeLocation', 'locale (location):')}</div>
         <Select className="gc-format-align-combo gc-num-locale-combo" value={locale} onChange={(v) => update('locale', Number(v))} items={LOCALE_ITEMS.map((text, i) => ({ text, value: String(i) }))} />
       </>}
       {category === 'Custom' && <>
-        <div className="gc-num-label gc-num-type-label">Type:</div>
+        <div className="gc-num-label gc-num-type-label">{fmt(designer, 'type', 'Type:')}</div>
         <div className="gc-num-custom">
-          <input className="gc-num-custom-input" aria-label="Type:" value={code} onChange={(event) => update('formatCode', event.target.value)} />
+          <input className="gc-num-custom-input" aria-label={fmt(designer, 'type', 'Type:')} value={code} onChange={(event) => update('formatCode', event.target.value)} />
           <div className="gc-num-custom-list" role="listbox">
             {CUSTOM_CODES.map((item) => <div key={item} role="option" aria-selected={code === item} title={item} className={`gc-num-list-row${code === item ? ' selected' : ''}`} onClick={() => update('formatCode', item)}>{item}</div>)}
           </div>
-          <button type="button" className="gc-num-delete" disabled={!code || CUSTOM_CODES.includes(code)} onClick={() => update('formatCode', '')}>Delete</button>
+          <button type="button" className="gc-num-delete" disabled={!code || CUSTOM_CODES.includes(code)} onClick={() => update('formatCode', '')}>{resolveText('${res.delete}', designer.resources) || 'Delete'}</button>
         </div>
       </>}
-      {showDesc && <div className="gc-num-desc">{DESCRIPTIONS[category]}</div>}
+      {showDesc && <div className="gc-num-desc">{T(uiKey(DESCRIPTIONS[category]), DESCRIPTIONS[category])}</div>}
     </div>
   );
 }
@@ -164,8 +187,8 @@ function Spinner({ value, onChange, className, min = -90, max = 999, ariaLabel }
         onChange={(event) => setText(event.target.value)} onBlur={commit}
         onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); commit(); } }} />
       <span className="gc-format-spinner-buttons">
-        <button type="button" aria-label="Increase" onClick={() => step(1)}><svg width="9" height="6" viewBox="0 0 9 6" aria-hidden="true"><path d="M4.5 0.5 8.5 5.5H0.5z" /></svg></button>
-        <button type="button" aria-label="Decrease" onClick={() => step(-1)}><svg width="9" height="6" viewBox="0 0 9 6" aria-hidden="true"><path d="M4.5 5.5 0.5 0.5h8z" /></svg></button>
+        <button type="button" aria-label={T('increase', 'Increase')} onClick={() => step(1)}><svg width="9" height="6" viewBox="0 0 9 6" aria-hidden="true"><path d="M4.5 0.5 8.5 5.5H0.5z" /></svg></button>
+        <button type="button" aria-label={T('decrease', 'Decrease')} onClick={() => step(-1)}><svg width="9" height="6" viewBox="0 0 9 6" aria-hidden="true"><path d="M4.5 5.5 0.5 0.5h8z" /></svg></button>
       </span>
     </span>
   );
@@ -195,14 +218,14 @@ function OrientationDial({ angle, onChange }: { angle: number; onChange: (a: num
   }
   const markerX = CX + R;
   return (
-    <svg className="gc-format-orientation-dial" width="92" height="152" viewBox="0 0 92 152" aria-label="Text orientation dial"
+    <svg className="gc-format-orientation-dial" width="92" height="152" viewBox="0 0 92 152" aria-label={T('textOrientationDial', 'Text orientation dial')}
       onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); setFrom(event); }}
       onPointerMove={(event) => { if (dragging.current) setFrom(event); }}
       onPointerUp={() => { dragging.current = false; }}
     >
       {marks}
       <g transform={`rotate(${-angle} ${CX} ${CY})`}>
-        <text x={CX - 2.5} y={CY + 3} fontSize="12" fill="#242424">Text</text>
+        <text x={CX - 2.5} y={CY + 3} fontSize="12" fill="#242424">{T('text', 'Text')}</text>
         <line x1={CX + 30} y1={CY - 1} x2={markerX - 5} y2={CY - 1} stroke="#3f3f3f" />
         <rect x={markerX - 2.51} y={CY + 1 - 2.51} width="5.02" height="5.02" transform={`rotate(45 ${markerX} ${CY + 1})`} fill="#ff0000" />
       </g>
@@ -221,14 +244,14 @@ function BoxCheck({ text, checked, onChange, className }: { text: string; checke
 }
 
 const H_ALIGN_ITEMS = [
-  { text: 'General', value: '3' }, { text: 'Left', value: '0' }, { text: 'Center', value: '1' }, { text: 'Right', value: '2' },
-  { text: 'Center Across Selection', value: '4' }, { text: 'Distributed', value: '5' }, { text: 'Justify', value: '6' },
+  { text: '${res.formatDialog.generalAlign}', value: '3' }, { text: '${res.formatDialog.left}', value: '0' }, { text: '${res.formatDialog.center}', value: '1' }, { text: '${res.formatDialog.right}', value: '2' },
+  { text: '${res.formatDialog.centerContinuous}', value: '4' }, { text: '${res.formatDialog.distributed}', value: '5' }, { text: '${res.formatDialog.justify}', value: '6' },
 ];
 const V_ALIGN_ITEMS = [
-  { text: 'Top', value: '0' }, { text: 'Center', value: '1' }, { text: 'Bottom', value: '2' }, { text: 'Justify', value: '3' },
+  { text: '${res.formatDialog.top}', value: '0' }, { text: '${res.formatDialog.center}', value: '1' }, { text: '${res.formatDialog.bottom}', value: '2' }, { text: '${res.formatDialog.justify}', value: '3' },
 ];
 const TEXT_DIRECTION_ITEMS = [
-  { text: '', value: '' }, { text: 'Context', value: '0' }, { text: 'Left-to-right', value: '1' }, { text: 'Right-to-left', value: '2' },
+  { text: '', value: '' }, { text: '${res.formatDialog.context}', value: '0' }, { text: '${res.formatDialog.leftToRight}', value: '1' }, { text: '${res.dialogs.rightToLeft}', value: '2' },
 ];
 
 /* Alignment tab, positioned like the trial: titled groups with rules and combo rows on the left
@@ -236,8 +259,9 @@ const TEXT_DIRECTION_ITEMS = [
  * an Orientation box: vertical-text toggle, half-dial and Degrees spinner, all two-way synced.
  * Vertical text and a rotation angle are mutually exclusive, exactly like the trial: picking one
  * resets the other (vertical text clears the angle to 0, any angle edit clears the toggle). */
-function AlignmentTab({ data, update }: Props): React.ReactElement {
+function AlignmentTab({ data, update, designer }: Props): React.ReactElement {
   const bool = (key: string): boolean => !!data[key];
+  const loc = (items: { text: string; value: string }[]): { text: string; value: string }[] => items.map((item) => ({ ...item, text: resolveText(item.text, designer.resources) }));
   const angle = Number(data.orientation ?? 0);
   const setAngle = (deg: number): void => { update('orientation', deg); if (bool('verticalText')) update('verticalText', false); };
   const toggleVertical = (): void => {
@@ -248,29 +272,29 @@ function AlignmentTab({ data, update }: Props): React.ReactElement {
   const direction = data.textDirection;
   return (
     <div className="gc-format-alignment-layout">
-      <div className="gc-align-head gc-align-head-ta"><span>Text alignment</span></div>
-      <div className="gc-align-lbl gc-align-lbl-h">Horizontal:</div>
-      <Select className="gc-format-align-combo gc-format-halign" value={data.hAlign ?? 3} onChange={(v) => update('hAlign', Number(v))} items={H_ALIGN_ITEMS} />
-      <div className="gc-align-lbl gc-align-lbl-v">Vertical:</div>
-      <Select className="gc-format-align-combo gc-format-valign" value={data.vAlign ?? 0} onChange={(v) => update('vAlign', Number(v))} items={V_ALIGN_ITEMS} />
-      <div className="gc-align-lbl gc-align-lbl-i">Indent:</div>
-      <Spinner className="gc-format-indent-spinner" ariaLabel="Indent" value={Number(data.indent ?? 0)} min={0} max={255} onChange={(v) => update('indent', v)} />
-      <div className="gc-align-head gc-align-head-tc"><span>Text control</span></div>
-      <BoxCheck className="gc-align-check-wrap" text="Wrap text" checked={bool('wrapText')} onChange={(v) => update('wrapText', v)} />
-      <BoxCheck className="gc-align-check-shrink" text="Shrink to fit" checked={bool('shrinkToFit')} onChange={(v) => update('shrinkToFit', v)} />
-      <BoxCheck className="gc-align-check-merge" text="Merge cells" checked={bool('mergeCells')} onChange={(v) => update('mergeCells', v)} />
-      <BoxCheck className="gc-align-check-ellipsis" text="Show Ellipsis" checked={bool('showEllipsis')} onChange={(v) => update('showEllipsis', v)} />
-      <div className="gc-align-head gc-align-head-rtl"><span>Right-to-left</span></div>
-      <div className="gc-align-lbl gc-align-lbl-d">Text direction:</div>
-      <Select className="gc-format-align-combo gc-format-direction" value={direction === undefined || direction === null ? '' : String(direction)} onChange={(v) => update('textDirection', v === '' ? undefined : Number(v))} items={TEXT_DIRECTION_ITEMS} />
+      <div className="gc-align-head gc-align-head-ta"><span>{T('textAlignment', 'Text alignment')}</span></div>
+      <div className="gc-align-lbl gc-align-lbl-h">{fmt(designer, 'horizontalAlignment', 'Horizontal:')}</div>
+      <Select className="gc-format-align-combo gc-format-halign" value={data.hAlign ?? 3} onChange={(v) => update('hAlign', Number(v))} items={loc(H_ALIGN_ITEMS)} />
+      <div className="gc-align-lbl gc-align-lbl-v">{fmt(designer, 'verticalAlignment', 'Vertical:')}</div>
+      <Select className="gc-format-align-combo gc-format-valign" value={data.vAlign ?? 0} onChange={(v) => update('vAlign', Number(v))} items={loc(V_ALIGN_ITEMS)} />
+      <div className="gc-align-lbl gc-align-lbl-i">{fmt(designer, 'indent', 'Indent:')}</div>
+      <Spinner className="gc-format-indent-spinner" ariaLabel={fmt(designer, 'indent', 'Indent:')} value={Number(data.indent ?? 0)} min={0} max={255} onChange={(v) => update('indent', v)} />
+      <div className="gc-align-head gc-align-head-tc"><span>{T('textControl', 'Text control')}</span></div>
+      <BoxCheck className="gc-align-check-wrap" text={fmt(designer, 'wrapText', 'Wrap text')} checked={bool('wrapText')} onChange={(v) => update('wrapText', v)} />
+      <BoxCheck className="gc-align-check-shrink" text={fmt(designer, 'shrink', 'Shrink to fit')} checked={bool('shrinkToFit')} onChange={(v) => update('shrinkToFit', v)} />
+      <BoxCheck className="gc-align-check-merge" text={fmt(designer, 'merge', 'Merge cells')} checked={bool('mergeCells')} onChange={(v) => update('mergeCells', v)} />
+      <BoxCheck className="gc-align-check-ellipsis" text={T('showEllipsis', 'Show Ellipsis')} checked={bool('showEllipsis')} onChange={(v) => update('showEllipsis', v)} />
+      <div className="gc-align-head gc-align-head-rtl"><span>{T('rightToLeft', 'Right-to-left')}</span></div>
+      <div className="gc-align-lbl gc-align-lbl-d">{fmt(designer, 'textDirection', 'Text direction:')}</div>
+      <Select className="gc-format-align-combo gc-format-direction" value={direction === undefined || direction === null ? '' : String(direction)} onChange={(v) => update('textDirection', v === '' ? undefined : Number(v))} items={loc(TEXT_DIRECTION_ITEMS)} />
       <div className="gc-format-orientation-group">
-        <div className="gc-format-orientation-title">Orientation</div>
-        <div className={`gc-format-vertical-text${bool('verticalText') ? ' selected' : ''}`} role="checkbox" aria-checked={bool('verticalText')} aria-label="Vertical text" onClick={toggleVertical}>
+        <div className="gc-format-orientation-title">{fmt(designer, 'orientation', 'Orientation')}</div>
+        <div className={`gc-format-vertical-text${bool('verticalText') ? ' selected' : ''}`} role="checkbox" aria-checked={bool('verticalText')} aria-label={T('verticalText', 'Vertical text')} onClick={toggleVertical}>
           {['T', 'e', 'x', 't'].map((ch, i) => <span key={i}>{ch}</span>)}
         </div>
         <OrientationDial angle={angle} onChange={setAngle} />
-        <Spinner className="gc-format-degrees-spinner" ariaLabel="Degrees" value={angle} min={-90} max={90} onChange={setAngle} />
-        <div className="gc-format-degrees-label">Degrees</div>
+        <Spinner className="gc-format-degrees-spinner" ariaLabel={fmt(designer, 'degrees', 'Degrees')} value={angle} min={-90} max={90} onChange={setAngle} />
+        <div className="gc-format-degrees-label">{fmt(designer, 'degrees', 'Degrees')}</div>
       </div>
     </div>
   );
@@ -306,7 +330,7 @@ function paletteColor(gc: GCRoot, name: string): string {
 
 function PaletteGrid({ gc, onPick }: { gc: GCRoot; onPick: (name: string) => void }): React.ReactElement {
   return (
-    <div className="gc-num-palette" role="listbox" aria-label="Color:">
+    <div className="gc-num-palette" role="listbox" aria-label={T('color2', 'Color:')}>
       {PALETTE_ROWS.map((row, rowIndex) => (
         <React.Fragment key={rowIndex}>
           {rowIndex === 1 || rowIndex === PALETTE_ROWS.length - 1 ? <div className="gc-num-palette-space" /> : null}
@@ -370,30 +394,30 @@ function FontTab({ data, update, designer }: Props): React.ReactElement {
   const previewFont = `${state.style.includes('Italic') ? 'italic' : 'normal'} ${state.style.startsWith('Bold') ? 'bold' : 'normal'} ${state.size || '11'}pt ${state.family || 'Calibri'}`;
   return (
     <div className="gc-format-font-layout">
-      <div className="gc-font-lbl gc-font-lbl-family">Font:</div>
-      <input className="gc-dialog-input gc-font-input gc-font-family-input" aria-label="Font:" value={state.family} onChange={(event) => edit({ family: event.target.value })} onBlur={() => undefined} />
-      <div className="gc-font-list gc-font-family-list" role="listbox" aria-label="Font:">
+      <div className="gc-font-lbl gc-font-lbl-family">{fmt(designer, 'font', 'Font')}:</div>
+      <input className="gc-dialog-input gc-font-input gc-font-family-input" aria-label={`${fmt(designer, 'font', 'Font')}:`} value={state.family} onChange={(event) => edit({ family: event.target.value })} onBlur={() => undefined} />
+      <div className="gc-font-list gc-font-family-list" role="listbox" aria-label={`${fmt(designer, 'font', 'Font')}:`}>
         {FONT_LISTS.map((name) => <div key={name} role="option" aria-selected={state.family === name} title={name} className={`gc-font-list-item${state.family === name ? ' selected' : ''}`} style={{ fontFamily: name }} onClick={() => edit({ family: name })}>{name}</div>)}
       </div>
-      <div className="gc-font-lbl gc-font-lbl-style">Font style:</div>
-      <input className="gc-dialog-input gc-font-input gc-font-style-input" aria-label="Font style:" value={state.style} readOnly />
-      <div className="gc-font-list gc-font-style-list" role="listbox" aria-label="Font style:">
-        {FONT_STYLES.map((name) => <div key={name} role="option" aria-selected={state.style === name} title={name} className={`gc-font-list-item${state.style === name ? ' selected' : ''}`} onClick={() => edit({ style: name })}>{name}</div>)}
+      <div className="gc-font-lbl gc-font-lbl-style">{fmt(designer, 'fontStyle', 'Font style:')}</div>
+      <input className="gc-dialog-input gc-font-input gc-font-style-input" aria-label={fmt(designer, 'fontStyle', 'Font style:')} value={state.style} readOnly />
+      <div className="gc-font-list gc-font-style-list" role="listbox" aria-label={fmt(designer, 'fontStyle', 'Font style:')}>
+        {FONT_STYLES.map((name) => <div key={name} role="option" aria-selected={state.style === name} title={displayName(designer, name)} className={`gc-font-list-item${state.style === name ? ' selected' : ''}`} onClick={() => edit({ style: name })}>{displayName(designer, name)}</div>)}
       </div>
-      <div className="gc-font-lbl gc-font-lbl-size">Size:</div>
-      <input className="gc-dialog-input gc-font-input gc-font-size-input" aria-label="Size:" value={state.size} onChange={(event) => edit({ size: event.target.value.trim() })} />
-      <div className="gc-font-list gc-font-size-list" role="listbox" aria-label="Size:">
+      <div className="gc-font-lbl gc-font-lbl-size">{fmt(designer, 'size', 'Size:')}</div>
+      <input className="gc-dialog-input gc-font-input gc-font-size-input" aria-label={fmt(designer, 'size', 'Size:')} value={state.size} onChange={(event) => edit({ size: event.target.value.trim() })} />
+      <div className="gc-font-list gc-font-size-list" role="listbox" aria-label={fmt(designer, 'size', 'Size:')}>
         {FONT_SIZES.map((name) => <div key={name} role="option" aria-selected={state.size === name} title={name} className={`gc-font-list-item${state.size === name ? ' selected' : ''}`} onClick={() => edit({ size: name })}>{name}</div>)}
       </div>
-      <div className="gc-font-lbl gc-font-lbl-underline">Underline:</div>
-      <Select className="gc-format-align-combo gc-font-underline" aria-label="Underline:" value={state.underline} onChange={(v) => edit({ underline: Number(v) })} items={UNDERLINE_ITEMS.map((text, i) => ({ text, value: String(i) }))} />
-      <fieldset className="gc-font-effects"><legend>Effects</legend>
-        <BoxCheck className="gc-font-strike" text="Strikethrough" checked={state.strike} onChange={(v) => edit({ strike: v })} />
+      <div className="gc-font-lbl gc-font-lbl-underline">{fmt(designer, 'underline', 'Underline:')}</div>
+      <Select className="gc-format-align-combo gc-font-underline" aria-label={fmt(designer, 'underline', 'Underline:')} value={state.underline} onChange={(v) => edit({ underline: Number(v) })} items={UNDERLINE_ITEMS.map((text, i) => ({ text: i === 0 ? fmt(designer, 'none', text) : text, value: String(i) }))} />
+      <fieldset className="gc-font-effects"><legend>{fmt(designer, 'effects', 'Effects')}</legend>
+        <BoxCheck className="gc-font-strike" text={fmt(designer, 'strikethrough', 'Strikethrough')} checked={state.strike} onChange={(v) => edit({ strike: v })} />
       </fieldset>
-      <div className="gc-font-lbl gc-font-lbl-color">Color:</div>
-      <ColorDropdown className="gc-font-color-dd" gc={gc} value={state.color} ariaLabel="Color:" onChange={(v) => edit({ color: v })} />
-      <fieldset className="gc-font-preview-group"><legend>Preview</legend>
-        <div className="gc-font-preview" style={{ font: previewFont, color: paletteColor(gc, state.color === '' ? '#000000' : state.color), textDecoration: state.strike ? 'line-through' : 'none' }}>AaBbCcYyZz</div>
+      <div className="gc-font-lbl gc-font-lbl-color">{fmt(designer, 'color', 'Color:')}</div>
+      <ColorDropdown className="gc-font-color-dd" gc={gc} value={state.color} ariaLabel={fmt(designer, 'color', 'Color:')} onChange={(v) => edit({ color: v })} />
+      <fieldset className="gc-font-preview-group"><legend>{fmt(designer, 'preview', 'Preview')}</legend>
+        <div className="gc-font-preview" style={{ font: previewFont, color: paletteColor(gc, state.color === '' ? '#000000' : state.color), textDecoration: state.strike ? 'line-through' : 'none' }}>{T('aaBbCcYyZz', 'AaBbCcYyZz')}</div>
       </fieldset>
     </div>
   );
@@ -480,7 +504,7 @@ function BorderPreviewSvg({ gc, state, onToggle }: { gc: GCRoot; state: BorderSt
     hotspot('diagonalUp', 10, H - 10, W - 10, 10), hotspot('diagonalDown', 10, 10, W - 10, H - 10),
   ];
   return (
-    <svg className="gc-bd-preview" width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-label="Border preview">
+    <svg className="gc-bd-preview" width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-label={T('borderPreview', 'Border preview')}>
       <rect x={0} y={0} width={W} height={H} fill="#f5f5f5" stroke="none" />
       {lines}
       {hotspots}
@@ -604,33 +628,33 @@ function BorderTab({ data, update, designer }: Props): React.ReactElement {
   };
   return (
     <div className="gc-format-border-layout">
-      <fieldset className="gc-bd-group"><legend>Border</legend>
-        <div className="gc-bd-line-label">Line</div>
-        <div className="gc-bd-style-grid" role="radiogroup" aria-label="Line style">
+      <fieldset className="gc-bd-group"><legend>{fmt(designer, 'border', 'Border')}</legend>
+        <div className="gc-bd-line-label">{fmt(designer, 'line', 'Line')}</div>
+        <div className="gc-bd-style-grid" role="radiogroup" aria-label={T('lineStyle', 'Line style')}>
           {[0, 1].map((column) => (
             <div key={column} className="gc-bd-style-col">
               {LINE_STYLES.slice(column * 7, column * 7 + 7).map((item) => (
-                <div key={item.name} role="radio" aria-checked={state.style === item.value} aria-label={item.name} title={item.name} className={`gc-bd-style${state.style === item.value ? ' selected' : ''}`} onClick={() => edit({ style: item.value })}>
-                  {item.value === 0 ? <span className="gc-bd-style-none">None</span> : <svg width="54" height="6" viewBox="0 0 54 6" aria-hidden="true">{(() => { const g = GRID_SAMPLE[item.value] ?? { w: 1 }; return g.double ? <><line x1="0" y1="1.5" x2="54" y2="1.5" stroke="#000000" strokeWidth={1} /><line x1="0" y1="4.5" x2="54" y2="4.5" stroke="#000000" strokeWidth={1} /></> : <line x1="0" y1="3" x2="54" y2="3" stroke={g.color ?? '#000000'} strokeWidth={g.w} strokeDasharray={g.dash} />; })()}</svg>}
+                <div key={item.name} role="radio" aria-checked={state.style === item.value} aria-label={displayName(designer, item.name)} title={displayName(designer, item.name)} className={`gc-bd-style${state.style === item.value ? ' selected' : ''}`} onClick={() => edit({ style: item.value })}>
+                  {item.value === 0 ? <span className="gc-bd-style-none">{fmt(designer, 'none', 'None')}</span> : <svg width="54" height="6" viewBox="0 0 54 6" aria-hidden="true">{(() => { const g = GRID_SAMPLE[item.value] ?? { w: 1 }; return g.double ? <><line x1="0" y1="1.5" x2="54" y2="1.5" stroke="#000000" strokeWidth={1} /><line x1="0" y1="4.5" x2="54" y2="4.5" stroke="#000000" strokeWidth={1} /></> : <line x1="0" y1="3" x2="54" y2="3" stroke={g.color ?? '#000000'} strokeWidth={g.w} strokeDasharray={g.dash} />; })()}</svg>}
                 </div>
               ))}
             </div>
           ))}
         </div>
-        <div className="gc-bd-color-label">Color:</div>
-        <ColorDropdown className="gc-bd-color-dd" gc={gc} value={state.color} ariaLabel="Color:" onChange={(v) => edit({ color: v })} />
+        <div className="gc-bd-color-label">{fmt(designer, 'borderColor', 'Color:')}</div>
+        <ColorDropdown className="gc-bd-color-dd" gc={gc} value={state.color} ariaLabel={fmt(designer, 'borderColor', 'Color:')} onChange={(v) => edit({ color: v })} />
       </fieldset>
       <div className="gc-bd-presets-area">
-        <fieldset className="gc-bd-line-group gc-bd-presets-group"><legend>Presets</legend></fieldset>
+        <fieldset className="gc-bd-line-group gc-bd-presets-group"><legend>{fmt(designer, 'presets', 'Presets')}</legend></fieldset>
         <div className="gc-bd-presets">
           {(['none', 'outline', 'inside'] as const).map((preset) => (
             <div key={preset} className="gc-bd-preset-item">
-              <div role="button" aria-label={preset === 'none' ? 'None' : preset === 'outline' ? 'Outline' : 'Inside'} className={`gc-bd-preset${preset === 'inside' && !multi ? ' disabled' : ''}`} onClick={() => { if (preset !== 'inside' || multi) applyPreset(preset); }}><PresetIcon kind={preset} disabled={preset === 'inside' && !multi} /></div>
-              <div className="gc-bd-preset-label">{preset === 'none' ? 'None' : preset === 'outline' ? 'Outline' : 'Inside'}</div>
+              <div role="button" aria-label={fmt(designer, preset, preset === 'none' ? 'None' : preset === 'outline' ? 'Outline' : 'Inside')} className={`gc-bd-preset${preset === 'inside' && !multi ? ' disabled' : ''}`} onClick={() => { if (preset !== 'inside' || multi) applyPreset(preset); }}><PresetIcon kind={preset} disabled={preset === 'inside' && !multi} /></div>
+              <div className="gc-bd-preset-label">{fmt(designer, preset, preset === 'none' ? 'None' : preset === 'outline' ? 'Outline' : 'Inside')}</div>
             </div>
           ))}
         </div>
-        <fieldset className="gc-bd-line-group gc-bd-line-fieldset"><legend>Line</legend></fieldset>
+        <fieldset className="gc-bd-line-group gc-bd-line-fieldset"><legend>{fmt(designer, 'line', 'Line')}</legend></fieldset>
         <div className="gc-bd-small-buttons">
           {([['top', 'Top Line'], ['hInside', 'Horizontal Inner Line'], ['bottom', 'Bottom Line']] as [BorderEdge, string][]).map(([edge, label], i) => (
             <div key={edge} role="button" aria-label={label} className={`gc-bd-small${shown(edge) ? ' selected' : ''}${(edge === 'hInside' && !multi) ? ' disabled' : ''}`} style={{ top: i * 42 }} onClick={() => { if (edge !== 'hInside' || multi) toggle(edge); }}><EdgeButtonIcon edge={edge} active={!!shown(edge)} disabled={edge === 'hInside' && !multi} /></div>
@@ -639,23 +663,23 @@ function BorderTab({ data, update, designer }: Props): React.ReactElement {
         <div className="gc-bd-preview-wrap"><BorderPreviewSvg gc={gc} state={state} onToggle={toggle} /><PreviewTextCanvas /></div>
         <div className="gc-bd-bottom-buttons">
           {([['diagonalUp', 6], ['left', 56], ['vInside', 136], ['right', 206], ['diagonalDown', 236]] as [BorderEdge, number][]).map(([edge, left]) => (
-            <div key={edge} role="button" aria-label={EDGE_NAMES[edge]} className={`gc-bd-small${shown(edge) ? ' selected' : ''}${(edge === 'vInside' && !multi) ? ' disabled' : ''}`} style={{ left }} onClick={() => { if (edge !== 'vInside' || multi) toggle(edge); }}><EdgeButtonIcon edge={edge} active={!!shown(edge)} disabled={edge === 'vInside' && !multi} /></div>
+            <div key={edge} role="button" aria-label={displayName(designer, EDGE_NAMES[edge])} className={`gc-bd-small${shown(edge) ? ' selected' : ''}${(edge === 'vInside' && !multi) ? ' disabled' : ''}`} style={{ left }} onClick={() => { if (edge !== 'vInside' || multi) toggle(edge); }}><EdgeButtonIcon edge={edge} active={!!shown(edge)} disabled={edge === 'vInside' && !multi} /></div>
           ))}
         </div>
       </div>
-      <fieldset className="gc-bd-radius-group"><legend>Radius</legend>
-        <div className="gc-bd-radius-apply-label">Apply to</div>
+      <fieldset className="gc-bd-radius-group"><legend>{T('radius', 'Radius')}</legend>
+        <div className="gc-bd-radius-apply-label">{T('applyTo', 'Apply to')}</div>
         <div className="gc-bd-radius-apply">
           {(['none', 'all', 'outer'] as const).map((mode, i) => (
             <div key={mode} className="gc-bd-radius-item" style={{ left: 7 + i * 44 }}>
-              <div role="button" aria-label={mode === 'none' ? 'None' : mode === 'all' ? 'All' : 'Outer'} className={`gc-bd-radius-button${state.radiusMode === mode ? ' checked' : ''}`} onClick={() => edit({ radiusMode: mode })}>
+              <div role="button" aria-label={T(mode === 'none' ? 'none' : mode === 'all' ? 'all' : 'outer', mode === 'none' ? 'None' : mode === 'all' ? 'All' : 'Outer')} className={`gc-bd-radius-button${state.radiusMode === mode ? ' checked' : ''}`} onClick={() => edit({ radiusMode: mode })}>
                 <RadiusApplyIcon mode={mode} />
               </div>
-              <div className="gc-bd-radius-text">{mode === 'none' ? 'None' : mode === 'all' ? 'All' : 'Outer'}</div>
+              <div className="gc-bd-radius-text">{T(mode === 'none' ? 'none' : mode === 'all' ? 'all' : 'outer', mode === 'none' ? 'None' : mode === 'all' ? 'All' : 'Outer')}</div>
             </div>
           ))}
         </div>
-        <div className="gc-bd-radius-corner-label">Corner</div>
+        <div className="gc-bd-radius-corner-label">{T('corner', 'Corner')}</div>
         {([0, 1, 2, 3] as const).map((index) => (
           <div key={index} className={`gc-bd-corner gc-bd-corner-${index}`}>
             <span className={`gc-bd-corner-icon gc-bd-corner-icon-${index}`} />
@@ -666,17 +690,17 @@ function BorderTab({ data, update, designer }: Props): React.ReactElement {
                 edit({ corners });
               }} />
               <span className="gc-bd-corner-spin">
-                <button type="button" aria-label="Increase" onClick={() => { const step = (v: number) => { const corners = state.linked ? state.corners.map(() => v + 1) : state.corners.map((c, i) => (i === index ? c + 1 : c)); edit({ corners }); }; step(state.corners[index]); }}><svg width="9" height="6" viewBox="0 0 9 6" aria-hidden="true"><path d="M4.5 0.5 8.5 5.5H0.5z" /></svg></button>
-                <button type="button" aria-label="Decrease" onClick={() => { const corners = state.linked ? state.corners.map((c) => Math.max(0, c - 1)) : state.corners.map((c, i) => (i === index ? Math.max(0, c - 1) : c)); edit({ corners }); }}><svg width="9" height="6" viewBox="0 0 9 6" aria-hidden="true"><path d="M4.5 5.5 0.5 0.5h8z" /></svg></button>
+                <button type="button" aria-label={T('increase', 'Increase')} onClick={() => { const step = (v: number) => { const corners = state.linked ? state.corners.map(() => v + 1) : state.corners.map((c, i) => (i === index ? c + 1 : c)); edit({ corners }); }; step(state.corners[index]); }}><svg width="9" height="6" viewBox="0 0 9 6" aria-hidden="true"><path d="M4.5 0.5 8.5 5.5H0.5z" /></svg></button>
+                <button type="button" aria-label={T('decrease', 'Decrease')} onClick={() => { const corners = state.linked ? state.corners.map((c) => Math.max(0, c - 1)) : state.corners.map((c, i) => (i === index ? Math.max(0, c - 1) : c)); edit({ corners }); }}><svg width="9" height="6" viewBox="0 0 9 6" aria-hidden="true"><path d="M4.5 5.5 0.5 0.5h8z" /></svg></button>
               </span>
             </span>
           </div>
         ))}
-        <div role="button" aria-label={state.linked ? 'Unlink corner radius values' : 'Link corner radius values'} className={`gc-bd-radius-link${state.linked ? ' checked' : ''}`} onClick={() => edit({ linked: !state.linked })}>
+        <div role="button" aria-label={state.linked ? fmt(designer, 'unlinkRadius', 'Unlink corner radius values') : fmt(designer, 'linkRadius', 'Link corner radius values')} className={`gc-bd-radius-link${state.linked ? ' checked' : ''}`} onClick={() => edit({ linked: !state.linked })}>
           <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8M4.5 3.5H3a2 2 0 0 0 0 5h1.5M7.5 3.5H9a2 2 0 0 1 0 5H7.5" fill="none" stroke="#242424" strokeWidth="1.1" /></svg>
         </div>
       </fieldset>
-      <div className="gc-bd-note">The selected border style can be applied by clicking the presets, preview diagram, or the buttons above.</div>
+      <div className="gc-bd-note">{fmt(designer, 'borderNote', 'The selected border style can be applied by clicking the presets, preview diagram, or the buttons above.')}</div>
     </div>
   );
 }
@@ -749,31 +773,31 @@ function FillTab({ data, update, designer }: Props): React.ReactElement {
   const [moreOpen, setMoreOpen] = useState(false);
   return (
     <div className="gc-format-fill-layout">
-      <div className="gc-fill-lbl gc-fill-lbl-bg">Background Color:</div>
-      <div role="button" aria-label="No Color" className="gc-fill-nocolor" onClick={() => edit({ bg: null })}>No Color</div>
+      <div className="gc-fill-lbl gc-fill-lbl-bg">{fmt(designer, 'backColor', 'Background Color:')}</div>
+      <div role="button" aria-label={T('noColor', 'No Color')} className="gc-fill-nocolor" onClick={() => edit({ bg: null })}>{T('noColor', 'No Color')}</div>
       <div className="gc-fill-palette">
         {PALETTE_ROWS.map((row, rowIndex) => (
           <React.Fragment key={rowIndex}>
             {rowIndex === 1 || rowIndex === PALETTE_ROWS.length - 1 ? <div className="gc-num-palette-space" /> : null}
             <div className="gc-num-palette-row">
-              {row.map((name) => <div key={name} role="option" aria-label={name} title={name} className="gc-num-palette-swatch" style={{ background: paletteColor(gc, name) }} onClick={() => edit({ bg: name })} />)}
+              {row.map((name) => <div key={name} role="option" aria-label={paletteName(designer, name)} title={paletteName(designer, name)} className="gc-num-palette-swatch" style={{ background: paletteColor(gc, name) }} onClick={() => edit({ bg: name })} />)}
             </div>
           </React.Fragment>
         ))}
       </div>
-      <div role="button" aria-label="Fill Effect..." className="gc-fill-effect-button" onClick={() => setEffectOpen(true)}>Fill Effect...</div>
-      <div role="button" aria-label="More Colors..." className="gc-fill-morecolors-button" onClick={() => setMoreOpen(true)}>More Colors...</div>
-      <div className="gc-fill-lbl gc-fill-lbl-patcol">Pattern Color:</div>
-      <ColorDropdown className="gc-fill-patcol-dd" gc={gc} value={state.patternColor} ariaLabel="Pattern Color:" onChange={(v) => edit({ patternColor: v })} />
-      <div className="gc-fill-lbl gc-fill-lbl-patstyle">Pattern Style:</div>
+      <div role="button" aria-label={T('fillEffect', 'Fill Effect...')} className="gc-fill-effect-button" onClick={() => setEffectOpen(true)}>{T('fillEffect', 'Fill Effect...')}</div>
+      <div role="button" aria-label={T('moreColors', 'More Colors...')} className="gc-fill-morecolors-button" onClick={() => setMoreOpen(true)}>{T('moreColors', 'More Colors...')}</div>
+      <div className="gc-fill-lbl gc-fill-lbl-patcol">{fmt(designer, 'patternColor', 'Pattern Color:')}</div>
+      <ColorDropdown className="gc-fill-patcol-dd" gc={gc} value={state.patternColor} ariaLabel={fmt(designer, 'patternColor', 'Pattern Color:')} onChange={(v) => edit({ patternColor: v })} />
+      <div className="gc-fill-lbl gc-fill-lbl-patstyle">{fmt(designer, 'patternStyle', 'Pattern Style:')}</div>
       <FillPatternCombo value={state.patternType} patternColor={patternForeground} backgroundColor={bgValue === '' ? 'transparent' : background} onChange={(v) => edit({ patternType: v })} />
-      <fieldset className="gc-fill-sample"><legend>Sample</legend>
+      <fieldset className="gc-fill-sample"><legend>{fmt(designer, 'sample', 'Sample')}</legend>
         <div className="gc-fill-sample-box">
           <PatternPreview type={state.patternType} fg={patternForeground} bg={background} width={600} height={60} />
         </div>
       </fieldset>
-      {moreOpen && <MoreColorsPopup gc={gc} initial={bgValue} onPick={(name) => { edit({ bg: name }); setMoreOpen(false); }} onClose={() => setMoreOpen(false)} />}
-      {effectOpen && <FillEffectPopup gc={gc} initial={bgValue} onPick={(value) => { edit({ bg: value }); setEffectOpen(false); }} onClose={() => setEffectOpen(false)} />}
+      {moreOpen && <MoreColorsPopup gc={gc} designer={designer} initial={bgValue} onPick={(name) => { edit({ bg: name }); setMoreOpen(false); }} onClose={() => setMoreOpen(false)} />}
+      {effectOpen && <FillEffectPopup gc={gc} designer={designer} initial={bgValue} onPick={(value) => { edit({ bg: value }); setEffectOpen(false); }} onClose={() => setEffectOpen(false)} />}
     </div>
   );
 }
@@ -785,15 +809,15 @@ function FillPatternCombo({ value, patternColor, backgroundColor, onChange }: { 
   const current = PATTERN_STYLES.find((item) => item.type === value);
   return (
     <div className="gc-fill-patstyle">
-      <div role="combobox" aria-label="Pattern Style:" aria-expanded={open} className="gc-fill-patstyle-button" onClick={() => setOpen(!open)}>
+      <div role="combobox" aria-label={T('patternStyle', 'Pattern Style:')} aria-expanded={open} className="gc-fill-patstyle-button" onClick={() => setOpen(!open)}>
         {current ? <PatternPreview type={current.type} fg={patternColor} bg={backgroundColor === 'transparent' ? '#ffffff' : backgroundColor} width={160} height={16} /> : null}
         <span className="gc-num-colordd-arrow" aria-hidden="true"><svg width="9" height="6" viewBox="0 0 9 6"><path d="M0.5 0.5h8L4.5 5.5z" /></svg></span>
       </div>
       {open && <>
         <div className="gc-num-dd-mask" onClick={() => setOpen(false)} />
-        <div className="gc-fill-patstyle-popup" role="listbox" aria-label="Pattern Style:">
+        <div className="gc-fill-patstyle-popup" role="listbox" aria-label={T('patternStyle', 'Pattern Style:')}>
           {PATTERN_STYLES.map((item) => (
-            <div key={item.type} role="option" aria-selected={value === item.type} title={item.name} className={`gc-fill-patstyle-item${value === item.type ? ' selected' : ''}`} onClick={() => { onChange(item.type); setOpen(false); }}>
+            <div key={item.type} role="option" aria-selected={value === item.type} title={T(uiKey(item.name), item.name)} className={`gc-fill-patstyle-item${value === item.type ? ' selected' : ''}`} onClick={() => { onChange(item.type); setOpen(false); }}>
               <PatternPreview type={item.type} fg={patternColor} bg={backgroundColor === 'transparent' ? '#ffffff' : backgroundColor} width={160} height={16} />
             </div>
           ))}
@@ -806,40 +830,44 @@ function FillPatternCombo({ value, patternColor, backgroundColor, onChange }: { 
 /* More Colors... sub-dialog (our own, the trial's content could not be captured): a hex field
  * plus the palette; picks a background colour name/hex. Fill Effects... offers a two-colour
  * gradient; the trial writes a gradient fill there — we record a named gradient instead. */
-function MoreColorsPopup({ gc, initial, onPick, onClose }: { gc: GCRoot; initial: string; onPick: (v: string) => void; onClose: () => void }): React.ReactElement {
+function MoreColorsPopup({ gc, designer, initial, onPick, onClose }: { gc: GCRoot; designer: Designer; initial: string; onPick: (v: string) => void; onClose: () => void }): React.ReactElement {
+  const okText = resolveText('${res.ok}', designer.resources) || 'OK';
+  const cancelText = resolveText('${res.cancel}', designer.resources) || 'Cancel';
   const [hex, setHex] = useState(/^#[0-9a-f]{6}$/i.test(initial) ? initial : '#000000');
   return (
     <div className="gc-num-dd-mask gc-fill-subdialog-mask" onClick={onClose}>
-      <div role="dialog" aria-label="Colors" className="gc-fill-subdialog" onClick={(event) => event.stopPropagation()}>
-        <div className="gc-fill-subdialog-title">Colors</div>
+      <div role="dialog" aria-label={T('colors', 'Colors')} className="gc-fill-subdialog" onClick={(event) => event.stopPropagation()}>
+        <div className="gc-fill-subdialog-title">{T('colors', 'Colors')}</div>
         <div className="gc-num-palette-row" style={{ marginBottom: 8 }}>{STANDARD_COLORS.map((name) => <div key={name} role="option" aria-label={name} title={name} className="gc-num-palette-swatch" style={{ background: paletteColor(gc, name) }} onClick={() => onPick(name)} />)}</div>
-        <div className="gc-num-label" style={{ position: 'static', width: 90, display: 'inline-block' }}>Hex:</div>
-        <input className="gc-dialog-input" aria-label="Hex color" value={hex} style={{ width: 90 }} onChange={(event) => setHex(event.target.value)} />
+        <div className="gc-num-label" style={{ position: 'static', width: 90, display: 'inline-block' }}>{T('hex', 'Hex:')}</div>
+        <input className="gc-dialog-input" aria-label={T('hexColor', 'Hex color')} value={hex} style={{ width: 90 }} onChange={(event) => setHex(event.target.value)} />
         <span className="gc-num-colordd-swatch" style={{ background: paletteColor(gc, hex), width: 24, height: 24, display: 'inline-block', marginLeft: 6, verticalAlign: 'middle', border: '1px solid #d1d1d1' }} />
         <div className="gc-fill-subdialog-buttons">
-          <button type="button" className="gc-dialog-primary gc-fill-subdialog-ok" onClick={() => onPick(hex)}>OK</button>
-          <button type="button" className="gc-dialog-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="gc-dialog-primary gc-fill-subdialog-ok" onClick={() => onPick(hex)}>{okText}</button>
+          <button type="button" className="gc-dialog-secondary" onClick={onClose}>{cancelText}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function FillEffectPopup({ gc, initial, onPick, onClose }: { gc: GCRoot; initial: string; onPick: (v: string) => void; onClose: () => void }): React.ReactElement {
+function FillEffectPopup({ gc, designer, initial, onPick, onClose }: { gc: GCRoot; designer: Designer; initial: string; onPick: (v: string) => void; onClose: () => void }): React.ReactElement {
+  const okText = resolveText('${res.ok}', designer.resources) || 'OK';
+  const cancelText = resolveText('${res.cancel}', designer.resources) || 'Cancel';
   const [from, setFrom] = useState(initial || '#FFFFFF');
   const [to, setTo] = useState('#B7CFE8');
   return (
     <div className="gc-num-dd-mask gc-fill-subdialog-mask" onClick={onClose}>
-      <div role="dialog" aria-label="Fill Effect" className="gc-fill-subdialog" onClick={(event) => event.stopPropagation()}>
-        <div className="gc-fill-subdialog-title">Fill Effect</div>
-        <div className="gc-num-label" style={{ position: 'static', width: 70, display: 'inline-block' }}>From:</div>
-        <input className="gc-dialog-input" aria-label="Gradient from" value={from} style={{ width: 100 }} onChange={(event) => setFrom(event.target.value)} />
+      <div role="dialog" aria-label={T('fillEffect2', 'Fill Effect')} className="gc-fill-subdialog" onClick={(event) => event.stopPropagation()}>
+        <div className="gc-fill-subdialog-title">{T('fillEffect2', 'Fill Effect')}</div>
+        <div className="gc-num-label" style={{ position: 'static', width: 70, display: 'inline-block' }}>{T('from', 'From:')}</div>
+        <input className="gc-dialog-input" aria-label={T('gradientFrom', 'Gradient from')} value={from} style={{ width: 100 }} onChange={(event) => setFrom(event.target.value)} />
         <span style={{ background: `linear-gradient(90deg, ${paletteColor(gc, from)}, ${paletteColor(gc, to)})`, width: 120, height: 24, display: 'inline-block', marginLeft: 8, border: '1px solid #d1d1d1' }} />
-        <div className="gc-num-label" style={{ position: 'static', width: 70, display: 'inline-block', marginTop: 8 }}>To:</div>
-        <input className="gc-dialog-input" aria-label="Gradient to" value={to} style={{ width: 100 }} onChange={(event) => setTo(event.target.value)} />
+        <div className="gc-num-label" style={{ position: 'static', width: 70, display: 'inline-block', marginTop: 8 }}>{T('to', 'To:')}</div>
+        <input className="gc-dialog-input" aria-label={T('gradientTo', 'Gradient to')} value={to} style={{ width: 100 }} onChange={(event) => setTo(event.target.value)} />
         <div className="gc-fill-subdialog-buttons">
-          <button type="button" className="gc-dialog-primary gc-fill-subdialog-ok" onClick={() => onPick(`gradient:${paletteColor(gc, from)} ${paletteColor(gc, to)}`)}>OK</button>
-          <button type="button" className="gc-dialog-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="gc-dialog-primary gc-fill-subdialog-ok" onClick={() => onPick(`gradient:${paletteColor(gc, from)} ${paletteColor(gc, to)}`)}>{okText}</button>
+          <button type="button" className="gc-dialog-secondary" onClick={onClose}>{cancelText}</button>
         </div>
       </div>
     </div>
@@ -850,14 +878,14 @@ function FillEffectPopup({ gc, initial, onPick, onClose }: { gc: GCRoot; initial
  * Trial layout: three checkboxes (Locked checked, Hidden unchecked, Allow Edit in Cell
  * checked) at 20px pitch and the two note paragraphs. Allow Edit in Cell writes no style
  * member in the trial (probed), so it stays a dialog-only flag. */
-function ProtectionTab({ data, update }: Props): React.ReactElement {
+function ProtectionTab({ data, update, designer }: Props): React.ReactElement {
   return (
     <div className="gc-format-protection-layout">
-      <BoxCheck className="gc-prot-locked" text="Locked" checked={data.locked !== false} onChange={(v) => update('locked', v)} />
-      <BoxCheck className="gc-prot-hidden" text="Hidden" checked={!!data.hidden} onChange={(v) => update('hidden', v)} />
-      <BoxCheck className="gc-prot-allowedit" text="Allow Edit in Cell" checked={data.allowEdit !== false} onChange={(v) => update('allowEdit', v)} />
-      <div className="gc-prot-note gc-prot-note1">Locking cells or hiding formulas has no effect until you protect the worksheet(Home tab, Cells group, 'Protect Sheet' button).</div>
-      <div className="gc-prot-note gc-prot-note2">Allow Edit in Cell indicates whether the cell can enter edit mode for editing.</div>
+      <BoxCheck className="gc-prot-locked" text={fmt(designer, 'locked', 'Locked')} checked={data.locked !== false} onChange={(v) => update('locked', v)} />
+      <BoxCheck className="gc-prot-hidden" text={fmt(designer, 'hidden', 'Hidden')} checked={!!data.hidden} onChange={(v) => update('hidden', v)} />
+      <BoxCheck className="gc-prot-allowedit" text={T('allowEditInCell', 'Allow Edit in Cell')} checked={data.allowEdit !== false} onChange={(v) => update('allowEdit', v)} />
+      <div className="gc-prot-note gc-prot-note1">{fmt(designer, 'protectionText', "Locking cells or hiding formulas has no effect until you protect the worksheet(Home tab, Cells group, 'Protect Sheet' button).")}</div>
+      <div className="gc-prot-note gc-prot-note2">{T('allowEditInCellIndicatesWhetherTheCellCanEnterEditModeForEditing', 'Allow Edit in Cell indicates whether the cell can enter edit mode for editing.')}</div>
     </div>
   );
 }
@@ -901,10 +929,10 @@ function CellButtonTab({ data, designer, update }: Props): React.ReactElement {
   return (
     <div className="gc-format-buttons-layout">
       <div className="gc-format-buttons-toolbar">
-        <button className="gc-format-button-add" onClick={() => { update('cellButtons', [...buttons, { ...BUTTON_DEFAULTS }]); setSelected(buttons.length); }}>Add</button>
-        <button className="gc-format-button-delete" disabled={!button} onClick={() => { update('cellButtons', buttons.filter((_, i) => i !== index)); setSelected(Math.max(0, index - 1)); }}>Delete</button>
-        <button aria-label="Move Up" disabled={!button || index === 0} onClick={() => move(-1)}>▲</button>
-        <button aria-label="Move Down" disabled={!button || index === buttons.length - 1} onClick={() => move(1)}>▼</button>
+        <button className="gc-format-button-add" onClick={() => { update('cellButtons', [...buttons, { ...BUTTON_DEFAULTS }]); setSelected(buttons.length); }}>{T('add', 'Add')}</button>
+        <button className="gc-format-button-delete" disabled={!button} onClick={() => { update('cellButtons', buttons.filter((_, i) => i !== index)); setSelected(Math.max(0, index - 1)); }}>{T('delete', 'Delete')}</button>
+        <button aria-label={T('moveUp', 'Move Up')} disabled={!button || index === 0} onClick={() => move(-1)}>▲</button>
+        <button aria-label={T('moveDown', 'Move Down')} disabled={!button || index === buttons.length - 1} onClick={() => move(1)}>▼</button>
       </div>
       <div className="gc-dialog-list gc-format-buttons-list" role="listbox">
         {buttons.map((_, i) => <div key={i} role="option" aria-selected={i === index} className={`gc-dialog-list-item${i === index ? ' selected' : ''}`} onClick={() => setSelected(i)}>Cell Button {i}</div>)}
@@ -912,24 +940,24 @@ function CellButtonTab({ data, designer, update }: Props): React.ReactElement {
       <div className="gc-format-buttons-detail">
         {button && <>
           <div className="gc-format-buttons-column">
-            <Check text="Enable" checked={button.enabled !== false} onChange={(value) => edit('enabled', value)} />
-            <Check text="UseButtonStyle" checked={!!button.useButtonStyle} onChange={(value) => edit('useButtonStyle', value)} />
-            <Field label="Position"><Select className="gc-format-button-position" value={Number(button.position)} onChange={(v) => edit('position', Number(v))} items={[{ text: 'Left', value: '0' }, { text: 'Right', value: '1' }]} /></Field>
-            <Field label="Width"><Input className="gc-format-button-width" type="number" value={button.width} onChange={(v) => edit('width', v === '' ? undefined : Number(v))} /></Field>
-            <Field label="Caption"><Input className="gc-format-button-caption-text" value={button.caption} onChange={(v) => edit('caption', v)} /></Field>
-            <Field label="BackColor"><Input className="gc-format-button-backcolor" value={button.buttonBackColor} onChange={(v) => edit('buttonBackColor', v)} /></Field>
-            <Field label="Hover BackColor"><Input className="gc-format-button-hovercolor" value={button.hoverBackColor} onChange={(v) => edit('hoverBackColor', v)} /></Field>
-            <Field label="Image Type"><Select className="gc-format-button-imagetype" value={Number(button.imageType)} onChange={(v) => edit('imageType', Number(v))} items={IMAGE_TYPES.map((text, i) => ({ text, value: String(i) }))} /></Field>
-            <Field label="Visibility"><Select className="gc-format-button-visibility" value={Number(button.visibility)} onChange={(v) => edit('visibility', Number(v))} items={[{ text: 'Always', value: '0' }, { text: 'On Selected', value: '1' }, { text: 'On Editing', value: '2' }]} /></Field>
-            <Field label="Command"><Select className="gc-format-button-command" value={String(button.command ?? 'none')} onChange={(v) => edit('command', v)} items={commands.map((name) => ({ text: name, value: name }))} /></Field>
+            <Check text={T('enable', 'Enable')} checked={button.enabled !== false} onChange={(value) => edit('enabled', value)} />
+            <Check text={T('useButtonStyle', 'UseButtonStyle')} checked={!!button.useButtonStyle} onChange={(value) => edit('useButtonStyle', value)} />
+            <Field label={T('position2', 'Position')}><Select className="gc-format-button-position" value={Number(button.position)} onChange={(v) => edit('position', Number(v))} items={[{ text: T('left', 'Left'), value: '0' }, { text: T('right', 'Right'), value: '1' }]} /></Field>
+            <Field label={T('width', 'Width')}><Input className="gc-format-button-width" type="number" value={button.width} onChange={(v) => edit('width', v === '' ? undefined : Number(v))} /></Field>
+            <Field label={T('caption', 'Caption')}><Input className="gc-format-button-caption-text" value={button.caption} onChange={(v) => edit('caption', v)} /></Field>
+            <Field label={T('backColor', 'BackColor')}><Input className="gc-format-button-backcolor" value={button.buttonBackColor} onChange={(v) => edit('buttonBackColor', v)} /></Field>
+            <Field label={T('hoverBackColor', 'Hover BackColor')}><Input className="gc-format-button-hovercolor" value={button.hoverBackColor} onChange={(v) => edit('hoverBackColor', v)} /></Field>
+            <Field label={T('imageType', 'Image Type')}><Select className="gc-format-button-imagetype" value={Number(button.imageType)} onChange={(v) => edit('imageType', Number(v))} items={IMAGE_TYPES.map((text, i) => ({ text, value: String(i) }))} /></Field>
+            <Field label={T('visibility', 'Visibility')}><Select className="gc-format-button-visibility" value={Number(button.visibility)} onChange={(v) => edit('visibility', Number(v))} items={[{ text: T('always', 'Always'), value: '0' }, { text: T('onSelected', 'On Selected'), value: '1' }, { text: T('onEditing', 'On Editing'), value: '2' }]} /></Field>
+            <Field label={T('command', 'Command')}><Select className="gc-format-button-command" value={String(button.command ?? 'none')} onChange={(v) => edit('command', v)} items={commands.map((name) => ({ text: name, value: name }))} /></Field>
           </div>
           <div className="gc-format-buttons-column">
-            <Field label="Image Src"><span className="gc-format-button-src-row"><Input className="gc-format-button-imagesrc" value={button.imageSrc} onChange={(v) => edit('imageSrc', v)} /><label className="gc-format-button-select-file">Select File<input type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => edit('imageSrc', String(reader.result ?? '')); reader.readAsDataURL(file); }} /></label></span></Field>
-            <Field label="CaptionAlign"><Select className="gc-format-button-captionalign" value={Number(button.captionAlign)} onChange={(v) => edit('captionAlign', Number(v))} items={[{ text: 'Left', value: '0' }, { text: 'Right', value: '1' }]} /></Field>
-            <Field label="ImageWidth"><Input className="gc-format-button-imagewidth" type="number" value={button.imageWidth} onChange={(v) => edit('imageWidth', Number(v))} /></Field>
-            <Field label="ImageHeight"><Input className="gc-format-button-imageheight" type="number" value={button.imageHeight} onChange={(v) => edit('imageHeight', Number(v))} /></Field>
-            <Label text="Preview" />
-            <div className="gc-format-button-preview" aria-label="Preview"><span className={`gc-format-button-draw${button.useButtonStyle ? ' gc-format-button-draw-style' : ''}`}>{String(button.imageSrc) && Number(button.imageType) === 1 ? '🖼' : ''}{String(button.caption ?? '')}</span></div>
+            <Field label={T('imageSrc', 'Image Src')}><span className="gc-format-button-src-row"><Input className="gc-format-button-imagesrc" value={button.imageSrc} onChange={(v) => edit('imageSrc', v)} /><label className="gc-format-button-select-file">{T('selectFile', 'Select File')}<input type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => edit('imageSrc', String(reader.result ?? '')); reader.readAsDataURL(file); }} /></label></span></Field>
+            <Field label={T('captionAlign', 'CaptionAlign')}><Select className="gc-format-button-captionalign" value={Number(button.captionAlign)} onChange={(v) => edit('captionAlign', Number(v))} items={[{ text: T('left', 'Left'), value: '0' }, { text: T('right', 'Right'), value: '1' }]} /></Field>
+            <Field label={T('imageWidth', 'ImageWidth')}><Input className="gc-format-button-imagewidth" type="number" value={button.imageWidth} onChange={(v) => edit('imageWidth', Number(v))} /></Field>
+            <Field label={T('imageHeight', 'ImageHeight')}><Input className="gc-format-button-imageheight" type="number" value={button.imageHeight} onChange={(v) => edit('imageHeight', Number(v))} /></Field>
+            <Label text={T('preview2', 'Preview')} />
+            <div className="gc-format-button-preview" aria-label={T('preview2', 'Preview')}><span className={`gc-format-button-draw${button.useButtonStyle ? ' gc-format-button-draw-style' : ''}`}>{String(button.imageSrc) && Number(button.imageType) === 1 ? '🖼' : ''}{String(button.caption ?? '')}</span></div>
           </div>
         </>}
       </div>
@@ -942,8 +970,8 @@ function CellButtonTab({ data, designer, update }: Props): React.ReactElement {
  * Text maps to Style.watermark, the rest to Style.labelOptions (official numeric enums), and the
  * Padding group to the cellPadding CSS shorthand "top right bottom left". */
 const LABEL_ALIGNMENTS = [
-  { text: 'Top Left', value: '0' }, { text: 'Top Center', value: '1' }, { text: 'Top Right', value: '2' },
-  { text: 'Bottom Left', value: '3' }, { text: 'Bottom Center', value: '4' }, { text: 'Bottom Right', value: '5' },
+  { text: '${res.dialogs.topLeft}', value: '0' }, { text: '${res.dialogs.topCenter}', value: '1' }, { text: '${res.dialogs.topRight}', value: '2' },
+  { text: '${res.dialogs.bottomLeft}', value: '3' }, { text: '${res.dialogs.bottomCenter}', value: '4' }, { text: '${res.dialogs.bottomRight}', value: '5' },
 ];
 
 function PaddingTab({ data, update }: Props): React.ReactElement {
@@ -954,40 +982,40 @@ function PaddingTab({ data, update }: Props): React.ReactElement {
   const font = `${italic ? 'italic' : 'normal'} ${bold ? 'bold' : 'normal'} ${String(data.labelFontSize ?? '11')}pt ${String(data.labelFontFamily ?? 'Calibri')}`;
   return (
     <div className="gc-format-padding-layout">
-      <fieldset className="gc-format-label-group"><legend>Label</legend>
-        <Label text="Text" /><Input className="gc-format-label-text" value={data.labelText ?? ''} onChange={(v) => update('labelText', v)} />
-        <Label text="Alignment" />
-        <div className="gc-format-label-alignment" role="radiogroup" aria-label="Alignment">
+      <fieldset className="gc-format-label-group"><legend>{T('label', 'Label')}</legend>
+        <Label text={T('text', 'Text')} /><Input className="gc-format-label-text" value={data.labelText ?? ''} onChange={(v) => update('labelText', v)} />
+        <Label text={T('alignment', 'Alignment')} />
+        <div className="gc-format-label-alignment" role="radiogroup" aria-label={T('alignment', 'Alignment')}>
           {LABEL_ALIGNMENTS.map((item) => <button key={item.value} role="radio" aria-checked={alignment === Number(item.value)} aria-label={item.text} title={item.text} className={`gc-format-alignment-icon gc-format-alignment-${item.value}${alignment === Number(item.value) ? ' selected' : ''}`} onClick={() => update('labelAlignment', Number(item.value))}><i /></button>)}
         </div>
-        <Label text="Fonts" />
+        <Label text={T('fonts', 'Fonts')} />
         <div className="gc-format-label-fonts">
           <Input className="gc-format-label-font-family" value={data.labelFontFamily ?? 'Calibri'} onChange={(v) => update('labelFontFamily', v)} />
           <Input className="gc-format-label-font-size" type="number" value={data.labelFontSize ?? '11'} onChange={(v) => update('labelFontSize', v)} />
-          <button className={`gc-format-label-bold${bold ? ' selected' : ''}`} aria-label="Bold" onClick={() => update('labelBold', !bold)}><b>B</b></button>
-          <button className={`gc-format-label-italic${italic ? ' selected' : ''}`} aria-label="Italic" onClick={() => update('labelItalic', !italic)}><i>I</i></button>
-          <input className="gc-format-label-color" type="color" aria-label="Label color" value={normalizeHex(data.labelForeColor)} onChange={(event) => update('labelForeColor', event.target.value)} />
+          <button className={`gc-format-label-bold${bold ? ' selected' : ''}`} aria-label={T('bold', 'Bold')} onClick={() => update('labelBold', !bold)}><b>B</b></button>
+          <button className={`gc-format-label-italic${italic ? ' selected' : ''}`} aria-label={T('italic', 'Italic')} onClick={() => update('labelItalic', !italic)}><i>I</i></button>
+          <input className="gc-format-label-color" type="color" aria-label={T('labelColor', 'Label color')} value={normalizeHex(data.labelForeColor)} onChange={(event) => update('labelForeColor', event.target.value)} />
         </div>
-        <Label text="Visibility" />
-        <Select className="gc-format-label-visibility" value={Number(data.labelVisibility ?? 2)} onChange={(v) => update('labelVisibility', Number(v))} items={[{ text: 'Visible', value: '0' }, { text: 'Hidden', value: '1' }, { text: 'Auto', value: '2' }]} />
-        <Label text="Margin" />
+        <Label text={T('visibility', 'Visibility')} />
+        <Select className="gc-format-label-visibility" value={Number(data.labelVisibility ?? 2)} onChange={(v) => update('labelVisibility', Number(v))} items={[{ text: T('visible', 'Visible'), value: '0' }, { text: T('hidden', 'Hidden'), value: '1' }, { text: T('auto', 'Auto'), value: '2' }]} />
+        <Label text={T('margin', 'Margin')} />
         <div className="gc-format-label-margin">
-          <Label text="Top" /><Input className="gc-format-margin-top" type="number" value={margin[0]} onChange={(v) => update('labelMarginTop', Number(v))} />
-          <Label text="Right" /><Input className="gc-format-margin-right" type="number" value={margin[1]} onChange={(v) => update('labelMarginRight', Number(v))} />
-          <Label text="Left" /><Input className="gc-format-margin-left" type="number" value={margin[3]} onChange={(v) => update('labelMarginLeft', Number(v))} />
-          <Label text="Bottom" /><Input className="gc-format-margin-bottom" type="number" value={margin[2]} onChange={(v) => update('labelMarginBottom', Number(v))} />
+          <Label text={T('top', 'Top')} /><Input className="gc-format-margin-top" type="number" value={margin[0]} onChange={(v) => update('labelMarginTop', Number(v))} />
+          <Label text={T('right', 'Right')} /><Input className="gc-format-margin-right" type="number" value={margin[1]} onChange={(v) => update('labelMarginRight', Number(v))} />
+          <Label text={T('left', 'Left')} /><Input className="gc-format-margin-left" type="number" value={margin[3]} onChange={(v) => update('labelMarginLeft', Number(v))} />
+          <Label text={T('bottom', 'Bottom')} /><Input className="gc-format-margin-bottom" type="number" value={margin[2]} onChange={(v) => update('labelMarginBottom', Number(v))} />
         </div>
       </fieldset>
       <div className="gc-format-padding-right">
-        <fieldset className="gc-format-padding-group"><legend>Padding</legend>
-          <Label text="Top" /><Input className="gc-format-padding-top" type="number" value={data.paddingTop ?? 0} onChange={(v) => update('paddingTop', Number(v))} />
-          <Label text="Right" /><Input className="gc-format-padding-right-input" type="number" value={data.paddingRight ?? 0} onChange={(v) => update('paddingRight', Number(v))} />
-          <Label text="Left" /><Input className="gc-format-padding-left" type="number" value={data.paddingLeft ?? 0} onChange={(v) => update('paddingLeft', Number(v))} />
-          <Label text="Bottom" /><Input className="gc-format-padding-bottom" type="number" value={data.paddingBottom ?? 0} onChange={(v) => update('paddingBottom', Number(v))} />
+        <fieldset className="gc-format-padding-group"><legend>{T('padding', 'Padding')}</legend>
+          <Label text={T('top', 'Top')} /><Input className="gc-format-padding-top" type="number" value={data.paddingTop ?? 0} onChange={(v) => update('paddingTop', Number(v))} />
+          <Label text={T('right', 'Right')} /><Input className="gc-format-padding-right-input" type="number" value={data.paddingRight ?? 0} onChange={(v) => update('paddingRight', Number(v))} />
+          <Label text={T('left', 'Left')} /><Input className="gc-format-padding-left" type="number" value={data.paddingLeft ?? 0} onChange={(v) => update('paddingLeft', Number(v))} />
+          <Label text={T('bottom', 'Bottom')} /><Input className="gc-format-padding-bottom" type="number" value={data.paddingBottom ?? 0} onChange={(v) => update('paddingBottom', Number(v))} />
         </fieldset>
-        <Label text="Preview" />
+        <Label text={T('preview2', 'Preview')} />
         <div className="gc-format-padding-preview">
-          <span className="gc-format-padding-preview-content">Content</span>
+          <span className="gc-format-padding-preview-content">{T('content', 'Content')}</span>
           {data.labelVisibility !== 1 && String(data.labelText ?? '') !== '' && <span className="gc-format-padding-preview-label" data-alignment={String(alignment)} style={{ font, color: String(data.labelForeColor ?? '#808080') }}>{String(data.labelText)}</span>}
         </div>
       </div>
@@ -1005,8 +1033,8 @@ function normalizeHex(value: unknown): string {
 /* Decoration tab — official structure: Corner Fold (position checkboxes bitmask 1/2/4/8,
  * size, color) and Icons (Add/Delete plus a Src/Position/Width/Height grid). */
 const ICON_POSITIONS = [
-  { text: 'Left', value: '0' }, { text: 'Right', value: '1' }, { text: 'Left of Text', value: '2' },
-  { text: 'Right of Text', value: '3' }, { text: 'Outside Left', value: '4' }, { text: 'Outside Right', value: '5' },
+  { text: '${res.dialogs.left}', value: '0' }, { text: '${res.dialogs.right}', value: '1' }, { text: '${res.dialogs.leftOfText}', value: '2' },
+  { text: '${res.dialogs.rightOfText}', value: '3' }, { text: '${res.dialogs.outsideLeft}', value: '4' }, { text: '${res.dialogs.outsideRight}', value: '5' },
 ];
 
 function DecorationTab({ data, update }: Props): React.ReactElement {
@@ -1018,23 +1046,23 @@ function DecorationTab({ data, update }: Props): React.ReactElement {
   const setIcons = (next: typeof icons): void => update('decoration', { ...decoration, icons: next });
   return (
     <div className="gc-format-decoration-layout">
-      <fieldset className="gc-format-fold-group"><legend>Corner Fold</legend>
+      <fieldset className="gc-format-fold-group"><legend>{T('cornerFold', 'Corner Fold')}</legend>
         <div className="gc-format-fold-positions">
-          <Label text="Position:" />
+          <Label text={T('position', 'Position:')} />
           {['Left Top', 'Right Top', 'Left Bottom', 'Right Bottom'].map((text, i) => <Check key={text} text={text} className={`gc-format-fold-${i}`} checked={!!(position & (1 << i))} onChange={(checked) => setFold({ position: checked ? position | (1 << i) : position & ~(1 << i) })} />)}
         </div>
         <div className="gc-format-fold-side">
-          <Label text="Size:" /><Input className="gc-format-fold-size" type="number" value={Number(fold.size ?? 0)} onChange={(v) => setFold({ size: Number(v) })} />
-          <Label text="Color:" /><Input className="gc-format-fold-color" value={fold.color ?? ''} onChange={(v) => setFold({ color: v })} />
+          <Label text={T('size', 'Size:')} /><Input className="gc-format-fold-size" type="number" value={Number(fold.size ?? 0)} onChange={(v) => setFold({ size: Number(v) })} />
+          <Label text={T('color2', 'Color:')} /><Input className="gc-format-fold-color" value={fold.color ?? ''} onChange={(v) => setFold({ color: v })} />
         </div>
       </fieldset>
-      <fieldset className="gc-format-icons-group"><legend>Icons</legend>
+      <fieldset className="gc-format-icons-group"><legend>{T('icons', 'Icons')}</legend>
         <div className="gc-format-icons-toolbar">
-          <button className="gc-format-icon-add" onClick={() => setIcons([...icons, { src: '', position: 1, width: 16, height: 16 }])}>Add</button>
-          <button className="gc-format-icon-delete" disabled={!icons.length} onClick={() => setIcons(icons.slice(0, -1))}>Delete</button>
+          <button className="gc-format-icon-add" onClick={() => setIcons([...icons, { src: '', position: 1, width: 16, height: 16 }])}>{T('add', 'Add')}</button>
+          <button className="gc-format-icon-delete" disabled={!icons.length} onClick={() => setIcons(icons.slice(0, -1))}>{T('delete', 'Delete')}</button>
         </div>
-        <div className="gc-format-icons-grid" role="table" aria-label="Icons">
-          <div role="row" className="gc-format-icons-head"><span role="columnheader">Src</span><span role="columnheader">Position</span><span role="columnheader">Width</span><span role="columnheader">Height</span></div>
+        <div className="gc-format-icons-grid" role="table" aria-label={T('icons', 'Icons')}>
+          <div role="row" className="gc-format-icons-head"><span role="columnheader">{T('src', 'Src')}</span><span role="columnheader">{T('position2', 'Position')}</span><span role="columnheader">{T('width', 'Width')}</span><span role="columnheader">{T('height', 'Height')}</span></div>
           {icons.map((icon, i) => (
             <div key={i} role="row" className="gc-format-icons-row">
               <span role="cell"><Input value={icon.src} onChange={(value) => setIcons(icons.map((item, j) => j === i ? { ...item, src: value } : item))} /></span>
@@ -1072,23 +1100,23 @@ function MaskTab({ data, update }: Props): React.ReactElement {
   return (
     <div className="gc-format-mask-layout">
       <div className="gc-format-mask-left">
-        <fieldset><legend>Settings</legend>
-          <Label text="Pattern" /><textarea className="gc-dialog-input gc-format-mask-pattern" aria-label="Pattern" value={pattern} onChange={(event) => update('maskPattern', event.target.value)} />
-          <Label text="Pattern Example" />
-          <div className="gc-format-mask-examples" role="table" aria-label="Pattern Example">
-            <div role="row" className="gc-format-mask-keyword-head"><span role="columnheader">Name</span><span role="columnheader">Pattern</span></div>
-            {MASK_EXAMPLES.map(([name, example]) => <div key={name} role="row"><span role="cell">{name}</span><span role="cell">{example}</span></div>)}
+        <fieldset><legend>{T('settings', 'Settings')}</legend>
+          <Label text={T('pattern', 'Pattern')} /><textarea className="gc-dialog-input gc-format-mask-pattern" aria-label={T('pattern', 'Pattern')} value={pattern} onChange={(event) => update('maskPattern', event.target.value)} />
+          <Label text={T('patternExample', 'Pattern Example')} />
+          <div className="gc-format-mask-examples" role="table" aria-label={T('patternExample', 'Pattern Example')}>
+            <div role="row" className="gc-format-mask-keyword-head"><span role="columnheader">{T('name', 'Name')}</span><span role="columnheader">{T('pattern', 'Pattern')}</span></div>
+            {MASK_EXAMPLES.map(([name, example]) => <div key={name} role="row"><span role="cell">{resolveText(`\${res.maskExamples.${uiKey(name)}}`, getResources()) || name}</span><span role="cell">{example}</span></div>)}
           </div>
         </fieldset>
-        <fieldset><legend>Optional</legend>
-          <Label text="Placeholder" /><Input className="gc-format-mask-placeholder" aria-label="Placeholder" value={placeholder} onChange={(v) => update('maskPlaceholder', v)} />
-          <Check text="Exclude Literal" checked={!!data.maskExcludeLiteral} onChange={(v) => update('maskExcludeLiteral', v)} />
-          <Check text="Exclude Placeholder" checked={!!data.maskExcludePlaceholder} onChange={(v) => update('maskExcludePlaceholder', v)} />
+        <fieldset><legend>{T('optional', 'Optional')}</legend>
+          <Label text={T('placeholder', 'Placeholder')} /><Input className="gc-format-mask-placeholder" aria-label={T('placeholder', 'Placeholder')} value={placeholder} onChange={(v) => update('maskPlaceholder', v)} />
+          <Check text={T('excludeLiteral', 'Exclude Literal')} checked={!!data.maskExcludeLiteral} onChange={(v) => update('maskExcludeLiteral', v)} />
+          <Check text={T('excludePlaceholder', 'Exclude Placeholder')} checked={!!data.maskExcludePlaceholder} onChange={(v) => update('maskExcludePlaceholder', v)} />
         </fieldset>
       </div>
-      <fieldset className="gc-format-mask-keywords"><legend>Keyword List</legend>
+      <fieldset className="gc-format-mask-keywords"><legend>{T('keywordList', 'Keyword List')}</legend>
         <div role="table">
-          <div role="row" className="gc-format-mask-keyword-head"><span role="columnheader">Keyword</span><span role="columnheader">Explanation</span></div>
+          <div role="row" className="gc-format-mask-keyword-head"><span role="columnheader">{T('keyword', 'Keyword')}</span><span role="columnheader">{T('explanation', 'Explanation')}</span></div>
           {MASK_KEYWORDS.map(([keyword, description]) => <div key={keyword} role="row"><span role="cell">{keyword}</span><span role="cell">{description}</span></div>)}
         </div>
       </fieldset>
@@ -1105,10 +1133,29 @@ export function FormatDialogContent({ designer, data, update }: Props): React.Re
   const initialIndex = Math.max(0, tabs.findIndex((tab) => tab.key === initial));
   const [active, setActive] = useState(initialIndex);
   const tab = tabs[active] ?? tabs[0];
+  // TASK 86: the trial's tab slots are fixed widths (its own measured layout); a caption
+  // only slightly wider than its content window still stays inside the box. A label wider
+  // than the whole slot (longer-language captions, TASK 87) must expand instead of
+  // overlapping its neighbours, so probe each caption once against the fixed slot and mark
+  // the tabs that need the expansion (the CSS min-width: max-content applies to those only).
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const bar = tabBarRef.current;
+    if (!bar) return undefined;
+    const items = [...bar.querySelectorAll<HTMLElement>('.gc-dialog-tab')];
+    for (const el of items) el.classList.remove('gc-dialog-tab-wide');
+    for (const el of items) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const textWidth = Array.from(range.getClientRects()).reduce((sum, rect) => sum + rect.width, 0);
+      if (textWidth > el.getBoundingClientRect().width + 0.5) el.classList.add('gc-dialog-tab-wide');
+    }
+    return undefined;
+  }, [tabs]);
   return (
     <div className={`gc-format-dialog-content gc-format-tab-${tab.key}`}>
-      <div className="gc-dialog-tab-bar gc-format-tab-bar" role="tablist">
-        {tabs.map((item, index) => <button key={item.key} role="tab" aria-selected={index === active} className={`gc-dialog-tab${index === active ? ' selected' : ''}`} onClick={() => setActive(index)}>{item.text}</button>)}
+      <div className="gc-dialog-tab-bar gc-format-tab-bar" role="tablist" ref={tabBarRef}>
+        {tabs.map((item, index) => <button key={item.key} role="tab" aria-selected={index === active} className={`gc-dialog-tab${index === active ? ' selected' : ''}`} onClick={() => setActive(index)}>{resolveText(item.text, designer.resources) || item.text}</button>)}
       </div>
       <div className={`gc-format-tab-content${tab.key === 'mask' ? ' gc-format-mask-content' : ''}`} role="tabpanel">
         {tab.key === 'number' && <NumberTab designer={designer} data={data} update={update} />}

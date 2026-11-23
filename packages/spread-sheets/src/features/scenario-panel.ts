@@ -15,6 +15,10 @@
 import type { Workbook } from '../workbook.js';
 import { ScenarioManager, type IScenario } from './scenarios.js';
 import { findControl as findRegisteredControl, registerControl, unregisterControl } from './controls.js';
+import { ltext } from '../localization.js';
+
+/** Scenario panel captions (`scenarios.*` language namespace). */
+const stext = (key: string, fallback: string, ...args: (string | number)[]) => ltext(`scenarios.${key}`, fallback, ...args);
 
 function hostElement(host: HTMLElement | string): HTMLElement {
   const element = typeof host === 'string' ? document.getElementById(host) : host;
@@ -65,7 +69,7 @@ export class ScenarioPanel {
     registerControl(this.host, this);
     const wrapper = document.createElement('div');
     wrapper.setAttribute('role', 'region');
-    wrapper.setAttribute('aria-label', 'Scenarios');
+    wrapper.setAttribute('aria-label', stext('title', 'Scenarios'));
     const panel = document.createElement('div');
     panel.className = 'opensheets-scenario-panel panel-side-panel';
 
@@ -75,7 +79,7 @@ export class ScenarioPanel {
     titleRow.className = 'title-row';
     const title = document.createElement('div');
     title.className = 'title';
-    title.textContent = 'Scenarios';
+    title.textContent = stext('title', 'Scenarios');
     titleRow.appendChild(title);
     const actionBar = document.createElement('div');
     actionBar.className = 'action-bar';
@@ -84,23 +88,23 @@ export class ScenarioPanel {
     const addButton = document.createElement('button');
     addButton.type = 'button';
     addButton.className = 'opensheets-scenario-action';
-    addButton.title = 'Add';
-    addButton.setAttribute('aria-label', 'Add');
+    addButton.title = stext('add', 'Add');
+    addButton.setAttribute('aria-label', stext('add', 'Add'));
     addButton.disabled = true; // enabled once the panel is attached to a workbook
     addButton.appendChild(icon('add'));
     addButton.addEventListener('click', () => this.addScenarioFromSelection());
     const restoreButton = document.createElement('button');
     restoreButton.type = 'button';
     restoreButton.className = 'opensheets-scenario-action';
-    restoreButton.title = 'Restore All';
-    restoreButton.setAttribute('aria-label', 'Restore All');
+    restoreButton.title = stext('restoreAll', 'Restore All');
+    restoreButton.setAttribute('aria-label', stext('restoreAll', 'Restore All'));
     restoreButton.appendChild(icon('restore'));
     restoreButton.addEventListener('click', () => { this.manager()?.restore(); this.refresh(); });
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
     deleteButton.className = 'opensheets-scenario-action';
-    deleteButton.title = 'Delete All';
-    deleteButton.setAttribute('aria-label', 'Delete All');
+    deleteButton.title = stext('deleteAll', 'Delete All');
+    deleteButton.setAttribute('aria-label', stext('deleteAll', 'Delete All'));
     deleteButton.appendChild(icon('delete'));
     deleteButton.addEventListener('click', () => { this.manager()?.remove(); this.refresh(); });
     primary.append(addButton, restoreButton, deleteButton);
@@ -116,8 +120,8 @@ export class ScenarioPanel {
     const deactivate = document.createElement('button');
     deactivate.type = 'button';
     deactivate.className = 'opensheets-scenario-action';
-    deactivate.title = 'Deactivate';
-    deactivate.setAttribute('aria-label', 'Deactivate');
+    deactivate.title = stext('deactivate', 'Deactivate');
+    deactivate.setAttribute('aria-label', stext('deactivate', 'Deactivate'));
     deactivate.appendChild(icon('deactivate'));
     deactivate.addEventListener('click', () => { this.manager()?.setActiveScenario(null); this.refresh(); });
     this.deactivateButton = deactivate;
@@ -136,7 +140,7 @@ export class ScenarioPanel {
     // scenarios exist (probe panels46d/46f: cls "empty visible" vs "empty").
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = 'No Scenarios defined.\nChoose Add to add scenarios';
+    empty.textContent = stext('empty', 'No Scenarios defined.\nChoose Add to add scenarios');
     this.emptyElement = empty;
     list.appendChild(empty);
     section.appendChild(list);
@@ -225,7 +229,7 @@ export class ScenarioPanel {
   private render(): void {
     const scenarios: IScenario[] = this.manager()?.all() ?? [];
     const active = this.activeName();
-    this.badge.textContent = `Activate: ${active ?? 'undefined'}`;
+    this.badge.textContent = stext('activateBadge', 'Activate: {0}', active ?? 'undefined');
     if (active) {
       this.badge.classList.add('visible');
       this.badge.title = active;
@@ -261,7 +265,9 @@ export class ScenarioPanel {
       for (const override of scenario.overrides ?? []) {
         const row = document.createElement('div');
         row.className = 'detail-row';
-        row.textContent = `${override.sheetName}: ${override.cells.length} cell${override.cells.length === 1 ? '' : 's'}`;
+        row.textContent = override.cells.length === 1
+          ? stext('overrideCell', '{0}: {1} cell', override.sheetName, override.cells.length)
+          : stext('overrideCells', '{0}: {1} cells', override.sheetName, override.cells.length);
         details.appendChild(row);
       }
       // Trial card footer (probe screenshot): "<n> sheets" / "<n> cells" chips and an
@@ -270,16 +276,16 @@ export class ScenarioPanel {
       footer.className = 'item-footer';
       const chipSheets = document.createElement('span');
       chipSheets.className = 'chip';
-      chipSheets.textContent = `${scenario.overrides?.length ?? 0} sheets`;
+      chipSheets.textContent = stext('sheets', '{0} sheets', scenario.overrides?.length ?? 0);
       const chipCells = document.createElement('span');
       chipCells.className = 'chip';
       let cellCount = 0;
       for (const override of scenario.overrides ?? []) cellCount += override.cells?.length ?? 0;
-      chipCells.textContent = `${cellCount} cells`;
+      chipCells.textContent = stext('cells', '{0} cells', cellCount);
       const activate = document.createElement('button');
       activate.type = 'button';
       activate.className = 'activate';
-      activate.textContent = 'Activate';
+      activate.textContent = stext('activate', 'Activate');
       activate.addEventListener('click', (event) => {
         event.stopPropagation();
         const manager = this.manager();

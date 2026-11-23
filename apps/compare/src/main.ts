@@ -18,7 +18,16 @@ window.__implementationGC = OpenSheets;
 const root = document.getElementById('root')!;
 root.innerHTML = '<header><div><p>OPENSHEETS / COMPATIBILITY LAB</p><h1>Workbook comparison</h1></div><label>Scenario <select id="scenario"></select></label></header><main><section><h2>SpreadJS 19.2.5 · trial</h2><div id="official-pane" class="pane"></div></section><section><h2>OpenSheets 0.1.0</h2><div id="ours-pane" class="pane"></div></section></main><p class="note">The same scenario runs in both panes. Black-box rendering and interaction comparison.</p>';
 try {
-  const scenario = selectScenario(new URLSearchParams(location.search).get('scenario'));
+  const query = new URLSearchParams(location.search);
+  const scenario = selectScenario(query.get('scenario'));
+  // TASK 88: `?lang=it` loads the Italian resources package on OUR side only
+  // (harness code; the official pane is untouched) and switches our culture
+  // before any workbook is created, like the official resource packages do.
+  if (query.get('lang') === 'it') {
+    const it = await import('../../../packages/spread-sheets-resources-it/dist/index.js');
+    it.registerItalian(OpenSheets);
+    OpenSheets.Spread.Common.CultureManager.culture('it-it');
+  }
   const select = document.getElementById('scenario') as HTMLSelectElement;
   for (const item of scenarios) select.add(new Option(item.title, item.name));
   select.value = scenario.name;
