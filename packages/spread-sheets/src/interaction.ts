@@ -643,9 +643,19 @@ export class Interaction {
     const kind = event.pointerType === 'touch' ? undefined : this.handleHit(event);
     if (kind) { this.drag = { kind, start: hit, range: s.getSelections().at(-1)!, initial: 0, startPixel: 0, last: hit }; return; }
     if (hit.row < 0 || hit.col < 0) {
-      const range = new Range(hit.row < 0 ? -1 : hit.row, hit.col < 0 ? -1 : hit.col, hit.row < 0 ? -1 : 1, hit.col < 0 ? -1 : 1);
-      s._setUserSelections(event.ctrlKey && s.selectionPolicy() === 2 ? [...s.getSelections(), range] : [range], Math.max(0, hit.row), Math.max(0, hit.col));
-      this.anchor = { row: Math.max(0, hit.row), col: Math.max(0, hit.col) };
+      // Shift+click on a row/column header extends from the anchor (user report 2026-11-23: click row 2, Shift+click row 5
+      // selected row 5 only). The active cell stays on the anchor, like a Shift+click on cells.
+      const extend = event.shiftKey && this.anchor && (hit.row < 0) !== (hit.col < 0);
+      const range = !extend ? new Range(hit.row < 0 ? -1 : hit.row, hit.col < 0 ? -1 : hit.col, hit.row < 0 ? -1 : 1, hit.col < 0 ? -1 : 1)
+        : hit.col < 0
+          ? new Range(Math.min(this.anchor!.row, hit.row), -1, Math.abs(this.anchor!.row - hit.row) + 1, -1)
+          : new Range(-1, Math.min(this.anchor!.col, hit.col), -1, Math.abs(this.anchor!.col - hit.col) + 1);
+      const keep = event.ctrlKey && s.selectionPolicy() === 2 ? s.getSelections().slice(0, extend ? -1 : undefined) : [];
+      if (extend) s._setUserSelections([...keep, range], this.anchor!.row, this.anchor!.col);
+      else {
+        s._setUserSelections([...keep, range], Math.max(0, hit.row), Math.max(0, hit.col));
+        this.anchor = { row: Math.max(0, hit.row), col: Math.max(0, hit.col) };
+      }
     } else {
       const span = s.getSpan(hit.row, hit.col);
       this.selectTo(span?.row ?? hit.row, span?.col ?? hit.col, event.shiftKey, event.ctrlKey || event.metaKey);
