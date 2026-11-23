@@ -68,6 +68,13 @@ type GanttChartApi = {
   _chartPreview?: { task: unknown; x: number; y: number } | undefined;
 };
 
+/** macOS / iOS: the platform whose "delete" key is Backspace and whose multi-select modifier is Cmd. */
+export function isMacPlatform(): boolean {
+  const nav = (typeof navigator === 'undefined' ? undefined : navigator) as (Navigator & { userAgentData?: { platform?: string } }) | undefined;
+  if (!nav) return false;
+  return /mac|iphone|ipad|ipod/i.test(nav.userAgentData?.platform ?? nav.platform ?? '') || /Macintosh|Mac OS X/.test(nav.userAgent ?? '');
+}
+
 export class Interaction {
   private abort = new AbortController();
   private hints: FormulaHints;
@@ -442,7 +449,16 @@ export class Interaction {
     const ctrl = event.ctrlKey || event.metaKey;
     if (event.key === 'Escape') { this.clearCopy(); this.closeMenu(); return; }
     if (ctrl && event.key.toLowerCase() === 'a') { event.preventDefault(); s._userSetSelection(-1, -1, -1, -1); return; }
-    if (event.key === 'Backspace') { event.preventDefault(); this.startEdit(false, ''); return; }
+    if (event.key === 'Backspace') {
+      event.preventDefault();
+      // macOS has no Delete key: its "delete" is Backspace, and Excel for Mac clears EVERY selected cell with it (user report
+      // 2026-11-23, MacBook). With a multi-cell selection on a Mac, run the Delete shortcut's command; otherwise keep the
+      // Windows/SpreadJS behaviour (edit the active cell from an empty text).
+      const multi = s.getSelections().length > 1 || s.getSelections().some(range => range.rowCount !== 1 || range.colCount !== 1);
+      const deleteCommand = cm.shortcuts.get('46:0:0:0:0');
+      if (isMacPlatform() && multi && deleteCommand) { cm.execute({ cmd: deleteCommand }); return; }
+      this.startEdit(false, ''); return;
+    }
     if (event.key.length === 1 && !ctrl && !event.altKey) { event.preventDefault(); this.startEdit(false, event.key); }
   }
   navigate(dr: number, dc: number, extend = false, edge = false): void {
@@ -650,7 +666,7 @@ export class Interaction {
         : hit.col < 0
           ? new Range(Math.min(this.anchor!.row, hit.row), -1, Math.abs(this.anchor!.row - hit.row) + 1, -1)
           : new Range(-1, Math.min(this.anchor!.col, hit.col), -1, Math.abs(this.anchor!.col - hit.col) + 1);
-      const keep = event.ctrlKey && s.selectionPolicy() === 2 ? s.getSelections().slice(0, extend ? -1 : undefined) : [];
+      const keep = (event.ctrlKey || event.metaKey) && s.selectionPolicy() === 2 ? s.getSelections().slice(0, extend ? -1 : undefined) : [];
       if (extend) s._setUserSelections([...keep, range], this.anchor!.row, this.anchor!.col);
       else {
         s._setUserSelections([...keep, range], Math.max(0, hit.row), Math.max(0, hit.col));
